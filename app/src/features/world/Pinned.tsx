@@ -1,4 +1,4 @@
-// A world's pinned actions (D271), each shown once vm/qfuncs confirms it on the chain its realm view names; code asked only by a world
+// A world's pinned actions, each shown once vm/qfuncs confirms it on the chain its realm view names; code asked only by a world
 // that pins one, after hydration. On the plate, under Read the proposals (Proposals.tsx): a Form block each, under its label. In the
 // chat's quick actions bar, which the route hands these: a pill each after Who's here, and the cards they open, drawn over the bar; a
 // card's id holds the bar's, the call and its view, so a card opened in one world never shows under another's pill.

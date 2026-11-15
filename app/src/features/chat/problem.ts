@@ -1,4 +1,4 @@
-// What the page says when a pin, an unpin or a save does not happen (slice 4's 4d, R9): what happened and what to do, in
+// What the page says when a pin, an unpin or a save does not happen: what happened and what to do, in
 // the person's words, never a code, one sentence for each cause the server or the device gives.
 import type { FlashMessage } from "@gnoworld/ui";
 import { transportWords } from "../../lib/api/transportWords.ts";

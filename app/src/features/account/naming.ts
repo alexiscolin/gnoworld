@@ -1,5 +1,5 @@
 // Right after a Connect (a login under way, not a session found at the page's load), an account with no name on the page's chain is asked
-// for one, once; "Later" closes it (D13953). The ask ends at the chain's first answer for that account, at a Connect that failed and at a
+// for one, once; "Later" closes it. The ask ends at the chain's first answer for that account, at a Connect that failed and at a
 // new universe, so nothing it held opens the dialog later or for another account.
 import { useEffect, useState } from "react";
 import { onAsked, tellNameless } from "../../pageAsks.ts";
@@ -29,7 +29,7 @@ export function useNaming(connecting: boolean, address: string | undefined, univ
   return { naming, setNaming, pickable: pickable === true, setPickable, justIn };
 }
 
-/** While the account logged in has no name to be read by, the chat is told so, and its ask to pick one opens the dialog (D13982). */
+/** While the account logged in has no name to be read by, the chat is told so, and its ask to pick one opens the dialog. */
 export function useNamelessTold(nameless: boolean, open: (naming: boolean) => void): void {
   useEffect(() => {
     tellNameless(nameless);

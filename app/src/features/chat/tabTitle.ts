@@ -1,4 +1,4 @@
-// The count of what the account has not seen, in the tab's title (slice 4's 4f-n): a tab in the background still shows it.
+// The count of what the account has not seen, in the tab's title: a tab in the background still shows it.
 import { useEffect } from "react";
 
 // The count this module put before a title: one or two digits, or 99+, and a space. "(2024) Review" is a title's own.

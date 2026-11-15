@@ -1,8 +1,8 @@
-// An action pinned by the team or proposed by Jarvis, as a Form block (9e, ADR-0002 section 4, "Proposed actions"): checked against
+// An action pinned by the team or proposed by Jarvis, as a Form block (ADR-0002 section 4, "Proposed actions"): checked against
 // `vm/qfuncs` before anything shows, the function, its types and the names of its arguments, so a planted message forges no button.
 // A confirmed one shows its why and a "Call" that opens the call card prefilled, every field editable; anything else shows nothing.
 // In the chat (`viewHref`), a call of more than two fields is only a compact card with its way to the realm view (ADR-0002 section 4).
-// In the chat's quick actions bar (`bar`, D271) it is one pill that opens the bar's own card, or a link to the realm view.
+// In the chat's quick actions bar (`bar`) it is one pill that opens the bar's own card, or a link to the realm view.
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router";
 import { HIDDEN, type FormField } from "@gnoworld/core";
@@ -29,7 +29,7 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall, exa
   const write = writeOf(listing, name);
   if (write === undefined || !Object.keys(args).every((arg) => write.fields.some((field) => field.name === arg)))
     return undefined;
-  // Jarvis's proposal names every parameter, as the server's check does (D225, D226): one left out is none.
+  // Jarvis's proposal names every parameter, as the server's check does: one left out is none.
   if (exact && write.fields.length !== Object.keys(args).length) return undefined;
   // Own keys only (a Map of the entries): a parameter the realm calls `constructor` must not find the object's own function.
   const given = new Map(Object.entries(args));

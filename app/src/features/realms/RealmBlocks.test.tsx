@@ -37,7 +37,7 @@ const HOSTILE = [
 ].join("\n");
 
 describe("RealmBlocks: a realm page drawn from its tree", () => {
-  // Slice 13, B (D13300): a `$help` link to the page's own realm is an action, drawn as its words with no address until a card holds it.
+  // A `$help` link to the page's own realm is an action, drawn as its words with no address until a card holds it.
   test("draws a `$help` action as its label alone, with no link and no address", () => {
     const blocks = withActions(blocksOf("[**Vote** YES](/r/gov/dao$help&func=Vote&option=YES&pid=14)"), {
       origin: GNOWEB,

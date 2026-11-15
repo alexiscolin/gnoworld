@@ -1,5 +1,5 @@
-// The cards' slice as a page reads it (link-previews L4): none before a card came. Apart from cardsSlice.ts, whose code joins the page's store
-// with the first card; this holds no more than the type and the test.
+// The cards' slice as a page reads it: none before a card came. Kept apart from cardsSlice.ts, whose code joins the page's store
+// with the first card, so this holds no more than the type and the test.
 import type { CardEvent } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 

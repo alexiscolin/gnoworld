@@ -4,8 +4,8 @@ import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 
 // A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
-// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-// Its links are Tab stops on the list's stop alone (U1).
+// compiler compares by value: the line keeps its drawing while others join and leave.
+// Its links are Tab stops on the list's stop alone.
 export interface LineTextProps {
   blocks: readonly Block[];
   me: string | undefined;

@@ -28,9 +28,8 @@ const draw = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
       {...over}
     />,
   );
-// The items of the More menu, which comes last: the bar's React menu, when narrow, holds items of its own (U1). Every
-// item's words, its icon's markup left out, its words empty too: an item that reads nothing is an item all the same
-// (G11).
+// The items of the More menu, which comes last: the bar's React menu, when narrow, holds items of its own. Every
+// item's words, its icon's markup left out, its words empty too: an item that reads nothing is an item all the same.
 const items = (markup: string) =>
   [...markup.slice(markup.indexOf('aria-label="More actions"')).matchAll(/role="menuitem"[^>]*>(.*?)<\/button>/g)].map(
     (found) => found[1]?.replace(/<[^>]*>/g, ""),
@@ -41,21 +40,21 @@ const tagWith = (tag: string, ...attributes: string[]) =>
     `<${tag}${attributes.map((a) => `(?=[^>]*\\s${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`).join("")}[^>]*>`,
   );
 
-// 4c's message menu (docs/decisions.md, 2026-10-26): the prototype's bar, its More menu; Report waits for slice 12.
+// The prototype's bar and its More menu.
 describe("a line's actions", () => {
   it("are a toolbar named for what they act on, out of the list's live announcements, its More menu an icon", () => {
     const markup = draw();
-    // 4c's UX review (U15, U3): the toolbar and its button named apart from the menu, "Message actions"; the button
+    // The toolbar and its button named apart from the menu, "Message actions"; the button
     // a toolbar's small control.
     expect(markup).toMatch(tagWith("div", 'role="toolbar"', 'aria-label="Actions on this message"', 'aria-live="off"'));
     expect(markup).toMatch(tagWith("button", 'aria-label="More actions"', 'aria-haspopup="menu"', 'data-size="xs"'));
     expect(markup).toMatch(tagWith("div", 'role="menu"', 'aria-label="Message actions"'));
     expect(markup).toContain('data-icon="more"');
-    // U10: rising astride its line until its place is measured.
+    // Rising astride its line until its place is measured.
     expect(markup).not.toContain("data-inside");
   });
 
-  // D376: an Add reaction menu holds the three quick reactions first and more: each item reacts, or takes the reaction back.
+  // An Add reaction menu holds the three quick reactions first and more: each item reacts, or takes the reaction back.
   it('hold an Add reaction menu led by the three quick reactions, "Take back" the one the reader gave', () => {
     const markup = draw({ reactions: [{ emoji: "👍", count: 1, mine: true }] });
     const react = markup.slice(0, markup.indexOf('aria-label="More actions"'));
@@ -75,7 +74,7 @@ describe("a line's actions", () => {
     expect(items(draw({ me: ALICE }))).toEqual(["Copy text", "Copy room link", "View profile", "Delete"]);
   });
 
-  // The red pass (M1): a guest has no address, and a guest's line no account tag: two missing values are no match.
+  // A guest has no address, and a guest's line no account tag: two missing values are no match.
   it.each([
     ["a guest, on an account's line", { me: undefined }],
     ["a guest, on a guest's line", { me: undefined, line: GUEST_LINE }],
@@ -88,7 +87,7 @@ describe("a line's actions", () => {
     expect(items(draw(over))).toEqual(["Copy text", "Copy room link", "View profile"]);
   });
 
-  // 4c's UX review (U4): a delete gone out and not answered yet offers no second one.
+  // A delete gone out and not answered yet offers no second one.
   it("offer no Delete while the line's delete waits for Ergo", () => {
     expect(items(draw({ me: ALICE, deleting: true }))).toEqual(["Copy text", "Copy room link", "View profile"]);
   });
@@ -97,14 +96,14 @@ describe("a line's actions", () => {
     expect(draw({ me: ALICE })).toMatch(/<dialog[^>]*>/);
   });
 
-  // 4c's UX review (U7): Delete apart, in danger's tone.
+  // Delete apart, in danger's tone.
   it("mark Delete as an act of danger, apart", () => {
     const markup = draw({ me: ALICE });
     expect(markup).toMatch(tagWith("button", 'role="menuitem"', 'data-tone="danger"'));
     expect(markup).toMatch(/role="separator"[^>]*><\/div><button[^>]*data-tone="danger"/);
   });
 
-  // 4c's UX review (U5, U6): the dialog says which line it means, its button the act.
+  // The dialog says which line it means, its button the act.
   it.each([
     ["a short line whole", "hi", "hi"],
     ["a line of 80 characters whole", "a".repeat(80), "a".repeat(80)],
@@ -121,7 +120,7 @@ describe("a line's actions", () => {
   });
 });
 
-// 4d (docs/decisions.md, 2026-10-26): the prototype's bar leads with three quick reactions, each pressed when the
+// The prototype's bar leads with three quick reactions, each pressed when the
 // reader gave it; "More reactions" waits for the emoji data. An account's alone: a room lets accounts alone speak.
 describe("a line's actions: quick reactions", () => {
   // The bar's controls, in order, its menu's items left out: a button's name, and whether it is pressed.
@@ -161,7 +160,7 @@ describe("a line's actions: quick reactions", () => {
   });
 });
 
-// 4d: Reply sits on the bar, a guest's too (D376), who is told where to connect.
+// Reply sits on the bar, a guest's too, who is told where to connect.
 describe("a line's actions: Reply", () => {
   const names = (markup: string) => [...markup.matchAll(/<button[^>]*\saria-label="([^"]+)"/g)].map(([, name]) => name);
 
@@ -176,8 +175,8 @@ describe("a line's actions: Reply", () => {
   });
 });
 
-// 4d's threads (docs/decisions.md, 2026-10-27, R9): a line's thread opens from an item of its More menu, not a fourth
-// control on the bar, whose phone width holds three on one row (F1170's U1); a page that opens no thread gives no item.
+// A line's thread opens from an item of its More menu, not a fourth
+// control on the bar, whose phone width holds three on one row; a page that opens no thread gives no item.
 describe("a line's actions: Open thread", () => {
   const controls = (markup: string) =>
     [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g)].map((found) => found[1]);
@@ -226,7 +225,7 @@ describe("a line's actions: Open thread", () => {
   });
 });
 
-// 4d-dm-bar (docs/decisions.md, 2026-10-27): a direct message's More menu holds what a conversation of two has, no link
+// A direct message's More menu holds what a conversation of two has, no link
 // (?dm= opens the reader's own) and no room's item (thread, pin, mark unread, save). Each item says its kinds, so one
 // added for rooms later stays out of a direct message until it asks for one.
 describe("a line's actions in a direct message", () => {
@@ -252,7 +251,7 @@ describe("a line's actions in a direct message", () => {
     expect(items(dm({ me: ALICE, onEdit: undefined }))).toEqual(["Copy text", "View profile", "Delete"]);
   });
 
-  // /code-review on 4d's DM bar (CR5): an orphan correction (`edits` set, its original gone) is a message of one's own too.
+  // An orphan correction (`edits` set, its original gone) is a message of one's own too.
   it("offer no Edit on an orphan correction, whose original left the window", () => {
     expect(items(dm({ me: ALICE, line: { ...LINE, edits: "m9" } }))).toEqual(["Copy text", "View profile", "Delete"]);
   });
@@ -270,7 +269,7 @@ describe("a line's actions in a direct message", () => {
   });
 });
 
-// slice-4-room-edit (docs/decisions.md, 2026-10-28, F1560): a room's own lines get Edit as a direct message's do, between
+// A room's own lines get Edit as a direct message's do, between
 // the room's link and Delete.
 describe("a line's actions in a room: Edit", () => {
   const edit = () => undefined;
@@ -320,7 +319,7 @@ describe("a line's actions in a room: Edit", () => {
   });
 });
 
-// D376: a guest sees the same bar, and is told where to connect when it presses an act that needs an account.
+// A guest sees the same bar, and is told where to connect when it presses an act that needs an account.
 describe("a line's actions: a guest", () => {
   it("sees the reactions and Reply, and the words that say where to connect", () => {
     const names = [

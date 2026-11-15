@@ -1,4 +1,4 @@
-// Today's expedition as the page shows it (slice 8): core's three stops of the curated pool, each with the device's key of its world, the
+// Today's expedition as the page shows it: core's three stops of the curated pool, each with the device's key of its world, the
 // page it leads to, its name and why to go. The pool and the site's places ship with the page; nothing is asked of a server.
 import { expeditionOf, hubWorldOf, stampKey, worldIdOf } from "@gnoworld/core";
 import pool from "../../../data/expedition.json" with { type: "json" };

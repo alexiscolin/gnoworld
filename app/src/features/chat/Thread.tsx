@@ -1,8 +1,8 @@
-// A thread's panel (slice 4's 4d threads; docs/plans/chat-features.md, M3): one thread's root and its replies beside
-// the room, drawn from the room's own lines, so none is fetched: a root the window no longer holds is "an earlier
+// A thread's panel: one thread's root and its replies beside
+// the room, drawn from the room's own lines, so none is fetched: a root the window does not hold is "an earlier
 // message", its replies kept. The room's lines are read as the room shows them, an author's edit folded into its line.
 // Its rows are the room's, with no bar, no chip, no quote and no player: a stranger's words open to abuse draw no
-// third party here, whatever the moderation's verdict (4g draws the players, in the room's list).
+// third party here, whatever the moderation's verdict (the room's list draws the players).
 // Its composer, given, tags every line with the root's msgid; a guest gets a word in its place.
 import { excerpt, foldEdits, threadsOf, type Line } from "@gnoworld/core";
 import { composing, IconButton, Sidebar, Stack } from "@gnoworld/ui";
@@ -20,7 +20,7 @@ export const TITLE_LENGTH = 60;
 const LINES = [shared["plain"], shared["scrolls"], room["lines"]].join(" ");
 
 export interface ThreadProps {
-  /** The msgid of the thread's root: a line of the room's lines, or a line the window no longer holds. */
+  /** The msgid of the thread's root: a line of the room's lines, or a line the window does not hold. */
   root: string;
   /** The room's lines. */
   lines: readonly Line[];
@@ -60,7 +60,7 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   useEffect(() => {
     start();
   }, []);
-  // An Escape that ends an input method's composition belongs to the composition (R5, Safari's keyCode 229 included).
+  // An Escape that ends an input method's composition belongs to the composition (Safari's keyCode 229 included).
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented || composing(event.nativeEvent)) return;
     event.preventDefault();

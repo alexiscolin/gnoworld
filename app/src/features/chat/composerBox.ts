@@ -1,6 +1,6 @@
 // The composer's box, which other parts of the page give the focus to: a member's editable box in the chat, or, as "Say hi" opens it, a
 // guest's textarea too (GuestWriter's "Write in … as a guest").
-/** The composer's field in a form: the editable box, which a textarea was. */
+/** The composer's field in a form: the editable box. */
 export const FIELD = '[role="textbox"]';
 const MEMBER = `#chat ${FIELD}`;
 const ANYONE = `${FIELD}, #chat textarea, form[aria-label^="Write in"] textarea`;

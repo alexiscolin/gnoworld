@@ -1,4 +1,4 @@
-// Opening a room at a found message (slice 13, C): CHATHISTORY AROUND, which Ergo v2.19.1 serves (irc/handlers.go:935; the server's
+// Opening a room at a found message: CHATHISTORY AROUND, which Ergo v2.19.1 serves (irc/handlers.go:935; the server's
 // irc/fetch.ts uses it). A hit's msgid comes from the server's index, never from Ergo, so it is checked again before it goes into a command.
 import type { IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";

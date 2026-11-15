@@ -1,4 +1,4 @@
-// The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
+// The conversation in view on a world's page, one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
 import { Chip, Cluster, Icon } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
@@ -20,11 +20,11 @@ export interface DmPage {
   acts?: DmActs | undefined;
   focus: boolean;
   noteId: string;
-  /** The conversation seen up to a line's time, as its reader reaches its end (4f-n). */
+  /** The conversation seen up to a line's time, as its reader reaches its end. */
   seen?: ((partner: string, time: string) => void) | undefined;
 }
 
-// The conversation's lines, with the reactions to them and what Ergo refused of the page's acts (4d's DM bar).
+// The conversation's lines, with the reactions to them and what Ergo refused of the page's acts.
 const stateOf = (dms: Dms): NonNullable<RoomViewProps["state"]> => ({
   lines: dms.lines,
   members: [],
@@ -34,8 +34,8 @@ const stateOf = (dms: Dms): NonNullable<RoomViewProps["state"]> => ({
   cannotReact: dms.acts?.reacted,
 });
 
-// A direct message's (4e): said to be one, its partner named, the address whole in its title (U7); not encrypted, by a
-// lock and a word in amber, caution's colour (U6); a line Ergo refused said so.
+// A direct message's: said to be one, its partner named, the address whole in its title; not encrypted, by a
+// lock and a word in amber, caution's colour; a line Ergo refused said so.
 function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }: DmPage): Shown {
   const short = shortAddress(partner);
   const { refused } = dms;
@@ -63,11 +63,11 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }
         <PersonLink address={partner} asIcon="s" />
       </Cluster>
     ),
-    // Its lines have the bar (4d's DM bar): a reaction, a reply, an edit and a delete of one's own; no link, no player.
+    // Its lines have the bar: a reaction, a reply, an edit and a delete of one's own; no link, no player.
     view: {
       room: undefined,
       partner,
-      // Its page is the one it holds, so its reader's reach of the end counts as a read (4f-n).
+      // Its page is the one it holds, so its reader's reach of the end counts as a read.
       state: stateOf(dms),
       empty: dms.empty,
       onDelete: acts?.onDelete ?? (() => false),
@@ -100,7 +100,7 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }
   };
 }
 
-/** What is in view: the direct message ?dm= names; else none when ?dm= names none it can show (U9); else the room. */
+/** What is in view: the direct message ?dm= names; else none when ?dm= names none it can show; else the room. */
 export function shownOf(dms: Dms, room: Room, page: DmPage): Shown | undefined {
   if (dms.partner !== undefined) return dmShown(dms.partner, dms, page);
   return dms.problem !== undefined || room.id === undefined ? undefined : roomShown(room.id, room.state, room.acts);

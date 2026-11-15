@@ -1,5 +1,5 @@
-// The card's fee line (9d, answer 9d-1): an estimate, the median fee the function's last successful calls paid, with the block it
-// stands on. Adena simulates the call again and sets the real gas and fee when the person signs (reports/slice-9d-fee.md).
+// The card's fee line: an estimate, the median fee the function's last successful calls paid, with the block it
+// stands on. Adena simulates the call again and sets the real gas and fee when the person signs.
 import type { CallFees } from "@gnoworld/chain/fees";
 import { grouped } from "@gnoworld/ui";
 

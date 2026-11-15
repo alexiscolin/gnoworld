@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { NYM_PREFIX, NYM_RULE, nymProblem } from "./nym.ts";
 
-// 9f: what follows `nym-` is checked before Adena opens against Register's first checks (recordings README): `^nym-[a-z]{5,13}\d{3}$`
+// What follows `nym-` is checked before Adena opens against Register's first checks: `^nym-[a-z]{5,13}\d{3}$`
 // and a stem not starting with gl, g1, gno, atom, atone, photon or cosmos (`gi` is allowed). Role names and collisions are the
 // chain's answer, shown as its error.
 describe("nymProblem", () => {
@@ -48,7 +48,7 @@ describe("nymProblem", () => {
     expect(NYM_PREFIX).toBe("nym-");
   });
 
-  // The recording's rule written another way: count the leading letters, then exactly 3 ASCII digits and nothing after.
+  // The rule written another way: count the leading letters, then exactly 3 ASCII digits and nothing after.
   it("agrees with the recording's rule for any text, and never throws", () => {
     const PREFIXES = ["gl", "g1", "gno", "atom", "atone", "photon", "cosmos"];
     const letter = (char: string) => char >= "a" && char <= "z";

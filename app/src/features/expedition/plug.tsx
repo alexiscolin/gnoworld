@@ -1,4 +1,4 @@
-// Slice 8's discovery in 8a's slots (slots.tsx): the passport's expedition and quests, the arrival's line and the quests' watcher, all in one
+// The discovery in the shell's slots (slots.tsx): the passport's expedition and quests, the arrival's line and the quests' watcher, all in one
 // chunk asked when first drawn or asked; the watcher once a chat session is open, the one place a talk step is done. This file is on every
 // first screen: it holds none of them, and asks one import, so it carries one list of what to preload.
 import { lazy, Suspense } from "react";

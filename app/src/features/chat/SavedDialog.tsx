@@ -1,4 +1,4 @@
-// The saved messages' list as a dialog with its data (slice 4's 4d): what the rooms' Saved and the account menu (slice 8) both open. Its
+// The saved messages' list as a dialog with its data: what the rooms' Saved and the account menu both open. Its
 // code comes when it is first asked for.
 import { lazy, Suspense } from "react";
 import { useApp, useAppStore } from "../../storeContext.tsx";

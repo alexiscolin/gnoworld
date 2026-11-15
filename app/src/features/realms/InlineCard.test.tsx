@@ -10,7 +10,7 @@ import { CHAIN } from "../../../tests/callFixtures.ts";
 import { callsIn } from "../calls/index.ts";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 
-// The call card as the realm view draws it (9e): nothing until it is opened, the fee read for the card's own function and again when
+// The call card as the realm view draws it: nothing until it is opened, the fee read for the card's own function and again when
 // its indexer changes, and a card's Try again done through the store. NOT recorded: the indexer's answers (the tests read requests).
 const REALM = "gno.land/r/demo/profile";
 const WRITE = {

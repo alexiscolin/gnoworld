@@ -10,7 +10,7 @@ import { fakeAdena, SIGNED_HASH } from "../../../tests/fakeAdena.ts";
 import { signCall, type SignDeps } from "./signCall.ts";
 import { ensureCalls, type CallsStore } from "./slice.ts";
 
-// 9d: the card's course, through the real callContract and a stand-in for Adena
+// The card's course, through the real callContract and a stand-in for Adena
 // (app/tests/fakeAdena.ts): preview, "Sign in Adena", landing in a block, the result. Done only from the chain's answer.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
@@ -490,7 +490,7 @@ describe("signCall: the account watch (F5651)", () => {
   });
 });
 
-// 9e: a write with no field (D254) and a card opened prefilled sign exactly what their fields hold.
+// A write with no field and a card opened prefilled sign exactly what their fields hold.
 describe("signCall: the cards 9e opens", () => {
   const open = (store: CallsStore, params: { Name: string; Type: string }[], func: string) => {
     store.getState().callsActions.open({ id: func, chainId: "onyx-1", realm: NEW.realm, func, params });

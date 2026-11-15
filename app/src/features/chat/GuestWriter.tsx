@@ -1,4 +1,4 @@
-// A guest's composer (D351, D430): one plain line in the composer's box, Enter sending it as the account's does, said through the server, which judges it before the bot says it
+// A guest's composer: one plain line in the composer's box, Enter sending it as the account's does, said through the server, which judges it before the bot says it
 // as anon/<name>. The name is the visit's, asked as the reader first comes to the box; a refusal says why, in the field's own words.
 // Connect Adena stays beside it: an account keeps its name and does what a guest cannot.
 import type { GuestCause } from "@gnoworld/schemas";
@@ -38,7 +38,7 @@ function reasonOf(reason: Refused["reason"]): string {
 
 const problemOf = (said: Refused): string => (said.cause === undefined ? reasonOf(said.reason) : CAUSES[said.cause]);
 
-// What an account has that a guest has not (D13982), said beside Connect Adena.
+// What an account has that a guest has not, said beside Connect Adena.
 const ADENA_GIVES = "With Adena, a gno.land name of your own, links, replies and reactions.";
 
 // No guest name to be had: the server answers 404 where guests do not speak at all (GUEST_CHAT=off, or no moderation to judge them).

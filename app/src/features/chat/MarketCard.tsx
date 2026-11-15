@@ -1,5 +1,5 @@
-// The market card among a room's lines (Alexis, 2026-11-11), the reader's alone: GNOT, ATONE and BTC, each a row: its price in dollars, its 24 hour
-// change and the day's small chart, the high and the low in the row's title (Alexis, 2026-11-11: a card a third as high, and `/market`). Restored from the home's old prices row (D425). A chunk of its own, asked when the
+// The market card among a room's lines, the reader's alone: GNOT, ATONE and BTC, each a row: its price in dollars, its 24 hour
+// change and the day's small chart, the high and the low in the row's title. A chunk of its own, asked when the
 // card is first drawn. Loading, missing and failed are states in words, never a gap and never a number.
 import type { MarketToken } from "@gnoworld/schemas";
 import { Card, EmptyState, Sparkline, Stack } from "@gnoworld/ui";

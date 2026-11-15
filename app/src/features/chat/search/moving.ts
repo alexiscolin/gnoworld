@@ -1,4 +1,4 @@
-// The arrow keys among the search's results (slice 13, C): Down from the field goes to the first result, Up and Down move among them, Up from the first
+// The arrow keys among the search's results: Down from the field goes to the first result, Up and Down move among them, Up from the first
 // goes back to the field, Home and End go to the ends. Enter is the button's own, Escape the panel's. The results are the panel's `[data-hit]` buttons.
 import type { KeyboardEvent } from "react";
 

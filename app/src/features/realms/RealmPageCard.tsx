@@ -1,4 +1,4 @@
-// A realm's page in its plate (5h, D375, the proposal's "Its page"): the realm's Markdown read once (useRealm), drawn as the allowlisted blocks of
+// A realm's page in its plate (the proposal's "Its page"): the realm's Markdown read once (useRealm), drawn as the allowlisted blocks of
 // core's reader in a window of its own, a long one scrolling inside it. Every state names the way out: the link to the realm on gnoweb
 // (ADR-0002 §4, gnoweb is the source of truth) stands in its header whatever the page holds, with the height it was read at, the cap's
 // state or the failed read's state and its next step.
@@ -54,7 +54,7 @@ function Body({
           <p>
             {state.failure === undefined ? "The page could not be drawn. Try again in a moment." : state.failure.next}
           </p>
-          {/* The page's one retry (D534): the facts and the calls under it say nothing of their own when the chain is down. */}
+          {/* The page's one retry: the facts and the calls under it say nothing of their own when the chain is down. */}
           <Button
             icon="retry"
             onClick={() => {

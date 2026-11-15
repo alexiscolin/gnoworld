@@ -23,7 +23,7 @@ export interface Left {
 
 let left: Left | undefined;
 
-// A screen's still copy (the design system's), out of focus and no longer a chat screen: the page finds the live one alone.
+// A screen's still copy (the design system's), out of focus and not a chat screen: the page finds the live one alone.
 function unmarked(screen: Element): HTMLElement | undefined {
   const copy = stillCopy(screen);
   if (copy === undefined) return undefined;

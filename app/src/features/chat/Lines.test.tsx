@@ -1,5 +1,4 @@
-// The lines view as the build compiles it, counting what a render recomputes (the complexity review of 4d's
-// reactions): a room at its window, 200 lines each answering the one before, one edit folded, 1,000 reactions.
+// The lines view as the build compiles it, counting what a render recomputes: a room at its window, 200 lines each answering the one before, one edit folded, 1,000 reactions.
 import type * as core from "@gnoworld/core";
 import { excerpt, foldEdits, reactionsOn, threadsOf, type Line, type Reaction } from "@gnoworld/core";
 import { act } from "react";
@@ -117,7 +116,7 @@ describe("the lines view, compiled", () => {
     expect(vi.mocked(Reactions)).toHaveBeenCalled();
   });
 
-  // R4 (redpass-dmb): in a direct message the partner's tag +gnoworld/edit naming my line corrects nothing of mine.
+  // In a direct message the partner's tag +gnoworld/edit naming my line corrects nothing of mine.
   it("leaves my words alone when the partner's line is tagged as a correction of my line", () => {
     draw({
       room: undefined,
@@ -144,7 +143,7 @@ describe("the lines view, compiled", () => {
     expect(bars[0]?.closest("li")).toBe(host.querySelectorAll("ol > li")[5]);
   });
 
-  // A new message made each reply line quote its line again: two Markdown parses and a grapheme cut, 200 times (F1220).
+  // A new message made each reply line quote its line again: two Markdown parses and a grapheme cut, 200 times.
   it("quotes again the reply that came, never the room's others, when a line comes", () => {
     draw();
     vi.mocked(excerpt).mockClear();
@@ -160,7 +159,7 @@ describe("the lines view, compiled", () => {
   });
 
   // Each render ran the edit fold and the reactions' fold again, and with an edit folded the fold's new array moved the
-  // list to its end, forcing a layout, whatever the pointer had moved (F1221).
+  // list to its end, forcing a layout, whatever the pointer had moved.
   it("folds nothing again, and lays nothing out, when the pointer moves over lines", () => {
     draw();
     const layout = vi.spyOn(Element.prototype, "scrollHeight", "get");
@@ -182,7 +181,7 @@ describe("the lines view, compiled", () => {
     expect([vi.mocked(excerpt).mock.calls.length, vi.mocked(Reactions).mock.calls.length]).toEqual([0, 0]);
   });
 
-  // Every line with chips drew its chips again for each reaction and each line that came: 200 lines, 1,000 chips (F1222).
+  // Every line with chips drew its chips again for each reaction and each line that came: 200 lines, 1,000 chips.
   it("draws again the chips of the line a reaction came to, and no other", () => {
     draw();
     vi.clearAllMocks();
@@ -202,9 +201,9 @@ describe("the lines view, compiled", () => {
 });
 
 // The device's place forgotten when the room is read through, once: a mark another tab sets after it is the reader's,
-// and the next line this tab reads must not erase it (F1470).
+// and the next line this tab reads must not erase it.
 describe("reading a room through", () => {
-  // jsdom lays nothing out, and a list with no height is a hidden one, read by no one (4d's threads, F1856): the list has one.
+  // jsdom lays nothing out, and a list with no height is a hidden one, read by no one: the list has one.
   beforeEach(() => {
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(400);
   });
@@ -243,7 +242,7 @@ describe("reading a room through", () => {
   });
 });
 
-// 4d's threads (R11): the root of this room's chain carries a 199-reply chip, so a chip that is a new object each
+// The root of this room's chain carries a 199-reply chip, so a chip that is a new object each
 // render, or a thread read once a line, would draw the 200 lines again for each live line.
 describe("the lines view, compiled: threads' chips", () => {
   const asked = { onThread: () => undefined };
@@ -275,7 +274,7 @@ describe("the lines view, compiled: threads' chips", () => {
     expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("200 replies");
   });
 
-  // CR11 (F1770): a direct message's lines root no thread, so reading its chains each render is work for nothing.
+  // A direct message's lines root no thread, so reading its chains each render is work for nothing.
   it("reads no thread of a direct message's lines, which root none", () => {
     draw({ ...asked, room: undefined });
     expect(vi.mocked(threadsOf)).not.toHaveBeenCalled();
@@ -299,7 +298,7 @@ describe("the lines view, compiled: threads' chips", () => {
   });
 });
 
-// Slice 9g (frames 20 to 35): the calls the chain told stand among the world's main room's messages, as cards, by the time each was
+// Frames 20 to 35: the calls the chain told stand among the world's main room's messages, as cards, by the time each was
 // heard; the keys of the list move among the messages and skip the cards.
 describe("the lines view with the chain's calls", () => {
   const call = (height: number, atMs: number): ChainHeard => ({

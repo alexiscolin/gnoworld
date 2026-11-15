@@ -1,4 +1,4 @@
-// The rooms that orbit a page's world as moons (D490, ADR-0002 §3): the room the reader is in, then the busiest others, four at most, from
+// The rooms that orbit a page's world as moons (ADR-0002 §3): the room the reader is in, then the busiest others, four at most, from
 // the activity API (messages a minute, read each 20 s while the page shows); the set holds a minute before it changes, so no moon flickers.
 // A world the server lists no room of has none.
 import { EARTH, hubWorldOf } from "@gnoworld/core";

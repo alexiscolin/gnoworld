@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { sayProblem } from "./problem.ts";
 
 describe("sayProblem", () => {
-  // F674: the login says why an address is refused, each reason its own words.
+  // The login says why an address is refused, each reason its own words.
   it.each([
     ["empty", /no address/],
     ["case", /lower case/],

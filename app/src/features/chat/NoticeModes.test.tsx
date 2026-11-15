@@ -17,7 +17,7 @@ const buttons = (html: string) =>
     m[1],
   ]);
 
-// 4f-n: a room's notification mode, all, mentions or none, chosen in the room (ADR-0002, "Menu and settings").
+// A room's notification mode, all, mentions or none, chosen in the room (ADR-0002, "Menu and settings").
 describe("NoticeModes", () => {
   it("is a group named for its room, holding the three modes by name, as pressed buttons", () => {
     const html = view();
@@ -37,7 +37,7 @@ describe("NoticeModes", () => {
     expect(said(view({ mode: "none" }))).toContain("not even mentions");
   });
 
-  // U2: one paragraph read "Nothing: not even mentions." whichever mode was selected, so with Mentions chosen it read as
+  // One paragraph read "Nothing: not even mentions." whichever mode was selected, so with Mentions chosen it read as
   // the current state; the selected mode's own words show, under a visible label.
   const WORDS = {
     all: "Every new message in this room.",
@@ -65,7 +65,7 @@ describe("NoticeModes", () => {
     expect(view()).not.toContain("Not kept on this device");
   });
 
-  // R13: each button sets its own mode; static markup cannot press one, so the handlers are read off the element tree
+  // Each button sets its own mode; static markup cannot press one, so the handlers are read off the element tree
   // (the node project has no DOM), the Chips' onClick in the order drawn, and the journey presses them in a browser.
   const handlers = (node: ReactNode): (() => void)[] => {
     if (!isValidElement<{ onClick?: () => void; children?: ReactNode }>(node)) {

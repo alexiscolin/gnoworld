@@ -1,4 +1,4 @@
-// The room's pins as a reader sees them (slice 4's 4d): the lines pinned, each under the id it is shown by, and the bar
+// The room's pins as a reader sees them: the lines pinned, each under the id it is shown by, and the bar
 // above the lines. A visitor reads them as an account does; what an account keeps besides is RoomKeeping's.
 import { foldEdits, type Line } from "@gnoworld/core";
 import type { PinnedLine } from "@gnoworld/schemas";

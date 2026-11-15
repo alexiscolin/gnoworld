@@ -7,9 +7,9 @@ const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const CAROL = "g1pery0j3xzn6wm5m3w8sxkmyafmnd6cle4s3er";
 
-// 4e: the navigation's list of conversations.
+// The navigation's list of conversations.
 describe("the direct messages' list", () => {
-  // 4e's UX review (U19): the list followed first contact, not the latest line.
+  // The list follows the latest line, not first contact.
   it("lists the conversations heard last first, the store keeping them oldest first", () => {
     expect(listOf([ALICE, BOB], undefined)).toEqual([BOB, ALICE]);
   });
@@ -20,8 +20,7 @@ describe("the direct messages' list", () => {
   });
 });
 
-// 4e's late test audit (T3): the page's privacy rules were pure logic no unit test read; three journey mutants
-// survived (a stranger's lines shown at ?dm=<stranger>, ?dm=<own address>).
+// The page's privacy rules: a stranger's lines must not show at ?dm=<stranger>, nor at ?dm=<own address>.
 describe("the conversation a page shows", () => {
   it.each([
     ["for a guest", undefined, BOB],
@@ -51,7 +50,7 @@ describe("the conversation a page shows", () => {
     expect(conversationOf(ALL, BOB).lines).toEqual([LINE]);
   });
 
-  // Decision C (U2): Ergo keeps no direct message, so "No messages yet." was false after a reload.
+  // Ergo keeps no direct message, so "No messages yet." would be false after a reload.
   it("shows nothing with no partner, and a conversation never heard as empty since the page opened", () => {
     expect(conversationOf(ALL, undefined).lines).toEqual([]);
     expect(conversationOf(ALL, CAROL)).toEqual({
@@ -61,7 +60,7 @@ describe("the conversation a page shows", () => {
   });
 });
 
-// 4e's UX review (U9): ?dm= as a guest, at one's own address or at one that is none showed the main room, silently.
+// ?dm= as a guest, at one's own address or at one that is none must not show the main room, silently.
 describe("what a page says of a ?dm= it cannot show", () => {
   const ME = { kind: "in", address: Address.parse(ALICE) } as const;
   it.each([
@@ -72,7 +71,7 @@ describe("what a page says of a ?dm= it cannot show", () => {
       asked: BOB,
       said: undefined,
     },
-    // StrykerJS on 4e: the unknown session's rule, apart from the address's.
+    // The unknown session's rule, apart from the address's.
     {
       name: "nothing of an address that is none while the session is unknown",
       session: { kind: "unknown" } as const,

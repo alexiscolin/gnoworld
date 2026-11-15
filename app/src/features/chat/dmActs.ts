@@ -1,4 +1,4 @@
-// What the direct message in view lets its reader do through the page's link (slice 4's 4d, the DM bar), as roomActs does
+// What the direct message in view lets its reader do through the page's link (the DM bar), as roomActs does
 // for a room: built from the partner and the link alone.
 import type { Reacting } from "@gnoworld/core";
 import type { RefObject } from "react";
@@ -10,7 +10,7 @@ export interface DmActs {
   onReact: (reaction: Reacting) => boolean;
 }
 
-// What Ergo refused before is told no more once the act is tried again: its answer, or none, says the rest (CR4).
+// What Ergo refused before is told no more once the act is tried again: its answer, or none, says the rest.
 export function dmActs(
   link: RefObject<ChatLink | undefined>,
   partner: string,

@@ -74,7 +74,7 @@ describe("the dock's chat that heals itself", () => {
 });
 
 // A page asked with the chat full (`?chat=full`, a shared link) is drawn on the server first, where no document is: the shell's chat host
-// draws nothing there, and never reads the page to copy a dock's screen (it threw "document is not defined", a 500).
+// draws nothing there, and never reads the page to copy a dock's screen (it would throw "document is not defined", a 500).
 describe("the shell's chat host, drawn on the server", () => {
   afterEach(() => {
     asked.full = false;

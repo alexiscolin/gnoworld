@@ -7,7 +7,7 @@ import { slot } from "../../slots.tsx";
 import { drawing } from "../chat/index.ts";
 import { PreviewCard, type PreviewCardProps } from "./PreviewCard.tsx";
 
-// A page's capture as a card (8f): on a world's plate (frame 26: "Preview · gno.land/r/gov/dao · captured · Open large") and under a
+// A page's capture as a card: on a world's plate (frame 26: "Preview · gno.land/r/gov/dao · captured · Open large") and under a
 // chat line (frames 104, 107). The capture is drawn small as a picture of the page, never a part of it a reader can use; Open large
 // shows it at size, with when it was captured and the way to the page as it is now.
 const via = await drawing();
@@ -55,7 +55,7 @@ describe("PreviewCard", () => {
     expect(words).toContain("Open large");
   });
 
-  // Frame 104 draws the page alone under jonas's line (8f's review, finding 3): the card's words are its button's name, said, not shown.
+  // Frame 104 draws the page alone under a line: the card's words are its button's name, said, not shown.
   it("draws the picture alone under a line, its words for assistive technology alone", () => {
     const box = card({ look: "line" });
     const words = all(opener(box), "span");

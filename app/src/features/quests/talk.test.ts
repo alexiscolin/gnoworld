@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { watchTalk } from "./talk.ts";
 
-// A quest's talk step (slice 8): done once the reader's own message shows in the hub's main room the step names (Bubble's, "#bubble"), said
+// A quest's talk step: done once the reader's own message shows in the hub's main room the step names (Bubble's, "#bubble"), said
 // now or brought back by the history; never by another's line, a notice, another room, or before the reader has a nick.
 const line = (id: string, from: string, kind: Line["kind"] = "message"): Line => ({
   id,

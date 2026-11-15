@@ -1,4 +1,4 @@
-// The open proposal's status round its realm's planet (5k, statusRing.ts): the yes share lit from the top, the no share after it, the
+// The open proposal's status round its realm's planet (statusRing.ts): the yes share lit from the top, the no share after it, the
 // threshold a tick; drawn only where the realm reports a tally (gnoworld invents no timer). An SVG in the page's globe box, as wide as the
 // ring the layout keeps for it (1.106 radii, globe.module.css), so it follows the planet wherever the page lays it out.
 import type { Ring } from "./statusRing.ts";

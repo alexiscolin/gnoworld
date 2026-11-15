@@ -1,4 +1,4 @@
-// A link off gnoweb is behind a warning (plan §3, ADR-0002 §4; leaving.tsx): such a link is a button that opens it.
+// A link off gnoweb is behind a warning (ADR-0002 §4; leaving.tsx): such a link is a button that opens it.
 import { Button } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { useLeaving } from "../../leaving.tsx";

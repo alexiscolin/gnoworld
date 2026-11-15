@@ -72,8 +72,8 @@ interface Column {
 }
 
 // How far the list must move so the place `at` its link held at rest comes back under `at`, read off the page once the planets have their
-// new sizes, at the same share of its link: the column's pace then changes smoothly, where a planet's part and a name's part each held
-// gave it a jerk at their line (Alexis, 2026-11-07). Two neighbours grow alike at their line, so no link hands over with a jump.
+// new sizes, at the same share of its link: the column's pace then changes smoothly, where holding a planet's part and a name's part
+// each would jerk at their line. Two neighbours grow alike at their line, so no link hands over with a jump.
 function driftOf({ links, rests, top }: Column, at: number): number {
   const held = heldAt(rests, top, at);
   const [link, rest] = [links[held], rests[held]];

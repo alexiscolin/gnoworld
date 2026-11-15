@@ -1,4 +1,4 @@
-// The server's history of the prices (GET /api/markets/history, the last day), restored from the home's old sparklines: one read shared by
+// The server's history of the prices (GET /api/markets/history, the last day): one read shared by
 // the three tokens' charts. None means no history, and no chart.
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "../../lib/query/client.ts";

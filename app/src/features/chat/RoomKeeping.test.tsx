@@ -13,7 +13,7 @@ import { useRoomKeeping } from "./RoomKeeping.ts";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
-// 4d's marks on a room's lines (slice 4's 4d), apart from RoomView.test.tsx: a line saved or pinned says so in a word,
+// Marks on a room's lines, apart from RoomView.test.tsx: a line saved or pinned says so in a word,
 // and a line marked unread takes the New mark. `keeping` is what the room is told of the reader's device and the room's
 // pins; a guest, and a direct message, are given none.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -29,7 +29,7 @@ const line = (id: string, minute: number, over: Partial<Line> = {}): Line => ({
   ...over,
 });
 const LINES = [line("a", 0), line("b", 1), line("c", 2), line("d", 3)];
-// The places that leave line b, and line c, unread: the millisecond before each, as Ergo writes a time (4d's R18).
+// The places that leave line b, and line c, unread: the millisecond before each, as Ergo writes a time.
 const BEFORE_B = "2026-10-25T10:00:59.999Z";
 const BEFORE_C = "2026-10-25T10:01:59.999Z";
 const none = () => undefined;
@@ -72,7 +72,7 @@ const items = (html: string) => {
   return [...list.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 };
 
-// The lines view loads lazily (docs/decisions.md, 2026-10-26): drawn once and waited for, every view below draws it at once.
+// The lines view loads lazily: drawn once and waited for, every view below draws it at once.
 beforeAll(async () => {
   await prerender(
     <RoomView
@@ -111,7 +111,7 @@ describe("the marks of a saved and a pinned line", () => {
   // A line's own words are the sender's: a line that says "Saved" is no saved line.
   it("never mistake a line's own words for the mark", () => {
     const rows = items(view({ state: room({ lines: [line("a", 0, { text: "Saved Pinned" })] }) }));
-    // An account's first words in a room whose history came say "new here" (8d).
+    // An account's first words in a room whose history came say "new here".
     expect(rows[0]).toMatch(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} Saved Pinned$/);
   });
 });
@@ -206,7 +206,7 @@ describe("the room in view's keeping, from the store", () => {
     );
   });
 
-  // A line's id is its room's: the same id saved in another room marks nothing here (G13).
+  // A line's id is its room's: the same id saved in another room marks nothing here.
   it("marks a line saved only in the room it was saved in, though another room saved another line", () => {
     const seed = (store: ReturnType<typeof useAppStore>) => {
       const kept = new Map<string, string>();
@@ -246,7 +246,7 @@ describe("the room in view's keeping, from the store", () => {
 
 // An edit is a line of its own that corrects one (+gnoworld/edit): the room shows the corrected text in the first line's
 // place, but Ergo keeps the first at its id. What the reader saves, marks and pins is the version the room shows, and a
-// pin is of the newest version's id (F1483, the code review's CR1).
+// pin is of the newest version's id.
 describe("the version of an edited line that the room acts on", () => {
   const said = (id: string, text: string, edits?: string): IrcMessage => {
     const tags = `msgid=${id};time=2026-10-25T10:00:0${id.slice(1)}.000Z;account=${ALICE}${edits === undefined ? "" : `;+gnoworld/edit=${edits}`}`;
@@ -359,7 +359,7 @@ describe("the version of an edited line that the room acts on", () => {
     ...message,
     tags: new Map(message.tags).set("account", account),
   });
-  // R9 of redpass2-4dx: Mark unread reads the line as the room shows it, which is the first line's own place; an edit
+  // Mark unread reads the line as the room shows it, which is the first line's own place; an edit
   // folded into it is no line of the room's.
   it("marks an edited line unread at its own time, and marks none for an edit the room does not show", () => {
     const { keeping, unread } = mounted(EDITED);

@@ -1,4 +1,4 @@
-// What a room's lines show beyond their words (8d): a poll's votes (core's poll.ts) and an account's first words, the video's
+// What a room's lines show beyond their words: a poll's votes (core's poll.ts) and an account's first words, the video's
 // "new here" (frame 56). Apart from Lines.tsx, which draws them.
 import { POLL_KEYS, pollOf, votesOn, type Reaction, type Shown, type ShownLine } from "@gnoworld/core";
 import { dayKey, dayName } from "../../lib/days.ts";
@@ -45,7 +45,7 @@ export function firstWordsOf(
   return firsts;
 }
 
-/** Each line's chips as a string a line compares by value (F1222); a poll's keycaps are its bars, never chips too. */
+/** Each line's chips as a string a line compares by value; a poll's keycaps are its bars, never chips too. */
 export const chipsOn = (
   shown: ReadonlyMap<string, readonly Shown[]>,
   votes: ReadonlyMap<string, string>,
@@ -104,7 +104,7 @@ export function groupedOf(
 const NO_DAYS: ReadonlyMap<string, string> = new Map();
 
 /** The label above the lines of each day, on the first line of it (the first of the list included, once the list holds two days): `dayName`'s
- * words (D13015), in the reader's own zone unless a test says another: a day is the zone's calendar date, never 24 hours of milliseconds. */
+ * words, in the reader's own zone unless a test says another: a day is the zone's calendar date, never 24 hours of milliseconds. */
 export function dayLabelsOf(
   entries: readonly (Entry<ShownLine> | { jarvis: unknown })[],
   now: Date,
@@ -124,7 +124,7 @@ export function dayLabelsOf(
   return labels.size < 2 ? NO_DAYS : labels;
 }
 
-/** A day's opening standing among the entries (D13922): a separator no key stops on, which also ends its author's group. */
+/** A day's opening standing among the entries: a separator no key stops on, which also ends its author's group. */
 export interface DayEntry {
   day: string;
   key: string;

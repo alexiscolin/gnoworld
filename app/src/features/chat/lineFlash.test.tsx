@@ -57,7 +57,7 @@ describe("useRemoval", () => {
     expect(show(true, "m1")).toBe("none");
   });
 
-  // /code-review on 4d's DM bar (CR1): a link that dropped forgot the waiting delete, whose refusal then never came, so the
+  // A link that dropped forgot the waiting delete, whose refusal then never came, so the
   // line offered no Delete again until the conversation was mounted anew.
   it("offers the line's delete again once the link drops, its answer being lost with it", () => {
     show(true);
@@ -66,7 +66,7 @@ describe("useRemoval", () => {
   });
 });
 
-// F2093 (AP3): the bot hides a message by a REDACT, and its author saw it vanish without a word.
+// The bot hides a message by a REDACT, and its author saw it vanish without a word.
 describe("useRemoval: a message hidden", () => {
   const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
   const mine = (id: string): Line => ({ ...line(id), account: ME });

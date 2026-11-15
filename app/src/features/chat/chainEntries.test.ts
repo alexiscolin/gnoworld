@@ -4,7 +4,7 @@ import type { ChainHeard } from "../../store/chain.ts";
 import type { ChainPlace } from "./chainThread.ts";
 import { callsIn, interleave } from "./chainEntries.ts";
 
-// Slice 9g (frames 20 to 35): the calls the chain told are drawn in the thread of the world's main room, among its messages, by the
+// The calls the chain told are drawn in the thread of the world's main room, among its messages, by the
 // time each was heard; another room, or another universe's call, draws none.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, at: string, universe = "onyx"): ChainHeard => ({

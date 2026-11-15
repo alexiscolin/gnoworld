@@ -10,7 +10,7 @@ import type { RoomKeeping } from "./RoomKeeping.ts";
 export interface LinesProps {
   /** The room, whose lines have bars; none for a direct message's. */
   room: string | undefined;
-  /** The partner of a direct message, whose lines have bars too (4d's DM bar), but no player and no link. */
+  /** The partner of a direct message, whose lines have bars too, but no player and no link. */
   partner?: string | undefined;
   lines: readonly Line[];
   members: readonly string[];
@@ -18,36 +18,36 @@ export interface LinesProps {
   me: string | undefined;
   /** The msgid of a line Ergo refused to delete, said until dismissed. */
   refused?: string | undefined;
-  /** Whether the chat is connected: a delete that cannot go out says why (U8). */
+  /** Whether the chat is connected: a delete that cannot go out says why. */
   connected: boolean;
   /** Deletes a line, the reader's own; whether it went out. A room's view may leave out what a line's actions do:
    * nothing then, and a delete or a reaction never goes out. */
   onDelete?: ((id: string) => boolean) | undefined;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss?: (() => void) | undefined;
-  /** The room's reactions (4d), shown under their lines. */
+  /** The room's reactions, shown under their lines. */
   reactions?: readonly Reaction[] | undefined;
   /** Reacts to a line, or takes the reaction back, an account's; whether it went out. */
   onReact?: ((reaction: Reacting) => boolean) | undefined;
-  /** Ergo refused a reaction the page sent here, said until dismissed (4d). */
+  /** Ergo refused a reaction the page sent here, said until dismissed. */
   cannotReact?: true | undefined;
-  /** Makes a line, by its msgid, the one the composer's next answers (4d). */
+  /** Makes a line, by its msgid, the one the composer's next answers. */
   onReply?: ((id: string) => void) | undefined;
-  /** Opens the thread a line roots, by its msgid (4d's threads); none: no chip, no menu item. */
+  /** Opens the thread a line roots, by its msgid; none: no chip, no menu item. */
   onThread?: ((id: string) => void) | undefined;
   /** Puts a line's words in the composer to correct them, one of the reader's own (a direct message's). */
   onEdit?: ((id: string) => void) | undefined;
-  /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
+  /** The time of the last line the account read here, Ergo's; none while unknown. */
   read?: string | undefined;
-  /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
+  /** The room's history page came: the New mark waits on it, as a live line may come before it. */
   paged?: boolean;
   /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
   onRead?: ((id: string) => void) | undefined;
-  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  /** The room's lines' verdicts, by msgid, from the server's stream. */
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
-  /** Whether the reader saves data (ADR-0002 §8): then no player is offered (4g, F893). */
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered. */
   saving?: boolean;
-  /** What the reader keeps in this room and the room's pins (4d); none for a direct message's lines. */
+  /** What the reader keeps in this room and the room's pins; none for a direct message's lines. */
   keeping?: RoomKeeping | undefined;
 }
 
@@ -76,7 +76,7 @@ export type ListProps = Omit<LinesProps, "lines"> & {
   grouped: ReadonlySet<string>;
   /** The lines that are an account's first words in the room. */
   firsts: ReadonlySet<string>;
-  /** Each root's replies, by msgid (4d's threads): a chip counts them. */
+  /** Each root's replies, by msgid: a chip counts them. */
   repliesOf: ReadonlyMap<string, readonly Line[]>;
   /** The newest edit shown in each corrected line's place, by the line's msgid: the verdict a player waits on is its. */
   newest: ReadonlyMap<string, string>;
@@ -91,7 +91,7 @@ export const marksOf = (props: ListProps, id: string) => ({
   ...cardMarks(props, id),
 });
 
-// What the reader keeps of a line, on this device (saved) and in its room (pinned) (4d).
+// What the reader keeps of a line, on this device (saved) and in its room (pinned).
 export const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
   saved: keeping?.saved.has(id) === true,
   pinned: keeping?.pinned.has(id) === true,
@@ -101,7 +101,7 @@ export const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
 export const answeredBy = (line: ShownLine, byId: ReadonlyMap<string, Line>, lineOf: (id: string) => string) =>
   line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""));
 
-// A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
+// A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's.
 export const verdictIn = (
   verdicts: LinesProps["verdicts"],
   newest: ReadonlyMap<string, string>,

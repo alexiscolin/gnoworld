@@ -1,4 +1,4 @@
-/* A link's card under a chat line (L4): as wide as a line's preview, its picture whole at its own proportions, its description muted. */
+/* A link's card under a chat line: as wide as a line's preview, its picture whole at its own proportions, its description muted. */
 @layer components {
   .card {
     max-inline-size: var(--column-l);

@@ -8,8 +8,8 @@ import { mountInStore } from "../../../tests/inStore.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Actions } from "./Actions.tsx";
 
-// Slice 5j (frames 26 and 92), slice 8 (frames 31, 86, 93): the main action, then Follow and Share with the plate's first paint. Share
-// opens the share sheet (features/share); the hardening slice writes their tests.
+// Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share
+// opens the share sheet (features/share).
 const PLACE = { name: "Bubble", path: "/net/onyx/w/bubble" };
 const FOLLOW = "onyx:bubble";
 const PROPOSALS = "/net/onyx/r/gov/dao";
@@ -85,8 +85,8 @@ describe("a world's actions", () => {
 
 const labels = (el: HTMLElement) => [...el.querySelectorAll("a, button")].map((node) => node.textContent);
 
-// Slice 5k (frames 22 and 27): a world with a proposals realm draws 'Read the proposals' first, as a link to a plain path of this
-// site; one with none draws no such button. Where the realm comes from is a hubs.json schema change, parked (F2953).
+// Frames 22 and 27: a world with a proposals realm draws 'Read the proposals' first, as a link to a plain path of this
+// site; one with none draws no such button. Where the realm comes from is a hubs.json schema change, parked.
 describe("a world's actions, with proposals", () => {
   it("draws 'Read the proposals' first, as a link with a hidden icon, to the realm's view", () => {
     const el = draw(PROPOSALS);
@@ -100,7 +100,7 @@ describe("a world's actions, with proposals", () => {
     expect(labels(draw(PROPOSALS))).toEqual(["Read the proposals", "Follow", "Share"]);
   });
 
-  // Frame 31: Read the proposals, Follow and Share on one line; the chat is the dock's, beside the plate (the chief's round of slice 8).
+  // Frame 31: Read the proposals, Follow and Share on one line; the chat is the dock's, beside the plate.
   it("makes the proposals the one solid action and leaves the chat to the dock, with no 'Say hi' beside them", () => {
     const withProposals = draw(PROPOSALS);
     expect(withProposals.querySelector("a[href='#chat']")).toBeNull();

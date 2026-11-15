@@ -1,7 +1,7 @@
-// The composer's field on Lexical: it shows the formatting in place (italic, not `*word*`), as Slack does, and hands the room the
-// same Markdown as before. It stands where the design system's field did: label, placeholder, help and error for a screen
-// reader and the box's grid, Enter sends, Shift+Enter adds a line, IME composition never sends half a word (F1713), and
-// the suggestions (Suggestions.tsx) open as one types.
+// The composer's field on Lexical: it shows the formatting in place (italic, not `*word*`), as Slack does, and hands the room
+// Markdown. It does what the design system's field does: label, placeholder, help and error for a screen reader and the
+// box's grid; Enter sends, Shift+Enter adds a line, IME composition never sends half a word, and the suggestions
+// (useSuggestions.ts) open as one types.
 import { FieldWords, Listbox } from "@gnoworld/ui";
 import type { LexicalEditor } from "lexical";
 import { useId } from "react";

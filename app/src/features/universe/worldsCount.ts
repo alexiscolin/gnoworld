@@ -1,5 +1,5 @@
-// How many worlds the cosmos draws (slice 7d6), which the first screen's hero says. The home reads it from the count the server writes beside
-// the worlds' file (7n2), a few bytes on phones and computers alike; the scene's read of the file says what it draws, and that count stands.
+// How many worlds the cosmos draws, which the first screen's hero says. The home reads it from the count the server writes beside
+// the worlds' file, a few bytes on phones and computers alike; the scene's read of the file says what it draws, and that count stands.
 // Apart from the scene's chunk, so the door and the chunk it opens do not import each other.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { readWorldsCount } from "../../lib/chain/worldsCount.ts";

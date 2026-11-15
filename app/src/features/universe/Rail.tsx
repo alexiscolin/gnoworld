@@ -1,4 +1,4 @@
-// The rail (frames 4 and 16; ADR-0002 §1's rail and §10; 7i): the Earth and the worlds of the moment down the right edge, each its planet and
+// The rail (frames 4 and 16; ADR-0002 §1's rail and §10): the Earth and the worlds of the moment down the right edge, each its planet and
 // its name, 25 at most, the column scrolling to its end, "See all" under it; one stop in the tab order, the arrows among the worlds; each
 // planet its real one once drawn (WorldPlanet), ui's disc till then. Where it stands, the page's plain list of worlds steps aside for it.
 import { Button } from "@gnoworld/ui";
@@ -97,7 +97,7 @@ function useRail(places: WorldPlaces, followed: readonly string[], universe: str
   const entries = useSyncExternalStore(order.subscribe, order.entries, noEntries);
   const railRef = useRef<HTMLElement>(null);
   const [cut, setCut] = useState(false);
-  // A rail of the Earth alone stands not, and leaves the page its list of hubs (Alexis, 2026-11-03).
+  // A rail of the Earth alone stands not, and leaves the page its list of hubs.
   const standing = known !== undefined && entries.some(({ section }) => section !== "earth");
   useEffect(() => {
     const leaving = new AbortController();
@@ -124,7 +124,7 @@ function useRail(places: WorldPlaces, followed: readonly string[], universe: str
       standFor(false);
     };
   }, [standing, order]);
-  // A tag's rail (D425) and a system's (D428): the worlds they keep, in place of the rail's own; far out, the rail's own.
+  // A tag's rail and a system's: the worlds they keep, in place of the rail's own; far out, the rail's own.
   const lens = useLens();
   const lit = useLit();
   const system = useResting();
@@ -202,7 +202,7 @@ export function Rail({ places, universe }: { places: WorldPlaces; universe: stri
           ))}
         </ul>
       </div>
-      {/* The rail shows the worlds of the moment; every place is the search palette's (D355), asked open on no words. */}
+      {/* The rail shows the worlds of the moment; every place is the search palette's, asked open on no words. */}
       <div className={styles["foot"]}>
         <Button
           size="s"

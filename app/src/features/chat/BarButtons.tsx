@@ -1,4 +1,4 @@
-// The buttons of a line's bar, one click each (D376): the reactions, and Reply, Open thread and the room's link.
+// The buttons of a line's bar, one click each: the reactions, and Reply, Open thread and the room's link.
 import { IconButton, Menu } from "@gnoworld/ui";
 import type { LineActionsProps } from "./LineActions.tsx";
 

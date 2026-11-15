@@ -7,7 +7,7 @@ import { site } from "../../places.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Hero } from "./Hero.tsx";
 
-// "Go explore" (ADR-0003 §3) flies to the busiest world: a plain click asks where, then goes there through the router, so 7g's flight
+// "Go explore" (ADR-0003 §3) flies to the busiest world: a plain click asks where, then goes there through the router, so the flight
 // takes the page from the cosmos to that world. A click with a key held is the browser's, to the Earth its address names.
 const where = vi.hoisted(() => ({ exploreTo: vi.fn<(places: unknown) => Promise<string>>() }));
 vi.mock("./explore.ts", () => where);
@@ -93,7 +93,7 @@ describe("Go explore's click", () => {
     expect(explore.getAttribute("href")).toBe("/earth");
   });
 
-  // F4507: what goes wrong between the click and the answer.
+  // What goes wrong between the click and the answer.
   it("goes to the Earth its address names when the answer fails", async () => {
     const failure = new Error("the chunk did not come");
     where.exploreTo.mockRejectedValue(failure);

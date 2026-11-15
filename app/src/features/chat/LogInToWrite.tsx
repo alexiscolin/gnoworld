@@ -1,4 +1,4 @@
-// A guest's place of the composer (Alexis, 2026-11-07: "un CTA pour la connexion, un texte plus joli"): the composer's box, saying what an
+// A guest's place of the composer: the composer's box, saying what an
 // account may do here, and the way in, which asks the header's one account control (pageAsks.ts).
 import { Button, Cluster, Stack } from "@gnoworld/ui";
 import { askFor } from "../../pageAsks.ts";

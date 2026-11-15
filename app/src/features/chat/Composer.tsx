@@ -1,6 +1,6 @@
-// The composer (slice 4's 4c): Markdown to the room in view, sent with Enter or Send, Shift+Enter adding a line (a
+// The composer: Markdown to the room in view, sent with Enter or Send, Shift+Enter adding a line (a
 // message of several lines goes as one, 4096 bytes and 40 lines at most: draft/multiline); its caller shows
-// it to an account alone, a room letting accounts alone speak (+M). The design system's field holds the line and
+// it to an account alone, a room letting accounts alone speak. The design system's field holds the line and
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks.
@@ -44,46 +44,46 @@ export interface ComposerProps {
   members: readonly string[];
   /** The members' gno.land names by address, for those who have one, in place of the chains' (a test's): `@` suggests them by name. */
   names?: ReadonlyMap<string, string> | undefined;
-  /** Whether a mention of the whole room counts in this room (4f-n); the field says so as `@room` stands in the draft. */
+  /** Whether a mention of the whole room counts in this room; the field says so as `@room` stands in the draft. */
   groups?: boolean | undefined;
   /** Sends the draft as composed (and as written, which a refused direct message puts back); whether it went. */
   onSay: (composed: Composed, draft: string) => boolean;
-  /** Why the draft is held back for the server's pace, asked as Send is pressed: none when it may go (F2092). */
+  /** Why the draft is held back for the server's pace, asked as Send is pressed: none when it may go. */
   slow?: ((composed: Composed) => string | undefined) | undefined;
-  /** Where the draft starts: the room's, kept on the device (4d). */
+  /** Where the draft starts: the room's, kept on the device. */
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
-  /** What each change of the draft tells the room of the account's typing (4f). */
+  /** What each change of the draft tells the room of the account's typing. */
   onTyping?: ((state: "active" | "done") => void) | undefined;
-  /** The name of whom it writes to, in place of the room's: a direct message's partner (4e). */
+  /** The name of whom it writes to, in place of the room's: a direct message's partner. */
   label?: string | undefined;
-  /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
+  /** The lines Ergo refused so far, the last one's draft, and why it did not go (a direct message to an account
    * not connected). One more while the composer is in view puts its draft back in the box. */
   refused?: Refused | undefined;
   /** Whether `refused` is a refusal not told yet as the composer starts: a correction Ergo refused, taken up again. */
   fresh?: boolean | undefined;
-  /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
+  /** Takes the focus as it starts: a direct message just opened from who is here, whose button went. */
   focus?: boolean | undefined;
-  /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
+  /** The id of what describes whom it writes to: a direct message's "not encrypted". */
   describedBy?: string | undefined;
-  /** The line the next one answers (4d's replies), said over the field; how many times Reply was asked, each asking
+  /** The line the next one answers (a reply), said over the field; how many times Reply was asked, each asking
    * putting the focus in the field; and how to answer none. */
   replying?: Answered | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
-  /** Whether the connection sends a message of several lines whole; else a draft goes a line at a time, 20 at most (CR7). */
+  /** Whether the connection sends a message of several lines whole; else a draft goes a line at a time, 20 at most. */
   multiline?: boolean | undefined;
   /** A message of the reader's is being corrected, its words the draft: Save sends the correction, which Escape or the
-   * bar's Cancel drops (a direct message's, 4d). */
+   * bar's Cancel drops (a direct message's). */
   editing?: boolean | undefined;
   onCancelEdit?: (() => void) | undefined;
-  /** The line it was correcting went from the conversation: the field says so until the draft changes (CR3). */
+  /** The line it was correcting went from the conversation: the field says so until the draft changes. */
   gone?: boolean | undefined;
 }
 
 // The draft, and each change of it: the device and the room told at once. A render alone (a line arriving, a room opened
-// on a kept draft) writes nothing and tells no one (R3).
+// on a kept draft) writes nothing and tells no one.
 function useDraft({ draft: kept = "", onDraft, onTyping }: Pick<ComposerProps, "draft" | "onDraft" | "onTyping">) {
   const [draft, setDraft] = useState(kept);
   const change = (next: string) => {

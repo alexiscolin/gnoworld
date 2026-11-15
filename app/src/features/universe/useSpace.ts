@@ -1,4 +1,4 @@
-// A page's hold on space (D401): the place it shows (the home's view, a system or the universe by its address, the Earth, a world),
+// A page's hold on space: the place it shows (the home's view, a system or the universe by its address, the Earth, a world),
 // kept while it is on screen; its planet's circle watched as the page lays it out; its text entering at once when no flight brings
 // it, and its chrome ghosted out as it leaves. True once the first frame is drawn, or 2.5 s after the page is on screen.
 import { EARTH } from "@gnoworld/core";
@@ -27,8 +27,7 @@ const FULL_PAGE = "full";
 // galaxy at /universe, the Earth's ecosystem at /, a system) shows the same chrome where it was, so it leaves no ghost and rises nothing.
 const pages: { standing?: string | undefined; left?: string | undefined; cameAfter?: string | undefined } = {};
 
-/** Whether the page standing came after a page of its own kind (the cosmos after the cosmos): its chrome stays as it was (Alexis,
- * 2026-11-09: "ne pas recharger ce titre sur l'écosystème de la Terre qui a le même"). */
+/** Whether the page standing came after a page of its own kind (the cosmos after the cosmos): its chrome stays as it was. */
 export const sameKind = (): boolean => pages.standing !== undefined && pages.standing === pages.cameAfter;
 
 const kindOf = (body: "earth" | "cosmos" | WorldShown | undefined): string =>
@@ -47,7 +46,7 @@ function placeOf(
   if (body === "earth") return ["world", EARTH];
   if (typeof body === "object") return ["world", body.world];
   if (path.endsWith("/universe")) return ["universe", ""];
-  // The home's own path is the Earth's first screen; a namespace that orbits the Earth is the Earth's system, `/s/gnoland` (D501).
+  // The home's own path is the Earth's first screen; a namespace that orbits the Earth is the Earth's system, `/s/gnoland`.
   if (system === undefined) return ["home", ""];
   return ["system", isHome(system) ? HOME_SYSTEM : system];
 }
@@ -61,7 +60,7 @@ const placeFrom = (kind: Place["kind"] | "none", id: string): Place | undefined 
 export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  // The page's one reading of who is here, held while space shows: every world's name carries it (D562).
+  // The page's one reading of who is here, held while space shows: every world's name carries it.
   useHere(true);
   const [kind, id] = placeOf(body, pathname, useParams()["system"]);
   // A page that comes once space drew finds it drawn: its chat and its loader know it from the first render.

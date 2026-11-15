@@ -1,4 +1,4 @@
-// "Release a command-line key" (D13940): a key's holder frees it from a gnoworld account with no session, by the same block and paste as a link.
+// "Release a command-line key": a key's holder frees it from a gnoworld account with no session, by the same block and paste as a link.
 // It never says whether the key was linked. Reached from the device menu and from Settings, logged in or not.
 import { Dialog, Stack } from "@gnoworld/ui";
 import { ReleaseFlow } from "./CommandTab.tsx";

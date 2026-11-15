@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CallFailure } from "../../lib/adena/answers.ts";
 import { sayFailure, sayProblem, shown } from "./say.ts";
 
-// 9d, D206: every failure of a call is a state with the next step the person can take. The text is ours: Adena's message and
+// Every failure of a call is a state with the next step the person can take. The text is ours: Adena's message and
 // the realm's log are shown as what they are, after it, never in place of it.
 const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain" | "not-loaded", RegExp> = {
   missing: /install adena/i,

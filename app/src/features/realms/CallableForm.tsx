@@ -1,4 +1,4 @@
-// A page's `<gno-form exec="Func">` that a call can carry (9e, ADR-0002 section 4): the form as RealmForm draws it, every field in
+// A page's `<gno-form exec="Func">` that a call can carry (ADR-0002 section 4): the form as RealmForm draws it, every field in
 // view, and a "Call" that opens the call card under it, prefilled from the form, every field editable (a hidden one shows as a field,
 // the form still says it is hidden), the card after the form's frame and not inside it (a frame of its own, the column's width). What the chain does not confirm leaves the read-only form: `vm/qfuncs` has no such write
 // function, a type no call carries, a field no parameter is named for, two of one name, a line that is no field, fields left

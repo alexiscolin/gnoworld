@@ -9,7 +9,7 @@ import { shownOf } from "./shown.tsx";
 import "./Thread.tsx";
 import { useThreads } from "./Threading.tsx";
 
-// R2 (redpass2-4th): the thread's composer is a lazy chunk like the panel's. One that could not be fetched is the panel's
+// The thread's composer is a lazy chunk like the panel's. One that could not be fetched is the panel's
 // failure alone, and the next thread opened asks for it again: a lazy component would keep its failure for good.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const fetched = vi.hoisted(() => ({ count: 0 }));

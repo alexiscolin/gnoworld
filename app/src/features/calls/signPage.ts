@@ -1,4 +1,4 @@
-// The call card's signature in the page (9d): the parts signCall takes, the real ones. Everything Adena and the chain's `tx`
+// The call card's signature in the page: the parts signCall takes, the real ones. Everything Adena and the chain's `tx`
 // need is loaded by the first click on "Sign in Adena", so the first screen's JavaScript does not carry any of it (ADR-0002
 // section 4, budgets.spec.ts).
 import type { Universe } from "../../lib/adena/call.ts";

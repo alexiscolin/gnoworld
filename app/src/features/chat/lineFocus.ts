@@ -1,4 +1,4 @@
-// The keyboard and the pointer among a room's lines (4c's message menu, docs/decisions.md 2026-10-26): the list is one
+// The keyboard and the pointer among a room's lines: the list is one
 // tab stop, a line, the arrows moving among them; a line pointed at or holding the focus shows its bar.
 import type { Line } from "@gnoworld/core";
 import {
@@ -17,7 +17,7 @@ const linesOf = (list: HTMLElement): Element[] => [...list.children].filter((ite
 
 // The place of the line a list's event happened in, a link in its words included; -1 outside a line.
 function itemAt(list: HTMLElement, target: EventTarget | null): number {
-  // Up to the list's own item: a line that is a Markdown list holds items of its own (F814's class).
+  // Up to the list's own item: a line that is a Markdown list holds items of its own.
   let item = target instanceof Element ? target : null;
   while (item !== null && item.parentElement !== list) item = item.parentElement;
   return item === null ? -1 : linesOf(list).indexOf(item);
@@ -41,7 +41,7 @@ export function stopOf(lines: readonly Line[], chosen: string | undefined, fresh
 function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
   const list = event.currentTarget;
   const items = linesOf(list);
-  // From a line or a link in its words (U1); a key on its bar, its menu or its dialog is theirs.
+  // From a line or a link in its words; a key on its bar, its menu or its dialog is theirs.
   const to = nextLine(event, items.length, () =>
     event.target instanceof Element && event.target.closest("[role='toolbar']") !== null
       ? -1
@@ -89,7 +89,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   // line from under the pointer between the press and the release and lose the click (a chip, a link).
   const pressedRef = useRef(false);
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it, the same line
-  // again after the focus left the list too (G8): never as a line arrives (/code-review) or under the pointer.
+  // again after the focus left the list too: never as a line arrives (/code-review) or under the pointer.
   useEffect(() => {
     if (pressedRef.current) return;
     listRef.current?.querySelector(":scope > li:focus-within [role='toolbar']")?.scrollIntoView({ block: "nearest" });
@@ -100,7 +100,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
       setFocused(line?.id);
       setAsked((was) => stays(was, line?.id));
       setHeld(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
-      // The focus moved: its line's bar shows until the pointer moves again (U11).
+      // The focus moved: its line's bar shows until the pointer moves again.
       setPointed(undefined);
       if (line !== undefined) setChosen(line.id);
     },
@@ -125,10 +125,10 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     onPointerLeave: () => {
       setPointed(undefined);
     },
-    // A press on the bar's own controls keeps the bar in view, as before: only a line's words, a chip, a link, are pressed.
+    // A press on the bar's own controls keeps the bar in view: only a line's words, a chip, a link, are pressed.
     onPointerDown: (event: { target: EventTarget }) => {
       pressedRef.current = !(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
-      // Released anywhere, outside the list too: a press dragged off it would else leave the list thinking it is held (27).
+      // Released anywhere, outside the list too: a press dragged off it would else leave the list thinking it is held.
       if (pressedRef.current) {
         const until = new AbortController();
         const release = () => {
@@ -164,7 +164,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     if (item instanceof HTMLElement) item.focus();
   };
   // One bar at a time: the pointed line's while the pointer is on the lines, else the focused line's; a bar holding
-  // the focus stays beside it (U11).
+  // the focus stays beside it.
   const mounted = (id: string) => (held && id === focused) || id === (pointed ?? focused) || id === asked?.id;
   return { stop, mounted, on, leave, asked };
 }

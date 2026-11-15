@@ -1,9 +1,9 @@
-// What a room's composer starts from and keeps, moved out of Writer.tsx for the lint's sizes.
+// What a room's composer starts from and keeps.
 import type { Address } from "@gnoworld/schemas";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import type { WriterProps } from "./Writer.tsx";
 
-// What the composer starts from and keeps: the account's drafts on this device, the room's (4d), or a thread's own, which
+// What the composer starts from and keeps: the account's drafts on this device, the room's, or a thread's own, which
 // the page keeps in memory; a correction's own words (an edit) are kept nowhere, as a refused correction taken up again
 // (`back`) is a plain draft.
 export function draftOf(props: WriterProps, address: Address) {

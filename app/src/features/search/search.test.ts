@@ -13,7 +13,7 @@ import { SHOWN, searchPlaces } from "./search.ts";
 import { buildIndex, FUNCTION_SCORE } from "./searchIndex.ts";
 import { COMMANDS, type SearchFilter, type SearchItem } from "./types.ts";
 
-// The palette's search, over the places the page holds already (no request, docs/plans/slice-5.md §1).
+// The palette's search, over the places the page holds already (no request).
 const ITEMS: SearchItem[] = [
   { name: "Bubble", kind: "world", universe: "onyx", path: "/w/bubble", slug: "bubble", rooms: ["#bubble"], here: 2 },
   { name: "Arcade", kind: "world", universe: "onyx", path: "/w/arcade", slug: "arcade", rooms: ["#arcade"] },

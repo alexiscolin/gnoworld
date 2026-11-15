@@ -30,7 +30,7 @@
     }
   }
 
-  /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is (F2165). */
+  /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is. */
   .screen[data-full] {
     position: fixed;
     inset: var(--flash-room) 0 0;
@@ -39,8 +39,8 @@
     z-index: 3;
   }
 
-  /* The lines read larger than the site's 13.5 px chat text, in the full chat and in the dock alike (Alexis, 2026-11-07, "plus gros en mode
-     full size"; 2026-11-08, the dock "plus gros et convivial"); a phone's keeps the site's. */
+  /* The lines read larger than the site's 13.5 px chat text, in the full chat and in the dock alike; a phone's keeps the
+     site's. */
   .screen:not([data-compact]) {
     --font-chat: var(--font-chat-l);
   }
@@ -50,7 +50,7 @@
     content: none;
   }
 
-  /* The wide full chat's band, under the site's header, whose 96 px the chat leaves it (Alexis, 2026-11-09): the header stays where it
+  /* The wide full chat's band, under the site's header, whose 96 px the chat leaves it: the header stays where it
      stood, the chat's surface under it. */
   :root:has(.screen[data-full]:not([data-compact])) {
     --chat-head: calc(var(--control-m) + 2 * var(--space-s));
@@ -82,7 +82,7 @@
   }
 
   /* The dock beside a place's plate: its header's first row on the plate's crumbs' line, the 24 px row 27 px under the plate's top (frame
-     20; Alexis, 2026-11-07), the row being a small control high. */
+     20), the row being a small control high. */
   .screen:not([data-full]) [data-region="header"] {
     /* raw: the crumbs' row's middle, 27 px and half its 24 px under the plate's top (ui Panel's plate), less half this row */
     padding-block-start: calc(27px + 12px - var(--control-s) / 2);

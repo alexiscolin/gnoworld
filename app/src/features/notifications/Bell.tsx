@@ -1,6 +1,6 @@
-// The header's bell (frames 86, 87; 8a's slot): the button and its count on the first screen, the rest later. The count
-// comes a moment after the page has loaded (Watch.tsx); the panel at the first press (Panel.tsx). Neither is in the first
-// screen's budget, nor later.ts: on the home, the one page that has it nowhere else, it would cost a chunk of its own (472 B).
+// The header's bell (frames 86, 87): the button and its count on the first screen, the rest later. The count comes a moment after
+// the page has loaded (Watch.tsx); the panel at the first press (Panel.tsx). Neither is in the first screen's code, nor in later.ts:
+// on the home, the one page that has it nowhere else, it would cost a chunk of its own.
 import { IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useApp } from "../../storeContext.tsx";
@@ -29,7 +29,7 @@ function useSettled(): boolean {
 
 export function Bell() {
   const [count, setCount] = useState(0);
-  // The bell counts what is the reader's own: a visitor's bell holds the news, uncounted (the plan space-simple).
+  // The bell counts what is the reader's own: a visitor's bell holds the news, uncounted.
   const signedIn = useApp(({ login }) => login.session.kind === "in");
   const settled = useSettled();
   const [open, setOpen] = useState(false);

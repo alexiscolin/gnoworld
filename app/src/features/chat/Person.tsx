@@ -7,7 +7,7 @@ interface PersonProps {
   account?: boolean;
 }
 
-// A person: a guest by its nick, said so, a guest who speaks through the bot (anon/<name>, D430) by its name; an account's address
+// A person: a guest by its nick, said so, a guest who speaks through the bot (anon/<name>) by its name; an account's address
 // shortened, its whole in its title; another name whole (the moderation bot's). Whether the name is an address, read once by a caller.
 export function Person({ name, guest, account }: PersonProps) {
   if (name === JARVIS_NICK) return <span>Jarvis (AI)</span>;

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, mount, settled } from "../../../tests/mount.tsx";
 import MarketCard from "./MarketCard.tsx";
 
-// The market card's reads are queries (D13973): the cards of one page share one read of each file, and a failed read is asked again by the
+// The market card's reads are queries: the cards of one page share one read of each file, and a failed read is asked again by the
 // next card, not kept for the page's life.
 const MARKETS = {
   source: "CoinGecko",

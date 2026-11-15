@@ -1,4 +1,4 @@
-// The command-line way to link a key, or to release one (owners' moderation, part 5; D13940): the address, the block the server composed (shown as it came, never built here),
+// The command-line way to link a key, or to release one: the address, the block the server composed (shown as it came, never built here),
 // the file the tool wrote pasted back. A code lives 10 minutes, once; a refusal brings a new code at once, the block filled again.
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { Button, Cluster, Stack } from "@gnoworld/ui";

@@ -24,7 +24,7 @@ export function ToggleChips<Id extends string>({
   ));
 }
 
-/** The chips wrapping whole, never cut (Alexis, 2026-11-08: "c'est coupé"), the sort at the row's end: the palette's filters and
+/** The chips wrapping whole, never cut, the sort at the row's end: the palette's filters and
  * Discover's. */
 export function FilterRow({ chips, sort }: { chips: ReactNode; sort: ReactNode }) {
   return (

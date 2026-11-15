@@ -5,7 +5,7 @@ import type { ChainCall } from "../../store/chain.ts";
 import { all, mount, one } from "../../../tests/mount.tsx";
 import { ChainCard } from "./ChainCard.tsx";
 
-// Slice 9g (frames 20 to 35, the activity of a world's room): a call the chain told is a card of the room's thread, in words from the
+// Frames 20 to 35, the activity of a world's room: a call the chain told is a card of the room's thread, in words from the
 // event alone (who, what, the realm, the block it stands at), drawn as text. A room that shows "kaito voted yes" shows it from the chain's
 // event and from nothing a page did first (ADR-0002 §4).
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -58,7 +58,7 @@ describe("the chain's lines in a room", () => {
     }
   });
 
-  // Red pass: the second wall holds for the actor and the realm too, which the schema also stops, and the box stays text and short.
+  // The second wall holds for the actor and the realm too, which the schema also stops, and the box stays text and short.
   it("draws an actor of markup, of a bidi override or of 10 KB as short text only", () => {
     for (const actor of [`<img src=x onerror=1>`, `g1${bidi}abcdefghijkl`, `g1${"a".repeat(10_000)}`]) {
       const { box, item } = mountLine({ ...line(1), actor: actor as ChainCall["actor"], realm: `gno.land/r/${actor}` });
@@ -69,7 +69,7 @@ describe("the chain's lines in a room", () => {
     }
   });
 
-  // An address is its first six and last five characters, as the schemas' shortAddress cuts it (D13015).
+  // An address is its first six and last five characters, as the schemas' shortAddress cuts it.
   // Whole lines: a hostile name is stripped and capped, not replaced by text, and an address is cut only past 12 characters.
   it.each([
     ["a bidi override", `Vote${bidi}`, "g10gh7…3y5tv called Vote"],

@@ -1,6 +1,5 @@
-// A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
-// (4c), its link's player (4g), its link's page preview (8f), its link's card (L4) and its bar. One that mentions the reader says so (4d), one of the reader's own says
-// "you" (4e).
+// A room's line: its marks, its time, its author, its text drawn from Markdown, its link's player, its link's page
+// preview, its link's card and its bar. One that mentions the reader says so, one of the reader's own says "you".
 import { markdown, mentions, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { ReactNode } from "react";
@@ -50,7 +49,7 @@ function NewDivider() {
   );
 }
 
-// A line's reactions under it, when it has any (4d).
+// A line's reactions under it, when it has any.
 function Chips({ to, chips, react }: { to: string; chips: string | undefined; react: LineViewProps["react"] }) {
   return chips === undefined || chips === "" ? null : <Reactions to={to} chips={chips} react={react} />;
 }
@@ -103,7 +102,7 @@ function chipOf({ id, replies, stop, onThread }: ChipOf) {
 }
 
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
-// mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
+// mention shortened for the reader and the room's members alone. A change of members reads its mentions
 // again, never its drawing.
 export interface LineViewProps {
   line: ShownLine;
@@ -115,30 +114,30 @@ export interface LineViewProps {
   actions: ReactNode;
   /** Whether it goes on its author's group: no face and name, its time in the gutter on hover. */
   grouped?: boolean;
-  /** Whether it is the first line past the reading place as the room opened (4f). */
+  /** Whether it is the first line past the reading place as the room opened. */
   fresh: boolean;
-  /** Its verdict from the server's stream, which a link's player waits on (4g). */
+  /** Its verdict from the server's stream, which a link's player waits on. */
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
   players: boolean;
-  /** What its card needs (link-previews L4, lineCard.ts's cardMarks): no msgid for a direct message's line, which has no card. */
+  /** What its card needs (lineCard.ts's cardMarks): no msgid for a direct message's line, which has no card. */
   cardMsgid?: string | undefined;
   cardKey?: string | undefined;
   may?: boolean;
   saving?: boolean;
-  /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
+  /** Whether it is saved on this device, and whether it is pinned in its room. */
   saved: boolean;
   pinned: boolean;
-  /** Its reactions as shown (4d), as chipsOf writes them, and how an account reacts; none for a guest. */
+  /** Its reactions as shown, as chipsOf writes them, and how an account reacts; none for a guest. */
   chips: string | undefined;
   /** Whether it is its author's first words in the room: the video's "new here". */
   newHere?: boolean | undefined;
   /** A poll line's votes, as votesString writes them; none for a line that is no poll. */
   votes?: string | undefined;
   react: ((reaction: Reacting) => boolean) | undefined;
-  /** The line it answers, when the room holds it (4d's replies). */
+  /** The line it answers, when the room holds it. */
   answers: Line | undefined;
-  /** The replies of the thread it roots, and how a chip opens it (4d's threads); none draws no chip. */
+  /** The replies of the thread it roots, and how a chip opens it; none draws no chip. */
   replies?: number | undefined;
   onThread?: ((id: string) => void) | undefined;
   /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
@@ -176,13 +175,13 @@ export function LineView(props: LineViewProps) {
     fresh,
   });
   const blocks = markdown(line.text);
-  // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
+  // Its first link to an accepted service gets a player, but for a reader who saves data.
   const embed = players ? embedIn(blocks) : undefined;
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   // What the quote shortens, a string the compiler compares by value: the quote is cut again only when its own words or
-  // the people they mention change, never as other lines come (F1220).
+  // the people they mention change, never as other lines come.
   const quoted = quoteKnown(answers, members, me);
   // Mine: my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar; U5).
   const mine = me !== undefined && line.account === me;
@@ -216,7 +215,7 @@ export function LineView(props: LineViewProps) {
         mine={mine}
         tabbable={row.links}
       />
-      {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
+      {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere. */}
       {actions}
       {/* The reactions at the line's start, the thread's chip at its end, on one row; none drawn, no row. */}
       <div className={styles["foot"]}>

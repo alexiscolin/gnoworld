@@ -1,4 +1,4 @@
-// Direct messages on a world's page (slice 4's 4e): the conversation the address names (?dm=<address>), an
+// Direct messages on a world's page: the conversation the address names (?dm=<address>), an
 // account's with another account, and the list the rooms' navigation shows.
 import type { Line, Reaction } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
@@ -9,7 +9,7 @@ import type { DmsProps } from "./RoomsView.tsx";
 
 /** What every direct message says of itself (ADR-0002, Chat). */
 export const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
-/** And that it lives in the page alone: Ergo keeps no direct message (decision 154; decision C). */
+/** And that it lives in the page alone: Ergo keeps no direct message. */
 export const PAGE_ONLY = "Kept only while this page is open.";
 
 export interface Dms {
@@ -23,9 +23,9 @@ export interface Dms {
   empty: string;
   /** The lines to it Ergo refused this session: how many, the last one's draft, and whether its partner was offline. */
   refused: AppState["dmRefused"][string] | undefined;
-  /** Why the ?dm= asked shows no conversation, said in its place (U9). */
+  /** Why the ?dm= asked shows no conversation, said in its place. */
   problem: string | undefined;
-  /** The reactions to the conversation's lines (4d's DM bar). */
+  /** The reactions to the conversation's lines (the direct message bar). */
   reactions?: readonly Reaction[] | undefined;
   /** What Ergo refused of the page's delete or reaction in it: the line whose delete, and a reaction. */
   acts?: AppState["dmActRefused"][string] | undefined;
@@ -42,7 +42,7 @@ export function partnerOf(account: string | undefined, asked: string | null): st
 export const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
   partner === undefined || heard.includes(partner) ? heard.toReversed() : [partner, ...heard.toReversed()];
 
-/** Why the address's ?dm= shows no conversation: a guest's, one's own address, an address that is none (U9); nothing
+/** Why the address's ?dm= shows no conversation: a guest's, one's own address, an address that is none; nothing
  * while the session is unknown. */
 export function problemOf(session: AppState["login"]["session"], asked: string | null): string | undefined {
   if (asked === null || session.kind === "unknown") return undefined;
@@ -57,7 +57,7 @@ export function conversationOf(all: AppState["dms"], partner: string | undefined
 }
 
 // Everyone in a room this page follows, as one string the store's selector compares by value: a partner among them is online.
-// ponytail: every member of every room followed, a world's few rooms of a few hundred people each.
+// ponytail: every member of every room followed: a world's few rooms of a few hundred people each.
 const presentIn = (rooms: AppState["chat"]["rooms"]): string =>
   [...new Set(Object.values(rooms).flatMap((room) => room.members))].sort().join(" ");
 

@@ -5,7 +5,7 @@ import { all, click, faceOf, follows, mount, nth, one, settled } from "../../../
 import { shortAddress } from "./names.ts";
 import { People } from "./People.tsx";
 
-// 5q: "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, a rule under each row. The list and the way to write to a person stay (4e): the
+// "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, a rule under each row. The list and the way to write to a person stay: the
 // whole face and name is one button, named "Message" and the address, which opens the conversation.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

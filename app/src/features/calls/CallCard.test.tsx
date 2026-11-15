@@ -14,9 +14,9 @@ import { CallCard, type CallCardProps } from "./CallCard.tsx";
 import { signCall } from "./signCall.ts";
 import { ensureCalls } from "./slice.ts";
 
-// 9d: the card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
+// The card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
 // REALM / FUNCTION / ARGUMENTS / NETWORK / FEE block, the warnings, then "Sign in Adena" and "Cancel" and, once signed, the
-// wait and the result (a hash short as an address is: six, "…", five, D13015). Every state is words, and the result says done only from the chain's answer.
+// wait and the result (a hash short as an address is: six, "…", five). Every state is words, and the result says done only from the chain's answer.
 const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const REALM = "gno.land/r/demo/profile";
 const PARAMS = [
@@ -48,7 +48,7 @@ const view = (over: Partial<CallCardProps> = {}) =>
     />,
   );
 const buttons = (box: HTMLElement) => all(box, "button").map((b) => said(b));
-// The wait's look: Sign in Adena kept, pressed, with no Cancel, and the ring before the words (F5736, F5737).
+// The wait's look: Sign in Adena kept, pressed, with no Cancel, and thering before the words.
 function expectWaiting(box: HTMLElement) {
   expect(buttons(box)).toEqual(["Sign in Adena"]);
   expect(all(box, "button")[0]?.getAttribute("aria-busy")).toBe("true");
@@ -96,7 +96,7 @@ describe("CallCard, the preview", () => {
     expect(inputs.map((input) => input.labels?.[0]?.textContent)).toEqual(["bio", "times"]);
   });
 
-  // F5966: the frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
+  // The frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
   it("draws each argument's name in its own case, aside the caps label, which its field keeps for assistive technology", () => {
     const box = view();
     const names = all(box, "[class*='name']");
@@ -342,7 +342,7 @@ describe("CallCard, its buttons and fields call their handlers", () => {
   });
 });
 
-// F5723: what the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
+// What the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
 // card is signed through signCall with a stand-in for Adena: the drawn fields and network are compared with
 // DoContract's message, not with a helper only a test calls.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -428,7 +428,7 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
     expect(block.className).toContain("block");
   });
 
-  // F5953: the block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
+  // The block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
   it("wears the shared edge on its block", () => {
     const classes = (all(view(), "dl")[0] ?? document.body).className.split(" ");
     expect(classes).toEqual([expect.stringContaining("edge"), expect.stringContaining("block")]);
@@ -441,7 +441,7 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
   });
 });
 
-// Alexis (D272): a GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
+// A GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
 // the fee is lost: one line, in the card every vote opens (the realm view, a pinned action, a page's form). r/gov/dao's votes are
 // MustVoteOnProposalSimple and the two of a struct no call carries (read on onyx with gnomcp).
 describe("CallCard, a GovDAO vote", () => {
@@ -471,7 +471,7 @@ describe("CallCard, a GovDAO vote", () => {
 });
 
 // The video's card is named after the action ("Boop the pot", f0110), its function in its own row: a pinned action's card is titled
-// by its label (design review of 9e-1); a card with no name is titled by its function, as before.
+// by its label; a card with no name is titled by its function.
 describe("CallCard, its title", () => {
   it("is the name it is given, the function staying in its FUNCTION row", () => {
     const box = view({ title: "Vote" });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { feeText } from "./fee.ts";
 
-// 9d, question 9d-1 option 1: the fee line is an estimate, from what the last calls of the same realm and function paid
-// (ugnot) up to a block it names, labelled so; Adena simulates and sets the real fee when the person signs (reports/slice-9d-fee.md).
+// The fee line is an estimate, from what the last calls of the same realm and function paid
+// (ugnot) up to a block it names, labelled so; Adena simulates and sets the real fee when the person signs.
 const read = (fees: number[], height = 4242) => ({ fees, height });
 const AT = "an estimate from calls up to block 4,242";
 

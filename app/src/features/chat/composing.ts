@@ -1,5 +1,5 @@
-// What the composer is told of the line the next message answers (slice 4's 4d replies) or corrects (the DM bar's and the
-// room's edits), moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
+// What the composer is told of the line the next message answers (a reply) or corrects (the DM bar's and the room's edits):
+// each its conversation's alone, dropped as another comes in view.
 import { canEdit, shownLine, type Composed, type Line } from "@gnoworld/core";
 import { useState } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
@@ -45,9 +45,9 @@ interface Composing {
 
 type Here<T> = ReturnType<typeof useHere<T>>;
 
-// The line the next one answers (4d's replies), and how many times Reply was asked: each asking puts the focus in the
-// field (G8). Its conversation's alone: another in view drops it, as does a line sent. Asking for one ends an edit
-// (`endEdit`), as asking for an edit drops a reply (CR7).
+// The line the next one answers, and how many times Reply was asked: each asking puts the focus in the
+// field. Its conversation's alone: another in view drops it, as does a line sent. Asking for one ends an edit
+// (`endEdit`), as asking for an edit drops a reply.
 function repliesOf(
   shown: Shown | undefined,
   lines: readonly Line[] | undefined,
@@ -76,14 +76,14 @@ function repliesOf(
 }
 
 // A line's words as the box holds them: compose sends one leading slash less than a line that starts with one is typed
-// with, so the box shows the slash back, as a changed line needs it (CR6).
+// with, so the box shows the slash back, as a changed line needs it.
 const boxed = (text: string) => (text.startsWith("/") ? `/${text}` : text);
 
 // What the edits of a conversation hold: the line chosen, whether an edit ended in it, and how to end one.
 interface Edits {
   edit: Here<Chosen>;
   ended: Here<true>;
-  /** That the line being corrected went from the conversation (CR3). */
+  /** That the line being corrected went from the conversation. */
   gone: Here<true>;
   end: () => void;
   dropReply: () => void;
@@ -92,7 +92,7 @@ interface Edits {
 }
 
 // The line left the conversation (a bot's hide, a delete from another device): the edit ends, so its return does not reopen
-// it, and the field says it (CR3).
+// it, and the field says it.
 function dropGone(edit: Here<Chosen>, gone: Here<true>, found: Line | undefined) {
   if (edit.value === undefined || found !== undefined) return;
   edit.clear();
@@ -114,7 +114,7 @@ function editsOf(
   const found = shownAs(edit, lines);
   dropGone(here, gone, found);
   // An orphan correction (its original left the window) is no line to correct: a new correction would name a line
-  // nothing folds into (CR5).
+  // nothing folds into.
   const editing = found?.edits === undefined ? found : undefined;
   if (shown === undefined) return { view: {}, writer: {} };
   const view = {
@@ -147,7 +147,7 @@ function editsOf(
 
 // A line Ergo refused takes its reply or its correction up again as its conversation is in view or comes into view: its
 // draft is back in the box (the store put it on the device), so the next Send answers or corrects as the first did. Not
-// while a correction is open there: the draft waits on the device, a plain one (CR2); true then, for the refusal to say so.
+// while a correction is open there: the draft waits on the device, a plain one; true then, for the refusal to say so.
 function takeUp(tags: RefusedTags | undefined, { reply, edit }: { reply: Here<Chosen>; edit: Here<Chosen> }) {
   if (tags === undefined) return false;
   if (edit.value !== undefined) return true;
@@ -171,7 +171,7 @@ function toldPlain(refused: Shown["writer"]["refused"], plain: number | undefine
 
 // Whether the refusals of the conversation `key` count `count` is news: each conversation's count is held as it is viewed,
 // the ones the page held as it opened being old (nothing is news on the first view of the page), and any other, heard in
-// view or while another conversation was (R7), new.
+// view or while another conversation was, new.
 function useNews(key: string | undefined, count: number) {
   const [heard, setHeard] = useState<Readonly<Record<string, number>>>();
   if (key === undefined || heard?.[key] === count) return false;
@@ -180,7 +180,7 @@ function useNews(key: string | undefined, count: number) {
 }
 
 // What Ergo refused of the conversation's lines: a direct message's alone, whose lines go out labelled so its answers are
-// known; a room's are heard by no one (F1920).
+// known; a room's are heard by no one.
 const refusedIn = (shown: Shown | undefined) => (shown?.kind === "dm" ? shown.writer.refused : undefined);
 
 // A new refusal is taken up as its conversation is in view; what was left plain is told as the refusal's own.

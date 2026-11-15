@@ -66,7 +66,7 @@ describe("the composer's field shows the formatting in place", () => {
     expect((await typed("> said")).box.querySelector("blockquote")?.textContent).toBe("said");
   });
 
-  // C5 of the review: the line sent and the field draw a quote and code by one module's rules.
+  // The line sent and the field draw a quote and code by one module's rules.
   it("draws the chat's Markdown by the same rules as the sent line", () => {
     const page = inPage(composer());
     expect(rules["rules"]).toBeTruthy();
@@ -181,7 +181,7 @@ describe("the keys of the field", () => {
     expect(page.held()).toBe("hello\n");
   });
 
-  // F1713: an Enter that picks a word of an input method (Japanese, Chinese) is no Enter.
+  // An Enter that picks a word of an input method (Japanese, Chinese) is no Enter.
   it("never sends half a word: not as a composition runs, nor for Safari's Enter after it", async () => {
     const went: Composed[] = [];
     const page = inPage(

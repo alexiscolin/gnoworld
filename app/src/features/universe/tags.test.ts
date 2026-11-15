@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { landTags, waitTags } from "./tags.ts";
 
-// O2: a flight that begins or lands on a page with no aiming tag gives GSAP no target, which it logs as "GSAP target not found".
+// A flight that begins or lands on a page with no aiming tag gives GSAP no target, which it logs as "GSAP target not found".
 afterEach(() => {
   vi.restoreAllMocks();
 });

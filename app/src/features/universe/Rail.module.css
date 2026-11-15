@@ -4,7 +4,7 @@
    clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
-    /* The page's edge, the header's own (D13956) */
+    /* The page's edge, the header's own */
     --_edge: var(--page-edge);
     /* The rail's footprint from the window's right edge (core's RAIL), written by the rail: unset, the rail takes its content's width. */
     --_footprint: initial;
@@ -23,8 +23,8 @@
   }
 
   .column {
-    /* raw: the panel down to 1,058 px of 1,080 at most, its 22 px of air kept where the ticker stood (Alexis, 2026-11-09); less the 52 px of See
-       all under the column */
+    /* raw: the panel down to 1,058 px of 1,080 at most, its 22 px of air kept; less the 52 px of See all under the
+       column */
     max-block-size: calc(100vb - 120px - 52px);
     /* layout: the planets scroll inside the panel, which keeps its edge */
     overflow: auto;

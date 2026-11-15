@@ -22,7 +22,7 @@ const line = (over: Partial<Line> = {}): Line => ({
 });
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
 const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"] };
-// A room as the page draws one: and who is here, which the info panel holds (5q).
+// A room as the page draws one: and who is here, which the info panel holds.
 type Room = NonNullable<RoomViewProps["state"]> | undefined;
 type Over = Omit<Partial<RoomViewProps>, "state"> & {
   state?: Room;
@@ -60,16 +60,16 @@ const part = (html: string, label: string) => {
   return found?.[2] ?? "";
 };
 // Each list item's words: a line that is a list holds items of its own, so a test of one counts the Messages
-// list's own children instead (F814's class).
+// list's own children instead.
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 
-// The lines view loads lazily, after the page is drawn (docs/decisions.md, 2026-10-26): drawn once and waited for, it
+// The lines view loads lazily, after the page is drawn: drawn once and waited for, it
 // is held, and every view below draws it at once, as a room switch does once the page has it.
 beforeAll(async () => {
   await prerender(
     <RoomView room="#bubble/games" state={ROOM} chat="connected" onDelete={() => false} onDismiss={() => undefined} />,
   );
-  // The typists' code comes once someone is typing (5q's fix pass, the first screen's budget): held the same way.
+  // The typists' code comes once someone is typing (the first screen's budget): held the same way.
   await prerender(
     <RoomView
       room="#bubble/games"
@@ -82,7 +82,7 @@ beforeAll(async () => {
 });
 
 describe("RoomView", () => {
-  // Slice 9g: a room the chain told a call of holds a card of its thread even with no message: the list is not the empty one.
+  // A room the chain told a call of holds a card of its thread even with no message: the list is not the empty one.
   it("draws a card of the chain in a world's main room that holds no message, and nothing in another room", () => {
     const call = {
       id: "h900030:0",
@@ -113,7 +113,7 @@ describe("RoomView", () => {
     expect(said(part(html("#bubble"), "Messages"))).toBe("");
   });
 
-  // 4g: a line's first link to an accepted service gets its player, waiting on the line's verdict; another host none.
+  // A line's first link to an accepted service gets its player, waiting on the line's verdict; another host none.
   it("puts a player under a line linking an accepted service, waiting on its verdict, and none under another", () => {
     const lines = [
       line({ id: "y", text: "watch https://youtu.be/dQw4w9WgXcQ" }),
@@ -128,7 +128,7 @@ describe("RoomView", () => {
     expect(said(part(hidden, "Messages"))).not.toContain("YouTube");
   });
 
-  // F875: each player reads its own line's verdict, not another line's.
+  // Each player reads its own line's verdict, not another line's.
   it("gives each line's player its own line's verdict", () => {
     const lines = ["a", "b", "c"].map((id) => line({ id, text: `${id}: https://youtu.be/dQw4w9WgXcQ` }));
     const html = view({ state: { ...ROOM, lines }, verdicts: { a: "checked", b: "hidden" } });
@@ -151,7 +151,7 @@ describe("RoomView", () => {
   it("names a guest's line by its nick and says it is a guest's, never by an account", () => {
     const html = part(view({ state: { ...ROOM, lines: [GUEST_LINE] } }), "Messages");
     expect(items(html)).toEqual([expect.stringMatching(/^guest-ab12cd \(guest\) \d{2}:\d{2} hello$/)]);
-    // No title on the guest's name (an account's address is its title); the time's full date is the one title (D13922).
+    // No title on the guest's name (an account's address is its title); the time's full date is the one title.
     expect(html).not.toMatch(/<(?!time)[^>]* title=/);
   });
 
@@ -181,7 +181,7 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toContain("heads up");
     expect(notice).not.toContain("*");
-    // Its mark in the head, after the name and before the time: where no sender's words stand (F808).
+    // Its mark in the head, after the name and before the time: where no sender's words stand.
     expect(notice).toMatch(/^g10gh7…3y5tv Notice \d{2}:\d{2} heads up$/);
     // Muted, its mark apart: the classes the sheet reads (`.notice .text`, `.mark`).
     expect(html).toMatch(
@@ -189,7 +189,7 @@ describe("RoomView", () => {
     );
   });
 
-  // 4d: a line that mentions the reader, by a word as well as its colour (docs/DESIGN-SYSTEM.md, "about me").
+  // A line that mentions the reader, by a word as well as its colour (docs/DESIGN-SYSTEM.md, "about me").
   it("marks a line that mentions the reader, by a word and an attribute, and its mention apart", () => {
     const lines = [line({ text: `ready, @${BOB}?` }), line({ id: "b", time: LATER, text: `and @${ALICE}` })];
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
@@ -200,7 +200,7 @@ describe("RoomView", () => {
     expect(html).toMatch(
       /<li data-about-me=""(?: tabindex="-?\d")?>.*<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span>/s,
     );
-    // The mark comes in the head, after the name and before the time: where no sender's words stand (F808).
+    // The mark comes in the head, after the name and before the time: where no sender's words stand.
     expect(first).toMatch(/^g10gh7…3y5tv Mentions you \d{2}:\d{2} ready, @g1jg8m…vsqf5 \?$/);
     expect(html).toMatch(/<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span><time /);
     expect(html).toContain(`<span data-mention="me" title="${BOB}">`);
@@ -240,7 +240,7 @@ describe("RoomView", () => {
     expect(html.match(/data-about-me/g)).toHaveLength(1);
   });
 
-  // F812: a checksum-valid address ground to shorten as BOB's does; it holds no key, so it is in no room.
+  // A checksum-valid address ground to shorten as BOB's does; it holds no key, so it is in no room.
   it("shows a mention of a member or of the reader shortened, of anyone else whole (F812)", () => {
     const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
     const lines = [line({ text: `@${ground} @${ALICE} @${BOB}` })];
@@ -249,7 +249,7 @@ describe("RoomView", () => {
     expect(html).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
   });
 
-  // F818's StrykerJS: a line's members travel as one string; each of two keeps its short form.
+  // A line's members travel as one string; each of two keeps its short form.
   it("shortens each member a line mentions, two of them in one line", () => {
     const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
     const lines = [line({ text: `@${ALICE} and @${carol}` })];
@@ -257,7 +257,7 @@ describe("RoomView", () => {
     expect(said(html)).toMatch(/ @g10gh7…3y5tv and @g1l6m6…kkanc$/);
   });
 
-  // F819 (docs/decisions.md, 2026-10-26): an author of a line in view proved its key as a member did, by Ergo's
+  // An author of a line in view proved its key as a member did, by Ergo's
   // account tag; a nick alone proves nothing.
   it("shortens a mention of an author of a line in view, by its account tag, though it left the room", () => {
     const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
@@ -328,7 +328,7 @@ describe("RoomView", () => {
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 
-  // 4c's message menu (docs/decisions.md, 2026-10-26): the Messages list is one stop of the tab order, its newest
+  // The message menu: the Messages list is one stop of the tab order, its newest
   // line; the arrows reach the others, and the line focused scrolls into view.
   it("puts the newest line alone in the tab order, the others reached by the arrows", () => {
     const lines = ["a", "b", "c"].map((id) => line({ id, text: `line ${id}` }));
@@ -341,25 +341,25 @@ describe("RoomView", () => {
     expect(html).not.toMatch(/<ol [^>]*tabindex=/);
   });
 
-  // The red pass (M12): a line that is a Markdown list holds list items of its own; the tab stop is the line's alone.
+  // A line that is a Markdown list holds list items of its own; the tab stop is the line's alone.
   it("gives a line that is a list one tab stop, its own items none", () => {
     const html = part(view({ state: { ...ROOM, lines: [line({ text: "- one\n- two" })] } }), "Messages");
-    // The author's name, which opens their card (8d), is out of the Tab order: tabindex="-1", no stop.
+    // The author's name, which opens their card, is out of the Tab order: tabindex="-1", no stop.
     expect(html.match(/tabindex="(?!-1")/g)).toHaveLength(1);
   });
 
-  // 4c's message menu: Ergo's refusal of a delete, said in the room's flash.
+  // The message menu: Ergo's refusal of a delete, said in the room's flash.
   it("says in the room's flash that Ergo refused to delete a line", () => {
     expect(said(view({ state: { ...ROOM, refused: "a" } }))).toContain("Could not delete the message.");
     expect(said(view())).not.toContain("Could not delete");
   });
 
-  // 4e's UX review (U13): an empty list was a Tab stop of no size, a screen reader saying "Messages, list" of nothing.
+  // An empty list is no Tab stop: a screen reader would say "Messages, list" of nothing.
   it("is no Tab stop while it holds no line", () => {
     expect(view({ state: { ...ROOM, lines: [] } })).not.toMatch(/<ol [^>]*tabindex/i);
   });
 
-  // 4b's pre-merge (/code-review): lines that come while the room is open reach a screen reader.
+  // Lines that come while the room is open reach a screen reader.
   it("announces the lines that come, politely, and them alone", () => {
     const html = view();
     expect(html).toMatch(/<ol [^>]*aria-live="polite"/);
@@ -393,13 +393,13 @@ describe("RoomView", () => {
     expect(items(part(view({ state: { ...ROOM, members: [nick] } }), "Who's here"))).toEqual([shown]);
   });
 
-  // 4e: an account opens a direct message with another from who is here; a guest has none, nor does one write to
+  // An account opens a direct message with another from who is here; a guest has none, nor does one write to
   // itself or to the bot.
   it("offers an account a direct message with each other account here, and nothing else", () => {
     const opened: string[] = [];
     const members = [ALICE, BOB, "guest-ab12cd", "gnoworld"];
     const html = part(view({ me: BOB, state: { ...ROOM, members }, onMessage: (a) => opened.push(a) }), "Who's here");
-    // Decision D (U8), 5q: the person's name is the button, the word "Message" before it for a screen reader alone.
+    // The person's name is the button, the word "Message" before it for a screen reader alone.
     expect([...html.matchAll(/<button[^>]*>(.*?)<\/button>/gs)].map((m) => said(m[1] ?? ""))).toEqual([
       "Message g10gh7…3y5tv",
     ]);
@@ -479,7 +479,7 @@ describe("RoomView", () => {
     expect(said(html)).not.toContain("No messages yet.");
   });
 
-  // 4c's UX review (U14): the list says how the keyboard moves in it, which nothing else would tell a screen reader.
+  // The list says how the keyboard moves in it, which nothing else would tell a screen reader.
   it("names the keys that move among its lines and reach a line's actions", () => {
     expect(view()).toMatch(
       /<ol aria-label="Messages" aria-description="Up and down arrows move between messages; Tab reaches a message&#x27;s actions\."/,
@@ -493,7 +493,7 @@ describe("RoomView", () => {
     ];
     const html = view({ state: { ...ROOM, lines } });
     expect(html).toContain("<strong>b</strong>");
-    // Its tab index is the list's (U1): a line not the list's stop keeps its links out of the Tab order.
+    // Its tab index is the list's: a line not the list's stop keeps its links out of the Tab order.
     expect(html).toMatch(
       /<a href="https:\/\/a\.example" title="https:\/\/a\.example" dir="ltr" target="_blank" rel="noopener noreferrer"( tabindex="-1")?>x<\/a>/,
     );
@@ -508,7 +508,7 @@ describe("RoomView", () => {
     );
   });
 
-  // 4e's UX review (U5): my own lines read as mine, my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar).
+  // My own lines read as mine, my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar).
   it("marks the reader's own lines as theirs, by the word you, and no one else's", () => {
     const lines = [line({ id: "a", text: "mine" }), line({ id: "b", from: BOB, account: BOB, text: "theirs" })];
     const html = part(view({ me: ALICE, state: { ...ROOM, lines } }), "Messages");
@@ -520,7 +520,7 @@ describe("RoomView", () => {
     expect(items(part(view({ state: { ...ROOM, lines } }), "Messages")).join(" ")).not.toMatch(/\byou\b/);
   });
 
-  // 4e: a conversation says why it is empty in words of its own (decisions B, C).
+  // A conversation says why it is empty in words of its own.
   it("says the words it is given when it holds no line, once connected", () => {
     const html = view({ state: { ...ROOM, lines: [] }, empty: "Nothing kept." });
     expect(said(html)).toContain("Nothing kept.");
@@ -534,7 +534,7 @@ describe("RoomView", () => {
   });
 });
 
-// 4f: who is typing, under the lines (IRCv3's +typing).
+// Who is typing, under the lines (IRCv3's +typing).
 describe("RoomView: who is typing", () => {
   const CAROL = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
   // Typing until a minute from now, so the render's clock reads it live.
@@ -557,7 +557,7 @@ describe("RoomView: who is typing", () => {
     expect(html).not.toContain("3y5tv is typing");
   });
 
-  // The UX review (U2, U8, U10): the line's place is always drawn, so the composer below never moves; the names, in
+  // The line's place is always drawn, so the composer below never moves; the names, in
   // full, are its title, as the line is cut to one.
   it("draws the typing line's place with no one typing, and names three typists", () => {
     expect(view()).toMatch(/<p class="[^"]*typing[^"]*"><\/p>/);
@@ -566,12 +566,12 @@ describe("RoomView: who is typing", () => {
     expect(html).toMatch(new RegExp(`<p class="[^"]*typing[^"]*" title="${ALICE}, ${CAROL} and ${BOB} are typing">`));
   });
 
-  // The merge of 4e and 4f: a direct message (no room) tells no typing, so it keeps no place for it either.
+  // A direct message (no room) tells no typing, so it keeps no place for it either.
   it("draws no typing line's place for a direct message", () => {
     expect(view({ room: undefined })).not.toMatch(/<p class="[^"]*typing[^"]*"/);
   });
 
-  // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.
+  // A live typist beside the past one, so the test fails while nothing is said at all.
   it("says nothing of a typist whose time is past, nor with no one typing", () => {
     const html = words(view({ state: { ...ROOM, typing: { ...typing(BOB), [ALICE]: Date.now() - 1 } } }));
     expect(html).toContain("g1jg8m…vsqf5 is typing");
@@ -579,7 +579,7 @@ describe("RoomView: who is typing", () => {
     expect(words(view())).not.toContain("typing");
   });
 
-  // The red pass (R24): out of every live region of the room, the Messages list and the link's status among them: no
+  // Out of every live region of the room, the Messages list and the link's status among them: no
   // element open around the words has a role or aria-live.
   it("keeps who is typing out of the room's live announcements", () => {
     const html = view({ chat: "waiting", state: { ...ROOM, typing: typing(ALICE) } });
@@ -595,9 +595,9 @@ describe("RoomView: who is typing", () => {
   });
 });
 
-// 4f: the first line past the reading place marked New (Ergo's draft/read-marker).
+// The first line past the reading place marked New (Ergo's draft/read-marker).
 describe("RoomView: what is new", () => {
-  // A room whose history's page came, which the New mark waits on (4f's G1).
+  // A room whose history's page came, which the New mark waits on.
   const OPENED = { ...ROOM, paged: true as const };
   const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
 
@@ -606,10 +606,10 @@ describe("RoomView: what is new", () => {
   it("marks the first line past the reading place New, before its time, and that line alone", () => {
     const html = part(view({ state: { ...OPENED, lines: LINES, read: T(0) } }), "Messages");
     expect(items(html)).toEqual([
-      // An account's first words in a room whose history came: "new here" (8d).
+      // An account's first words in a room whose history came: "new here".
       expect.stringMatching(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} /),
       expect.stringMatching(/^New( from here)? g10gh7…3y5tv \d{2}:\d{2} /),
-      // An account's first words in a room whose history came: "new here" (8d).
+      // An account's first words in a room whose history came: "new here".
       expect.stringMatching(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} /),
     ]);
     expect(html.match(/data-new=""/g)).toHaveLength(1);
@@ -633,7 +633,7 @@ describe("RoomView: what is new", () => {
   });
 });
 
-// A part's words as a reader hears them: its tags gone, no space added where none was (R12).
+// A part's words as a reader hears them: its tags gone, no space added where none was.
 const wordsOf = (html: string) =>
   html
     .replaceAll(/<[^>]+>/g, "")
@@ -643,7 +643,7 @@ const wordsOf = (html: string) =>
 // The Messages list's own lines, each one's words.
 const linesOf = (html: string) =>
   [...part(html, "Messages").matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => wordsOf(m[1] ?? ""));
-// Each button's name and pressed state, its attributes in any order (R12).
+// Each button's name and pressed state, its attributes in any order.
 const pressables = (html: string) =>
   [...html.matchAll(/<button[^>]*>/g)].flatMap(([tag]) => {
     const name = /\saria-label="([^"]+)"/.exec(tag)?.[1];
@@ -651,9 +651,9 @@ const pressables = (html: string) =>
     return name === undefined || pressed === undefined ? [] : [`${name} (${pressed})`];
   });
 
-// 4d: under a line, its reactions as the design system's chips, an emoji and its count, the reader's own pressed, each
+// Under a line, its reactions as the design system's chips, an emoji and its count, the reader's own pressed, each
 // named for a screen reader (its emoji, its count, "including you": docs/DESIGN-SYSTEM.md), out of the list's live
-// announcements; 20 distinct emoji a line at most, the rest said in a word (docs/decisions.md, 2026-10-26).
+// announcements; 20 distinct emoji a line at most, the rest said in a word.
 describe("RoomView: reactions", () => {
   // The view reads no msgid of a reaction: each keeps the same.
   const reaction = (to: string, emoji: string, who: string) => ({ id: "r", time: T0, to, emoji, who, on: true });
@@ -677,7 +677,7 @@ describe("RoomView: reactions", () => {
 
   it("shows a line's reactions to a guest as words it cannot press", () => {
     const html = view({ state: { ...ROOM, lines: TWO, reactions: REACTIONS } });
-    // The authors' names open their cards (8d): no other button.
+    // The authors' names open their cards: no other button.
     expect(part(html, "Messages").match(/<button(?![^>]*aria-haspopup="dialog")/g)).toBeNull();
     expect(linesOf(html)[0]).toMatch(/first👍 2😂 1$/);
   });
@@ -696,7 +696,7 @@ describe("RoomView: reactions", () => {
     expect(linesOf(html)[0]).toMatch(/\+5 more$/);
   });
 
-  // The green pass (G9): the word comes past the 20th emoji, never at it.
+  // The word comes past the 20th emoji, never at it.
   it.each([
     [20, 20, ""],
     [21, 20, "+1 more"],
@@ -714,11 +714,11 @@ describe("RoomView: reactions", () => {
     const lines = ["a", "b", "c"].map((id) => line({ id, text: id }));
     const reactions = lines.flatMap(({ id }) => MANY.map((each) => ({ ...each, id: `${each.id}${id}`, to: id })));
     const html = part(view({ me: BOB, onReact: () => true, state: { ...ROOM, lines, reactions } }), "Messages");
-    // The authors' names, which open their cards (8d), are no chips.
+    // The authors' names, which open their cards, are no chips.
     expect(html.match(/<button(?![^>]*aria-haspopup="dialog")/g)).toHaveLength(60);
   });
 
-  // R8: a reaction names a msgid; another room's line of that msgid is not its line.
+  // A reaction names a msgid; another room's line of that msgid is not its line.
   it("shows no reaction whose line is not in the room", () => {
     const html = view({
       me: BOB,
@@ -729,9 +729,9 @@ describe("RoomView: reactions", () => {
   });
 });
 
-// 4d: above a reply, the line it answers, its author and its words in one line, 70 characters at most, cut between
-// graphemes (R6); markup in those words stays text (R5); a line not in this room, another room's of that msgid
-// included, is an earlier message (R8).
+// Above a reply, the line it answers, its author and its words in one line, 70 characters at most, cut between
+// graphemes; markup in those words stays text; a line not in this room, another room's of that msgid
+// included, is an earlier message.
 describe("RoomView: replies", () => {
   const replying = (target: Partial<Line>, reply: Partial<Line> = {}) => [
     line({ id: "a", ...target }),
@@ -743,8 +743,8 @@ describe("RoomView: replies", () => {
     expect(linesOf(html)[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: the first lineyes$/);
   });
 
-  // F1176 (the UX review's U4): a quote shows a mention as the line does: an author's, the reader's and a member's
-  // shortened, anyone else's whole (F812).
+  // A quote shows a mention as the line does: an author's, the reader's and a member's
+  // shortened, anyone else's whole.
   it("shortens a mention in a quote as the line does, never another's", () => {
     const CAROL = "g1jt8gqa4fddp0w803ysa6la4epsdn0hd8wwqcdj";
     const lines = replying({ text: `@${BOB} @${ALICE} @${CAROL}` });
@@ -754,7 +754,7 @@ describe("RoomView: replies", () => {
     expect(quoted({ state: { ...ROOM, lines, members: [CAROL] } })).toContain("@g1jt8g…wqcdj");
   });
 
-  // The security review (S2, F808's class): a line's marks stand in its head, before its quote, so a quoted
+  // A line's marks stand in its head, before its quote, so a quoted
   // "Mentions you" is heard after "Replying to", never where the mark stands.
   it("puts a reply's marks in its head, before its quote, so quoted words never read as a mark", () => {
     const real = linesOf(
@@ -800,8 +800,8 @@ describe("RoomView: replies", () => {
   });
 });
 
-// 4d: an edit by the line's own account shown in the line's place, marked edited, its quote reading the edited words;
-// another account's edit, or one naming a line not in this room (R8), a line of its own.
+// An edit by the line's own account shown in the line's place, marked edited, its quote reading the edited words;
+// another account's edit, or one naming a line not in this room, a line of its own.
 describe("RoomView: edits", () => {
   it("shows an edit by the line's own account in its place, marked edited, and quotes the edited words", () => {
     const lines = [
@@ -816,7 +816,7 @@ describe("RoomView: edits", () => {
     expect(shown[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: hello/);
   });
 
-  // slice-4-room-edit, security: a corrected line keeps its own msgid but shows the correction's words, so its player, which
+  // Security: a corrected line keeps its own msgid but shows the correction's words, so its player, which
   // waits on a verdict, waits on the correction's: the line's own "checked" says nothing of a link the correction brought.
   it("waits on the correction's verdict for the player of a link a correction brought, not on its line's", () => {
     const lines = [
@@ -848,7 +848,7 @@ describe("RoomView: edits", () => {
     ).toContain("Play the YouTube video");
   });
 
-  // R3 (redpass-red): a moderator hides the newest correction and the line falls back to the one before it, whose own
+  // A moderator hides the newest correction and the line falls back to the one before it, whose own
   // verdict the player waits on, never the original's; another account's line naming it is no correction at all.
   it("falls back to the older correction's verdict once the newest is hidden, never the original's", () => {
     const link = "watch https://youtu.be/dQw4w9WgXcQ";
@@ -868,8 +868,8 @@ describe("RoomView: edits", () => {
     expect(first).not.toContain("Waiting");
   });
 
-  // F1177 (the UX review's U5): the mark stands in the head, right before the time, never after the sender's words
-  // (F971), so a sender's "(edited)" reads as theirs; a reply's quote is under that row.
+  // The mark stands in the head, right before the time, never after the sender's words,
+  // so a sender's "(edited)" reads as theirs; a reply's quote is under that row.
   it("marks an edited line on its time row, and a line that says (edited) not at all", () => {
     const lines = [line({ id: "a", text: "helo" }), line({ id: "e", text: "hello", edits: "a" })];
     expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^g10gh7…3y5tv Edited \d{2}:\d{2}hello$/);
@@ -889,7 +889,7 @@ describe("RoomView: edits", () => {
     );
   });
 
-  // The code review (CR5): a plain client replies or reacts to the edit's own msgid; both reach the line it corrects.
+  // A plain client replies or reacts to the edit's own msgid; both reach the line it corrects.
   it("reads a reply and a reaction to an edit's own msgid as its line's", () => {
     const lines = [
       line({ id: "a", text: "helo" }),

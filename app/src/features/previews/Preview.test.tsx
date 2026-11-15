@@ -9,7 +9,7 @@ import { slot } from "../../slots.tsx";
 import { drawing } from "../chat/index.ts";
 import { Preview } from "./Preview.tsx";
 
-// A page's preview where a page asks for one (8f): the captures' file read, the page's capture found by its path, drawn as its card.
+// A page's preview where a page asks for one: the captures' file read, the page's capture found by its path, drawn as its card.
 // No capture, no preview: a page the file does not hold, a file of another universe, or a file that could not be read draws nothing.
 const CAPTURE = { path: "gno.land/r/gov/dao", captured: "2026-11-05T10:00:00.000Z", text: "# GovDAO\n" };
 const FILE: Previews = { version: 1, universe: "onyx", updated: "2026-11-05T10:00:01.000Z", previews: [CAPTURE] };

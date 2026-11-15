@@ -28,7 +28,7 @@ describe("where Go explore goes", () => {
     await expect(exploreTo(PLACES, answered([here("earth", 180), here("bubble", 1)]))).resolves.toBe("/w/bubble");
   });
 
-  // F4520: a page that listed the Earth among its worlds, by its slug, still never sends Go explore there.
+  // A page that listed the Earth among its worlds, by its slug, still never sends Go explore there.
   it("never counts the Earth's slug as a world, should the page list it", async () => {
     const listed = { ...PLACES, worlds: [{ slug: "earth", path: "/earth" }, ...PLACES.worlds] };
     await expect(exploreTo(listed, answered([here("earth", 180), here("govdao", 1)]))).resolves.toBe("/w/govdao");

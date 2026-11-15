@@ -1,7 +1,7 @@
-// The verdicts of the shown room's lines (slice 4's 4g; docs/decisions.md, 2026-10-26): the room's stream, which the
-// asker follows, gives them from when it says it began (F890); GET /api/verdicts the lines said before (F884), asked
+// The verdicts of the shown room's lines: the room's stream, which the
+// asker follows, gives them from when it says it began; GET /api/verdicts the lines said before, asked
 // once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
-// given is asked again (F874).
+// given is asked again.
 import type { Line } from "@gnoworld/core";
 import {
   type CardEvent,
@@ -26,7 +26,7 @@ export interface Asking {
   carded?: ((events: readonly CardEvent[]) => void) | undefined;
   /** A verdict the stream gave, into the store. */
   judged: (event: StreamEvent) => void;
-  /** The verdicts one answer of the server gave, into the store at once (F1057). */
+  /** The verdicts one answer of the server gave, into the store at once. */
   judgedAll: (events: readonly StreamEvent[]) => void;
   /** The verdicts the page holds of a room's lines. */
   held: (room: string) => Readonly<Record<string, unknown>> | undefined;
@@ -35,7 +35,7 @@ export interface Asking {
   follow: (room: string, on: Told, language: Language | undefined) => () => void;
   /** Whether a line's text holds a link a player or a card is shown for (linked.ts). */
   linked: (text: string) => boolean;
-  /** A first signal the same stream gave (slice 9h): the page follows one stream, not one for each thing it hears. */
+  /** A first signal the same stream gave: the page follows one stream, not one for each thing it hears. */
   signal?: ((signal: Signal) => void) | undefined;
 }
 
@@ -88,15 +88,15 @@ interface Following {
   who: Who;
   /** The room's lines last shown, none before they load. */
   lines: readonly Line[] | undefined;
-  /** When its stream began following, by the stream's own word (F890); none before it; after its end, all time. */
+  /** When its stream began following, by the stream's own word; none before it; after its end, all time. */
   since: number | undefined;
   stop: () => void;
   /** The stream followed again, after its end. */
   again: ReturnType<typeof setTimeout> | undefined;
 }
 
-// Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
-// a request; after a failure that may pass, rests, then asks the view last given again (F874).
+// Asks the server of the lines in view said before the stream began, once each while in view, VERDICTS_ASKED
+// a request; after a failure that may pass, rests, then asks the view last given again.
 function serverAsker({
   verdicts,
   judgedAll,
@@ -152,9 +152,9 @@ function serverAsker({
     // What was asked of a line gone from view is forgotten, so a long session holds no more than its view.
     const shown = new Set(lines.map(({ id }) => id));
     for (const id of mine) if (!shown.has(id)) mine.delete(id);
-    // A line already looked at is not read again while in view: only the new ones' Markdown (F1055).
+    // A line already looked at is not read again while in view: only the new ones' Markdown.
     const before = lines.filter(({ id, time }) => !mine.has(id) && Date.parse(time) < since);
-    // An id the route refuses (over 128 characters, a comma) would have it refuse the whole request, for good (F892).
+    // An id the route refuses (over 128 characters, a comma) would have it refuse the whole request, for good.
     const wanted = unjudged(before, { held: view.held, asked: mine }, linked).filter(
       (id) => VerdictId.safeParse(id).success,
     );
@@ -191,16 +191,16 @@ export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked
   };
   const start = (room: string, who: Who, lines?: readonly Line[]): void => {
     const mine: Following = { room, who, lines, since: undefined, stop: () => undefined, again: undefined };
-    // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
+    // The stream's word after its replay, on the server's clock, which Ergo's server-time shares: never the
     // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest;
-    // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it (F891).
+    // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it.
     const since = (time: number) => {
       if (following !== mine) return;
       if (mine.since !== undefined && time > mine.since) server.forget(room);
       mine.since = time;
       askShown();
     };
-    // The browser gave the stream up (a 429, a restart's 502), and no verdict comes from it (F888): every line in
+    // The browser gave the stream up (a 429, a restart's 502), and no verdict comes from it: every line in
     // view is the server's to answer, and the stream is followed again after the route's minute.
     const dead = () => {
       if (following !== mine) return;
@@ -212,7 +212,7 @@ export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked
         start(room, who, mine.lines);
       }, BUSY_REST_MS);
     };
-    // A new stream (a room, a reader, one followed again) asks of what it shows afresh (F891).
+    // A new stream (a room, a reader, one followed again) asks of what it shows afresh.
     server.forget(room);
     following = mine;
     mine.stop = follow(room, { verdict: judged, signal, since, dead }, who.language);

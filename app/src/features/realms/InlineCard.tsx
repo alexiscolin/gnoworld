@@ -1,4 +1,4 @@
-// The call card as the realm view draws it (9d, 9e): under the thing that opened it, in the thread and never in a modal. The write rows,
+// The call card as the realm view draws it: under the thing that opened it, in the thread and never in a modal. The write rows,
 // a page's form and a proposed action share it: the fee read once when it opens, its words from the course the store holds.
 import { readCallFees, type CallFees } from "@gnoworld/chain/fees";
 import type { ReadOptions } from "@gnoworld/chain/read";

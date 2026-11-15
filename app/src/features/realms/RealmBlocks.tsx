@@ -1,4 +1,4 @@
-// A realm page's tree as elements (5h): core's allowlisted blocks, every text React's text, nothing from a realm reaches
+// A realm page's tree as elements: core's allowlisted blocks, every text React's text, nothing from a realm reaches
 // HTML. Marks, paragraphs, code and flat lists are the chat's drawing; a rule is an hr, a nested or task list lists with
 // read-only boxes, an image a card linking to it (never loaded: a third party's picture leaks the visitor's address, and
 // the CSP has none), an alert a notice, a form read only (RealmForm) or, in a realm's view, with its Call (CallableForm).
@@ -193,7 +193,7 @@ export function RealmBlocks({
   origin?: string;
   more?: string;
   via: Drawing;
-  /** The realm the page is of: with it, a form a call can carry gets its Call (9e). */
+  /** The realm the page is of: with it, a form a call can carry gets its Call. */
   call?: CallPlace;
 }) {
   const warning = useExternalLinks(origin);

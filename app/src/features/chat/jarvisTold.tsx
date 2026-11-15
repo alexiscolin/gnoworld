@@ -1,4 +1,4 @@
-// Jarvis's door in the chat in view (10u-a): once Jarvis is on, and the conversation is a room, the page is told so (jarvisHere.ts): the
+// Jarvis's door in the chat in view: once Jarvis is on, and the conversation is a room, the page is told so (jarvisHere.ts): the
 // quick actions and the account menu wake their Jarvis, and the panel's host (features/jarvis) comes. A guest is told too: its card asks it to
 // connect. The state is read once a page, whatever the rooms the person goes through.
 import { RoomId } from "@gnoworld/schemas";

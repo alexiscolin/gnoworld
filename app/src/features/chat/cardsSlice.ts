@@ -1,4 +1,4 @@
-// The link cards' slice of the store (link-previews L4): each line's card key, by room and msgid, from the server's `card` events and from
+// The link cards' slice of the store: each line's card key, by room and msgid, from the server's `card` events and from
 // its answer for lines older than the stream's replay. A card exists only after one of them said so; a removal is kept, so no answer asked
 // before it brings the card back. It joins the page's store with the first card, as the calls' slice does (features/calls/slice.ts), and is
 // kept out of store/: the first screen's budget has no room for it.

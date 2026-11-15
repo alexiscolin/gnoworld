@@ -10,7 +10,7 @@ import { all, button, drawer, modals, one, settled } from "../../../tests/mount.
 import { JarvisSlot } from "../chat/jarvisEntries.tsx";
 import { JarvisListener } from "./JarvisListener.tsx";
 
-// 10u-a: the page's asks "jarvis" and "jarvis-catch-up" add Jarvis's cards for the room the chat told, to the account that asked.
+// The page's asks "jarvis" and "jarvis-catch-up" add Jarvis's cards for the room the chat told, to the account that asked.
 const ME = "g1me";
 const place = (room: string, account: string | undefined): JarvisHere => ({
   room,

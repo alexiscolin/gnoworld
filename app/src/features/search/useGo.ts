@@ -51,7 +51,7 @@ export function useGo(universe: UniverseView, close: () => void) {
     Promise.resolve(navigate(to)).catch(reportError);
   };
   // A world's chat is docked on its page, the Earth's on its own, a realm's in its own room, full; any other place says its chat on its Earth.
-  // Opened from the full chat, it stays there: the place's own chat page, its room changing, no space (D393).
+  // Opened from the full chat, it stays there: the place's own chat page, its room changing, no space.
   const chat = (item: SearchItem, to?: string) => {
     if (item.kind === "room" || item.kind === "person") {
       go(item);

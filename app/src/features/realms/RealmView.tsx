@@ -1,4 +1,4 @@
-// A realm's page and Try it, the plate's lower half (5h, D375, D566): its page in a card of its own, then its functions to try. The frame, the title and
+// A realm's page and Try it, the plate's lower half: its page in a card of its own, then its functions to try. The frame, the title and
 // the realm's facts are the plate's (routes/plate).
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { Stack } from "@gnoworld/ui";

@@ -7,7 +7,7 @@ import { all, button, click, settled } from "../../../tests/mount.tsx";
 import { shortAddress } from "./names.ts";
 import { PersonCard, type PersonCardProps } from "./PersonCard.tsx";
 
-// A person's card (8d): Message and Follow only for an account the reader can name, never for a guest, oneself or a nick; Message goes to
+// A person's card: Message and Follow only for an account the reader can name, never for a guest, oneself or a nick; Message goes to
 // the account's address and Follow keeps that address.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

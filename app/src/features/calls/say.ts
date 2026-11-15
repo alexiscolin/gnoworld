@@ -1,4 +1,4 @@
-// What the call card says (9d, D206): every failure of a call is a state with the next step the person can take, in our words.
+// What the call card says: every failure of a call is a state with the next step the person can take, in our words.
 // Adena's message and the realm's log come after them, drawn as what they are and never in place of them; a hidden character
 // in either is written out (`shown`).
 import type { Problem } from "@gnoworld/core";
@@ -24,8 +24,8 @@ function isGovVote({ realm, func }: { realm: string; func: string }): boolean {
   return realm === "gno.land/r/gov/dao" && func.includes("Vote");
 }
 
-/** The warnings a card says before Adena opens: every call's, then a GovDAO vote's (Alexis, D272: r/gov/dao refuses a vote from
- * anyone but its members). The words are written here, in the function, where a mutation of them is tested (F412). */
+/** The warnings a card says before Adena opens: every call's, then a GovDAO vote's (r/gov/dao refuses a vote from
+ * anyone but its members). The words are written here, in the function, where a mutation of them is tested. */
 export function warningsOf(call: { realm: string; func: string }): readonly string[] {
   if (!isGovVote(call)) return [NOT_CHECKED];
   return [NOT_CHECKED, "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost."];
@@ -34,7 +34,7 @@ export function warningsOf(call: { realm: string; func: string }): readonly stri
 /** A chain as the card names it. */
 export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;
 
-export interface Said {
+interface Said {
   reason: CardFailure;
   log?: string | undefined;
   hash?: string | undefined;

@@ -1,4 +1,4 @@
-// What the link knows of a reaction Ergo may refuse (slice 4's 4d, apart from link.ts): a reaction is labelled with the
+// What the link knows of a reaction Ergo may refuse (apart from link.ts): a reaction is labelled with the
 // room it is for, as Ergo answers a labelled command by its label, a refusal included.
 import type { IrcMessage } from "@gnoworld/core";
 

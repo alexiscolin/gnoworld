@@ -1,4 +1,4 @@
-// The Adena way to link an account (owners' moderation, part 5): Adena is switched to the account to link, the server's text is shown in words,
+// The Adena way to link an account: Adena is switched to the account to link, the server's text is shown in words,
 // Adena signs it for that account, and the server answers with the identity's members. Adena's own answer for a wrong account is told with the
 // account it is on.
 import { shortAddress, type Address, type Challenge } from "@gnoworld/schemas";

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-/** The window where a place's chat has a dock beside the scene (ui's Panel.Layout) and the planet is framed close (D458). */
+/** The window where a place's chat has a dock beside the scene (ui's Panel.Layout) and the planet is framed close. */
 export const DOCKED = "(min-width: 1280px)";
 
 /** Whether the screen matches a media query, read as the screen says it and again when it changes; a page rendered on

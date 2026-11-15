@@ -1,4 +1,4 @@
-// The chat's move to another place's room in place (Alexis, 2026-11-10: "les transitions vers le chat selon les mondes"): the same screen
+// The chat's move to another place's room in place: the same screen
 // stays, the room it leaves is a still copy over it that fades out as the next one stands under, so nothing changes in one frame.
 // Nothing moves under reduced motion.
 import { gsap } from "gsap";

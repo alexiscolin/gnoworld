@@ -136,7 +136,7 @@ describe("logIn", () => {
   });
 });
 
-// F769: a failed /me left the page with no login and no chat until a reload; it is asked again until known.
+// A failed /me must not leave the page with no login and no chat until a reload: it is asked again until known.
 describe("knowSession", () => {
   // A server that cannot say `failures` times, then names the account; and the waits asked of the page's clock.
   const failing = (failures: number) => {
@@ -578,7 +578,7 @@ describe("logOut", () => {
   });
 });
 
-// D200: only an account change ends the session, with the server's logout as a click's; a network change ends nothing.
+// Only an account change ends the session, with the server's logout as a click's; a network change ends nothing.
 describe("endForAccount", () => {
   const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 

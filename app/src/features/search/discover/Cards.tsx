@@ -4,9 +4,9 @@ import { isAddress, STYLES, type ShelfId, type StoreRow, type TodayRow } from "@
 import { shortAddress } from "@gnoworld/schemas";
 import { EmptyState, Grid as Columns, Sidebar, Stack } from "@gnoworld/ui";
 import type { KeyboardEvent } from "react";
+import { discOf } from "../../../lib/worldDisc.ts";
 import { WorldPlanet } from "../../../WorldPlanet.tsx";
 import styles from "./Discover.module.css";
-import { discOf } from "./planet.ts";
 import { nameOfShelf } from "./Shelves.tsx";
 import type { Discovery } from "./useDiscover.ts";
 
@@ -14,8 +14,7 @@ const LABELS = new Map<string, string>(STYLES.map(({ id, label }) => [id, label]
 /** A shelf draws this many cards; the rest asks for a style or a filter. */
 const GRID_MAX = 60;
 
-const short = (namespace: string) => (isAddress(namespace) ? shortAddress(namespace) : namespace);
-export const shortOf = short;
+export const short = (namespace: string) => (isAddress(namespace) ? shortAddress(namespace) : namespace);
 
 // One owner often deploys the same names in several worlds (`sinopia/market`, `minhwa/market`): the card names the world it is in, and an
 // older version says which.

@@ -1,4 +1,4 @@
-/* The chat's search panel beside the room (slice 13, C): the canvas's ChatSearch, States and Phone frames. */
+/* The chat's search panel beside the room: the canvas's ChatSearch, States and Phone frames. */
 @layer components {
   .panel {
     inline-size: 100%;

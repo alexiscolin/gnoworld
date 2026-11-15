@@ -12,7 +12,7 @@ function freeRoom(): Circle["free"] {
 }
 
 // The circle of the page's `[data-globe]` box, none where it keeps none (or keeps it unseen), with the room beside the plate; its planet
-// framed close where the page frames it so (D458).
+// framed close where the page frames it so.
 export function circleOf(globe: HTMLElement | null): Circle | undefined {
   if (globe === null) return undefined;
   const box = globe.getBoundingClientRect();

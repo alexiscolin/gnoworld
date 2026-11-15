@@ -1,5 +1,5 @@
 // Over the room read around a found message: where it is read, the way back to the latest, and the found message scrolled to and marked
-// (slice 13, C). A late chunk with the search: a room never read so draws none of it.
+// A late chunk with the search: a room never read so draws none of it.
 import { Button, Sidebar } from "@gnoworld/ui";
 import { useEffect, useState, type RefObject } from "react";
 import { useApp, useAppStore } from "../../../storeContext.tsx";

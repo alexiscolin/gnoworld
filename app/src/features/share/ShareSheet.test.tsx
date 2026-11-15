@@ -7,7 +7,7 @@ import { ORIGIN } from "../../meta.ts";
 import { linkOf } from "./link.ts";
 import { openShare } from "./ShareSheet.tsx";
 
-// Share (slice 8; the plan's threat model, "Share"): the link is the place's public URL and nothing else; the picture is the scene's canvas
+// Share: the link is the place's public URL and nothing else; the picture is the scene's canvas
 // alone, none without a scene; the sheet works without the device's share sheet, canShare or a clipboard; closing the device's sheet is no
 // fault.
 const place = { name: "Bubble", path: "/w/bubble" };

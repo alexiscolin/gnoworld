@@ -1,4 +1,4 @@
-/* A realm's page (5h): the chat's marks and blocks in a column of the page's own, as gnoweb lays its prose out: titles in the
+/* A realm's page: the chat's marks and blocks in a column of the page's own, as gnoweb lays its prose out: titles in the
    plate's small scale, lists, code, quotes, notices and tables; a form drawn as a read-only list. */
 @layer components {
   .page {

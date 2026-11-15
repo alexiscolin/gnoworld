@@ -7,7 +7,7 @@ import { FOLLOWS_KEPT } from "../../lib/keep/fields.ts";
 import { FollowButton } from "./FollowButton.tsx";
 import { worldsFollowedIn } from "./followed.ts";
 
-// Follow (slice 8; ADR-0002 §1, Follow): a world or a person, on this device alone, the last followed first, 500 at most (the oldest
+// Follow: a world or a person, on this device alone, the last followed first, 500 at most (the oldest
 // dropped); its words say its state; a device that refuses says the change holds for this visit only.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 let store: AppStore | undefined;

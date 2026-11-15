@@ -7,7 +7,7 @@ import { StoreProvider } from "../../storeContext.tsx";
 import { pageClock, type SessionDeps } from "./logIn.ts";
 import { Account } from "./testing/Account.tsx";
 
-// The login in the header (4a): the session read as the page starts, again on the page's clock (pageClock, real here), which the page's
+// The login in the header: the session read as the page starts, again on the page's clock (pageClock, real here), which the page's
 // leaving stops; Adena's code asked at the click that logs in, with the page's own Adena, its connect and its signer; a logout. What
 // logIn.ts does with them is its own test's.
 const flow = vi.hoisted(() => ({

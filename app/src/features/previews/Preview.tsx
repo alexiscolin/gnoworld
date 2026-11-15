@@ -1,4 +1,4 @@
-// A page's preview where a page asks for one (8f): the captures' file read once a page, the page's capture found by its path, drawn as
+// A page's preview where a page asks for one: the captures' file read once a page, the page's capture found by its path, drawn as
 // its card with the chat's drawing, which comes with it. No capture, no preview: a page the file does not hold, a file of another universe
 // than the default, whose pages the job captures, or a file that could not be read draws nothing, and nothing while the file comes.
 import type { Capture, Previews } from "@gnoworld/schemas/indexer";

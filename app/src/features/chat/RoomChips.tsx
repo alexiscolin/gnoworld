@@ -1,4 +1,4 @@
-// The docked chat's rooms as chips under its header (the video's frame 26), on one line (D13016): the room in view, those holding unseen
+// The docked chat's rooms as chips under its header (the video's frame 26), on one line: the room in view, those holding unseen
 // lines, the most active, as many as the row's width holds, and a last "+N" chip that opens the rooms' view the header's name opens. One link
 // to each, the one in view cream, a count after the one that holds something unseen, a "+" to make one for an account on the Earth.
 // The full chat has its column, a phone its drawer; this row is the dock's.
@@ -63,7 +63,7 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
   const listed = sections.flatMap((section) => section.rooms).filter(({ room }) => links.has(room));
   const rooms = pickRooms(listed, current, badges);
   const labels = distinctLabels(listed);
-  // One room is the header's name already: the row shows a choice, or nothing (Alexis, 2026-11-07: "pas besoin de doublon").
+  // One room is the header's name already: the row shows a choice, or nothing.
   const drawn = listed.length >= 2 || make;
   const { rowRef, fit } = useFitting(drawn, rooms.map((room) => `${room}${String(badges?.[room])}`).join());
   if (!drawn) return null;

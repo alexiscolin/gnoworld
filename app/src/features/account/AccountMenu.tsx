@@ -1,6 +1,6 @@
-// The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout; 8p, frames 6 and 17): logged out, the way in,
+// The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout; frames 6 and 17): logged out, the way in,
 // Connect Adena, beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
-// that holds the passport, the saved messages, the settings, a name to pick (9f) and the way out. The name shown, its dialog and the menu's code
+// that holds the passport, the saved messages, the settings, a name to pick and the way out. The name shown, its dialog and the menu's code
 // come after the first screen, never with it.
 import { shortAddress, type Address } from "@gnoworld/schemas";
 import { Button, IconButton } from "@gnoworld/ui";
@@ -14,9 +14,9 @@ import { useNaming, useNamelessTold } from "./naming.ts";
 const JarvisListener = lazy(async () => ({ default: await loadListener() }));
 const Face = lazy(async () => ({ default: (await import("./Face.tsx")).Face }));
 const Opened = lazy(async () => ({ default: (await import("./OpenedJarvis.tsx")).OpenedJarvis }));
-// The name (9f) is read once the first screen is up: the short address stands in until it is there.
+// The name is read once the first screen is up: the short address stands in until it is there.
 const NameLabel = lazy(async () => ({ default: (await import("../names/index.ts")).NameLabel }));
-// An account linked to others says so once, right after its login (owners' moderation, part 5).
+// An account linked to others says so once, right after its login.
 const LinkedNotice = lazy(async () => ({ default: (await import("./LinkedNotice.tsx")).LinkedNotice }));
 const PickName = lazy(async () => ({ default: (await import("../names/index.ts")).PickName }));
 
@@ -101,7 +101,7 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
   );
 }
 
-/** The account's menu; `network`, the network's name its pill carries once logged in (D330). */
+/** The account's menu; `network`, the network's name its pill carries once logged in. */
 export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.

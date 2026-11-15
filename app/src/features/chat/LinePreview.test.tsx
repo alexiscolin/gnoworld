@@ -9,7 +9,7 @@ import { modals, settled } from "../../../tests/mount.tsx";
 import "../../plugs.ts";
 import { LineView, type LineViewProps } from "./LineView.tsx";
 
-// A page's preview under a line (8f, frames 104 and 107): a line whose link points at a realm's home on the default universe's gnoweb
+// A page's preview under a line: a line whose link points at a realm's home on the default universe's gnoweb
 // shows that page's capture, once the moderation has checked the line (ADR-0002 §6, "Link previews wait for the check"). The page asks
 // the site's own captures' file, once a page however many lines link, and never the address a line holds.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -122,7 +122,7 @@ describe("a page's preview under a line", () => {
     const { host, draw } = drawn([props("https://onyx.testnets.gno.land/r/samcrew/memba"), beside]);
     await settled(() => cards(host).length === 1);
     expect(first()).toBeNull();
-    // The correction comes with no verdict, as the stream leaves an edit until its check (F2000).
+    // The correction comes with no verdict, as the stream leaves an edit until its check.
     draw([props(GOVDAO, { verdict: undefined }), beside]);
     expect(first()).toBeNull();
     draw([props(GOVDAO, { verdict: "checked" }), beside]);
@@ -189,7 +189,7 @@ describe("a page's preview under a line", () => {
     expect(cards(host)[0]?.getAttribute("tabindex")).not.toBe("-1");
   });
 
-  // F896's class (8f's review, finding 2): a hide or an edit takes the card away while it, or its open capture, holds the focus.
+  // A hide or an edit takes the card away while it, or its open capture, holds the focus.
   it.each([
     ["the card held the focus", false],
     ["its open capture held the focus", true],

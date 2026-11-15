@@ -1,4 +1,4 @@
-// "Get started" (D13017): what a Connect with no Adena opens in place of a bare "Install Adena", step by step. It watches for Adena (the
+// "Get started": what a Connect with no Adena opens in place of a bare "Install Adena", step by step. It watches for Adena (the
 // window's focus, a light poll while open) and, once it is there, offers the same Connect as the header's, with no reload.
 import { Button, Cluster, Dialog, Disclosure } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
@@ -6,10 +6,10 @@ import { NEW_TAB } from "../../lib/newTab.ts";
 import { adenaHere as here } from "./getStartedAsk.ts";
 import styles from "./GetStarted.module.css";
 
-// Adena's own install links, read from adena.app on 2026-11-12: its phone apps are "coming soon", so a phone is told to use a computer.
+// Adena's own install links, from adena.app: it has no phone app, so a phone is told to use a computer.
 const CHROME = "https://chromewebstore.google.com/detail/adena/oefglhbffgfkcpboeackfgdagmlnihnh";
 const FIREFOX = "https://addons.mozilla.org/en-US/firefox/addon/adena/";
-// The faucet linked from onyx.testnets.gno.land's own page (fetched 2026-11-12).
+// The faucet linked from onyx.testnets.gno.land's own page.
 const FAUCET = "https://faucet.gno.land";
 const POLL_MS = 2000;
 

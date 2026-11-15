@@ -20,7 +20,7 @@ const said = async (worlds: typeof heard.worlds) => {
   return signals;
 };
 
-// A station's world stands round the Earth, never in the cloud (Alexis, 2026-11-05): the rail names it not and its people count on none.
+// A station's world stands round the Earth, never in the cloud: the rail names it not and its people count on none.
 describe("the rail's stations", () => {
   const station = hubs.find((hub) => hub.kind === "station");
   const other = hubs.find((hub) => hub.kind !== "station");
@@ -40,7 +40,7 @@ describe("the rail's stations", () => {
   });
 });
 
-// A station's world stands round the Earth, never in the cloud (8l; Alexis, 2026-11-05): no name and no count for it, while every other
+// A station's world stands round the Earth, never in the cloud: no name and no count for it, while every other
 // world of the universe keeps both.
 describe("the stations round the Earth", () => {
   it("names no station and counts no one on one, a planet and the Earth kept", async () => {

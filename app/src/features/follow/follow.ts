@@ -1,4 +1,4 @@
-// Follow (ADR-0002 §1, Follow; slice 8): a world or a person, kept on this device alone, the last followed first. A world is named as the
+// Follow: a world or a person, kept on this device alone, the last followed first. A world is named as the
 // device keys it ("universe:world", core's stampKey), a person by their account's address, never a nick. Nothing of it leaves the device.
 import { FOLLOWS_KEPT, type DeviceFields } from "../../lib/keep/fields.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";

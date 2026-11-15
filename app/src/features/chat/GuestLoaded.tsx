@@ -1,5 +1,5 @@
-// A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people; in an open room a guest's line
-// (D430), else the word to log in; no direct message, no notice, nothing kept. What an account adds is AccountChat's, loaded for one.
+// A visitor's world, its rooms once listed: the switcher, the room in view and its people; in an open room a guest's line,
+// else the word to log in; no direct message, no notice, nothing kept. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
 import { EmptyState } from "@gnoworld/ui";
 import type { ReactNode, RefObject } from "react";
@@ -28,7 +28,7 @@ import type { AppState } from "../../store/index.ts";
 
 // The people's list, its code (the nebula faces) asked once someone is here: a room nobody has joined yet
 // draws none, and the first screen's budget (ADR-0001 §12) does not carry it.
-// A chunk that cannot be fetched leaves the list's place with a word, never the page (F1763).
+// A chunk that cannot be fetched leaves the list's place with a word, never the page.
 const People = chunked(async () => ({ default: (await import("./People.tsx")).People }), {
   waiting: null,
   failed: <EmptyState look="failed" line="Who is here could not load." />,
@@ -55,7 +55,7 @@ interface GuestLoadedProps {
   place: ChatPlace;
 }
 
-// The room in view where a guest may speak: an open room of the list (D430); the server holds the rest of the rule.
+// The room in view where a guest may speak: an open room of the list; the server holds the rest of the rule.
 const openRoom = (sections: RoomList["sections"], room: string | undefined) =>
   sections.some(({ rooms }) => rooms.some((each) => each.room === room && each.type === "open")) ? room : undefined;
 
@@ -122,7 +122,7 @@ export function GuestLoaded({
   asksDm,
   place,
 }: GuestLoadedProps) {
-  // A direct message asked for shows its problem in the room's place, as an account's does (U9).
+  // A direct message asked for shows its problem in the room's place, as an account's does.
   const live = chat === "connected";
   const room = asksDm ? undefined : current;
   useRoomKeys(roomIds(sections), room);
@@ -130,7 +130,7 @@ export function GuestLoaded({
   const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
   const people = peopleOf(state, live);
-  // A visitor reads a thread, whose panel says to log in where an account writes (4d's threads).
+  // A visitor reads a thread, whose panel says to log in where an account writes.
   const threads = useThreads({
     shown,
     state,

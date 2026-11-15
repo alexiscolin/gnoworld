@@ -1,4 +1,4 @@
-/* A world's pinned actions over the composer (D271): pills that share the row's width, each an edge round the resting fill, its words
+/* A world's pinned actions over the composer: pills that share the row's width, each an edge round the resting fill, its words
    centred (the prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). The quick actions are the composer's +. */
 @layer components {
   .bar {
@@ -54,7 +54,7 @@
     --box-in: calc(max(var(--chat-inset), var(--space-l)) - var(--space-2xs) - var(--line-width));
   }
 
-  /* The card a pinned action opens over the row (D271): it scrolls in its own box, so the row and what writes stay on screen. */
+  /* The card a pinned action opens over the row: it scrolls in its own box, so the row and what writes stay on screen. */
   .cards {
     /* raw: under half the window, the conversation keeping the rest and the row's two lines (a phone's) their room */
     max-block-size: 44dvb;

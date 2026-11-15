@@ -1,4 +1,4 @@
-// The chat's move between its dock and the full screen (Alexis, 2026-11-08, "une bonne transition entre les deux modes"): opening, the
+// The chat's move between its dock and the full screen: opening, the
 // full chat grows out of the dock's box over the page, which fades out under it; closing, a still copy of it shrinks back into the dock's
 // box as the page comes back in, and goes. Nothing moves under reduced motion.
 import { gsap } from "gsap";
@@ -8,8 +8,8 @@ import { motionOf } from "../../space/motion.ts";
 import { fadeFrames, growFrames, insetsOf, parseInset, shrinkFrames, type Insets } from "./moveClip.ts";
 import { restoreScrolls, stillFull, takeClosing, takeDocked } from "./stillScreen.ts";
 
-// Space's flights' own curve, a cubic in and out (space/rig/flight.ts's inOut), a little longer than before: the chat eases off and lands
-// as a flight does (Alexis, 2026-11-09: "plus smooth à la fin et au début … en cohérence avec … les planètes").
+// Space's flights' own curve, a cubic in and out (space/rig/flight.ts's inOut): the chat eases off and lands
+// as a flight does.
 const EASE = FULL_MOVE.ease;
 const GROW_S = FULL_MOVE.duration;
 const SHRINK_S = 0.8;
@@ -41,7 +41,7 @@ function dockStays({ copy, scrolls }: { copy: HTMLElement; scrolls: readonly (re
 }
 
 // The full chat's `screen`, just laid out: grows out of the dock's box, fading in over the dock's ghost (rise.ts), which fades out under it.
-// Web Animations: the browser runs the clip and the opacity on its compositor, so busy script never drops a frame of the grow (D13980).
+// Web Animations: the browser runs the clip and the opacity on its compositor, so busy script never drops a frame of the grow.
 function growFull(screen: HTMLElement): void {
   const from = takeDock();
   const dock = takeDocked();

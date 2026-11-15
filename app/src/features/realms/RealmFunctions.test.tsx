@@ -10,7 +10,7 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 import { useFunctions } from "./useFunctions.ts";
 
-// 5i, tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
+// Tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
 // its result once through `vm/qeval`. Free: the label says so, the block height says when, and Adena is never asked.
 // The answers are chainFixture.ts's: EVALS recorded through gnomcp, FUNCTIONS written from wugnot's source (not recorded).
 const CHAIN = {
@@ -74,7 +74,7 @@ async function settle(box: HTMLElement, until: () => boolean = () => box.querySe
       await new Promise((resolve) => setTimeout(resolve, 5));
     });
   }
-  // Out of turns is a failure to say so, not a silent return that lets the next line fail for another reason (review of 5i, row 8).
+  // Out of turns is a failure to say so, not a silent return that lets the next line fail for another reason.
   if (!until()) throw new Error("settle: the page did not reach the state asked for");
 }
 async function panel(fetcher: ChainFetch, realm = WUGNOT, extra: { maxBytes?: number; chain?: typeof CHAIN } = {}) {
@@ -427,9 +427,9 @@ describe("a name from qfuncs", () => {
   });
 });
 
-// Slice 13, B (plan §3, eval floods; D13301): a card keeps one read in flight, starts one per 400 ms (later asks wait, the last kept), gives
+// Eval floods: a card keeps one read in flight, starts one per 400 ms (later asks wait, the last kept), gives
 // it 10 s and reads 64 KB of the answer. useFunctions is driven by a harness asking directly: the panel's busy button refuses a click while
-// a read is under way, which the plate's card (part C) may not.
+// a read is under way, which the plate's card may not.
 describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 KB", () => {
   const INT = [{ Name: ".res.0", Type: "int64", Value: "" }];
   const SEARCH = [
@@ -563,7 +563,7 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       ]);
     }));
 
-  // R1 of the review (F13318, S3 F13317): an earlier read that answers while a later one waits its turn is not the later one's answer.
+  // An earlier read that answers while a later one waits its turn is not the later one's answer.
   test("lets no answer of an earlier read stand for a later one asked while it waits", () =>
     faked(async () => {
       const fetcher = evalChain((url) => {
@@ -660,7 +660,7 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       expect(signalOf(fetcher, 0)?.aborted).toBe(true);
     }));
 
-  // The cap weighs the RPC's answer as sent (its JSON, the result in base64 inside), in bytes of UTF-8 (D13301).
+  // The cap weighs the RPC's answer as sent (its JSON, the result in base64 inside), in bytes of UTF-8.
   test.each([
     { name: "exactly 65,536 bytes of ASCII", bytes: 65_536, char: "e", state: "read" },
     { name: "65,537 bytes of ASCII", bytes: 65_537, char: "e", state: "failed" },

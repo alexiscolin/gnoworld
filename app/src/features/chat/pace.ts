@@ -1,5 +1,5 @@
 // The server's two rates on an account's messages, which the page keeps so as not to send what is hidden: 20 messages
-// and 100 lines a minute (server/src/moderation/check.ts and rate.ts), each hide a strike on the account (F2092).
+// and 100 lines a minute (server/src/moderation/check.ts and rate.ts), each hide a strike on the account.
 const MINUTE = 60_000;
 const MESSAGES = 20;
 const LINES = 100;

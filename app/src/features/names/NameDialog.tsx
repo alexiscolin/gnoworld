@@ -1,4 +1,4 @@
-// The name dialog (9f, frames 9 to 15, "Pick a name and a face"): the kicker, the title, the line naming r/sys/namereg, the person's
+// The name dialog ("Pick a name and a face"): the kicker, the title, the line naming r/sys/namereg, the person's
 // nebula as the face (no planet, no upload: ADR-0002 section 1), the `nym-` field with its rule, "Register · 0 GNOT" and "Later".
 // It holds no state of the chain: its `phase` is the card's course, and a name shows as registered only in the phase `done`.
 import { Avatar, Button, Cluster, Dialog, Field, grouped, Stack } from "@gnoworld/ui";

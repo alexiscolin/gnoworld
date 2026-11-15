@@ -10,7 +10,7 @@ import Proposals from "./Proposals.tsx";
 import { HOME, PATH, PINNED_VOTE } from "../../../tests/govdaoFixtures.ts";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 
-// 9e-1 (Alexis, 2026-11-06): a world's pinned actions on its page, under Read the proposals, each a Form block under its label once
+// A world's pinned actions on its page, under Read the proposals, each a Form block under its label once
 // vm/qfuncs confirms it, read from the chain of the realm view the world names; anything else draws nothing. NOT recorded: qfuncs' shape.
 const DAO = "gno.land/r/gov/dao";
 const ANSWER = () =>
@@ -105,7 +105,7 @@ describe("a world's pinned actions on its page", () => {
   });
 });
 
-// 9e-1 (D271): a world's pinned actions stand first, under Read the proposals, each a Form block once vm/qfuncs confirms it; the
+// A world's pinned actions stand first, under Read the proposals, each a Form block once vm/qfuncs confirms it; the
 // proposals follow. NOT recorded: qfuncs' shape.
 describe("a world's proposals, with its pinned actions", () => {
   // The pinned actions' chunk's first import compiles it, longer than a wait for a drawing: asked once before.
@@ -132,7 +132,7 @@ describe("a world's proposals, with its pinned actions", () => {
       </StoreProvider>,
     );
     const vote = await calling(el, "Vote");
-    // The card's header names it (Card.Header's title, a level-2 heading), no longer an id of the page's own.
+    // The card's header names it (Card.Header's title, a level-2 heading), not an id of the page's own.
     const heading = [...el.querySelectorAll("h2")].find((each) => each.textContent === "Proposals") ?? null;
     expect(heading).not.toBeNull();
     expect(heading !== null && follows(vote, heading)).toBe(true);

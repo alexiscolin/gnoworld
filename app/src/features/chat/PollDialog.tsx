@@ -61,7 +61,7 @@ interface RowProps {
 }
 
 // A field and, while answers can be removed, a column at its end: a remove control, or a blank of its width (the question's), so every
-// field of the form keeps one width (Alexis, 2026-11-11: "les fields ne sont pas tous égaux").
+// field of the form keeps one width.
 function Row({ field, end }: { field: ReactNode; end: ReactNode | undefined }) {
   return end === undefined ? (
     field

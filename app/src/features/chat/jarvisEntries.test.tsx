@@ -7,7 +7,7 @@ import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
 import { useSaidAnswers, withJarvis } from "./jarvisEntries.tsx";
 
-// 10u-a: Jarvis's cards stand among a room's lines where and when they were asked.
+// Jarvis's cards stand among a room's lines where and when they were asked.
 const line = (id: string, time: string) => ({ line: { id, time } });
 const card = (id: string, at: string): JarvisItem => ({ id, room: "#bubble", account: "g1me", at });
 const order = (entries: ReturnType<typeof withJarvis<{ id: string; time: string }>>) =>

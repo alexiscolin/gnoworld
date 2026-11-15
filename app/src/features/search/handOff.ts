@@ -1,4 +1,4 @@
-// The palette's hand-off to the chat's search (slice 13, C): the typed words, handed over by a row under the results, a click, or the chord
+// The palette's hand-off to the chat's search: the typed words, handed over by a row under the results, a click, or the chord
 // the row names (⌘⇧F). Plain words only: a mark (#, @, /r/, >) or an address is a place's, and words too short ask nothing of the search.
 // The row is no option of the list: the arrows and Enter stay with the places.
 import { SEARCH_Q_MIN } from "@gnoworld/schemas";

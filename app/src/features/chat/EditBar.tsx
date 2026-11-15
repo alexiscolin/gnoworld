@@ -1,4 +1,4 @@
-// The composer's edit bar (slice 4's 4d, the DM bar): over the field, that a message is being corrected, and a way to
+// The composer's edit bar: over the field, that a message is being corrected, and a way to
 // drop the correction; Escape in the box drops it too, as the reply bar's does, and Save sends it.
 import { IconButton, Sidebar } from "@gnoworld/ui";
 import { useId, type KeyboardEvent, type ReactNode } from "react";

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { all, mount, nth, one } from "../../../tests/mount.tsx";
 import { PlaceInfo } from "./PlaceInfo.tsx";
 
-// 5q: the full-screen chat's info panel (frame 23.58.01, right): the place's kicker and name, what it says of itself, then
+// The full-screen chat's info panel (frame 23.58.01, right): the place's kicker and name, what it says of itself, then
 // Here now. The pins stay where the frames put them, above the conversation (PinBar). Never the video's sample figures (184
 // talking, 31 countries): only what the page holds, how many are talking here now once it knows.
 describe("the info panel", () => {

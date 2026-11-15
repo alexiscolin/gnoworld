@@ -1,4 +1,4 @@
-// What a realm page's lists and images are drawn as (D382): lists with lists under their items, tasks as read-only boxes,
+// What a realm page's lists and images are drawn as: lists with lists under their items, tasks as read-only boxes,
 // and an image as a card.
 import type { Inline, Outline } from "@gnoworld/core";
 import { Icon } from "@gnoworld/ui";

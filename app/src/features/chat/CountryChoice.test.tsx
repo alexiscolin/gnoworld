@@ -7,7 +7,7 @@ import { mount, one } from "../../../tests/mount.tsx";
 import { keepCountry, keptCountry } from "../../lib/country.ts";
 import { CountryChoice } from "./CountryChoice.tsx";
 
-// D395 (amends 7j's opt-in): an account's lines show its time zone's country by default, the one it picks instead, or none once it hides
+// An account's lines show its time zone's country by default, the one it picks instead, or none once it hides
 // it. The time zone is only a default shown, never written: the device holds a choice or the mark that it hides one, nothing else.
 const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");

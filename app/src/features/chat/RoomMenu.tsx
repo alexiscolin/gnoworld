@@ -1,13 +1,12 @@
 // What the room's name opens (the video's chevron after it): what the room says of itself, then what an account adds
-// (its notification modes, whom it hears direct messages from). It holds what once stood above the lines and in the
-// rooms' column, so none of it is lost to the video's plainer look.
+// (its notification modes, whom it hears direct messages from).
 import { Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 
 export interface RoomMenuProps {
   /** What the room says of itself: its description, a conversation's "not encrypted". */
   note?: ReactNode;
-  /** The note's id, which the composer points at (4e's U6). */
+  /** The note's id, which the composer points at. */
   noteId?: string | undefined;
   /** What an account adds below the note. */
   children?: ReactNode;

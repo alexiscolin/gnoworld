@@ -1,4 +1,4 @@
-// Jarvis's cards among a room's lines (10u-a), the asker's alone and on this device (D1017): each stands where it was asked, before the
+// Jarvis's cards among a room's lines, the asker's alone and on this device: each stands where it was asked, before the
 // first entry that is newer. How a card is drawn is the panel's host's (features/jarvis), which comes when Jarvis is first asked.
 import { JARVIS_NICK, plainWords as plain } from "@gnoworld/core";
 import { hashKey } from "@tanstack/react-query";

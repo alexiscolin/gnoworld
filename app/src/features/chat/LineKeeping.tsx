@@ -1,4 +1,4 @@
-// What a line's bar offers an account of what it keeps and of the room's pins (slice 4's 4d): Pin for a reader who may
+// What a line's bar offers an account of what it keeps and of the room's pins: Pin for a reader who may
 // pin, Save message and Mark unread in the menu, each act saying in the room's flash why it did not happen.
 import type { Line } from "@gnoworld/core";
 import { IconButton, type FlashMessage } from "@gnoworld/ui";

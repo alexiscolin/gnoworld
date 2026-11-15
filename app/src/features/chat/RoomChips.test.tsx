@@ -12,7 +12,7 @@ vi.mock("../../storeContext.tsx", () => ({
   useApp: (select: (state: unknown) => unknown) => select({ login: { session } }),
 }));
 
-// 5q2 (frame f0026): the dock's rooms as a row of chips under the header, each a link to its room, the one in view marked.
+// The dock's rooms (frame f0026): as a row of chips under the header, each a link to its room, the one in view marked.
 const SECTIONS: RoomList["sections"] = [
   {
     name: null,
@@ -87,7 +87,7 @@ describe("RoomChips", () => {
     ).toBeNull();
   });
 
-  // D13935: a "+" at the row's end, the full chat's own dialog, for an account on the Earth.
+  // A "+" at the row's end, the full chat's own dialog, for an account on the Earth.
   const EARTH: RoomList["sections"] = [
     {
       name: null,

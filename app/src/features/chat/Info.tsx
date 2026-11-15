@@ -1,4 +1,4 @@
-// The full chat's info panel as the screen fills it (moved out of ChatScreen.tsx): the place, who talks, the countries declared and
+// The full chat's info panel as the screen fills it: the place, who talks, the countries declared and
 // the links out.
 import type { ReactNode, RefObject } from "react";
 import type { ChatScreenProps } from "./ChatScreen.tsx";

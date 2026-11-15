@@ -1,4 +1,4 @@
-// The account's name and the dialog that registers one (9f): loaded on their own, after the first screen, by the account's menu. The dialog's
+// The account's name and the dialog that registers one: loaded on their own, after the first screen, by the account's menu. The dialog's
 // code, the signing parts included, is a chunk of its own, asked when it is first drawn (a lazy component resolves to a function, never to
 // another lazy one: React's error 306).
 import { createElement, lazy, Suspense, type ComponentProps } from "react";

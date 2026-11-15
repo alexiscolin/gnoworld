@@ -1,4 +1,4 @@
-// What the chat's page tells the account of what it has not seen (slice 4's 4f-n): a count on each room's and
+// What the chat's page tells the account of what it has not seen: a count on each room's and
 // conversation's row, the tab's title, a list of the notices, a status for a screen reader, and the room in view's mode.
 // A guest is told nothing: the store holds nothing for one.
 import type { Notice, NoticeMode } from "@gnoworld/core";

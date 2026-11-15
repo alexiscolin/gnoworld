@@ -1,5 +1,5 @@
-// A draft that asks a poll (8d): `/poll A question? | an answer | another` sends the poll's text (core's poll.ts), any other draft
-// what core's compose makes of it. Read here, in the composer's own chunk, so the first screen's compose stays as it was.
+// A draft that asks a poll: `/poll A question? | an answer | another` sends the poll's text (core's poll.ts), any other draft
+// what core's compose makes of it. Read here, in the composer's own chunk, so the first screen's compose does not carry it.
 import { COMMANDS, compose, pollAsked, pollText, type Composed } from "@gnoworld/core";
 
 const POLL = "/poll";

@@ -1,6 +1,5 @@
-// The shown room's verdicts, which a link's player waits on (slice 4's 4g): its stream's and the server's, which the
-// asker (askVerdicts.ts) follows and asks. A reader who saves data is shown no player, so follows and asks nothing
-// (F879).
+// The shown room's verdicts, which a link's player waits on: its stream's and the server's, which the
+// asker (askVerdicts.ts) follows and asks. A reader who saves data is shown no player, so follows and asks nothing.
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
@@ -35,13 +34,13 @@ export interface Shown {
   room: string | undefined;
   lines: readonly Line[] | undefined;
   reader: string | undefined;
-  /** Whether the reader saves data, read once: then the page follows and asks nothing (F879, F893). */
+  /** Whether the reader saves data, read once: then the page follows and asks nothing. */
   saving: boolean;
 }
 
 /** Follows and asks of the shown room's verdicts for its reader. */
 export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown): void {
-  // The asker, made once the page runs, as the panel's link is; none for a reader who saves data (F879).
+  // The asker, made once the page runs, as the panel's link is; none for a reader who saves data.
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   // What finds a player's link in a line, asked with the room's first lines: the first screen holds no Markdown's code.
   const linkedRef = useRef<Linked>(undefined);
@@ -50,9 +49,9 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
     if (saving) return;
     const forget = translationLines((room) => store.getState().chat.rooms[room]?.lines);
     const api = pageVerdictsApi();
-    // The world's calls on chain and the Earth's count come on the same stream, into the store in batches (9g).
+    // The world's calls on chain and the Earth's count come on the same stream, into the store in batches.
     const feed = lazyChain(async () => (await loadFeed()).chainFeed(store.getState().chainActions));
-    // The cards' events (link-previews L4) wait for their feed's chunk in their order.
+    // The cards' events wait for their feed's chunk in their order.
     const card = lazyCards(async () => {
       const [{ cardFeed }, { addCards }] = await Promise.all([loadCardFeed(), loadCardsSlice()]);
       return cardFeed((events) => {

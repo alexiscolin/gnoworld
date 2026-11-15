@@ -147,7 +147,7 @@ export function Panel({
             ))}
           </ol>
         )}
-        {/* The chain's own lines (a new realm's signal, a proposal opened or closing) come with the indexer's events, slice 9. */}
+        {/* The chain's own lines (a new realm's signal, a proposal opened or closing) wait for the indexer's events. */}
         <ComingSoon name="New realms and proposals, from the chain">
           New realms and proposals, from the chain
         </ComingSoon>

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { dmActs } from "./dmActs.ts";
 import type { ChatLink } from "./link.ts";
 
-// /code-review on 4d's DM bar (CR4): a refusal stayed told until dismissed, so a retry met it at once: the line offered
-// Delete again while its REDACT was in flight, and a success still flashed "Could not delete the message.".
+// A refusal is dismissed before a retry, or the retry would meet it at once: the line would offer Delete again while its
+// REDACT is in flight, and a success would still flash "Could not delete the message.".
 describe("a direct message's acts", () => {
   it("dismiss what Ergo refused before sending a delete or a reaction", () => {
     const calls: string[] = [];

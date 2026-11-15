@@ -1,16 +1,16 @@
-/* The name dialog (9f, frames 9 to 15): the line naming the registry, the face, and a phone's words in place of the signature. */
+/* The name dialog: the line naming the registry, the face, and a phone's words in place of the signature. */
 @layer components {
   .note {
     font: var(--font-meta);
     color: var(--color-text-muted);
   }
 
-  /* The line under the title is the frames' 13 px reading size. */
+  /* The line under the title is in the 13 px reading size. */
   .note[data-size="reading"] {
     font: var(--font-reading);
   }
 
-  /* The frames draw the registry's path in the text colour, not as a chip on a fill. */
+  /* The registry's path is in the text colour, not a chip on a fill. */
   .note code {
     padding-inline: 0;
     background: none;

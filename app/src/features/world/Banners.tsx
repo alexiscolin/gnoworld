@@ -1,6 +1,6 @@
-// The first signals' chunk (slice 9h), loaded by Arrival.tsx: a logged-in account opening a world asks the server to chart it,
-// and the server's signal on the page's one stream (D215) is the only thing that shows a banner, to the account it names, for
-// a day after its time (D213); never the call's answer. The banners are the design system's flash in its arrival look, one at
+// The first signals' chunk, loaded by Arrival.tsx: a logged-in account opening a world asks the server to chart it,
+// and the server's signal on the page's one stream is the only thing that shows a banner, to the account it names, for
+// a day after its time; never the call's answer. The banners are the design system's flash in its arrival look, one at
 // a time (DESIGN-SYSTEM.md, Flash); Share copies the world's address and says what came of it.
 import type { Signal } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";

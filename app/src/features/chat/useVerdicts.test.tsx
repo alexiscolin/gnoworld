@@ -254,7 +254,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     expect(sources.opened).toHaveLength(1);
   });
 
-  // Slice 9h (D215): the world's arrival banners ride the stream this follows, so the page holds one stream, not two.
+  // The world's arrival banners ride the stream this follows, so the page holds one stream, not two.
   it("hands the stream's first signals to the store, through the one stream it follows", async () => {
     const sources = await draw([]);
     sources.opened[0]?.emit("signal", CHART);
@@ -268,7 +268,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     expect(store.getState().verdicts["#bubble"]?.["m1"]).toBeDefined();
   });
 
-  // Slice 9g (F5784): the chain's frames of the page's own stream reach the store, in a batch, through the lazily loaded feed.
+  // The chain's frames of the page's own stream reach the store, in a batch, through the lazily loaded feed.
   it("hands a chain frame to the store, the call in its world's lines", async () => {
     const sources = await draw([]);
     sources.opened[0]?.emit("chain", CALL);
@@ -277,7 +277,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     });
   });
 
-  // Link previews L4: a `card` frame reaches the store through its lazily loaded feed, in the order it came; one it cannot read is said once.
+  // A `card` frame reaches the store through its lazily loaded feed, in the order it came; one it cannot read is said once.
   it("hands a card frame to the store, a later one without a key taking the card away", async () => {
     const sources = await draw([]);
     const key = "a".repeat(64);

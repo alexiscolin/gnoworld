@@ -1,6 +1,5 @@
-/* The hero: bottom left of the cosmos, 48 px from the left and 32 from the bottom (the ticker's room given to it, Alexis, 2026-11-09), the kicker, the number at 176 px in mono with its
-   line at its right, then two actions of 52 px (the prototype's #hero, lines 514 to 546; frames 1 to 8; the line beside the number,
-   Alexis, 2026-11-09); a block in the page on a phone and on a screen too short to hold it over the page. */
+/* The hero: bottom left of the cosmos, 48 px from the left and 32 from the bottom (the ticker's room given to it), the kicker, the number at 176 px in mono with its
+   line at its right, then two actions of 52 px (the prototype's #hero, lines 514 to 546; frames 1 to 8); a block in the page on a phone and on a screen too short to hold it over the page. */
 @layer components {
   .hero {
     /* layout: the kicker, the number and the row, one under the other */
@@ -12,7 +11,7 @@
     gap: 22px;
     /* raw: the number's 88 px to 176 px, 11vi between (the prototype's #hero .num); a system's name keeps its room */
     --_size: clamp(88px, 11vi, 176px);
-    /* raw: the old row's width, the line and the two actions: a system's long name sends its line under it */
+    /* raw: the row's width, the line and the two actions: a system's long name sends its line under it */
     max-inline-size: 720px;
 
     /* The hero's own box takes no click from the page behind it; its words and actions do. */
@@ -112,7 +111,7 @@
   }
 
   .line {
-    /* the line's own grey, 22 px over the number (Alexis, 2026-11-09: "en plus gros") */
+    /* the line's own grey, 22 px over the number */
     color: var(--color-text-soft);
     /* raw: the line over the number, a step over the prototype's 17 px */
     font: 400 1.375rem/1.35 var(--family-sans);
@@ -206,7 +205,7 @@
     color: var(--color-text);
   }
 
-  /* f0008 lights the line's count, its figure and its word, over the rest of the line: #f4f5f9 against #c8d0de, a heavier weight. */
+  /* The line's count, its figure and its word, over the rest of the line: #f4f5f9 against #c8d0de, a heavier weight. */
   .count {
     color: var(--color-text);
     font-weight: 500;
@@ -217,14 +216,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* While the number comes, three hidden digits and the space after them keep its room (7n): a count of 100 to 999 fills it, whatever face
+  /* While the number comes, three hidden digits and the space after them keep its room: a count of 100 to 999 fills it, whatever face
      draws the line. `3ch` and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits. */
   .figure:empty::before {
     visibility: hidden;
     content: "000 ";
   }
 
-  /* The word after the room, "Worlds" in the page (F4641), drawn as the count's "worlds", so the line holds its width when the number comes. */
+  /* The word after the room, "Worlds" in the page, drawn as the count's "worlds", so the line holds its width when the number comes. */
   .coming {
     text-transform: lowercase;
   }
@@ -237,7 +236,7 @@
     }
 
     .actions {
-      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px (F4642) */
+      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px */
       flex-wrap: wrap;
     }
 
@@ -266,8 +265,8 @@
     display: none;
   }
 
-  /* From 900 px the rail stands for the list (7i), and the list never shows while space loads or comes back: only where space cannot
-     stand, refused or failed, does the page show it (D372; the universe marks it "fallback"). Its links stay in the page for a reader
+  /* From 900 px the rail stands for the list, and the list never shows while space loads or comes back: only where space cannot
+     stand, refused or failed, does the page show it (the universe marks it "fallback"). Its links stay in the page for a reader
      with no script. */
   @media (width >= 900px) {
     .worlds:not([data-rail="fallback"]) {

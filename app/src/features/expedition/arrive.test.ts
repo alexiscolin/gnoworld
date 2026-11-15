@@ -12,8 +12,7 @@ import { arrive } from "./arrive.ts";
 import { nextStop } from "./next.ts";
 import { stopsOn, worldName, worldOf } from "./stops.ts";
 
-// Today's expedition on the page (slice 8; row 8: "the same for everyone on a given day", "a stamp survives a reload", "streaks count UTC
-// days"): the day's stops from the shipped pool, the arrival's line and the streak, the quests' steps, and where "Go explore" goes.
+// Today's expedition on the page: the same for everyone on a given day, a stamp survives a reload, streaks count UTC days. The day's stops from the shipped pool, the arrival's line and the streak, the quests' steps, and where "Go explore" goes.
 const DAY = "2026-11-05";
 const NEXT = "2026-11-06";
 

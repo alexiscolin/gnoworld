@@ -1,4 +1,4 @@
-/* The blog card's posts side by side (D13008): each its day, its title, then its link at its foot, so both links share one line. */
+/* The blog card's posts side by side: each its day, its title, then its link at its foot, so both links share one line. */
 @layer components {
   .post {
     /* layout: the post's parts one under the other */

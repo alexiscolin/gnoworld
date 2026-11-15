@@ -30,8 +30,7 @@ describe("the hero's big number, on a planted site", () => {
     expect(headingOf(html)).toBe("Worlds in Mainland");
   });
 
-  // 7n: the number comes after the page, and the actions beside the line must not slide when it does (frames 2 to 8 never move). F4641:
-  // read with no script, by a search engine or a link's preview, the heading is a sentence, "Worlds in", never " worlds in".
+  // The number comes after the page, and the actions beside the line must not slide when it does (frames 2 to 8 never move). Read with no script, by a search engine or a link's preview, the heading is a sentence, "Worlds in", never " worlds in".
   test("keeps its figure's room in the line while the number comes: an empty figure, then the words", async () => {
     const html = await heroWith("main", undefined, true);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
@@ -45,7 +44,7 @@ describe("the hero's big number, on a planted site", () => {
     expect(headingOf(html)).toBe("534 worlds in Mainland");
   });
 
-  // f0008 lights the line's count, its figure and its word, over the rest of the line (#f4f5f9 against #c8d0de, the design review of 7n).
+  // The line's count, its figure and its word are lit over the rest of the line (#f4f5f9 against #c8d0de).
   test("marks the line's count, its figure and its word, apart from the universe's name", async () => {
     expect(await heroWith("main", 534)).toMatch(
       /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*>534<\/span> worlds<\/strong> in Mainland<\/h1>/,
@@ -126,7 +125,7 @@ describe("the hero's actions for a newcomer", () => {
     expect(html).toContain(">Join the chat");
   });
 
-  // F4518: the first visit's look holds only where the cosmos stands, which the universe marks (Universe.test); the build writes none.
+  // The first visit's look holds only where the cosmos stands, which the universe marks (Universe.test); the build writes none.
   test("writes its actions as standing beside no cosmos, which the universe marks once it stands", async () => {
     expect(actionsOf(await heroOf("main"))).toContain('data-cosmos="none"');
   });
@@ -141,9 +140,9 @@ describe("the hero's actions for a newcomer", () => {
   });
 });
 
-// D434, D438: the number is the people online with "Online now" over it, and the line continues it: "people exploring 18 worlds.";
-// the countries are no longer said. F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
-// 8i (frame 6): who is online, from the server; "coming" while it is asked, none where no server counts people.
+// The number is the people online with "Online now" over it, and the line continues it: "people exploring 18 worlds."; the hero as the
+// frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
+// Frame 6: who is online, from the server; "coming" while it is asked, none where no server counts people.
 describe("the hero's people", () => {
   const withPeople = (people: People | undefined, worlds: number | undefined) =>
     render({ path: "/", Component: () => <Hero universe={universeOf("main")} worlds={worlds} people={people} /> }, "/");

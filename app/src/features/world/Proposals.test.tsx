@@ -10,7 +10,7 @@ import type { Proposal } from "../../lib/chain/proposal.ts";
 import { HOME, PATH } from "../../../tests/govdaoFixtures.ts";
 import Proposals from "./Proposals.tsx";
 
-// A world's proposals (5k): the realm's home page as RECORDED on onyx-1 states no threshold, so no ring and no "of 66.66%"; a failed read says its
+// A world's proposals: the realm's home page as RECORDED on onyx-1 states no threshold, so no ring and no "of 66.66%"; a failed read says its
 // state and links to gnoweb; a ring comes only from a tally, invented here.
 // A read ends, then the query tells its readers a timer later: two turns.
 const turns = async () => {
@@ -189,7 +189,7 @@ describe("a world's proposals", () => {
     const el = mount(<Tallied path={PATH} onRing={onRing} />);
     await flush();
     expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 15 · YES 33% of 66.66%");
-    // 7e: the ring is the scene's tilted orbit, never a flat one on the plate (decision of 2026-10-31): the page hands it the tally.
+    // The ring is the scene's tilted orbit, never a flat one on the plate: the page hands it the tally.
     expect(el.querySelector("svg[role='img'], circle, path[stroke-dasharray]")).toBeNull();
     expect(onRing).toHaveBeenCalledExactlyOnceWith({ lit: 0.33, mark: 0.6666 });
     vi.doUnmock("../../lib/chain/proposal.ts");

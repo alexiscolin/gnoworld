@@ -1,4 +1,4 @@
-// What stands among a room's lines and is none: a day's opening (D13922), a call of the chain, a card of Jarvis.
+// What stands among a room's lines and is none: a day's opening, a call of the chain, a card of Jarvis.
 import { ChainCard } from "./ChainCard.tsx";
 import type { Entry } from "./chainEntries.ts";
 import type { DayEntry } from "./lineMarks.ts";

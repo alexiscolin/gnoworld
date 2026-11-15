@@ -1,4 +1,4 @@
-// What a realm's view reads (5h), once: the realm's page (vm/qrender) and the block height (the page's age), the two
+// What a realm's view reads, once: the realm's page (vm/qrender) and the block height (the page's age), the two
 // requests through lib/chain, and the chat's drawing, a lazy chunk. Nothing polls: one request each per view. A read that
 // fails is a state with its next step, never a blank; the height failing leaves the page standing, said so.
 import { page, type Page } from "@gnoworld/core";

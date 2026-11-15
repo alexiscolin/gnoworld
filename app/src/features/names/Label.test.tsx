@@ -9,7 +9,7 @@ import type { Named, readName } from "../../lib/chain/names.ts";
 import { queryClient } from "../../lib/query/client.ts";
 import { NameLabel } from "./Label.tsx";
 
-// 9f in the account's menu: the pill's name is mainnet's, else Onyx's, else the short address; a name can be picked only once the
+// In the account's menu: the pill's name is mainnet's, else Onyx's, else the short address; a name can be picked only once the
 // universe's own chain has answered that the account has none there.
 const ACCOUNT = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const source = { url: "https://rpc", at: "2026-11-06T05:00:00.000Z" };

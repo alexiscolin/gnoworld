@@ -1,4 +1,4 @@
-// What goes under a room's lines (moved out of QuickActions.tsx): a world's pinned actions over what writes (the composer, or a visitor's
+// What goes under a room's lines: a world's pinned actions over what writes (the composer, or a visitor's
 // word); and the quick actions the composer's + opens, the place's own: a direct message's, the Earth's, a world's with a realm or without.
 import type { ReactNode } from "react";
 import { realmView } from "../../places.ts";
@@ -24,7 +24,7 @@ const realmOf = ({ realms, universe }: ChatPlace): string | undefined => {
 };
 
 export interface DockProps {
-  /** The calls the world's team pins (D271): their pills in a row over what writes, and the cards they open over it. */
+  /** The calls the world's team pins: their pills in a row over what writes, and the cards they open over it. */
   pinned?: Pinned | undefined;
   children: ReactNode;
 }

@@ -1,7 +1,7 @@
-// What the account tells Ergo besides its lines (slice 4's 4f), one connection's or one session's.
+// What the account tells Ergo besides its lines, one connection's or one session's.
 
 /** The least time between two of a room's typing TAGMSGs: IRCv3's typing spec throttles them to 3 s; a done counts
- * too, or a field cleared and written again would send two a cycle (CR5). */
+ * too, or a field cleared and written again would send two a cycle. */
 const TYPING_EVERY_MS = 3_000;
 
 /** Its typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing), one connection's: one TAGMSG at most each 3 s a
@@ -47,7 +47,7 @@ export class TypingOut {
 }
 
 /** The least time between two MARKREADs of one room: each spends Ergo's fakelag once its budget of 16 is gone
- * (deploy/ergo/ircd.yaml.tmpl), so a busy room read at its end would queue the account's own lines behind them (F940). */
+ * (deploy/ergo/ircd.yaml.tmpl), so a busy room read at its end would queue the account's own lines behind them. */
 const MARK_EVERY_MS = 2_000;
 
 /** The reading places it asks Ergo to keep (draft/read-marker), one session's: a place goes once past Ergo's and what

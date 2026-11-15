@@ -7,13 +7,13 @@ import { explorerLink } from "../../lib/chain/explorer.ts";
 import { all, mount, noMedia, settled } from "../../../tests/mount.tsx";
 import FromExplorer from "./FromExplorer.tsx";
 
-// A world's realm card (8g, frame 93): the facts the indexer read and the file holds, each left out when no source gave it, never a zero;
+// A world's realm card: the facts the indexer read and the file holds, each left out when no source gave it, never a zero;
 // the read's source, or its failure as a status; the explorer's link and the docs'.
 const read = vi.hoisted((): { value: unknown } => ({ value: undefined }));
 vi.mock("../../lib/chain/indexer.ts", () => ({ readRealmFacts: () => Promise.resolve(read.value) }));
 
 const SOURCE = { url: "https://indexer.example.test/graphql/query", at: "2026-11-05T06:00:00.000Z" };
-// A realm of its own for each test: the facts of a realm are read once a session and kept (useRealmFacts's `held`, D530).
+// A realm of its own for each test: the facts of a realm are read once a session and kept (useRealmFacts's `held`).
 let VIEW = "";
 let REALM = "";
 let runs = 0;
@@ -66,7 +66,7 @@ describe("a world's realm card", () => {
     const box = await drawn(FILE, "Read from");
     expect(label(box, "Deployed by")).toBe("gnoland");
     expect(label(box, "Since block")).toBe((786661).toLocaleString("en-US"));
-    // The calls are the plate's figure now (D399), the card holds the block of the last one.
+    // The calls are the plate's figure; the card holds the block of the last one.
     expect(label(box, "Last call at block")).toBe((790123).toLocaleString("en-US"));
     expect(box.textContent).not.toContain("Calls · all time");
     expect(box.textContent).toContain("indexer.example.test");
@@ -89,7 +89,7 @@ describe("a world's realm card", () => {
     expect(label(box, "Deployed by")).toBe(shortAddress(DEPLOYER));
   });
 
-  // D534: the page's one error line is the Render card's, so a failed read says nothing in this card.
+  // The page's one error line is the Render card's, so a failed read says nothing in this card.
   it("says nothing of a failed read, and keeps the file's facts and the links", async () => {
     const next = "The indexer did not answer; try again in a minute.";
     said({ ok: false, failure: { kind: "down", next }, source: SOURCE });

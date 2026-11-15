@@ -1,4 +1,4 @@
-// The call card (9d, ADR-0002 section 4): a call to a realm shown before Adena opens, in the thread under its function's row and
+// The call card (ADR-0002 section 4): a call to a realm shown before Adena opens, in the thread under its function's row and
 // never as a modal. The kicker, the title, the block of what is called and where, the warnings, then the signature and its
 // way out; once signed, the wait, the landing in a block and the result. Every state is words with its next step, and the
 // result says done only from the chain's answer, which the course puts in the card (signCall.ts).
@@ -123,7 +123,7 @@ function Actions({ card, onSign, onCancel, onRetry, login }: Omit<CallCardProps,
       </Card.Actions>
     );
   }
-  // A call that may have been sent has no way back to a signature: it could be signed twice (F5728, F5747).
+  // A call that may have been sent has no way back to a signature: it could be signed twice.
   if (retryable(state)) {
     return (
       <Card.Actions>

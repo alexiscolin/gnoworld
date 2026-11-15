@@ -1,5 +1,5 @@
-// The search as a large sheet over a scrim (D355; ⌘K, the "/" key and the header's button). The field is on top. Empty, the sheet is
-// Discover, a store of realms (D373); typing, one ranked list of the best 50 at the left with how many more answered, the chosen place's
+// The search as a large sheet over a scrim (⌘K, the "/" key and the header's button). The field is on top. Empty, the sheet is
+// Discover, a store of realms; typing, one ranked list of the best 50 at the left with how many more answered, the chosen place's
 // preview at the right.
 import type { StoreRow } from "@gnoworld/core";
 import { Dialog } from "@gnoworld/ui";
@@ -36,7 +36,7 @@ export default function SearchDialog({
   universe: UniverseView;
   open: boolean;
   onClose: () => void;
-  /** The namespace a full Plan's "+N" opens on (F5462). */
+  /** The namespace a full Plan's "+N" opens on. */
   start?: string;
 }) {
   const palette = usePalette(universe, open, start);
@@ -60,7 +60,7 @@ export default function SearchDialog({
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };
-  // A realm's chat is its own room, full (Alexis, 2026-11-12); a realm with no page of its own talks in its world's, else the Earth's.
+  // A realm's chat is its own room, full; a realm with no page of its own talks in its world's, else the Earth's.
   const talk = (row: StoreRow) => {
     const item = itemOf(row, universe.id);
     go(item, realmChat(item, placeOf(universe, row.world)?.href ?? universe.earth.path));

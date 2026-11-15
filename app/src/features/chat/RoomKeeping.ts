@@ -1,4 +1,4 @@
-// What the room in view shows and lets an account do of what it keeps and of the room's pins (slice 4's 4d): its
+// What the room in view shows and lets an account do of what it keeps and of the room's pins: its
 // saved lines and the place it asked to go back to, from the device, the room's pins, from the server, and the acts
 // that change them, built from the store and the shown room alone.
 import { foldEdits, type Line } from "@gnoworld/core";
@@ -19,7 +19,7 @@ export interface RoomKeeping {
   /** The lines saved on this device, and those pinned in the room. */
   saved: ReadonlySet<string>;
   pinned: ReadonlySet<string>;
-  /** The link cards the server told of the room's lines, by msgid (link-previews L4). */
+  /** The link cards the server told of the room's lines, by msgid. */
   cards?: Readonly<Record<string, string>> | undefined;
   onSave: (id: string) => "saved" | "full" | "none" | undefined;
   onUnsave: (id: string) => void;
@@ -43,7 +43,7 @@ export function useRoomKeeping(room: string | undefined, pinning: Pinning) {
   const api = pageModerationApi();
   // What the room shows is the newest version of an edited line (foldEdits), but Ergo keeps each version at its own id:
   // the line saved or marked is the one shown (the first's id, the last edit's words), a pin is the last edit's own id
-  // (the first's pin would publish what its author took back, F1483), and a pin is shown on the line it corrects.
+  // (the first's pin would publish what its author took back), and a pin is shown on the line it corrects.
   const lineOf = (id: string): Line | undefined =>
     foldEdits(store.getState().chat.rooms[room]?.lines ?? []).shown.findLast((line) => line.id === id);
   const newestOf = (id: string): string => {

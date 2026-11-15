@@ -1,4 +1,4 @@
-// The chat's search on the chat's screen (slice 13, C): the header's button, the chords, the panel in the info panel's place, and the band over
+// The chat's search on the chat's screen: the header's button, the chords, the panel in the info panel's place, and the band over
 // a room read around a found message. Only this file is on the first screen; the panel, the field's logic and the band are one late chunk,
 // asked when the search is first opened (a room never searched loads none of it).
 import type { RoomList, SearchHit } from "@gnoworld/schemas";

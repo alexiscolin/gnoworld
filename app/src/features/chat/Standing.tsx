@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import styles from "./Thread.module.css";
 
 // The panel's place while its code comes, or when it could not: a word and Close, which a narrow room needs, as the
-// room is hidden while a thread is open (CR3). While it comes (`busy`) the word is for a screen reader alone, and the panel's
+// room is hidden while a thread is open. While it comes (`busy`) the word is for a screen reader alone, and the panel's
 // shape, a few lines, stands in its place.
 export function Standing({ word, close, busy = false }: { word: string; close: () => void; busy?: boolean }) {
   const boxRef = useRef<HTMLElement>(null);

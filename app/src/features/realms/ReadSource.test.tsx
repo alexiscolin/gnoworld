@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mount } from "../../../tests/mount.tsx";
 import { ReadSource } from "./ReadSource.tsx";
 
-// 5k: "never a number without its source and age" (plan §3): the host, left to right, and the minute asked in UTC, in words.
+// "Never a number without its source and age": the host, left to right, and the minute asked in UTC, in words.
 const AT = "2026-10-31T06:00:07.123Z";
 
 describe("where a read came from", () => {

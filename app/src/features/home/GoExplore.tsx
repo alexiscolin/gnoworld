@@ -1,5 +1,5 @@
 // "Go explore" (ADR-0003 §3; frame 4's filled call): its address is the Earth's, which a new tab opens; a plain click asks where to go (the
-// live moment, else today's next stop: explore.ts; while a tag is lit, its worlds in turn) and goes there through the router, so 7g's flight
+// live moment, else today's next stop: explore.ts; while a tag is lit, its worlds in turn) and goes there through the router, so the flight
 // takes the page from the cosmos to that world. A click with a key held, or with another button, is the browser's.
 import { Icon } from "@gnoworld/ui";
 import { useEffect, useRef, type MouseEvent } from "react";
@@ -43,7 +43,7 @@ export function useExplore(places: ExplorePlaces): () => void {
   };
 }
 
-// The worlds a tag lights, in the rail's order (D425): Go explore flies to each in turn, from the liveliest.
+// The worlds a tag lights, in the rail's order: Go explore flies to each in turn, from the liveliest.
 let turn = { lens: "", next: 0 };
 function nextLit(lens: string, entries: readonly { readonly href: string }[]): string | undefined {
   if (turn.lens !== lens) turn = { lens, next: 0 };

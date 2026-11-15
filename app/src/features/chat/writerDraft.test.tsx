@@ -43,7 +43,7 @@ beforeAll(async () => {
   );
 });
 
-// The second red pass on the DM bar (R2): a correction Ergo refused, taken up again (`back`), starts from the device's
+// The second red pass on the DM bar: a correction Ergo refused, taken up again (`back`), starts from the device's
 // draft, which the refusal put back, and keeps what is typed as a plain composer does; a correction's own words are not
 // kept. Nothing but the browser journey held this.
 describe("Writer: the box of a correction", () => {
@@ -66,7 +66,7 @@ describe("Writer: the box of a correction", () => {
   });
 });
 
-// CR3 of the room edit: the line being corrected went, and the box says so.
+// The line being corrected went, and the box says so.
 describe("Writer: a correction whose line went", () => {
   it("hands the composer the word that the line went, and nothing when it did not", () => {
     expect(writer({ gone: true })).toContain('data-gone="true"');

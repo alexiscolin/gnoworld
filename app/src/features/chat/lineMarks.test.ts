@@ -81,7 +81,7 @@ describe("the day each line opens", () => {
   });
 
   it("keeps a 25-hour day whole across the autumn clock change, and yesterday one day back", () => {
-    // Paris went back on 2026-10-25: the 25th ran 22:00Z on the 24th to 23:00Z on the 25th.
+    // When Paris goes back an hour, the 25th ran 22:00Z on the 24th to 23:00Z on the 25th.
     const keys = (times: string[]) => [
       ...dayLabelsOf(
         times.map((t, i) => lineAt(`l${String(i)}`, t)),

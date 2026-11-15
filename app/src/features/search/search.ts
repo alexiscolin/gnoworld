@@ -1,5 +1,5 @@
 // The palette's search: one pass over the index of the places the page already holds, so typing sends no request. A query is a name, or
-// opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command (D355). The best 50 come back, with how many answered.
+// opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command. The best 50 come back, with how many answered.
 import { compareRanks } from "@gnoworld/core";
 import { realmPageHref } from "../../lib/realmPage.ts";
 import { matchLower, parseQuery, wordsOf, type Parsed } from "./match.ts";

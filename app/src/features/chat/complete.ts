@@ -1,4 +1,4 @@
-// The composer's word being typed (slice 4's 4c): the draft's last word, and the choices it may become, which the field suggests
+// The composer's word being typed: the draft's last word, and the choices it may become, which the field suggests
 // (composer/suggest.ts): a command when it leads the draft, a room after `#`, an account after `@`.
 
 /** What a word may become: the commands, the world's rooms by label, the room's accounts by address. */
@@ -6,7 +6,7 @@ export interface Choices {
   commands: readonly string[];
   rooms: readonly string[];
   people: readonly string[];
-  /** Whether `@room` is offered, first of the accounts: a room's composer, not a direct message's (4f-n). */
+  /** Whether `@room` is offered, first of the accounts: a room's composer, not a direct message's. */
   group?: boolean;
   /** Whether `@jarvis` is offered, first of the accounts: where Jarvis can answer the account. */
   jarvis?: boolean;

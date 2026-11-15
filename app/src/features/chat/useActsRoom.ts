@@ -1,5 +1,4 @@
-// How much room the chat header's own width leaves the place's buttons, so the header stays on one line (Alexis, 2026-11-12: "pas sur 2
-// lignes"): PlaceActs.tsx gives what does not fit to its "More" menu.
+// How much room the chat header's own width leaves the place's buttons, so the header stays on one line: PlaceActs.tsx gives what does not fit to its "More" menu.
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useFull } from "./full.ts";
 import type { ActsRoom } from "./PlaceActs.tsx";

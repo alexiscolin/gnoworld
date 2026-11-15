@@ -7,7 +7,7 @@ import { createAppStore } from "../../store/index.ts";
 import { makeKit } from "./accountKit.ts";
 import { chatLink } from "./link.ts";
 
-// 4d's part of the chat's link: at each session's start it hands the keep slice the account's device (what it saved,
+// The chat's link: at each session's start it hands the keep slice the account's device (what it saved,
 // the places it asked to go back to), none for a guest's, and forgets the last session's pins, whose right to pin was
 // the last reader's own. Apart from link.test.ts, whose harness is its own.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -132,7 +132,7 @@ describe("the chat's link and what an account keeps on its device", () => {
   });
 
   // A copy on the device outlives the line unless the page hears it go: Ergo's REDACT unsaves it, and its author's edit
-  // replaces its words, as for the room and its pins (F1484, the security review's S2).
+  // replaces its words, as for the room and its pins.
   it("takes a saved line off the device as Ergo's REDACT of it comes, and no other room's", () => {
     const t = setup();
     t.signedIn(ALICE);
@@ -168,7 +168,7 @@ describe("the chat's link and what an account keeps on its device", () => {
   });
 
   // The device's copy follows the room's own rule (core's foldEdits): an edit with no account proves no author, so a
-  // guest's saved line, which has none either, is not its to rewrite (R1 of redpass2-4dx).
+  // guest's saved line, which has none either, is not its to rewrite.
   it("leaves a guest's saved line as it is for an edit that carries no account", () => {
     const t = setup();
     const guestLine: SavedLine = {
@@ -185,7 +185,7 @@ describe("the chat's link and what an account keeps on its device", () => {
     expect(t.device().saved()).toEqual([guestLine]);
   });
 
-  // The edit is by the line's room: an edit of the same id in another room corrects no saved line of this one (R2).
+  // The edit is by the line's room: an edit of the same id in another room corrects no saved line of this one.
   it("replaces no saved line by an edit of the same id in another room", () => {
     const t = setup();
     t.signedIn(ALICE);
@@ -196,7 +196,7 @@ describe("the chat's link and what an account keeps on its device", () => {
     expect(t.device().saved()).toEqual([SAVED]);
   });
 
-  // What Ergo says of a line is heard by the device the session holds, and only by it (R6 of redpass2-4dx).
+  // What Ergo says of a line is heard by the device the session holds, and only by it.
   describe("hearing a line taken back", () => {
     const REDACT = `:${BOB}!u@h REDACT #bubble m1`;
     const EDIT = `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${BOB};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble :corrected`;

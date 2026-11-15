@@ -1,6 +1,6 @@
-// The login's place in the header (slice 4's 4a; 8p, frame 6): one pill, Connect Adena, the step a login is at, and why the last login
-// stopped. Logged in, the account's pill and its menu take the address and the way out (frame 17, AccountMenu.tsx). A phone cannot log in:
-// it is told to use a computer for that, and that it writes once logged in (U6).
+// The login's place in the header: one pill, Connect Adena, the step a login is at, and why the last login stopped. Logged in, the
+// account's pill and its menu take the address and the way out (AccountMenu.tsx). A phone cannot log in: it is told to use a computer
+// for that, and that it writes once logged in.
 import { Button, Cluster, Icon } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import type { LoginSlice } from "../../store/login.ts";
@@ -13,7 +13,7 @@ export interface LoginViewProps {
   step: Login["step"];
   problem: Login["problem"];
   onLogIn: () => void;
-  /** The network's name, after the button's words, and after the phone's (D340). */
+  /** The network's name, after the button's words, and after the phone's. */
   network?: ReactNode;
 }
 
@@ -25,14 +25,14 @@ const wordsOf = (step: Login["step"], stopped: string | undefined) =>
 
 export function LoginView({ session, step, problem, onLogIn, network = null }: LoginViewProps) {
   // There from the start, empty: a screen reader announces a region's change. Alone once the session is known or awaited, so no empty box
-  // holds a gap after the account's pill (frame 17's right edge).
+  // holds a gap after the account's pill.
   const status = (
     <p role="status" className={session.kind === "out" ? "visually-hidden" : styles["problem"]}>
       {problem === undefined ? null : sayProblem(problem)}
     </p>
   );
   if (session.kind !== "out") return status;
-  // Why the last login stopped is the button's own words (D377), short; its status region says it whole to a screen reader alone.
+  // Why the last login stopped is the button's own words, short; its status region says it whole to a screen reader alone.
   const stopped = step === "idle" && problem !== undefined;
   return (
     <Cluster>

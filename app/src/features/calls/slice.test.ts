@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { callsIn, ensureCalls, type CallsStore } from "./slice.ts";
 
-// 9d: the call cards' slice. A card is one call being prepared, signed and followed to its block; its state moves
+// The call cards' slice. A card is one call being prepared, signed and followed to its block; its state moves
 // only along the course, so nothing shows as done before the chain's answer (ADR-0002 section 4).
 const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const PARAMS = [

@@ -1,7 +1,7 @@
 /* A realm's page in its plate: the window it scrolls in, the page's look in it (the proposal's .md), and the boxes of Try it. */
 @layer components {
   /* The page's window: as tall as its page, up to a height that is taller on a wide plate or once the card is expanded, shorter on a narrow one
-     (Alexis, 2026-11-10: a short page leaves no empty window); past it, its foot fades into the card till it is scrolled to the end, and a
+     (a short page leaves no empty window); past it, its foot fades into the card till it is scrolled to the end, and a
      wheel at either end goes on to the plate (RealmPageCard.tsx). */
   .window {
     max-block-size: var(--web-h);

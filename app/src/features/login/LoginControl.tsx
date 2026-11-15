@@ -1,6 +1,6 @@
 // The login in the page: the session read as the page starts, again until the server says (paused while the tab is hidden, resting
-// after a round), a login with the page's Adena, a logout. The header's account menu holds the way out (8p, frame 17): the hook hands it
-// the logout, the view draws the way in.
+// after a round), a login with the page's Adena, a logout. The header's account menu holds the way out: the hook hands it the logout,
+// the view draws the way in.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { reportedOr } from "../../lib/reported.ts";
@@ -9,10 +9,10 @@ import { GET_STARTED } from "./getStartedAsk.ts";
 import { knowSession, logIn, logOut, pageClock, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
 
-// What a login with no Adena opens (D13017), after the first screen.
+// What a login with no Adena opens, loaded after the first screen.
 const GetStarted = lazy(async () => ({ default: (await import("./GetStarted.tsx")).GetStarted }));
 
-// Adena's account followed, loaded with the first gesture that needs a wallet: a login's click, a call card's (F5651).
+// Adena's account followed, loaded with the first gesture that needs a wallet: a login's click, a call card's.
 async function follow(deps: SessionDeps, adena: unknown): Promise<void> {
   const { listen, watchAccount } = await import("./watch.ts");
   watchAccount(adena, { ...deps, listen });
@@ -58,7 +58,7 @@ export function useLogin() {
 }
 
 /** The way in, its step and why the last login stopped, for `login` as `useLogin` holds it; `network`, the network's name the button
- * carries after its words (D340). */
+ * carries after its words. */
 export function LoginControl({
   login,
   logIn,

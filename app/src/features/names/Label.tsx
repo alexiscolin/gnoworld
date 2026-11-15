@@ -1,4 +1,4 @@
-// The name the account's pill shows (9f), read after the first screen, in a chunk of its own: the dialog that registers one (PickName.tsx)
+// The name the account's pill shows, read after the first screen, in a chunk of its own: the dialog that registers one (PickName.tsx)
 // is another, asked at the menu's item. `again` makes the label read the chains anew once a registration ran.
 import { grouped } from "@gnoworld/ui";
 import { useEffect } from "react";

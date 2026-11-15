@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 
-// P401: the page that showed space goes, and the moons' asking and looking go with it.
+// The page that showed space goes, and the moons' asking and looking go with it.
 const stopped = vi.hoisted(() => vi.fn());
 const flies = vi.hoisted(() => ({ on: false }));
 vi.mock("./moonRooms.ts", () => ({ feedMoons: () => undefined, stopMoons: stopped }));

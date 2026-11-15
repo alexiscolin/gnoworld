@@ -13,7 +13,7 @@ import type { NameDialogProps } from "./NameDialog.tsx";
 import { NAMEREG, nymProblem } from "./nym.ts";
 import { RegisterFlow, type RegisterFlowProps } from "./RegisterFlow.tsx";
 
-// 9f: what the flow passes the dialog (the fee, the card's course, a refusal before any card) and when it asks the chain for the fee.
+// What the flow passes the dialog (the fee, the card's course, a refusal before any card) and when it asks the chain for the fee.
 // The dialog has its own tests; here it is a stand-in that keeps the props it was drawn with.
 const hoisted = vi.hoisted(() => ({
   drawn: [] as unknown[],

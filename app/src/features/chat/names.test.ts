@@ -24,7 +24,7 @@ const SECTIONS = [
   { name: null, rooms: open("#bubble/news") },
 ];
 
-// 7f2: the Earth is a page of its own, and its main room the general chat (frames 37 to 55).
+// The Earth is a page of its own, and its main room the general chat (frames 37 to 55).
 describe("a room of the Earth", () => {
   it("has its address on the Earth's page, which no /w/ path holds", () => {
     expect(roomHref("#earth")).toBe("/earth");
@@ -109,7 +109,7 @@ describe("the chat's names", () => {
 });
 
 // The list depends on who reads it: asked once the session is known, so a page whose chat loads before its /me
-// answers asks it once (4b's pre-merge).
+// answers asks it once.
 describe("what a world's room list is asked for", () => {
   const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 
@@ -163,7 +163,7 @@ describe("a room's search on its world's page", () => {
   });
 });
 
-// 4f-n: a mention of the whole room counts where Ergo's own modes limit who speaks (an announcement room) or who reads
+// A mention of the whole room counts where Ergo's own modes limit who speaks (an announcement room) or who reads
 // (a room of members): the page has no list of a world's moderators, so an open room's @room is a stranger's.
 describe("groupRooms: where a mention of the whole room counts", () => {
   const typed = (room: string, type: "open" | "announcement" | "accounts" | "members" | "members-write") => ({
@@ -206,7 +206,7 @@ describe("groupsAt: whether a mention of the whole room counts in a room", () =>
   });
 });
 
-// F819: whom a mention may shorten: the members, and the authors in view by their account tag.
+// Whom a mention may shorten: the members, and the authors in view by their account tag.
 describe("whom a mention may shorten", () => {
   const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -234,7 +234,7 @@ describe("whom a mention may shorten", () => {
   });
 });
 
-// D374: "talking now" is who wrote in the last 15 minutes, from the lines the room holds; "here now" is who has it open.
+// "Talking now" is who wrote in the last 15 minutes, from the lines the room holds; "here now" is who has it open.
 describe("talkingOf", () => {
   const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -269,7 +269,7 @@ describe("hereOf", () => {
 });
 
 describe("a room of a realm's world", () => {
-  // Bug: a generated world (gnoradio's) has no /w/ page, so its rooms led to "No world here".
+  // A generated world (gnoradio's) has no /w/ page, so its rooms led to "No world here".
   const ghost = "#nym-alexiscolin000-gnoradio-0123456789/home-0123456789";
 
   it("has no address: the Earth's and a hub's rooms keep theirs", () => {

@@ -9,7 +9,7 @@ import { callsIn, ensureCalls } from "../calls/slice.ts";
 import type { SignDeps } from "../calls/signCall.ts";
 import { REGISTER_ID, registerName, registrationOf } from "./registerName.ts";
 
-// 9f: Register of r/sys/namereg/v0 through 9d's card course (signCall) on the universe's chain only: the name is checked before
+// Register of r/sys/namereg/v0 through the call card's course (signCall) on the universe's chain only: the name is checked before
 // anything opens, the call's one argument is `nym-` and what was typed, and the person is registered only when the chain's
 // answer says so. Adena is a stand-in (app/tests/fakeAdena.ts), the chain's tx read a fake.
 const ACCOUNT = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

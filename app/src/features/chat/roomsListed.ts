@@ -1,5 +1,5 @@
 // The rooms each world last listed, by the chat's query (names.ts's roomsQuery), kept by the query client: a world opened again, or one the pointer
-// came over in the full chat's column, shows its rooms at once while its list is asked again behind (Alexis, 2026-11-07: "super réactif").
+// came over in the full chat's column, shows its rooms at once while its list is asked again behind.
 import type { AppState } from "../../store/index.ts";
 import { Heard } from "../../lib/heard.ts";
 import { roomsOptions } from "../../lib/query/apiReads.ts";

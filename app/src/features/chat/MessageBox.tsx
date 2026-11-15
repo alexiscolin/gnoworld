@@ -8,7 +8,7 @@ import { useFull } from "./full.ts";
 import styles from "./MessageBox.module.css";
 
 // The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
-// them: B, I, U, S. Underline goes as `++` (8k).
+// them: B, I, U, S. Underline goes as `++`.
 const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: string }[])[] = [
   [
     { format: "bold", icon: "bold", label: "Bold" },
@@ -31,7 +31,7 @@ type LinkTool = (size: "xs" | "s") => ReactNode;
 
 // The format bar: each format of BAR, named, applied to the box's selection.
 function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: LinkTool | undefined }) {
-  // Larger in the full chat, the screen its own (Alexis, 2026-11-07).
+  // Larger in the full chat, the screen its own.
   const tools = useFull() ? "s" : "xs";
   return (
     <div role="group" aria-label="Format" className={styles["format"]}>
@@ -72,7 +72,7 @@ function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void;
 }
 
 // The video's one rounded box: the format bar, the field (its children), and at its foot the room's quick actions, the field's words
-// (the field draws them, the box's grid places them) and Send. No @ nor / of its own: both are typed, and Tab completes them (Alexis, 2026-11-08).
+// (the field draws them, the box's grid places them) and Send. No @ nor / of its own: both are typed, and Tab completes them.
 export function MessageBox({
   onFormat,
   linkTool,
@@ -81,7 +81,7 @@ export function MessageBox({
   quick,
   children,
 }: {
-  /** The format bar's tools; none, no bar: a guest's line is one plain line (D430). */
+  /** The format bar's tools; none, no bar: a guest's line is one plain line. */
   onFormat?: ((format: Format) => void) | undefined;
   /** The bar's link tool, which is the composer's (a popover that asks for the address): it brings its own code. */
   linkTool?: LinkTool | undefined;

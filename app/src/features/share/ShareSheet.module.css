@@ -1,4 +1,4 @@
-/* The share sheet's picture: the view at the canvas's own proportions, its caption over its foot, as the prototype's share card. */
+/* The share sheet's picture: the view at the canvas's own proportions, its caption over its foot. */
 @layer components {
   .picture {
     position: relative;

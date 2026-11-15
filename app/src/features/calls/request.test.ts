@@ -4,7 +4,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { callRequest } from "./request.ts";
 
-// 9d: the preview and the message are made from one CallRequest, so the card cannot show one call and sign another.
+// The preview and the message are made from one CallRequest, so the card cannot show one call and sign another.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const CUR = { Name: "cur", Type: realmType() };
 const PARAMS = [CUR, { Name: "bio", Type: "string" }, { Name: "times", Type: "int64" }, { Name: "loud", Type: "bool" }];

@@ -4,7 +4,7 @@ import { nextStops, STYLES, type StoreRow } from "@gnoworld/core";
 import { Button, Cluster, IconButton, Kicker, Stack } from "@gnoworld/ui";
 import { Fragment } from "react";
 import { FollowButton } from "../../follow/index.ts";
-import { Planet, shortOf } from "./Cards.tsx";
+import { Planet, short } from "./Cards.tsx";
 import styles from "./Discover.module.css";
 import { followKey } from "./realms.ts";
 import type { Discovery } from "./useDiscover.ts";
@@ -81,7 +81,7 @@ export function Detail({
   const kind = stylesOf(row).join(" · ") || "Realm";
   return (
     <section key={row.id} className={styles["detail"]} aria-label="Realm detail">
-      {/* Four groups a larger step apart (Alexis, 2026-11-08: "trop collé"): who it is, its figures, what to do, where next. */}
+      {/* Four groups a larger step apart: who it is, its figures, what to do, where next. */}
       <Stack space="l">
         <p className="visually-hidden" role="status">
           {`${row.name}, ${kind}, ${String(row.callers)} callers, ${String(row.calls)} calls, ${String(here)} here now`}
@@ -115,7 +115,7 @@ export function Detail({
           </p>
           <p className={styles["note"]}>
             {row.page ? "It has a page of its own, and its functions." : "No page of its own: its functions."}
-            {row.author === null ? ` By @${shortOf(row.namespace)}.` : ` By ${row.author}.`}
+            {row.author === null ? ` By @${short(row.namespace)}.` : ` By ${row.author}.`}
           </p>
         </Stack>
         <Stats row={row} here={here} />

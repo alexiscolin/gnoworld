@@ -17,7 +17,7 @@ const store = () => {
   return { actions, made, of: (room: string) => cardsIn(made.getState())?.cards[room], notified: () => heard };
 };
 
-// Link previews L4: a line has a card only after the server's event (or its answer) says so, and a removal takes it for good.
+// A line has a card only after the server's event (or its answer) says so, and a removal takes it for good.
 describe("the store's link cards", () => {
   it("joins the store with the first card, once, and the page has none before", () => {
     const made = createAppStore();

@@ -1,7 +1,7 @@
-// What the page's link keeps for an account alone (slice 4, moved out of link.ts): what it sends (lines, corrections,
+// What the page's link keeps for an account alone: what it sends (lines, corrections,
 // reactions, deletes, typing), the reading places it asks Ergo to keep, the lines a direct message waits an answer to,
 // and the notices it makes of what it hears. A guest's link has none of it, and a visitor's page never loads its code
-// (the first screen's budget, ADR-0001 §12; docs/decisions.md, 2026-10-28).
+// (the first screen's budget, ADR-0001 §12).
 import type { IrcMessage } from "@gnoworld/core";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
@@ -12,7 +12,7 @@ import { Speaking } from "./speaking.ts";
 import { Places, TypingOut } from "./telling.ts";
 
 // What the kit reads as it speaks and the room's menu sets, through here: an account loads both, and a file of its own would be one more on
-// every first load's list and in nginx's table (F3665).
+// every first load's list and in nginx's table.
 export { keepCountry, shownCountry } from "../../lib/country.ts";
 
 /** What the link lends: the store, the connection and the key of its session ("guest" or an address), the way out to

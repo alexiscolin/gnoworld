@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Thread, TITLE_LENGTH, type ThreadProps } from "./Thread.tsx";
 
-// 4d's threads (docs/plans/chat-features.md, M3): the panel beside a room, one thread's root and its replies, drawn from
+// The threads: the panel beside a room, one thread's root and its replies, drawn from
 // the room's own lines, so none is fetched. The panel is a lazy chunk: the room's lines come first, as a page does.
 const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// A line of the room; `reply` is the msgid it answers (4d's replies).
+// A line of the room; `reply` is the msgid it answers.
 const line = (id: string, minute: number, over: Partial<Line> & { reply?: string } = {}): Line => ({
   id,
   time: T(minute),
@@ -82,7 +82,7 @@ describe("Thread", () => {
     expect(said(panel())).toMatch(/\b2 replies\b/);
   });
 
-  // The app's own word first (F808): a sender's words never stand before it; the title is text alone.
+  // The app's own word first: a sender's words never stand before it; the title is text alone.
   const heading = (html: string) => [...html.matchAll(/<(h[1-6])[^>]*>(.*?)<\/\1>/gs)].map((found) => found[2] ?? "");
   const graphemes = (text: string) => [...new Intl.Segmenter().segment(text)].length;
 
@@ -94,7 +94,7 @@ describe("Thread", () => {
     expect(panel()).toMatch(/<h[1-6][^>]*>Thread/);
   });
 
-  // CR10 (F1769): the title is a heading a screen reader reads out: a member's address in it is shortened, as the room's
+  // The title is a heading a screen reader reads out: a member's address in it is shortened, as the room's
   // lines and the reply quote shorten it, and one that is no member's stays whole.
   it("shortens a member's address in the title, as the room's lines do, and keeps any other whole", () => {
     const other = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
@@ -106,7 +106,7 @@ describe("Thread", () => {
     expect(title).toContain(`@${other}`);
   });
 
-  // R4: the reader's own address is shortened too, though the reader is in no members' list.
+  // The reader's own address is shortened too, though the reader is in no members' list.
   it("shortens the reader's own address in the title, whether or not the members hold it", () => {
     // Nobody in view but BOB wrote or is a member, so only `me` makes ALICE's address shortenable.
     const by = { from: BOB, account: BOB };
@@ -126,7 +126,7 @@ describe("Thread", () => {
     expect(said(list(html, "In this thread"))).toContain("the end");
   });
 
-  // The words of the root and of every reply are a sender's, a reply's the most open to abuse (R5): text nodes and
+  // The words of the root and of every reply are a sender's, a reply's the most open to abuse: text nodes and
   // allowlisted elements, never markup they build, and a link only to https.
   const PAYLOAD = [
     "<img src=x onerror=alert(1)> <script>alert(2)</script>",
@@ -183,7 +183,7 @@ describe("Thread", () => {
     expect(items(list(panel({ lines, me: BOB }), "In this thread")).join(" ")).not.toContain("Mentions you");
   });
 
-  // A line's author is its account tag alone (F805, F812): a guest's line whose nick is a valid address is a guest's.
+  // A line's author is its account tag alone: a guest's line whose nick is a valid address is a guest's.
   it("shows a reply with no account tag as a guest's, though its nick is an address", () => {
     const lines = [
       line("root", 0),
@@ -192,12 +192,12 @@ describe("Thread", () => {
     const html = list(panel({ lines }), "In this thread");
     const [, guest = ""] = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((found) => found[1] ?? "");
     expect(said(guest)).toContain("(guest)");
-    // No title on the guest's name (an account's address is its title); the time's full date is the one title (D13922).
+    // No title on the guest's name (an account's address is its title); the time's full date is the one title.
     expect(guest).not.toMatch(/<(?!time)[^>]* title=/);
     expect(said(items(html)[0] ?? "")).not.toContain("(guest)");
   });
 
-  // R6: the panel draws no player: the room's list does, after the moderation's verdict.
+  // The panel draws no player: the room's list does, after the moderation's verdict.
   it("draws no player or picture for a link to an accepted service, only the link", () => {
     const text = "see https://www.youtube.com/watch?v=dQw4w9WgXcQ and https://giphy.com/gifs/4548k01F5Ej28";
     const html = panel({ lines: [line("root", 0, { text }), line("r", 1, { reply: "root", text })] });
@@ -206,7 +206,7 @@ describe("Thread", () => {
     expect(html).toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"');
   });
 
-  // R1: the panel reads the room's lines as the room shows them, an author's edit folded into its line.
+  // The panel reads the room's lines as the room shows them, an author's edit folded into its line.
   describe("with an edit among the room's lines", () => {
     const base = [line("a", 0, { text: "the root" }), line("b", 1, { reply: "a", text: "a reply" })];
 
@@ -248,7 +248,7 @@ describe("Thread", () => {
     });
   });
 
-  // R8: the root hidden while the panel is open: its words leave the title and the first row, the replies stay.
+  // The root hidden while the panel is open: its words leave the title and the first row, the replies stay.
   it("drops a root's words once the room lost it, its replies kept under an earlier message", () => {
     const kept = panel();
     const lost = panel({ lines: ROOM_LINES.filter(({ id }) => id !== "root") });
@@ -272,7 +272,7 @@ describe("Thread", () => {
     const grown = panel({ lines: [...ROOM_LINES, line("late", 9, { text: "a late one", reply: "root" })] });
     expect(items(list(grown, "In this thread"))).toHaveLength(4);
     const without = panel({ lines: ROOM_LINES.filter(({ id }) => id !== "first") });
-    // The reply to the lost one answers a message that is gone: it leaves the thread (decisions, 2026-10-27).
+    // The reply to the lost one answers a message that is gone: it leaves the thread.
     expect(items(list(without, "In this thread"))).toHaveLength(1);
   });
 
@@ -290,12 +290,12 @@ describe("Thread", () => {
     expect(said(html)).toMatch(/No replies yet/);
   });
 
-  // G5: a root with no words (only spaces) has no title to follow the word: no stray colon.
+  // A root with no words (only spaces) has no title to follow the word: no stray colon.
   it("is named Thread alone when its root's words are only spaces", () => {
     expect(heading(panel({ lines: [line("root", 0, { text: "   " })] }))).toEqual(["Thread"]);
   });
 
-  // G2: a link of a panel's row is a Tab stop, as a link of the list's stop line is; no row is a stop of the room's list.
+  // A link of a panel's row is a Tab stop, as a link of the list's stop line is; no row is a stop of the room's list.
   it("leaves a reply's link in the Tab order and gives no row a tab stop of its own", () => {
     const text = "see [the docs](https://example.com/fine)";
     const html = panel({ lines: [line("root", 0), line("r", 1, { reply: "root", text })] });
@@ -306,7 +306,7 @@ describe("Thread", () => {
     expect(list(html, "In this thread")).not.toMatch(/<li\b[^>]*tabindex/);
   });
 
-  // G3 (F819): an account author in view, by its account tag, makes its mention shortenable though it is not a member;
+  // An account author in view, by its account tag, makes its mention shortenable though it is not a member;
   // a guest's nick, whatever it looks like, proves nothing.
   it("shortens a mention of an account that wrote a line in view and is no member, not a guest's nick", () => {
     const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";

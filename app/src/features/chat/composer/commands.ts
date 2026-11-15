@@ -104,7 +104,6 @@ export function caretInCode(editor: LexicalEditor): boolean {
   });
 }
 
-/** Replaces the `length` characters before the caret (the word being typed) with `text`. */
 /** Puts `prefix` at the start of the draft `markdown` and the caret after it, the field focused. */
 export function startWith(editor: LexicalEditor, prefix: string, markdown: string): void {
   setMarkdown(editor, `${prefix}${markdown}`);
@@ -115,6 +114,7 @@ export function startWith(editor: LexicalEditor, prefix: string, markdown: strin
   });
 }
 
+/** Replaces the `length` characters before the caret (the word being typed) with `text`. */
 export function replaceWordBeforeCaret(editor: LexicalEditor, length: number, text: string): void {
   editor.focus();
   editor.update(() => {

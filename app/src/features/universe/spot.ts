@@ -1,4 +1,4 @@
-// Where a speaker stands on a world that has no countries (D565): a point of its ground drawn from a seed, the world's id and the speaker's
+// Where a speaker stands on a world that has no countries: a point of its ground drawn from a seed, the world's id and the speaker's
 // account or guest name, so the same person speaks from the same place on a given world, never from a list.
 import { textHash, unitOf } from "@gnoworld/core";
 import type { LatLon } from "../../space/earth/ground.ts";

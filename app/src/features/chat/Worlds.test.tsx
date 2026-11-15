@@ -8,7 +8,7 @@ import { pictureOf } from "../../lib/worldPictures.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { inRailOrder, Worlds } from "./Worlds.tsx";
 
-// 5q: the full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
+// The full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
 const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
 const GOVDAO = { slug: "govdao", name: "GovDAO", href: "/w/govdao", realms: ["gno.land/r/gov/dao"] };
 const EARTH = { slug: "earth", name: "Earth", href: "/earth" };
@@ -46,7 +46,7 @@ describe("Worlds", () => {
   });
 });
 
-// Alexis 2026-11-06: each world shows the picture taken of its real planet, 44 px, with its name on hover only.
+// Each world shows the picture taken of its real planet, 44 px, with its name on hover only.
 describe("Worlds, the pictures of the real planets", () => {
   it("draws one picture to a world from the manifest, the Earth first, each its own", () => {
     const box = mount(<Worlds universe={UNIVERSE} worlds={[EARTH, BUBBLE, GOVDAO]} current="earth" />);
@@ -95,7 +95,7 @@ describe("Worlds, the pictures of the real planets", () => {
   });
 });
 
-// Alexis 2026-11-06: one order for both columns, the universe's rail's: the Earth, the worlds followed, the rest.
+// One order for both columns, the universe's rail's: the Earth, the worlds followed, the rest.
 describe("inRailOrder", () => {
   const slugs = (list: readonly { slug: string }[]) => list.map(({ slug }) => slug);
   const ZENAO = { slug: "zenao", name: "Zenao", href: "/w/zenao" };
@@ -118,7 +118,7 @@ describe("inRailOrder", () => {
   });
 });
 
-// Alexis 2026-11-06: the pictures carry the textures' credit, so the full chat offers the credits too: the universe's own dialog.
+// The pictures carry the textures' credit, so the full chat offers the credits too: the universe's own dialog.
 describe("Worlds, the credits", () => {
   it("offers a Credits button at the column's foot that opens the attributions, Solar System Scope's among them", async () => {
     modals();

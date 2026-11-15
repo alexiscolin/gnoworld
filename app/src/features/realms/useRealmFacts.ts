@@ -1,5 +1,5 @@
-// A realm's facts from the public indexer (5k): kept by indexer and realm, so a place seen again draws them at once and reads them again quietly,
-// and the plate's standing and the realm's card share one request (D530). A read that fails is a state of its own, never a blank, and does not
+// A realm's facts from the public indexer: kept by indexer and realm, so a place seen again draws them at once and reads them again quietly,
+// and the plate's standing and the realm's card share one request. A read that fails is a state of its own, never a blank, and does not
 // touch the page's read (RealmView): each is read on its own.
 import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { queryOptions, useQuery } from "@tanstack/react-query";

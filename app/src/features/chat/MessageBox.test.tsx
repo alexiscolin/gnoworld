@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 
-// 5q: the composer's one box (frame 23.58.01): a small format bar, the field, and at its foot a round Send alone (the @ and /
-// marks went, D418: both are typed).
+// The composer's one box (frame 23.58.01): a small format bar, the field, and at its foot a round Send alone (the @ and /
+// are typed, not drawn).
 const draw = (over: Partial<Parameters<typeof MessageBox>[0]> = {}) =>
   mount(
     <MessageBox
@@ -26,7 +26,7 @@ describe("the composer's box", () => {
     expect(button(box, "Send")?.getAttribute("type")).toBe("submit");
   });
 
-  // 5q2 (frame f0066): the bar's tools in groups, a rule between them (prototype #fmtBar .sep): marks, then code, then lists.
+  // Frame f0066: the bar's tools in groups, a rule between them (prototype #fmtBar .sep): marks, then code, then lists.
   it("sets a rule between the format bar's groups: after the marks, after the code and the quote", () => {
     const bar = one(draw(), '[role="group"][aria-label="Format"]');
     const order = [...bar.querySelectorAll("button, [role='separator']")].map((each) =>
@@ -72,7 +72,7 @@ describe("the composer's box", () => {
     expect(onFormat).toHaveBeenCalledWith("bold");
   });
 
-  // 8k (frame 73: B, I, U, S): the underline between italic and strikethrough, its icon the design system's, a plain
+  // Frame 73 (B, I, U, S): the underline between italic and strikethrough, its icon the design system's, a plain
   // button as its siblings are (none of them holds a pressed state or a shortcut).
   it("draws Underline between Italic and Strikethrough, with the design system's underline icon, and applies it", () => {
     const onFormat = vi.fn();

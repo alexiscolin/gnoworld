@@ -2,7 +2,7 @@ import { markdown } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import { capturedPath, previewIn } from "./pageLinks.ts";
 
-// Which page a chat line's link shows the capture of (8f): a link to a realm's home on the default universe's gnoweb, and nothing else.
+// Which page a chat line's link shows the capture of: a link to a realm's home on the default universe's gnoweb, and nothing else.
 // The page never asks the address a line holds: it only looks it up among the captures the server's job wrote.
 const GNOWEB = "https://onyx.testnets.gno.land";
 

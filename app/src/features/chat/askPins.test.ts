@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import { PINS_EVERY_MS, pinAsker } from "./askPins.ts";
 
-// The shown room's pins (slice 4's 4d): asked of the server when the room is shown, again each minute while the page
-// shows, and after the reader's own pin or unpin. Ergo tells nothing of them (they are the server's, docs/plans/slice-4.md
-// §7), so another moderator's change reaches a reader within a minute, or at the next look.
+// The shown room's pins: asked of the server when the room is shown, again each minute while the page
+// shows, and after the reader's own pin or unpin. Ergo tells nothing of them (they are the server's
+// ), so another moderator's change reaches a reader within a minute, or at the next look.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const list = (room: string, ids: string[], may = false): PinList => ({
   room,
@@ -65,7 +65,7 @@ describe("the shown room's pins", () => {
     expect(t.told).toEqual([list("#bubble", ["m1"])]);
   });
 
-  // The decision's number, in its own words (docs/decisions.md, 2026-10-27): a minute, not a moment less.
+  // A minute, not a moment less.
   it("are asked each minute while the page shows, and not before", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
@@ -178,7 +178,7 @@ describe("the shown room's pins", () => {
   });
 
   // The session changes before the page's effect shows the room again: an answer asked for the last reader, given in
-  // between, is the last reader's (F1486, the code review's CR5).
+  // between, is the last reader's.
   it("drop an answer given after the session changed, before the room was shown again", async () => {
     let release: (value: Result<PinList>) => void = () => undefined;
     const t = setup({ answer: () => new Promise((resolve) => (release = resolve)) });
@@ -238,7 +238,7 @@ describe("pinning and unpinning from the shown room", () => {
   });
 
   // A poll asked before the act and answered after it holds the list as it was: taking it would bring an unpinned line
-  // back, or take a pinned one off, for the minute (F1485, the code review's CR2).
+  // back, or take a pinned one off, for the minute.
   it.each([
     ["pin", ["m1", "m2"], ["m1"]],
     ["unpin", ["m1"], ["m1", "m2"]],
@@ -263,7 +263,7 @@ describe("pinning and unpinning from the shown room", () => {
   });
 
   // The same class from the other side: a poll that starts while the act is in flight and lands after it holds the list
-  // as it was before the act (R3 of redpass2-4dx).
+  // as it was before the act.
   it("drop a poll's older answer that was asked while a pin was in flight and lands after it, and ask again", async () => {
     const releases: Record<"pin" | "poll", (value: Result<PinList>) => void> = {
       pin: () => undefined,
@@ -300,7 +300,7 @@ describe("pinning and unpinning from the shown room", () => {
   });
 
   // Another moderator unpinned the line a second ago, or the reader was demoted, or the stack is full: the bar holds the
-  // list as it was until the minute, and each retry costs a request of the 30 a minute (F1487, the code review's CR6).
+  // list as it was until the minute, and each retry costs a request of the 30 a minute.
   it.each(["not_found", "forbidden", "full", "not_ready"] as const)(
     "ask the room's pins again once after a refusal of %s, which the server's list explains",
     async (reason) => {
@@ -321,7 +321,7 @@ describe("pinning and unpinning from the shown room", () => {
     },
   );
 
-  // A refusal that lands after the reader changed explains nothing of the new reader's list (R10 of redpass2-4dx).
+  // A refusal that lands after the reader changed explains nothing of the new reader's list.
   it("ask nothing after a refusal that lands once the reader changed", async () => {
     let release: (value: Result<PinList>) => void = () => undefined;
     const t = setup({
@@ -368,7 +368,7 @@ describe("pinning and unpinning from the shown room", () => {
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(2);
   });
 
-  // The store takes the list each call answers, not the poll's (G7).
+  // The store takes the list each call answers, not the poll's.
   it("hand the store what the pin and the unpin answered, read in full", async () => {
     const t = setup({
       answer: (room, call) => Promise.resolve(ok(list(room, [`from-${call}`], call !== "pins"))),

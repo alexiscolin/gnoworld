@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// 4f-n (G11): the hook that tells the page what the account has not seen, on the real store, rendered in jsdom.
+// The hook that tells the page what the account has not seen, on the real store, rendered in jsdom.
 import { parseLine } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { act, Profiler, useEffect } from "react";
@@ -88,7 +88,7 @@ const tell = (what: (state: AppState) => void) => {
 const mention = (id: string, where: string, minute = 5) =>
   ({ id, kind: "mention", where, time: T(minute), by: ALICE }) as const;
 
-// R1 (redpass2-4fn): the title's setter is the spy, and lets only a few writes through: the observer sees its own write,
+// The title's setter is the spy, and lets only a few writes through: the observer sees its own write,
 // so a guard or a disconnect gone loops in microtasks, which no timeout ends. With the cap it fails a count instead.
 let writes = 0;
 beforeEach(() => {
@@ -126,7 +126,7 @@ describe("useNotices", () => {
     });
   };
 
-  // F1512: a guest's list was a new `[]` each render, so useAnnounced set its state on it again and again; only the
+  // A guest's list is one array, not a new `[]` each render, or useAnnounced set its state on it again and again; only the
   // compiler of the build, which keeps the one array, hid the loop (the test renders as written).
   it("draws for a guest without looping on a list made anew each render, and tells it nothing", () => {
     draw(on({ session: { kind: "out" } }));
@@ -179,7 +179,7 @@ describe("useNotices", () => {
     expect(document.title).toBe(TITLE);
   });
 
-  // F1678 (CR6): a route change sets the title anew, which dropped the count while its number stood.
+  // A route change sets the title anew, which dropped the count while its number stood.
   it("puts the count back before a title another writer set, with the count the same", async () => {
     draw(on());
     follow();
@@ -230,7 +230,7 @@ describe("useNotices", () => {
     expect(document.title).toBe("Games · gno.world");
   });
 
-  // F1676 (CR4): Clear sees the places on the page; the rooms' marks also go to Ergo, as a read does.
+  // Clear sees the places on the page; the rooms' marks also go to Ergo, as a read does.
   it("hands the marks that Clear sets to the link, which tells Ergo those of the rooms", () => {
     const read = vi.fn();
     draw(on({ read }));
@@ -296,7 +296,7 @@ describe("useNotices", () => {
     expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #bubble");
   });
 
-  // F1677 (CR5): a second notice of the same author and place said the same words, so the status stayed as it was and a
+  // A second notice of the same author and place said the same words, so the status stayed as it was and a
   // screen reader said nothing; and what Clear had seen stayed said.
   it("keys the status on the notice said, so the same words said again are new, and says nothing once cleared", () => {
     draw(on());
@@ -334,7 +334,7 @@ describe("useNotices", () => {
     expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #news");
   });
 
-  // F1533: the hook read the whole store, so a line in any room, a typing event or a topic drew the page and its lists again.
+  // The hook must not read the whole store, so a line in any room, a typing event or a topic drew the page and its lists again.
   it("draws nothing again for a change of a room that moves no count and no mode, and once for each that does", () => {
     draw(on());
     follow();

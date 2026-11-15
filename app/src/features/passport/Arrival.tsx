@@ -1,6 +1,6 @@
-// A place's arrival (slice 8; frames 23, 37, 93, 104): its first visit stamps the passport and says so in the top centre's pill,
+// A place's arrival (frames 23, 37, 93, 104): its first visit stamps the passport and says so in the top centre's pill,
 // "Stamped · GovDAO / 2 stamps in your passport", with the passport a press away; a world this device charted first says "First to chart",
-// as the scene wakes it. 8b's line ("Today's expedition · 1 of 3") stands in the same pill, never a second one, and alone for a place
+// as the scene wakes it. The expedition's line ("Today's expedition · 1 of 3") stands in the same pill, never a second one, and alone for a place
 // already stamped (slots.tsx). One pill at a time: the shell's (topPill.tsx).
 import { markFirst, stampedIn, stampKey, utcDay } from "@gnoworld/core";
 import { useEffect, useEffectEvent } from "react";
@@ -27,7 +27,7 @@ export function Arrival({ universe, world, name: given, path }: ArrivalProps) {
   const store = useAppStore();
   const readable = useApp(({ device }) => device.readable);
   const [, open] = useDeviceView();
-  // The pill's one act: the passport, or for a world charted first, its share when 8c's is plugged in.
+  // The pill's one act: the passport, or for a world charted first, its share once the share slot is filled.
   const say = useEffectEvent((title: string, line: string, shared = false) => {
     const share = shared ? slot("share") : undefined;
     raisePill({

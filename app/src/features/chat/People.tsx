@@ -1,4 +1,4 @@
-// Who is here, in the info panel (4b; 5q's nebula): counted once connected, the bot left out, the first
+// Who is here, in the info panel: counted once connected, the bot left out, the first
 // MEMBERS_SHOWN named.
 import { Avatar, Cluster } from "@gnoworld/ui";
 import { lazy, Suspense } from "react";
@@ -23,7 +23,7 @@ export interface PeopleProps {
   /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
   me: string | undefined;
   onMessage: ((partner: string) => void) | undefined;
-  /** Each account but the reader's may be followed, on this device (slice 8): where it is here, the labels say so. */
+  /** Each account but the reader's may be followed, on this device: where it is here, the labels say so. */
   canFollow?: boolean;
   /** The room's lines: the country each declared there, its code and name at the row's end. */
   lines?: readonly Line[] | undefined;
@@ -54,7 +54,7 @@ export function People({ members, connected, me, onMessage, canFollow = false, l
           const account = isAccount(nick);
           return (
             <li key={nick} className={styles["row"]}>
-              {/* The face and the name at the start: one column whatever the name's width (U18). A
+              {/* The face and the name at the start: one column whatever the name's width. A
                   person the reader may write to is one button, the whole of its face and name: it opens the conversation. */}
               <Cluster space="3xs" justify="between">
                 {onMessage !== undefined && account && me !== undefined && nick !== me ? (

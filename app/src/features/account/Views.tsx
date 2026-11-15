@@ -7,7 +7,7 @@ import { PassportView } from "../passport/index.ts";
 import { SettingsView } from "../settings/index.ts";
 import { useDeviceView, type DeviceView } from "../../deviceViews.ts";
 
-// The release of a command-line key has its own chunk, asked when it is opened (D13940).
+// The release of a command-line key has its own chunk, asked when it is opened.
 const ReleaseDialog = lazy(async () => ({ default: (await import("../settings/index.ts")).ReleaseDialog }));
 
 export function Views({ universe }: { universe: string }) {

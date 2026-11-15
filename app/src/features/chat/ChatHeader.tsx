@@ -1,5 +1,5 @@
 // The chat's header (the video's frames 26 and 66, top): the room's name and the place's buttons; the site header's Chat and the chat's own
-// arrows open a docked chat full, its arrows or a level close it (D441, D445), and a chat with no dock (a phone's screen) has a close.
+// arrows open a docked chat full, its arrows or a level close it, and a chat with no dock (a phone's screen) has a close.
 import { Cluster, Dialog, Icon, IconButton, Sidebar } from "@gnoworld/ui";
 import { useEffect, useState, type ReactNode, type Ref } from "react";
 import { useLocation } from "react-router";
@@ -16,13 +16,13 @@ export interface ChatHeaderProps {
   /** The room's name, or a direct message's partner. */
   title: ReactNode;
   onClose: () => void;
-  /** Whether the chat has a dock: it opens full from it and goes back to it (D441); without one it is closed. */
+  /** Whether the chat has a dock: it opens full from it and goes back to it; without one it is closed. */
   docked?: boolean | undefined;
-  /** What the name opens, behind a chevron after it (the place's rooms under a search, D487): none draws a plain name. */
+  /** What the name opens, behind a chevron after it (the place's rooms under a search): none draws a plain name. */
   menu?: { label: string; content: ReactNode } | undefined;
   /** A short mark after the name, always in view: a direct message's "Not encrypted", drawn by its own code. */
   mark?: ReactNode;
-  /** The control to the rooms, before the name, on a phone's screen (5b's drawer). */
+  /** The control to the rooms, before the name, on a phone's screen (its drawer). */
   rooms?: ReactNode;
   /** The place's own buttons, after its name. */
   buttons?: ReactNode;
@@ -33,7 +33,7 @@ export interface ChatHeaderProps {
 // A name in the wide full chat's row, which gives way at its end.
 const CUT = [styles["title"], "truncate"].join(" ");
 
-// "Bubble / #general" in the wide full chat, one size, no network's name (Alexis, 2026-11-07); a room named as its place says it once,
+// "Bubble / #general" in the wide full chat, one size, no network's name; a room named as its place says it once,
 // and a long name gives way at its end.
 function Where({ world, title, menu }: Pick<ChatHeaderProps, "world" | "title" | "menu">) {
   const same = typeof title === "string" && title.replace(/^#/, "").toLowerCase() === world?.toLowerCase();
@@ -132,7 +132,7 @@ function Controls({
         {lead}
         {/* A rule between the place's buttons and the close after them; a docked chat has none. */}
         {lead === undefined || docked ? null : <span className={site["divider"]} aria-hidden="true" />}
-        {/* A chat with a dock is never closed (Alexis, 2026-11-07): it opens full from here, and the full chat closes from its own bar (PlaceView.tsx); one with none is closed. */}
+        {/* A chat with a dock is never closed: it opens full from here, and the full chat closes from its own bar (PlaceView.tsx); one with none is closed. */}
         {docked || <IconButton icon="close" label="Close the chat" size={control} onClick={onClose} />}
         {docked && !full ? <FullButton full={false} /> : null}
       </Cluster>
@@ -142,7 +142,7 @@ function Controls({
 
 export function ChatHeader({ title, onClose, docked, rooms, menu, mark, world, buttons }: ChatHeaderProps) {
   // The wide full chat's band, under the site's header: the worlds' and rooms' columns' room, then the place and the room (Where);
-  // docked, the rooms' control, then the room's name: no place's name, which the dock's row always cut (Alexis, 2026-11-07).
+  // docked, the rooms' control, then the room's name: no place's name, which the dock's row always cut.
   const wide = useFull() && rooms === undefined;
   const { controlsRef, fit } = useActsRoom({
     docked,

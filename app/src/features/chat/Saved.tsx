@@ -1,5 +1,5 @@
-// The saved messages' button and its list (slice 4's 4d): for an account alone, which has a device to keep them on, beside the rooms (the
-// account menu opens the same list, slice 8). The list's code comes when it is first asked for.
+// The saved messages' button and its list: for an account alone, which has a device to keep them on, beside the rooms (the
+// account menu opens the same list). The list's code comes when it is first asked for.
 import { Icon, NavItem } from "@gnoworld/ui";
 import { useState } from "react";
 import { useLocation } from "react-router";

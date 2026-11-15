@@ -82,7 +82,6 @@ export function TryCard({ realm, chain, options }: Where) {
           level={2}
           actions={
             // The card's own switch stands in its header, as Calls per day's scale does: the title first, then what it shows
-            // (Alexis, 2026-11-10: "mauvaise hiérarchie avec le système d'onglets en dessous").
             <KindTabs id={tabsId} tab={tab} counts={{ read: reads, write: writes }} onSelect={setTab} />
           }
           expand={expand}

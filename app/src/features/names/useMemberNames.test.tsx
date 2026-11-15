@@ -34,7 +34,7 @@ describe("the members' names under the composer", () => {
     expect(mount(<Names asked />).textContent).toBe(JSON.stringify([[ALICE, "alice"]]));
   });
 
-  // C14 of the review: the first @ in a busy room asks one block a chain, not one an account.
+  // The first @ in a busy room asks one block a chain, not one an account.
   it("asks each chain's block once for all the members, not once for each", async () => {
     const fetched = vi.fn((url: string) =>
       Promise.resolve(

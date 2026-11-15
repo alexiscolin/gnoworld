@@ -1,4 +1,4 @@
-// A link's player (slice 4's 4g; docs/decisions.md, 2026-10-26): an accepted service's own, each from its own
+// A link's player: an accepted service's own, each from its own
 // documentation: YouTube's privacy-enhanced mode (support.google.com/youtube/answer/171780), Vimeo's player with
 // Do Not Track (help.vimeo.com, "Player parameters overview"), Giphy's embed_url (developers.giphy.com/docs/api/
 // schema). Imgur's form could not be read, its pages refusing crawlers: its links stay links. An id outside its
@@ -45,7 +45,7 @@ export function embedOf(href: string): Player | undefined {
   if (url.protocol !== "https:" || url.port !== "" || url.username !== "" || url.password !== "") return undefined;
   const youtube = youtubeId(url);
   if (youtube !== undefined && YOUTUBE_ID.test(youtube)) {
-    // autoplay=1: the frame loads on the reader's Play, which a second click on the service's own button repeated (F1054).
+    // autoplay=1: the frame loads on the reader's Play, so a second click on the service's own button is not needed.
     const src = `https://www.youtube-nocookie.com/embed/${youtube}?autoplay=1`;
     return { service: "YouTube", src, title: "YouTube video" };
   }

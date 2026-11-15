@@ -9,9 +9,9 @@ import { StoreProvider } from "../../storeContext.tsx";
 import { Arrival, FirstCharted } from "./Arrival.tsx";
 import { standInPopovers } from "../../../tests/popover.ts";
 
-// Slice 9h (frames 90 to 97): the arrival banners, the design system's flash in its arrival look, one at a time, shown to the
+// Frames 90 to 97: the arrival banners, the design system's flash in its arrival look, one at a time, shown to the
 // account the server's signal names and only from it: never the chart call's answer, a page load, a guest or another account.
-// Their code loads only for a banner to show (budgets.spec.ts); a banner ends a day after its signal's time (D213).
+// Their code loads only for a banner to show (budgets.spec.ts); a banner ends a day after its signal's time.
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const AT = "2026-11-05T12:00:00.000Z";
@@ -132,7 +132,7 @@ describe("charting on arrival", () => {
     expect(fetches).not.toHaveBeenCalled();
   });
 
-  // Every logged-in visit to a world calls it, and each call counts against the account's 20 an hour (D211): a refusal is
+  // Every logged-in visit to a world calls it, and each call counts against the account's 20 an hour: a refusal is
   // routine, and the page takes it quietly, asking once and never again against the rate.
   it.each([
     ["too many", { ok: false, reason: "too_many" }],
@@ -227,7 +227,7 @@ describe("the banners", () => {
     expect(text()).toBe("");
   });
 
-  // D213: a banner is the arrival's, not the page's: it ends a day after the signal's time, whether the stream gave it
+  // A banner is the arrival's, not the page's: it ends a day after the signal's time, whether the stream gave it
   // live or replayed it, so a reload a week later shows none.
   it("shows a banner while its signal is under a day old, and none once it is a day old or more", async () => {
     const page = setup();

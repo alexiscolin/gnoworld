@@ -1,4 +1,4 @@
-// A realm's exported functions with their parameters, read once from `vm/qfuncs` (9e): what the write rows, a page's `<gno-form>` and a
+// A realm's exported functions with their parameters, read once from `vm/qfuncs`: what the write rows, a page's `<gno-form>` and a
 // proposed action are each checked against before a Call shows. Panels of one view that ask in the same moment share one request.
 import { callFields, type CallField } from "@gnoworld/core";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";

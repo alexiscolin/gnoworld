@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Saved } from "./Saved.tsx";
 
-// The saved messages' button (slice 4's 4d): a button the account opens the list with; the list's code is asked for when
+// The saved messages' button: a button the account opens the list with; the list's code is asked for when
 // it is first opened, so the page holds no dialog before. Its opening, removing and closing are the journeys' (keep.spec.ts).
 describe("the saved messages' button", () => {
   it("is a button named Saved with its icon, and holds no dialog before it is opened", () => {

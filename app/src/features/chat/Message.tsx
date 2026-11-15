@@ -1,17 +1,17 @@
-// A message's text, read as Markdown (slice 4's 4c): core's tree, each node an element of the allowlist and every
+// A message's text, read as Markdown: core's tree, each node an element of the allowlist and every
 // text React's text, so nothing from Ergo reaches HTML. A one-paragraph message stays on its line, in a span; other
 // blocks go below it, in a div. A link opens its https address in a new tab, with no opener and no referrer, the
-// whole address in its title, its label being anyone's words. A mention (4d) shows its account's address shortened,
-// whole in its title; the reader's own apart; an address neither the reader's nor a member's whole (F812). Children go
+// whole address in its title, its label being anyone's words. A mention shows its account's address shortened,
+// whole in its title; the reader's own apart; an address neither the reader's nor a member's whole. Children go
 // to createElement one by one: a tree that never changes needs no keys.
 import { markdown, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import { NEW_TAB } from "../../lib/newTab.ts";
 import { isAccount, shortAddress } from "./names.ts";
 
-// A realm page's `$help` link to its own function (D13300) is its words alone, never an address; the realm's view makes it a call card.
+// A realm page's `$help` link to its own function is its words alone, never an address; the realm's view makes it a call card.
 const MARKS = { strong: "strong", em: "em", strike: "s", underline: "u", action: "span" } as const;
-// A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
+// A link isolates its text left to right: an override before it cannot draw its address backwards.
 export const LINK = { dir: "ltr", ...NEW_TAB } as const;
 
 // Who reads: the reader's address, none for a guest, and the room's members; whether the links take the Tab key.
@@ -29,8 +29,8 @@ export interface Reader {
 export const ANONYMOUS: Reader = { me: undefined, members: undefined, tabbable: true };
 
 // A mention: its address whole in its title, the design system's look (data-mention), the reader's own "me";
-// shortened for the reader and members alone, since a ground lookalike holds no key so joins no room (F812). An
-// address whose checksum fails is no account's: whole, as text (F805).
+// shortened for the reader and members alone, since a ground lookalike holds no key so joins no room. An
+// address whose checksum fails is no account's: whole, as text.
 function mentionOf(address: string, { me, members }: Reader): ReactNode {
   if (!isAccount(address)) return `@${address}`;
   const known = address === me || members?.has(address) === true;
@@ -97,9 +97,9 @@ export interface MarkdownProps {
   className?: string | undefined;
   /** The reader's address, whose mentions show apart; none for a guest. */
   me?: string | undefined;
-  /** The room's members, whose mentions show shortened as the reader's do; anyone else's whole (F812). */
+  /** The room's members, whose mentions show shortened as the reader's do; anyone else's whole. */
   members?: ReadonlySet<string> | undefined;
-  /** Whether its links are Tab stops: a line not the list's stop keeps them out (U1). */
+  /** Whether its links are Tab stops: a line not the list's stop keeps them out. */
   tabbable?: boolean;
 }
 

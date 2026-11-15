@@ -5,7 +5,7 @@ import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
 import { realmPageQuery, useRealm, type Realm } from "./useRealm.ts";
 
-// A realm's page as a query (slice 13): the held page in the first frame of a view seen again, the failure of a first read as a state of its own, the
+// A realm's page as a query: the held page in the first frame of a view seen again, the failure of a first read as a state of its own, the
 // last good page left when a fresh read fails, and a read of another chain never shown for this one.
 const SOURCE = { rpc: "https://rpc.one", realm: "gno.land/r/a/b", origin: undefined };
 const fails = { fetch: () => Promise.reject(new Error("offline")) };

@@ -12,7 +12,7 @@ const FACTS: LineCardFacts = {
   may: false,
 };
 
-// Which card a line gets, and who may remove it (link-previews L4, D13919): one card a line, a player or a capture first, only once checked.
+// Which card a line gets, and who may remove it: one card a line, a player or a capture first, only once checked.
 describe("a line's card", () => {
   it("is its key, once its event came and the line is checked", () => {
     expect(lineCard(FACTS)).toEqual({ key: KEY, removable: false });

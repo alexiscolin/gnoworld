@@ -3,9 +3,8 @@ import { describe, expect, it } from "vitest";
 import { policy } from "../../csp.ts";
 import { embedIn, embedOf } from "./embeds.ts";
 
-// 4g (docs/decisions.md, 2026-10-26): each service's player as its own documentation gives it (embeds.ts); Imgur's
-// form could not be read, so its links stay links until it is.
-// The players play on the reader's one Play (F1054).
+// Each service's player as its own documentation gives it (embeds.ts); Imgur's form could not be read, so its links stay
+// links. The players play on the reader's one Play.
 const YOUTUBE = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
 const VIMEO = "https://player.vimeo.com/video/76979871?dnt=1&autoplay=1";
 const GIPHY = "https://giphy.com/embed/4548k01F5Ej28";
@@ -74,7 +73,7 @@ describe("embedOf: the player a link opens", () => {
     ["a password on the right host", "https://:pw@www.youtube.com/watch?v=dQw4w9WgXcQ"],
     ["a port on Giphy", "https://giphy.com:444/embed/4548k01F5Ej28"],
     ["no URL", "not a url"],
-    // F873: each accepted host's lookalikes: a longer name, a subdomain, the name before another host.
+    // Each accepted host's lookalikes: a longer name, a subdomain, the name before another host.
     ["a host ending in Vimeo's name", "https://notvimeo.com/76979871"],
     ["a subdomain of Vimeo", "https://evil.vimeo.com/76979871"],
     ["Vimeo's name before another host", "https://vimeo.com.evil.example/76979871"],
@@ -89,7 +88,7 @@ describe("embedOf: the player a link opens", () => {
     ["a subdomain of www.vimeo.com", "https://evil.www.vimeo.com/76979871"],
     ["a subdomain of Vimeo's player", "https://evil.player.vimeo.com/video/76979871"],
     ["a subdomain of Giphy's media", "https://evil.media.giphy.com/media/4548k01F5Ej28/giphy.gif"],
-    // F878: a path one segment past the player's.
+    // A path one segment past the player's.
     ["a short with a path after its id", "https://www.youtube.com/shorts/dQw4w9WgXcQ/x"],
     ["an embed with a path after its id", "https://www.youtube.com/embed/dQw4w9WgXcQ/x"],
     ["youtu.be with a path after its id", "https://youtu.be/dQw4w9WgXcQ/x"],
@@ -100,8 +99,8 @@ describe("embedOf: the player a link opens", () => {
   });
 });
 
-// A7 (F1065): a player's address and the page's frame-src were tied by nothing: a player moved off its source's path
-// would be refused by the browser while every test passed.
+// A player's address and the page's frame-src must stay tied: a player moved off its source's path would be refused by
+// the browser while every other test passed.
 describe("embedOf, against the page's policy", () => {
   const sources =
     policy([])

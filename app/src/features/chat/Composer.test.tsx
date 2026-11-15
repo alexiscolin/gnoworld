@@ -32,7 +32,7 @@ const toPartner = () =>
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
 
 describe("Composer", () => {
-  // /code-review on 4e (CR7): a refusal put its draft back over what the reader had typed since.
+  // A refusal must not put its draft back over what the reader has typed since.
   it("puts a refused draft back into an empty box alone; a box holding words keeps them, the unsent ones quoted", () => {
     const refused = { draft: "hi **you**", why: "Not sent: g10gh7…3y5tv is not online." };
     expect(refusalAfter("", refused)).toEqual(refused);
@@ -43,8 +43,7 @@ describe("Composer", () => {
     expect(refusalAfter("x", { draft: "a".repeat(80), why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(80)}”`);
   });
 
-  // /code-review on 4d's DM bar (CR2): the unsent words were cut at 80 characters, and what a reader had typed since kept
-  // the box: the rest of a long correction was lost.
+  // The unsent words are quoted whole, and what a reader has typed since keeps the box.
   it("quotes the unsent words whole, however long, and takes a box holding them already for the draft back", () => {
     const long = `${"a".repeat(79)}👍🏽${"b".repeat(200)}`;
     expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${long}”`);
@@ -52,8 +51,7 @@ describe("Composer", () => {
     expect(refusalAfter("fixed", refused)).toEqual(refused);
   });
 
-  // The second red pass on the DM bar (R5): the longest draft quoted above is about 280 graphemes, so a cap at 300 or 500
-  // went unseen. A line is 512 bytes on the wire at most, but the box holds more.
+  // A cap at 300 or 500 graphemes would go unseen above. A line is 512 bytes on the wire at most, but the box holds more.
   it("quotes a draft of 2,000 characters whole", () => {
     const draft = "word ".repeat(400);
     expect(refusalAfter("x", { draft, why: "W." }).why).toBe(`W. Unsent: “${draft}”`);
@@ -85,14 +83,14 @@ describe("Composer", () => {
     expect(markup).not.toContain("inert");
   });
 
-  // 4e: a direct message's composer is named for its partner, as the page names the conversation.
+  // A direct message's composer is named for its partner, as the page names the conversation.
   it("names its form and its field by the label it is given, in place of the room's", () => {
     const markup = toPartner();
     expect(markup).toMatch(/<form[^>]*aria-label="Write to g10gh7…3y5tv"/);
     expect(markup).toMatch(/<label[^>]*>Message g10gh7…3y5tv<\/label>/);
   });
 
-  // The merge of 4e and 4f: typing is told to a room, never to a direct message's partner, which its field's help must not say.
+  // Typing is told to a room, never to a direct message's partner, which its field's help must not say.
   it("says nothing of typing to a direct message's partner, whom none is told", () => {
     expect(toPartner()).not.toContain("see when you type");
   });
@@ -161,7 +159,7 @@ describe("what the composer's field says", () => {
   });
 });
 
-// 4f-n (decisions, 2026-10-27, N3): as @room stands in the draft, the field says whether it notifies in this room, and why not.
+// As @room stands in the draft, the field says whether it notifies in this room, and why not.
 describe("what the composer's field says of @room", () => {
   it.each([
     ["@room the release is out", true, ROOM_NOTIFIES],
@@ -181,7 +179,7 @@ describe("what the composer's field says of @room", () => {
   });
 });
 
-// 4d's pre-merge: a draft given lets a render show what the composer says of it.
+// A draft given lets a render show what the composer says of it.
 describe("the composer, from a draft", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const from = (draft: string, groups?: boolean) =>
@@ -196,12 +194,12 @@ describe("the composer, from a draft", () => {
         onSay={() => true}
       />,
     );
-  // C3 of the review: the list of suggestions says what a word may become, so the field's help no longer names it.
+  // The list of suggestions says what a word may become, so the field's help does not name it.
   it("says nothing of what Tab completes: the suggestions' list does", () => {
     for (const draft of ["hi @g10", "@g10", "hi @", "/m", "#g"]) expect(from(draft)).not.toContain("Tab completes");
   });
 
-  // N3: the hint is read from the draft as typed or completed, from the room's own rule, none in a direct message.
+  // The hint is read from the draft as typed or completed, from the room's own rule, none in a direct message.
   it.each([
     [true, ROOM_NOTIFIES],
     [false, ROOM_SILENT],
@@ -228,7 +226,7 @@ describe("the composer, from a draft", () => {
     expect(withGroups(`@room ${"a".repeat(600)}`)).not.toContain(ROOM_NOTIFIES);
   });
 
-  // F1680 (CR8): the hint said "everyone" and hid behind the bytes left or a Tab completion, so a sender could guess.
+  // The hint must not say "everyone" nor hide behind the bytes left or a Tab completion, or a sender could guess.
   it("says what @room does ahead of the bytes left and of a completion", () => {
     const near = from(`@room ${"a".repeat(400)}`, true);
     expect(near).toContain(ROOM_NOTIFIES);
@@ -268,7 +266,7 @@ describe("the composer, from a draft", () => {
   });
 });
 
-// draft/multiline (docs/decisions.md row 255): Shift+Enter adds a line to the draft, Enter sends it; a message of
+// draft/multiline: Shift+Enter adds a line to the draft, Enter sends it; a message of
 // several lines goes as it is, and what keeps it from going is said.
 describe("the composer, a draft of several lines", () => {
   const from = (draft: string) =>
@@ -281,7 +279,7 @@ describe("the composer, a draft of several lines", () => {
     expect(from("")).not.toMatch(/<textarea/);
   });
 
-  // Alexis, 2026-11-08 (D418): no standing hint under the field, of the typing nor of how to add a line.
+  // No standing hint under the field, of the typing nor of how to add a line.
   it("says nothing under an empty field", () => {
     const markup = from("");
     expect(markup).not.toContain("Shift+Enter adds a line.");
@@ -329,7 +327,7 @@ describe("the composer, a draft of several lines", () => {
     expect(from(over)).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
   });
 
-  // F1720 (CR8): the line's own budget, about 440 bytes, binds before the message's 4096, and its line is named.
+  // The line's own budget, about 440 bytes, binds before the message's 4096, and its line is named.
   it("names the line with the fewest bytes left when it has fewer than the message, near its budget", () => {
     const draft = `one\n${"a".repeat(400)}\ntwo`;
     expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({
@@ -341,7 +339,7 @@ describe("the composer, a draft of several lines", () => {
     expect(said(compose(ROOM, near, NICK), false, { nick: NICK })).toStrictEqual({ help: "16 bytes left." });
   });
 
-  // F1718 (CR6): an action is one line, so a draft of several lines after /me loses its breaks without a word.
+  // An action is one line, so a draft of several lines after /me loses its breaks without a word.
   it("says an action is one line when the draft after /me holds line breaks, and nothing for one without", () => {
     const note = "An action is one line: its line breaks become spaces.";
     const draft = "/me waves\nhello";
@@ -363,7 +361,7 @@ describe("the composer, a draft of several lines", () => {
     expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({ help: "19 bytes left." });
   });
 
-  // F1719 (CR7): without draft/multiline each line goes as a PRIVMSG, and the bot's 20 messages a minute hide the rest.
+  // Without draft/multiline each line goes as a PRIVMSG, and the bot's 20 messages a minute hide the rest.
   it("refuses more than 20 lines when the connection has no draft/multiline, and Send is off", () => {
     const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
     const composed = compose(ROOM, twentyOne, NICK);
@@ -378,7 +376,7 @@ describe("the composer, a draft of several lines", () => {
     expect(sendable(compose(ROOM, "hi", NICK), false)).toBe(true);
   });
 
-  // R2: undefined is "not known yet" (a story, the connection's start), which blocks nothing: only a false does.
+  // undefined is "not known yet" (the connection's start), which blocks nothing: only a false does.
   it("lets 21 to 40 lines go while it is not known whether the connection has draft/multiline", () => {
     const composed = compose(ROOM, Array.from({ length: 40 }, (_, at) => `line ${String(at)}`).join("\n"), NICK);
     expect(said(composed, false, {})).toStrictEqual({});
@@ -410,7 +408,7 @@ describe("the composer, a draft of several lines", () => {
   });
 });
 
-// 4f: what an edit of the draft tells the room of the account's typing (IRCv3's +typing): a slash command is no
+// What an edit of the draft tells the room of the account's typing (IRCv3's +typing): a slash command is no
 // typing, as the spec has it; a cleared field ends it.
 describe("typingOf: what an edit of the draft tells the room", () => {
   it.each([
@@ -420,7 +418,7 @@ describe("typingOf: what an edit of the draft tells the room", () => {
     ["spaces alone", "   ", "done"],
     ["a slash command", "/me waves", undefined],
     ["a slash command after spaces", "  /nick bob", undefined],
-    // The red pass (R15): as compose reads a draft, `//` a slash of text and a control character a space.
+    // As compose reads a draft, `//` a slash of text and a control character a space.
     ["a slash of text", "//shrug", "active"],
     ["a slash command after a tab", "\t/nick bob", undefined],
     ["a slash command after a control character", "\u0001/me hi", undefined],
@@ -432,8 +430,8 @@ describe("typingOf: what an edit of the draft tells the room", () => {
   });
 });
 
-// 4d: Reply on a line's bar: the composer says which line the next one answers, its author and its words in one line,
-// 60 characters at most, cut between graphemes (R6), markup as text (R5); and offers to answer none.
+// Reply on a line's bar: the composer says which line the next one answers, its author and its words in one line,
+// 60 characters at most, cut between graphemes, markup as text; and offers to answer none.
 describe("Composer: a reply", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const draw = (over: Partial<Parameters<typeof Composer>[0]> = {}) =>
@@ -450,17 +448,17 @@ describe("Composer: a reply", () => {
     expect(names(markup)).toContain("Cancel the reply");
   });
 
-  // The code review (CR7): the field, which Reply focuses, is described by the bar that says which line it answers.
+  // The field, which Reply focuses, is described by the bar that says which line it answers.
   it("describes its field by the line it answers", () => {
     const markup = draw(to("the first line"));
     const describedBy = /<[^>]*role="textbox"[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
     const ids = describedBy.split(" ");
-    // The field is described by its help too (4f's typing disclosure): the bar is one of what describes it.
+    // The field is described by its help too: the bar is one of what describes it.
     const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
     expect(described.map(words)).toContain("Replying to g10gh7…3y5tv: the first line");
   });
 
-  // F1176 (the UX review's U4): the bar shows a mention as the line does, a member's and the reader's shortened.
+  // The bar shows a mention as the line does, a member's and the reader's shortened.
   it("shortens a mention of a member or of the reader in the words, no other", () => {
     const CAROL = "g1jt8gqa4fddp0w803ysa6la4epsdn0hd8wwqcdj";
     const quoted = (text: string) => words(draw({ ...to(text), members: [ALICE] }));
@@ -494,7 +492,7 @@ describe("Composer: a reply", () => {
 });
 
 // What Enter does in the composer's box, which the markup tests above cannot say (they render, they press nothing): the
-// form's submit is the only gate on the Enter path, as requestSubmit() ignores the Send button's disabled (R5).
+// form's submit is the only gate on the Enter path, as requestSubmit() ignores the Send button's disabled.
 describe("Enter in the composer's box", () => {
   const lines = (count: number) => Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
 
@@ -531,7 +529,7 @@ describe("Enter in the composer's box", () => {
     expect((await enter(lines(21), { multiline: false })).went).toEqual([]);
   });
 
-  // F2092 (AP3): the composer asks the link, as Send is pressed, whether the account is past the server's pace.
+  // The composer asks the link, as Send is pressed, whether the account is past the server's pace.
   it("sends nothing and keeps the draft when the link says the account is too fast, and says why", async () => {
     const why = tooFast({ limit: "messages", wait: 12_001 });
     expect(why).toBe("Too fast: 20 messages a minute at most. Try again in 13 s.");
@@ -550,8 +548,8 @@ describe("Enter in the composer's box", () => {
   });
 });
 
-// 4d-dm-bar: Edit on one's own line in a direct message puts its words in the box, to send as a correction (our own
-// convention, docs/decisions.md 2026-10-21); the bar over the field says so and offers to cancel, Send reads Save.
+// Edit on one's own line in a direct message puts its words in the box, to send as a correction (our own
+// convention); the bar over the field says so and offers to cancel, Send reads Save.
 describe("Composer: an edit", () => {
   const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const draw = (over: Partial<Parameters<typeof Composer>[0]> = {}) =>
@@ -593,7 +591,7 @@ describe("Composer: an edit", () => {
     expect(described.map(words)).toContain("Editing a message");
   });
 
-  // CR4 of the room edit: /me waves in the edit box would turn the message into an action, which has no Edit to turn it back.
+  // /me waves in the edit box would turn the message into an action, which has no Edit to turn it back.
   it("refuses to save an edit that composes to an action, and says so", () => {
     const markup = draw({ draft: "/me waves" });
     expect(words(markup)).toContain("An edit cannot be an action.");
@@ -611,7 +609,7 @@ describe("Composer: an edit", () => {
     expect([enabled(edit), enabled(action)]).toEqual([true, true]);
   });
 
-  // CR3 of the room edit: the line being corrected went, so the edit closed; the box, plain again, tells why its words went.
+  // The line being corrected went, so the edit closed; the box, plain again, tells why its words went.
   it("says the message is gone when the edit's line left, until the draft changes", () => {
     const markup = draw({ gone: true, editing: undefined, onCancelEdit: undefined, draft: "" });
     expect(words(markup)).toContain("That message is gone.");
@@ -626,7 +624,7 @@ describe("Composer: an edit", () => {
   });
 });
 
-// R3 (redpass2-red): the static markup tests check the disabled button, not the form's own submit handler, which a
+// The static markup tests check the disabled button, not the form's own submit handler, which a
 // keyboard's Enter reaches with the button disabled. A mounted composer, its form submitted.
 describe("Composer: submitting an edit", () => {
   const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -680,7 +678,7 @@ describe("Composer: submitting an edit", () => {
   });
 });
 
-// 5q: the composer of the video (frame 23.58.01, bottom): one rounded box holding the format bar, the field and the send
+// The composer of the video (frame 23.58.01, bottom): one rounded box holding the format bar, the field and the send
 // button. The box is a group; its edge is what the reader sees as the composer.
 const boxed = () =>
   markup(<Composer room="#bubble/games" nick={NICK} rooms={["#games"]} members={[]} onSay={() => true} />);

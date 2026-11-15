@@ -1,4 +1,4 @@
-// An answer of Jarvis as a card (10u-a), among the chat's lines: "AI CONCIERGE", violet, "AI · may be wrong". Its Markdown is drawn through
+// An answer of Jarvis as a card, among the chat's lines: "AI CONCIERGE", violet, "AI · may be wrong". Its Markdown is drawn through
 // core's chat reader and the chat's own drawing, no image and no HTML; a link on gnoweb or the app's own origin is an anchor, any other is
 // a button behind the leaving warning. Its buttons: fly goes to a place; an action opens the call card only once vm/qfuncs lists its
 // function with exactly its arguments' names, never coins. A label with a hidden character draws no button: its words are a machine's.

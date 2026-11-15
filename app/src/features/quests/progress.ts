@@ -1,5 +1,5 @@
-// The quests as the page shows them (slice 8; ADR-0002 §1, "Quests"): each step's world, whether this device did it, and which steps a
-// visit or the reader's own words in a room do. A step is done in any order; the call that ends each quest waits for slice 9's signing.
+// The quests as the page shows them (ADR-0002 §1, "Quests"): each step's world, whether this device did it, and which steps a
+// visit or the reader's own words in a room do. A step is done in any order; the call that ends each quest waits for the signing.
 import quests from "../../../data/quests.json" with { type: "json" };
 import { worldOf } from "../expedition/index.ts";
 

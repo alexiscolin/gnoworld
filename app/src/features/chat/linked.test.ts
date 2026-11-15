@@ -6,7 +6,7 @@ describe("whether a line holds a link a player can be shown for", () => {
     expect(linked("watch https://youtu.be/dQw4w9WgXcQ now")).toBe(true);
   });
 
-  // Link previews L4: a line's first https link may have a card, so the page asks the server of it as it asks of a player's.
+  // A line's first https link may have a card, so the page asks the server of it as it asks of a player's.
   it("is yes for a message whose first link is an https page, a card's", () => {
     expect(linked("read https://example.com/post please")).toBe(true);
   });

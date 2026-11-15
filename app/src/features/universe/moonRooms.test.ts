@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import type { Space } from "../../space/scene.ts";
 
-// P401, P301: the moons' asking and looking end with their view, stand still while the tab is hidden, and tell the scene only what changed.
+// The moons' asking and looking end with their view, stand still while the tab is hidden, and tell the scene only what changed.
 const asked = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/query/apiReads.ts", () => ({ activityOptions: (slug: string) => ({ slug }) }));
 vi.mock("../../lib/query/client.ts", () => ({

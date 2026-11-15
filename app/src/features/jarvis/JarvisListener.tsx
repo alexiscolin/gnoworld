@@ -1,4 +1,4 @@
-// What stands in the account menu's chunk of Jarvis (10u-a): while the chat in view can ask Jarvis, it listens for the first ask, and only
+// What stands in the account menu's chunk of Jarvis: while the chat in view can ask Jarvis, it listens for the first ask, and only
 // then brings the host, with the realms' call code and the chat's drawing, which it hands that ask.
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";

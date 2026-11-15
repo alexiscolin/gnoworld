@@ -1,4 +1,4 @@
-// The site's door to space (D401): one canvas under every page that shows space, the engine loaded in its own chunk on the first,
+// The site's door to space: one canvas under every page that shows space, the engine loaded in its own chunk on the first,
 // the worlds' file read once; a page says its place and keeps its planet's circle; what the engine asks back (a world, a system,
 // the universe) becomes the router's navigation, and its flight's end the page's arrival.
 import type { Space } from "../../space/scene.ts";
@@ -104,14 +104,14 @@ function start(): void {
       attach(space);
       // The journeys and the workshop read the engine's state (a production build holds no trace of it).
       exposeSpace(space);
-      // The Map (D433): space from above at every level, flown to and from as it is picked; a place asked later is reached the same.
+      // The Map: space from above at every level, flown to and from as it is picked; a place asked later is reached the same.
       space.view(isMap());
       import.meta.hot?.dispose(
         onMap(() => {
           space?.view(isMap());
         }),
       );
-      // A tag's light (D425), as it is picked and as who is here changes; the engine eases it.
+      // A tag's light, as it is picked and as who is here changes; the engine eases it.
       // Wired in every build: in `hot?.dispose(lightSpace(…))` a build with no hot module would never call lightSpace.
       const unlit = lightSpace(space);
       import.meta.hot?.dispose(unlit);
@@ -119,7 +119,7 @@ function start(): void {
       readWorlds();
     })
     .catch(() => {
-      // The engine's chunk did not come, or WebGL was refused: the pages stand without space, and say so (ViewInSpace.tsx).
+      // The engine's chunk did not come, or WebGL was refused: the pages stand without space, and say so (SpaceFoot.tsx).
       canvas.remove();
       labels.remove();
       tellOffer("failed");
@@ -136,7 +136,7 @@ function readWorlds(): void {
       const home = site.universeAt("/");
       pages = pagesOf(worlds, { earth: home.earth.path, worlds: home.worlds });
       space?.worlds(worlds);
-      // The first visit's dive to the home starts here, the file come: its Earth's tag waits for it to near (D459).
+      // The first visit's dive to the home starts here, the file come: its Earth's tag waits for it to near.
       if (asked?.kind === "home" && flying()) markFlown(true);
       if (asked !== undefined) tell(asked);
     })

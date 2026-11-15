@@ -1,4 +1,4 @@
-// The universe's door: what a page that shows space holds (D401), the GUI's view of where space is, and the newcomer's memory (ADR-0003).
+// The universe's door: what a page that shows space holds, the GUI's view of where space is, and the newcomer's memory (ADR-0003).
 export { useEntered, useNewcomer } from "./newcomer.ts";
 export { sameKind, useSpace } from "./useSpace.ts";
 export { useLoaded } from "./useLoaded.ts";

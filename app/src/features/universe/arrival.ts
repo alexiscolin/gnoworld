@@ -1,4 +1,4 @@
-// A page's arrival and leaving (D401, the dive's demo; the video's frames 19 and 20), with GSAP on the design system's own panel: first the
+// A page's arrival and leaving (the video's frames 19 and 20), with GSAP on the design system's own panel: first the
 // grounds, the plate's fill (space's own, frame.ts, on a page with a planet) and frame and the chat's panel; once they stand, the words:
 // the kicker, the title and the first screen's lines rise as the proposal's score has them (the plate's blocks play theirs in their own sheets), the chat's lines rise. It starts as the flight
 // nears its end, or at once on a page opened directly. Leaving plays the same back, 2.6 times as fast, on the page's ghost. Nothing moves
@@ -102,7 +102,7 @@ const STEPS: readonly Step[] = [
 ];
 
 let running: gsap.core.Timeline | undefined;
-// A page whose plate comes after it lays out (its chat's door, its route's code: the plate popped in whole, Alexis, 2026-11-10) waits for
+// A page whose plate comes after it lays out (its chat's door, its route's code: else the plate pops in whole) waits for
 // it, a few seconds at most, then plays; `waiting` stops that wait when another page comes or this one leaves.
 const PLATE_WAIT_MS = 6000;
 // The scene that is not sharp within this is shown as it is (frame.ts); the arrival waits for it a little longer, then plays.
@@ -110,8 +110,7 @@ const SCENE_WAIT_MS = 5000;
 let waiting: (() => void) | undefined;
 
 /** The cosmos's own parts, in the order they rise (rise.ts): the header, the hero, the worlds' list or the rail. They stay as
- * space's flights come and go between the galaxy and a system, so a page's arrival leaves them be: they rise once, as they come (Alexis,
- * 2026-11-09: "comme un double chargement"); they leave with their page's ghost as any part does. */
+ * space's flights come and go between the galaxy and a system, so a page's arrival leaves them be: they rise once, as they come; they leave with their page's ghost as any part does. */
 export const RISING = ["header", "[data-clear]", "nav[aria-label='Worlds']"];
 const STAYING = `:not(${RISING.join(", ")})`;
 

@@ -25,7 +25,7 @@ const EARTH = "earth";
 export const roomLabel = (room: string): string => {
   const { world, name } = partsOf(room);
   // A realm's room, and a world named by a long id, end in ten hex of the path or the id (core's realmRoom): the label is the name alone.
-  // A world named by its owner's address, a namespace of one, says it short, as a sender's (Alexis, 2026-11-09).
+  // A world named by its owner's address, a namespace of one, says it short, as a sender's.
   const label = (name ?? (world === EARTH ? "general" : world)).replace(/-[0-9a-f]{10}$/, "");
   return `#${isAccount(label) ? shortAddress(label) : label}`;
 };
@@ -78,10 +78,10 @@ function hrefOf(world: string, params: URLSearchParams, full: boolean): string {
 /** `href` as a link's prop, none when it has no address (exactOptionalPropertyTypes). */
 export const hrefProp = (href: string | undefined): { href?: string } => (href === undefined ? {} : { href });
 
-/** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */
+/** A direct message's address on the site: its world's page, and ?dm=<the partner's address>. */
 export const dmHref = (world: string, partner: string, full = false): string => hrefOf(world, dmParams(partner), full);
 
-/** A direct message's search on its world's page: ?dm=<the partner's address> (4e). */
+/** A direct message's search on its world's page: ?dm=<the partner's address>. */
 export const dmParams = (partner: string, full = false): URLSearchParams =>
   withFull(new URLSearchParams({ dm: partner }), full);
 
@@ -128,7 +128,7 @@ export function roomsQuery(world: string, session: AppState["login"]["session"],
   return `${world}|${session.kind === "in" ? session.address : "guest"}|${String(attempt)}`;
 }
 
-/** The rooms where a mention of the whole room counts (4f-n): where Ergo's modes limit who speaks or who reads. */
+/** The rooms where a mention of the whole room counts: where Ergo's modes limit who speaks or who reads. */
 export const groupRooms = (sections: RoomList["sections"]): string[] =>
   sections.flatMap(({ rooms }) =>
     rooms.filter(({ type }) => ["announcement", "members", "members-write"].includes(type)).map(({ room }) => room),
@@ -138,18 +138,18 @@ export const groupRooms = (sections: RoomList["sections"]): string[] =>
 export const groupsAt = (sections: RoomList["sections"], room: string | undefined): boolean =>
   room !== undefined && groupRooms(sections).includes(room);
 
-/** Whom a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their key as
- * a member did (F819). */
+/** Whom a mention may shorten: the members, and the authors in view by their account tag, who proved their key as
+ * a member did. */
 export const mentionable = (members: readonly string[], lines: readonly Line[]): Set<string> =>
   new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
 
 /** The server's moderation bot (server/src/irc/lines.ts), in every room, never listed. */
 export const BOT = "gnoworld";
 
-/** How long a person counts as talking after their last line (D374). */
+/** How long a person counts as talking after their last line. */
 const TALKING_MS = 15 * 60_000;
 
-/** How many are talking here now (D374): the people whose lines the room holds from the last 15 minutes, the bot left out, once
+/** How many are talking here now: the people whose lines the room holds from the last 15 minutes, the bot left out, once
  * connected; none before (a count of none says nothing). "Here now" is the members, never this. */
 export const talkingOf = (
   lines: readonly { from: string; account?: string | undefined; time: string }[],

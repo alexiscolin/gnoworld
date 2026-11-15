@@ -6,7 +6,7 @@ import { gsap } from "gsap";
 import { asksFull, FULL_MOVE } from "../../fullChat.ts";
 import { leavePage, pageNow, RISING } from "./arrival.ts";
 
-/** Rises `parts` in, the first `after` ms from now, as the dive's demo's text (D401), power3.out: `together`, from 18 px below in 0.7 s, all at
+/** Rises `parts` in, the first `after` ms from now, as the dive's demo's text, power3.out: `together`, from 18 px below in 0.7 s, all at
  * once; `across`, from 30 px to the right in 0.6 s, 0.06 s apart (the rail's worlds). */
 function lift(parts: Iterable<Element>, after: number, how: "across" | "together"): void {
   const moving = [...parts];
@@ -117,7 +117,7 @@ export function ghost(stayed: () => boolean): void {
     if (stayed()) return;
     document.body.append(layer);
     // Into the full chat, which grows out of the dock's box over it: the ghost stays where it stood and dissolves, its parts never
-    // sink or slide out from under the chat's panel (Alexis, 2026-11-09).
+    // sink or slide out from under the chat's panel.
     if (asksFull(new URLSearchParams(location.search)))
       gsap.to(layer, {
         autoAlpha: 0,

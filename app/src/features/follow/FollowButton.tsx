@@ -1,4 +1,4 @@
-// The plate's Follow (frames 86, 93): a world followed comes first in the rail and its news in the bell; a person followed shows on the
+// The plate's Follow: a world followed comes first in the rail and its news in the bell; a person followed shows on the
 // labels where they are. Its words say its state ("Following", the check), so a reader never reads a pressed state off a changed name.
 import { Button, IconButton } from "@gnoworld/ui";
 import { useState } from "react";
