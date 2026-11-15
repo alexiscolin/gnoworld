@@ -28,6 +28,8 @@ Import from the package root, or from `./bubbles`. `guestName` is exported from 
 
 No build step: the other packages import `packages/core/src` as it is. Its tests run with everyone's, or alone with
 `pnpm exec vitest run packages/core` from the root; the setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+`pnpm run test` runs them on Node only. The Chromium run (project `core_chromium`, which exists only with `CORE_CHROMIUM` set) is
+GitHub's `unit-browser` job (`.github/workflows/gate.yml`): `CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium`.
 
 ## Rules
 
