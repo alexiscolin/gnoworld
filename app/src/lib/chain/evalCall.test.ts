@@ -1,7 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
-import { evalCall, evalNameOf, isAddress, isRealmPath, userCall } from "./evalCall.ts";
+import { realmType } from "@gnoworld/core";
+import { isRealmPath } from "@gnoworld/schemas";
+import { evalCall, evalNameOf, isAddress, userCall } from "./evalCall.ts";
 
 // 5g-reads, tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
 // (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
@@ -234,6 +236,122 @@ describe("evalCall, for any strings", () => {
       }),
       { numRuns: 1000 },
     );
+  });
+});
+
+// Slice 13, B (docs/plans/slice-realm-plate.md §3): a read with arguments, its literals written by core's serializer (readArgs) and by
+// nothing else; the realm's grammar and the bare identifier still checked first. A first `realm` parameter is a write: qeval would inject
+// `cur` (gno v1.5.0, keeper.go:1924) and fake its success, so no call is built.
+describe("evalCall, a read with its typed arguments", () => {
+  const p = (Type: string, Name = "x") => ({ Name, Type });
+  const cur = () => p(realmType(), "cur");
+
+  it("builds the call with each argument as its Go literal, in order", () => {
+    const params = [p("string", "who"), p("bool", "all"), p("int", "page")];
+    expect(evalCall(WUGNOT, "BalanceOf", { params, texts: ['g1"x\\y', "true", "-3"] })).toBe(
+      `${WUGNOT}.BalanceOf("g1\\"x\\\\y", true, -3)`,
+    );
+  });
+
+  it("builds `Name()` for a read with no parameter, given or not", () => {
+    expect(evalCall(WUGNOT, "TotalSupply", { params: [], texts: [] })).toBe(`${WUGNOT}.TotalSupply()`);
+    expect(evalCall(WUGNOT, "TotalSupply", { params: null, texts: [] })).toBe(`${WUGNOT}.TotalSupply()`);
+  });
+
+  it.each([
+    ["a write, its first parameter the realm", () => [cur(), p("string")], ["x", "a"]],
+    ["a write with nothing else", () => [cur()], ["x"]],
+    ["a bool that is no bool", () => [p("bool")], ["yes"]],
+    ["an int with a call after it", () => [p("int")], ["1), Foo("]],
+    ["a string with a hidden character", () => [p("string")], ["a\u202eb"]],
+    ["a string past 256 bytes", () => [p("string")], ["a".repeat(257)]],
+    ["a float, which is not written here", () => [p("float64")], ["1.5"]],
+    ["a byte slice", () => [p("[]uint8")], ["AA=="]],
+  ])("builds nothing for %s", (_name, params, texts) => {
+    expect(evalCall(WUGNOT, "Read", { params: params(), texts })).toBeNull();
+  });
+
+  it("still checks the realm and the name before any argument", () => {
+    expect(evalCall("gno.land/r/demo/x.y", "Read", { params: [p("string")], texts: ["a"] })).toBeNull();
+    expect(evalCall(WUGNOT, "Read()", { params: [p("string")], texts: ["a"] })).toBeNull();
+  });
+
+  it("builds a call of up to 3,072 bytes and nothing past it: its hex travels in a GET's address", () => {
+    const params = Array.from({ length: 12 }, (_, n) => p("string", `s${String(n)}`));
+    const fill = (size: number) => params.map((_, n) => (n === 0 ? "a".repeat(size) : "a".repeat(256)));
+    // The call holds the realm, `.Read(`, twelve quoted strings, eleven `, ` and `)`.
+    const around = `${WUGNOT}.Read(`.length + 12 * 2 + 11 * 2 + 1;
+    const first = 3072 - around - 11 * 256;
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThanOrEqual(256);
+    expect(evalCall(WUGNOT, "Read", { params, texts: fill(first) })?.length).toBe(3072);
+    expect(evalCall(WUGNOT, "Read", { params, texts: fill(first + 1) })).toBeNull();
+  });
+
+  it("counts the call's bytes in UTF-8, not its characters", () => {
+    const params = Array.from({ length: 12 }, (_, n) => p("string", `s${String(n)}`));
+    const texts = params.map(() => "é".repeat(128));
+    const call = evalCall(WUGNOT, "Read", { params, texts });
+    expect(call).toBeNull();
+  });
+
+  // R5 of the red pass: the cap weighs the call as sent, its literals escaped, in UTF-8: the edge for each kind of character.
+  it.each([
+    ["quotes, each escaped to two bytes", '"', 128],
+    ["backslashes, each escaped to two bytes", "\\", 128],
+    ["three-byte characters", "日", 85],
+    ["four-byte characters", "😀", 64],
+  ])("builds the call at 3,072 bytes and nothing at 3,073, with %s", (_name, char, count) => {
+    const params = Array.from({ length: 12 }, (_, n) => p("string", `s${String(n)}`));
+    const go = (text: string) => `"${text.replace(/[\\"]/gu, (c) => `\\${c}`)}"`;
+    const bytes = (text: string) => new TextEncoder().encode(text).length;
+    const filled = (pad: number) => params.map((_, n) => (n === 0 ? "a".repeat(pad) : char.repeat(count)));
+    const expected = (pad: number) => `${WUGNOT}.Read(${filled(pad).map(go).join(", ")})`;
+    const pad = 3072 - bytes(expected(0));
+    expect(pad).toBeGreaterThan(0);
+    expect(pad).toBeLessThanOrEqual(256);
+    expect(evalCall(WUGNOT, "Read", { params, texts: filled(pad) })).toBe(expected(pad));
+    expect(bytes(expected(pad))).toBe(3072);
+    expect(evalCall(WUGNOT, "Read", { params, texts: filled(pad + 1) })).toBeNull();
+  });
+
+  // R6: a count of texts unlike the parameters' is a caller's bug: no call, never a throw that a read would not catch.
+  it.each([
+    ["a text missing", () => evalCall(WUGNOT, "Read", { params: [p("string")], texts: [] })],
+    ["no texts given", () => evalCall(WUGNOT, "Read", { params: [p("string")] })],
+    ["a text too many", () => evalCall(WUGNOT, "Read", { params: [], texts: ["a"] })],
+    ["texts for a function with none", () => evalCall(WUGNOT, "Read", { params: null, texts: ["a", "b"] })],
+  ])("builds nothing, and throws nothing, for %s", (_name, build) => {
+    expect(build()).toBeNull();
+  });
+
+  it("property: gno's parser cuts any built call back into the realm and one call, every argument a literal", () => {
+    const hostile = fc
+      .array(fc.constantFrom(...'"\\\n\t)(;,.:/` \u2028aé😀'.split("")), { maxLength: 40 })
+      .map((chars) => chars.join(""));
+    const arg = fc.oneof(
+      hostile.map((text) => ["string", text] as const),
+      fc.constantFrom("true", "false").map((text) => ["bool", text] as const),
+      fc.bigInt({ min: -(2n ** 63n), max: 2n ** 63n - 1n }).map((n) => ["int", n.toString()] as const),
+    );
+    let built = 0;
+    fc.assert(
+      fc.property(fc.array(arg, { maxLength: 5 }), (args) => {
+        const params = args.map(([type], n) => p(type, `a${String(n)}`));
+        const call = evalCall(WUGNOT, "Read", { params, texts: args.map(([, text]) => text) });
+        if (call === null) return;
+        built += 1;
+        const cut = parseQueryEvalData(call);
+        expect(cut?.pkgPath).toBe(WUGNOT);
+        expect(cut?.expr.startsWith("Read(")).toBe(true);
+        expect(cut?.expr.endsWith(")")).toBe(true);
+        // Outside the string literals, the call holds only literals, commas and the parentheses: nothing a string smuggles out.
+        const outside = (cut?.expr ?? "").replace(/"(?:[^"\\\n]|\\[\\"nt])*"/gu, "S");
+        expect(outside).toMatch(/^Read\((?:(?:S|true|false|-?\d+)(?:, (?:S|true|false|-?\d+))*)?\)$/u);
+      }),
+      { numRuns: 2000, seed: 20261110 },
+    );
+    expect(built).toBeGreaterThan(0);
   });
 });
 
