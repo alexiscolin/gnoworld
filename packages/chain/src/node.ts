@@ -1,7 +1,7 @@
-// The reads of a chain's node (D112), each one `readChain` of read.ts: the latest block's height, and the three `abci_query`
+// The reads of a chain's node, each one `readChain` of read.ts: the latest block's height, and the three `abci_query`
 // paths gnoworld asks, a realm's page (vm/qrender), one expression (vm/qeval) and a realm's functions (vm/qfuncs). One
-// request a read, after its node's status when a chain is named, the two under one time limit. What the realm wrote is returned as text and never interpreted; its error text, Log and Info reach no failure
-// and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
+// request a read, after its node's status when a chain is named, the two under one time limit. What the realm wrote is returned
+// as text and never interpreted; its error text, Log and Info reach no failure and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
 import { jsonOf } from "@gnoworld/core";
 import { abciQueryOf } from "./abci.ts";
 import { QueryAnswer, StatusAnswer, strictUtf8 } from "@gnoworld/schemas";
@@ -21,10 +21,10 @@ type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
 
 export interface NodeOptions extends ReadOptions {
   /** The universe's chain the node must be on: its status is read first, and a node naming another, or none, is read no
-   * further (D118). Null names none, as the app's reads; each caller states which (10h's review, V6). */
+   * further. Null names none, as the app's reads; each caller states which. */
   chainId: string | null;
   /** The caller's memory of the nodes it saw on their chain, each until when (ms): a node is asked its status again only a
-   * minute after it was seen (V7). An entry a node and chain the caller reads. */
+   * minute after it was seen. An entry a node and chain the caller reads. */
   seen?: Map<string, number>;
 }
 
@@ -80,7 +80,7 @@ async function query<T>(rpc: string, { path, data, decode }: Ask<T>, options: Re
 const refused = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
   Promise.resolve(failedRead("refused", sourceOf(rpc, options)));
 
-// The node's status; with a chain named, a node that names another, or none, is read no further (D118). An empty name is
+// The node's status; with a chain named, a node that names another, or none, is read no further. An empty name is
 // no chain's: a node that names none matches it nowhere.
 async function statusOf(rpc: string, options: NodeOptions): Promise<ChainRead<StatusAnswer>> {
   const { chainId, ...read } = options;
@@ -91,7 +91,7 @@ async function statusOf(rpc: string, options: NodeOptions): Promise<ChainRead<St
 }
 
 // A read of an https RPC, or a refusal without a request; with a chain named, its node's status first unless its caller
-// saw it on that chain within a minute, the two requests under the read's one time limit and its caller's signal (V1).
+// saw it on that chain within a minute, the two requests under the read's one time limit and its caller's signal.
 export function guarded<T>(
   rpc: string,
   options: NodeOptions,

@@ -1,4 +1,4 @@
-// What the server's jobs ask of a chain's node and its indexer (D113): the words of each request, written here and nowhere else.
+// What the server's jobs ask of a chain's node and its indexer: the words of each request, written here and nowhere else.
 // A request is data (a path and its data, a query and its variables); the job sends it over its own way out.
 import { evalNameOf, evalOwner } from "@gnoworld/core";
 
@@ -50,7 +50,7 @@ export function ownerAsk(namespace: string): AbciAsk | null {
 const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
 const ORDER = "order: { heightAndIndex: ASC }";
 
-// A call's success and function for the rollup (13a) alone: the worlds file's whole-chain read pays for neither (212 B a transaction with
+// A call's success and function for the rollup alone: the worlds file's whole-chain read pays for neither (212 B a transaction with
 // them, 180 B without, on onyx-1).
 const fields = (rich: boolean): string =>
   rich
@@ -75,7 +75,7 @@ export const callsInBlock = (height: number, rich = false): IndexerAsk => ({
   variables: { height },
 });
 
-/** The time of each block of `heights`, one alias each, `b<i>` for the variable `h<i>` (the rollup's days, slice 13a). */
+/** The time of each block of `heights`, one alias each, `b<i>` for the variable `h<i>` (the rollup's days). */
 export const blockTimes = (heights: readonly number[]): IndexerAsk => ({
   query: `query(${heights.map((_, i) => `$h${String(i)}: Int!`).join(", ")}) { ${heights
     .map((_, i) => `b${String(i)}: getBlocks(where: { height: { eq: $h${String(i)} } }) { height time }`)

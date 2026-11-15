@@ -1,4 +1,4 @@
-// GET /api/presence (slice 7, 7h): who is here in each world a guest may see, counts alone, for the cosmos's labels. A world is named by its
+// GET /api/presence: who is here in each world a guest may see, counts alone, for the cosmos's labels. A world is named by its
 // roles file's slug, as the server's rooms are; the client keys it as the cosmos holds it. Every count is bounded, and nothing else rides.
 import { PEOPLE_MOST, PER_HOUR_MOST } from "./counts.ts";
 import { HubSlug } from "./slug.ts";
@@ -36,7 +36,7 @@ const COUNTRIES_MOST = 26 * 26;
 /** The most bytes the people's answer weighs: two counts. */
 export const PRESENCE_PEOPLE_MAX_BYTES = 256;
 
-/** GET /api/presence/people (slice 8, 8i; the home's "671 ONLINE"): everyone on the site, logged in or not (D352), each account once, and how many countries those of them who declare one name (ADR-0001 §7: opt-in, never detected). Counts alone. */
+/** GET /api/presence/people (the home's "671 ONLINE"): everyone on the site, logged in or not, each account once, and how many countries those of them who declare one name (ADR-0001 §7: opt-in, never detected). Counts alone. */
 export const PresencePeople = z.strictObject({
   online: People,
   countries: z

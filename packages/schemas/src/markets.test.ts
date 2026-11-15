@@ -3,7 +3,7 @@ import manifest from "../package.json" with { type: "json" };
 import { Markets } from "./markets.ts";
 import * as schemas from "./index.ts";
 
-// The file the server's timer writes and the home page reads (ADR-0002 §6, "Prices"; slice 5 part 2, 5l): where the
+// The file the server's timer writes and the home page reads (ADR-0002 §6, "Prices"): where the
 // prices come from, when they were read, and the tokens that have a price, in the video's order.
 const GOOD = {
   source: "CoinGecko",
@@ -34,7 +34,7 @@ describe("Markets", () => {
     expect(Markets.safeParse({ ...GOOD, tokens: [] }).success).toBe(true);
   });
 
-  // The home's block height (decision of 2026-10-31, "je valide tes reco"): the server reads it with the prices, so a visitor's
+  // The home's block height: the server reads it with the prices, so a visitor's
   // browser asks no RPC. It is optional (a failed height leaves it out), a bounded integer with its block's time and its host.
   describe("the block", () => {
     const BLOCK = { height: 786661, time: "2026-10-31T11:59:10.123456789Z", host: "rpc.onyx.testnets.gno.land" };
@@ -131,8 +131,8 @@ describe("Markets", () => {
   });
 });
 
-// A schema no page uses must not ship: markets.json, read by the server alone for now, once cost /w/bubble 118 B of a
-// first screen with 30 B to spare (174,198 B against 174,080 B). The setting in zod.ts is what the CSP needs.
+// A schema no page uses must not ship: markets.json is read by the server alone, and the first screen's size
+// is tight. The setting in zod.ts is what the CSP needs.
 describe("the schemas package", () => {
   it("lets a bundler drop a module no page imports, but never zod.ts (its jitless setting)", () => {
     expect(manifest.sideEffects).toEqual(["./src/zod.ts"]);

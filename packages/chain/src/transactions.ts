@@ -1,8 +1,7 @@
-// What the server asks a universe's public indexer for the chain's rooms (slice 9g), the indexer's GraphQL being this package's
-// alone (D113). Checked against the live schema of the Onyx indexer on 2026-11-06 (introspection): `FilterInt` has eq, gt, lt;
-// `TransactionOrder` has heightAndIndex. Round 4 had no network: that `index` filters as a FilterInt and that `_and` takes a
-// list is read from the indexer's README (`FilterTransaction` has `_and _or _not index ...`), not yet from a live query.
-// What a transaction asks for holds no args, no memo and no events.
+// What the server asks a universe's public indexer for the chain's rooms, the indexer's GraphQL being this package's
+// alone. From the Onyx indexer's live schema (introspection): `FilterInt` has eq, gt, lt; `TransactionOrder` has
+// heightAndIndex. That `index` filters as a FilterInt and that `_and` takes a list is read from the indexer's README, not from
+// a live query. What a transaction asks for holds no args, no memo and no events.
 const TX_FIELDS =
   "hash block_height index success messages { value { __typename ... on MsgCall { caller pkg_path func } ... on MsgAddPackage { creator package { path } } } }";
 const PLACE_FIELDS = "block_height index";

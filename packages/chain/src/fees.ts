@@ -1,5 +1,5 @@
-// The fees the last calls of one realm function paid (9d, answer 9d-1): the card's fee line is an estimate from them, with the
-// block it stands on. One GET of the public indexer. Its filter lets other messages through (SHARED/recordings/README.md), so
+// The fees the last calls of one realm function paid: the card's fee line is an estimate from them, with the
+// block it stands on. One GET of the public indexer. Its filter lets other messages through, so
 // each row is checked again, and only a successful call with one message of that realm and function counts: a transaction of
 // several messages paid one fee for all. A transaction has no time, so the read is bounded by blocks under the tip, in the query.
 import { CALL_FEES_CAPS, CallFeesAnswer, TipAnswer } from "@gnoworld/schemas/indexer";
@@ -45,7 +45,7 @@ function callOf(row: Row, call: Call): { fee: number; height: number } | undefin
 
 const QUERY = `query($path: String!, $func: String!, $from: Int!) { getTransactions(where: { success: { eq: true }, block_height: { gt: $from }, messages: { value: { MsgCall: { pkg_path: { eq: $path }, func: { eq: $func } } } } }, order: { heightAndIndex: DESC }, limit: ${String(ASKED)}) { success block_height gas_fee { amount denom } messages { value { ... on MsgCall { pkg_path func } } } } }`;
 
-// The newest calls above `from`, as the fees they paid; the answer holds ASKED rows at most, newest first (F5729).
+// The newest calls above `from`, as the fees they paid; the answer holds ASKED rows at most, newest first.
 async function above(asked: string, call: Call, options: ReadOptions): Promise<ChainRead<CallFees>> {
   const answer = await readChain(asked, CallFeesAnswer, options);
   if (!answer.ok) return answer;

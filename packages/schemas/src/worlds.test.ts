@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RealmPath, WORLD_NATURES, Worlds, WORLDS_CAPS, WORLDS_MAX_BYTES } from "./worlds.ts";
 
-// The file the server's worlds job writes and every client reads (slice 7, 7c): worlds grouped from the chain's realm list, each
+// The file the server's worlds job writes and every client reads: worlds grouped from the chain's realm list, each
 // realm with what was read of its package and its history. A null is a fact not read, never a zero. Everything in it came from
 // a chain or an indexer, so every text is capped and every count is a whole number.
 const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";

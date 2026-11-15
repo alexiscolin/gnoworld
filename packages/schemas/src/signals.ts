@@ -1,5 +1,5 @@
-// The server's first signals (slice 9h, D210 to D219): who charted a world first and who spoke first. A signal names its
-// account by address alone (D212): a name is never part of what travels, so none can carry markup.
+// The server's first signals: who charted a world first and who spoke first. A signal names its
+// account by address alone: a name is never part of what travels, so none can carry markup.
 import { Address } from "./address.ts";
 import { Key } from "./slug.ts";
 import { Time } from "./pins.ts";

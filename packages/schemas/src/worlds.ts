@@ -1,4 +1,4 @@
-// The file the server's worlds job writes and every client reads (slice 7, 7c): the chain's realms grouped into worlds, each realm
+// The file the server's worlds job writes and every client reads: the chain's realms grouped into worlds, each realm
 // with what was read of its package and its history. All of it came from a chain or an indexer, so every text is capped and
 // checked, every count is a whole number, and a null is a fact not read, never a zero.
 import { isAddress } from "@gnoworld/core";
@@ -41,7 +41,7 @@ const Realm = z.strictObject({
   lastHeight: z.nullable(ChainCount),
 });
 
-/** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
+/** What a world's realms say it is, read once by the job: core's `NATURES`, which only leans a look and is never shown. */
 export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 
 /** The closed list of tags Jarvis may give a realm when it explains it (the natures and a few the outlines show beyond doubt): one source for
@@ -58,7 +58,7 @@ const World = z.object({
   seen: z.optional(z.nullable(Moment)),
   batch: z.optional(z.boolean()),
   // Its nature, kept from the pass that first read every realm of it (null: no rule reads it); absent until then. A nature this reader
-  // does not know reads as absent, so the job reads it again: a newer job's, or one a later part drops, never refuses the file.
+  // does not know reads as absent, so the job reads it again: a newer job's, or one a later job drops, never refuses the file.
   nature: z.optional(z.catch(z.optional(z.nullable(z.enum(WORLD_NATURES))), undefined)),
 });
 

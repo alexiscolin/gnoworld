@@ -104,7 +104,7 @@ describe("send", () => {
   });
 });
 
-// 10g: the capped read the prices timer, the names' read and the client of jarvis share.
+// The capped read the prices timer, the names' read and the client of jarvis share.
 describe("readCapped", () => {
   // A body that comes in the chunks given, and says when it is cut off.
   const chunked = (chunks: Uint8Array[]) => {

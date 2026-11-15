@@ -28,7 +28,7 @@ import {
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
 
-// 10d: what Jarvis hands the client, as data. Each builder makes a fresh value inside the test (F2356).
+// What Jarvis hands the client, as data. Each builder makes a fresh value inside the test.
 const action = () => ({
   realm: "gno.land/r/demo/poll",
   function: "Vote",
@@ -194,7 +194,7 @@ describe("ProposedAction", () => {
   });
 
   // The model is told a proposal's shape from its input schema (jarvis/src/allowlist.ts, `io: "input"`): the arguments stay an object
-  // of strings, keys and values bounded, whatever guard refuses `__proto__` (the combined review of 9e-1).
+  // of strings, keys and values bounded, whatever guard refuses `__proto__`.
   it("offers the model its arguments as an object of bounded strings", () => {
     const offered = z.toJSONSchema(ProposedAction, { io: "input" });
     const args = JSON.stringify(offered.properties?.["args"]);
@@ -255,7 +255,7 @@ describe("AnswerButton", () => {
   });
 });
 
-// 10g: the door's bodies, between the client, the console and the server.
+// The door's bodies, between the client, the console and the server.
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const fly = () => ({ type: "fly", label: "The poll", place: "/w/bubble" });
 const answered = (over: Record<string, unknown> = {}) => ({
@@ -469,7 +469,7 @@ describe("JarvisSettings", () => {
   });
 });
 
-// 10g: what the door sends jarvis, each field bounded, as jarvis's entry (10h) parses it.
+// What the door sends jarvis, each field bounded, as jarvis's entry parses it.
 const askLine = (over: Record<string, unknown> = {}) => ({
   speaker: 1,
   text: "the poll closes today",
@@ -654,7 +654,7 @@ describe("the digest's contract (10k)", () => {
   });
 });
 
-// 10u-a: whether Jarvis is on, which any page may ask without a session.
+// Whether Jarvis is on, which any page may ask without a session.
 describe("whether Jarvis is on", () => {
   const state = (value: unknown) => JarvisState.safeParse(value).success;
   it.each([[{ on: true }], [{ on: false }]])("takes %j", (value) => {

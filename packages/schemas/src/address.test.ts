@@ -52,7 +52,7 @@ describe("Address", () => {
     expect(Address.safeParse(address).success).toBe(false);
   });
 
-  // F674: the login form says why an address is refused, from the reason the schema gives.
+  // The login form says why an address is refused, from the reason the schema gives.
   it.each([
     ["", "empty"],
     ["G1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5", "case"],

@@ -1,9 +1,9 @@
-// What Jarvis hands the client (ADR-0002 §4 and §5; docs/plans/slice-10.md, 10d): a realm's digest, a proposed action and an
+// What Jarvis hands the client (ADR-0002 §4 and §5): a realm's digest, a proposed action and an
 // answer button, data and never HTML, each string bounded in code points (as Zod counts). A proposal names no coins: a field
 // for them fails here, and the person types any amount in the call card. A realm's path and a link are only bounded: they
-// are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). Since 10g,
-// the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
-// since 10k, a line's translation and a realm's digest.
+// are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). The
+// door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
+// also a line's translation and a realm's digest.
 import { Address } from "./address.ts";
 import { PROPOSAL_ARGS_CAPS, CallArgs, funcName, Key } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
@@ -76,7 +76,7 @@ export const AnswerButton = z.discriminatedUnion("type", [
 ]);
 export type AnswerButton = z.infer<typeof AnswerButton>;
 
-/** The most the door takes and gives (D90): a question's and an answer's code points, an answer's buttons, a quota in
+/** The most the door takes and gives: a question's and an answer's code points, an answer's buttons, a quota in
  * questions, a budget in whole dollars, and the accounts with no quota. */
 export const DOOR_CAPS = {
   question: 8000,
@@ -89,13 +89,13 @@ export const DOOR_CAPS = {
 
 /** How long the door waits for jarvis, in seconds, and how long a page waits for the door. Jarvis's own worst (jarvis/src/config.ts) is
  * turns × (attempts × call + retries × 8 s) + (turns − 1) × 30 s of tools = 4 × (3 × 60 + 2 × 8) + 3 × 30 = 874 s; the door waits 900 s,
- * the page 10 s more (R9, 10u-a). */
+ * the page 10 s more. */
 export const ASK_WAIT_S = { door: 900, page: 910 } as const;
 
-/** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
+/** The room's lines a question carries to jarvis at most, and the bytes of their text. */
 export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
 
-// A person's own question, which the server holds to its own cap; and the fixed asks (D13985), whose words are Jarvis's own,
+// A person's own question, which the server holds to its own cap; and the fixed asks, whose words are Jarvis's own,
 // so a page sets none of them and one answer serves everyone who asks the same at the same place.
 const Own = { question: text(DOOR_CAPS.question), room: RoomId };
 const Here = { ask: z.literal("here"), room: RoomId };
@@ -103,7 +103,7 @@ const CatchUp = { ask: z.literal("catch-up"), room: RoomId };
 const Explain = { ask: z.literal("function"), room: RoomId, realm: RealmPath, function: funcName(JARVIS_CAPS.name) };
 
 /** What a person asks Jarvis from a room: a question of their own, or a fixed ask: what can be done here, the room caught up,
- * a realm's function explained. The server adds the room's lines (D42). */
+ * a realm's function explained. The server adds the room's lines. */
 export const JarvisQuestion = z.union([
   z.strictObject(Own),
   z.strictObject(Here),
@@ -125,7 +125,7 @@ const spentOrOffAnswer = [
   z.strictObject({ status: z.literal("off") }),
 ] as const;
 
-/** Jarvis's answer as the client reads it: a text and its buttons; or, each answered by a fixed line or the page's form (D13985):
+/** Jarvis's answer as the client reads it: a text and its buttons; or, each answered by a fixed line or the page's form:
  * `declined` (off its ground), `paused` (3 strikes today), `capped` (the person's share spent), `early` (an account too new or never
  * heard), `busy` (the room's hour all asked), `spent` (the day's budget gone), `off` (switched off, by default). */
 export const JarvisAnswer = z.discriminatedUnion("status", [
@@ -142,7 +142,7 @@ export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
 /** What an answer cost, in millionths of a dollar. */
 const Cost = z.int().check(z.gte(0));
 
-/** An answer as jarvis gives the door (an explanation says `keep`: its code reads all succeeded and found the function, D13920), with its cost, which the door adds to the person's share and the page never reads (D13985):
+/** An answer as jarvis gives the door (an explanation says `keep`: its code reads all succeeded and found the function), with its cost, which the door adds to the person's share and the page never reads:
  * answered, declined, failed (it spent and gave nothing: its turns or tokens used, the model refusing or failing), spent (with what
  * its turns had cost when the day's budget ran out mid-way), or off. */
 export const JarvisPaidAnswer = z.discriminatedUnion("status", [
@@ -155,14 +155,14 @@ export const JarvisPaidAnswer = z.discriminatedUnion("status", [
 export type JarvisPaidAnswer = z.infer<typeof JarvisPaidAnswer>;
 
 /** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
- * share (D42). */
-/** The header the door proves itself to jarvis with: a shared secret, read from a file on both sides (10u-g2). */
+ * share. */
+/** The header the door proves itself to jarvis with: a shared secret, read from a file on both sides. */
 export const JARVIS_KEY_HEADER = "x-jarvis-key";
 // prettier-ignore
 export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest", explain: "/explain" } as const;
 
 /** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
- * by a number for who said it in this question alone, the asker 0, never an account (D91). */
+ * by a number for who said it in this question alone, the asker 0, never an account. */
 const lines = z
   .array(
     z.strictObject({
@@ -176,14 +176,14 @@ export const JarvisAsk = z.union([
   z.strictObject({ ...Own, lines }),
   z.strictObject({ ...Here, lines }),
   z.strictObject({ ...CatchUp, lines }),
-  // The chain the door found for the room, never the page's: the one jarvis reads the function's code on (D13920).
+  // The chain the door found for the room, never the page's: the one jarvis reads the function's code on.
   z.strictObject({ ...Explain, chain: z.optional(ChainId), lines }),
 ]);
 export type JarvisAsk = z.infer<typeof JarvisAsk>;
 
 const count = (max: number) => z.int().check(z.gte(1), z.lte(max));
 
-/** One of jarvis's two budgets a day, in whole dollars, as its settings take them (D65). */
+/** One of jarvis's two budgets a day, in whole dollars, as its settings take them. */
 export const JarvisBudget = z.strictObject({ budget: z.enum(["ask", "translate"]), dollars: count(DOOR_CAPS.dollars) });
 export type JarvisBudget = z.infer<typeof JarvisBudget>;
 
@@ -213,7 +213,7 @@ export const JarvisSettings = z.strictObject({
 });
 export type JarvisSettings = z.infer<typeof JarvisSettings>;
 
-/** The languages a line is translated into, by their ISO 639-1 code (D190): a bounded list, so a line has a bounded
+/** The languages a line is translated into, by their ISO 639-1 code: a bounded list, so a line has a bounded
  * number of translations. */
 export const JARVIS_LANGUAGES = [
   "en",
@@ -279,7 +279,7 @@ export const JarvisDigest = z.discriminatedUnion("status", [
 export type JarvisDigest = z.infer<typeof JarvisDigest>;
 
 /** A digest as jarvis answers the door: `made` says the model made it, or its none, for this request, so the door
- * keeps the asker's question; the door hands the page JarvisDigest, without it (10k-1, the second round's T3). */
+ * keeps the asker's question; the door hands the page JarvisDigest, without it. */
 export const JarvisMadeDigest = z.discriminatedUnion("status", [
   z.strictObject({ ...digested, made: z.boolean() }),
   z.strictObject({ status: z.literal("none"), made: z.boolean() }),
@@ -287,6 +287,6 @@ export const JarvisMadeDigest = z.discriminatedUnion("status", [
 ]);
 export type JarvisMadeDigest = z.infer<typeof JarvisMadeDigest>;
 
-/** Whether Jarvis is on, which any page may ask with no session (10u-a): the door's switch and nothing more. */
+/** Whether Jarvis is on, which any page may ask with no session: the door's switch and nothing more. */
 export const JarvisState = z.strictObject({ on: z.boolean() });
 export type JarvisState = z.infer<typeof JarvisState>;

@@ -15,7 +15,7 @@ import {
 } from "./data.ts";
 import { Expedition, Quests } from "./discovery.ts";
 
-// Slice 5's 5c: the data files' schemas (ADR-0002 §8 row 10), checked when the app builds. Every list accepts the empty
+// The data files' schemas (ADR-0002 §8 row 10), checked when the app builds. Every list accepts the empty
 // list but the universes', which names the default one. The caps (DATA_CAPS) are tested at the cap and one past it.
 const universe = {
   id: "onyx",
@@ -369,7 +369,7 @@ describe("Universes", () => {
     expect(Universes.safeParse([{ ...one, testnet }]).success).toBe(false);
   });
 
-  // R-F3, F2952 (Alexis, 2026-10-31): a chain's gnoweb and indexer are data, https only, each its own kind of address.
+  // A chain's gnoweb and indexer are data, https only, each its own kind of address.
   describe("gnoweb and indexer", () => {
     const fits = (field: string, value: string) => Universes.safeParse([{ ...one, [field]: value }]).success;
 
@@ -433,8 +433,8 @@ describe("Universes", () => {
   });
 });
 
-// Slice 6's 6a: the rules of the Earth's bubbles (ADR-0001 §7), one object, checked when the app builds. The bounds are
-// the plan's proposal (docs/plans/slice-6.md §3): each is tested at the bound and one past it.
+// The rules of the Earth's bubbles (ADR-0001 §7), one object, checked when the app builds. Each bound
+// is tested at the bound and one past it.
 describe("BubbleRules", () => {
   const rules = {
     maxOnScreen: 6,
@@ -512,7 +512,7 @@ describe("BubbleRules", () => {
   });
 });
 
-// 7f2: where the Earth's side rooms stand (ADR-0002 §10). A file of the team's, so a room is pinned by a reviewed change, and no room's name
+// Where the Earth's side rooms stand (ADR-0002 §10). A file of the team's, so a room is pinned by a reviewed change, and no room's name
 // reaches a place by chance.
 describe("EarthRooms", () => {
   const row = { room: "#earth/lisbon", lat: 38.7, lon: -9.1 };
@@ -558,8 +558,8 @@ describe("EarthRooms", () => {
   });
 });
 
-// What turns round the Earth (7v; Alexis, 2026-11-03): projects the team adds by hand, even with no realm, each a name and its own address,
-// and a world's page where it has one; a file the team reviews, the admin console after (slice 12).
+// What turns round the Earth: projects the team adds by hand, even with no realm, each a name and its own address,
+// and a world's page where it has one; a file the team reviews, the admin console after.
 describe("EarthOrbit", () => {
   const row = { name: "gnosh.ai", url: "https://gnosh.ai" };
 
@@ -591,7 +591,7 @@ describe("EarthOrbit", () => {
   });
 });
 
-// 9e-1 (Alexis, 2026-11-06): a world's pinned actions, at most 3, each a call on one of the world's own realms, its texts capped as a
+// A world's pinned actions, at most 3, each a call on one of the world's own realms, its texts capped as a
 // proposal's; the client checks each against vm/qfuncs before it shows. A label is drawn on a button: no control or format character.
 describe("a world's pinned actions", () => {
   const DAO = "gno.land/r/gov/dao";
@@ -693,7 +693,7 @@ describe("a world's pinned actions", () => {
       expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success, label).toBe(false);
   });
 
-  // The reviews of 9e-1: a label is compared as a reader sees it (case, spaces, apostrophes, compatibility forms), so no pill reads as
+  // A label is compared as a reader sees it (case, spaces, apostrophes, compatibility forms), so no pill reads as
   // Who's here or as another pill; one that draws nothing is refused. Code points, not escapes typed here.
   it.each([
     ["a curly apostrophe", `Who${String.fromCodePoint(0x2019)}s here`],
@@ -720,7 +720,7 @@ describe("a world's pinned actions", () => {
     ).toBe(false);
   });
 
-  // The verifier of 9e-1: marks that draw nothing (a combining grapheme joiner, a variation selector, Khmer's inherent vowels) are
+  // Marks that draw nothing (a combining grapheme joiner, a variation selector, Khmer's inherent vowels) are
   // no Cf, so the control check missed them; any default-ignorable code point is read as nothing.
   it.each([
     ["blank", [0x34f]],

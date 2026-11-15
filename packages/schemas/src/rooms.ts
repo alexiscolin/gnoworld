@@ -1,4 +1,4 @@
-// A room a world's moderator makes (slice 3's plan, 3l): its name a slug of [a-z0-9] and single hyphens,
+// A room a world's moderator makes: its name a slug of [a-z0-9] and single hyphens,
 // 32 characters at most; the server makes it as #<world>/<name>, so it is never a world's main room.
 import { PEOPLE_MOST, PER_HOUR_MOST } from "./counts.ts";
 import { RealmPath } from "./realmPath.ts";
@@ -15,17 +15,17 @@ export const RoomId = z
   .string()
   .check(z.maxLength(64), z.regex(/^#[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)?$/));
 
-/** POST /api/rooms/realm's body (D390): the realm a room is asked for, by its path. */
+/** POST /api/rooms/realm's body: the realm a room is asked for, by its path. */
 export const RealmRoomRequest = z.strictObject({ path: RealmPath });
 export type RealmRoomRequest = z.infer<typeof RealmRoomRequest>;
 
-// F671: the room made, read by the client as a room's id.
+// The room made, read by the client as a room's id.
 export const MadeRoom = z.strictObject({ room: RoomId });
 export type MadeRoom = z.infer<typeof MadeRoom>;
 
 const RoomType = z.enum(["open", "announcement", "accounts", "members", "members-write"]);
 
-/** A room as listed: its type, and (D394) the people in it now and the lines it had in 24 hours, each left out when zero or unknown. */
+/** A room as listed: its type, and the people in it now and the lines it had in 24 hours, each left out when zero or unknown. */
 const ListedRoom = z.object({
   room: RoomId,
   type: RoomType,

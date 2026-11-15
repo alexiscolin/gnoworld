@@ -95,7 +95,7 @@ describe("CallRequest", () => {
     expect(CallRequest.safeParse({ ...REQUEST, ...change }).success).toBe(false);
   });
 
-  // No coins ever (plan 9, section 1): no field can carry them, so no card can show them and no message can send them.
+  // No coins ever: no field can carry them, so no card can show them and no message can send them.
   it.each(["send", "max_deposit", "coins", "memo", "gasFee", "debug"])("refuses a %s field", (field) => {
     expect(CallRequest.safeParse({ ...REQUEST, [field]: "1ugnot" }).success).toBe(false);
   });

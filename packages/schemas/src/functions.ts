@@ -1,7 +1,6 @@
 // The text of `vm/qfuncs`, in a file of its own: only a realm's view reads it, and a module shared with the first screen's
 // reads (chain.ts) would carry it into the first screen's chunk. It is imported by the subpath `@gnoworld/schemas/functions`,
-// not the root. The move saves 31 B of the store chunk (two builds, gzip), not the 21 B or the 3 KB earlier messages say; the
-// cap's number is budgets.spec.ts's.
+// not the root. The cap's number is budgets.spec.ts's.
 import { z } from "./zod.ts";
 
 const Variable = z.object({ Name: z.string(), Type: z.string() });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Expedition, Quests } from "./discovery.ts";
 
-// The discovery's data files (slice 8; the plan's threat model, "quest data files": "a quest of 10,000 steps"): an expedition's stop names a
+// The discovery's data files: an expedition's stop names a
 // hub or a named realm, never both; a quest holds two to eight steps, each of its kind's shape, and ends on a realm's call.
 const stop = () => ({
   id: "start",

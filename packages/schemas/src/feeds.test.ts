@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { OnAir } from "./feeds.ts";
 
-// The team's hand-copied file (slice 8, 8i): what a row of onAir.json may hold.
+// The team's hand-copied file: what a row of onAir.json may hold.
 const line = (over: Record<string, unknown> = {}) => ({
   id: "l",
   universe: "onyx",

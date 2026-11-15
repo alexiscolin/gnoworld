@@ -10,5 +10,5 @@ export const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/));
 /** A name in a path, and the id of a universe: a slug of at most SLUG_CAP characters. */
 export const Key = Slug.check(z.maxLength(SLUG_CAP));
 
-/** A hub's world as who is here names it (7h): its roles file's slug, at most 64 characters. */
+/** A hub's world as who is here names it: its roles file's slug, at most 64 characters. */
 export const HubSlug = Slug.check(z.maxLength(64));

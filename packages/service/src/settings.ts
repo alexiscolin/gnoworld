@@ -69,7 +69,7 @@ export function isOrigin(text: string): boolean {
   return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
 }
 
-// An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole (F636).
+// An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole.
 export const absolute = z.string().refine((path) => {
   const [root, ...parts] = path.split("/");
   return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));

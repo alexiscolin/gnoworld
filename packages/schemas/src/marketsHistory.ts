@@ -1,4 +1,4 @@
-// The prices' history (slice 8, 8i; the markets row's sparklines, frame 6): what the server's prices timer read of each token over the last
+// The prices' history (the markets row's sparklines): what the server's prices timer read of each token over the last
 // day, one price a read, oldest first, kept beside markets.json and served at GET /api/markets/history. Behind the indexer's door, never the
 // barrel: only the markets row's own chunk reads it, after the first screen.
 import { MARKET_SYMBOLS, MarketToken } from "./markets.ts";

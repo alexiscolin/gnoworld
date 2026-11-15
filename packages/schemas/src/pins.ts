@@ -1,4 +1,4 @@
-// A room's pins (slice 4's 4d): GET /api/pins's answer and the body of POST /api/pins. A pin is the line as Ergo held
+// A room's pins: GET /api/pins's answer and the body of POST /api/pins. A pin is the line as Ergo held
 // it when a moderator pinned it, read by the server from Ergo; a request names the room and the line's id alone.
 import { Address } from "./address.ts";
 import { RoomId } from "./rooms.ts";

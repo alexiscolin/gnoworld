@@ -1,13 +1,13 @@
-// The one read of the public indexer (slice 5 part 2, 5k; D112): a realm's facts, through `readChain` and a Zod schema, one
+// The one read of the public indexer: a realm's facts, through `readChain` and a Zod schema, one
 // GET of an https address with the limits of read.ts, a source and a time on every result, no polling. onyx-1's indexer has no
-// `realmFacts` (F4875): the facts are the realm's deploy, its first successful MsgAddPackage, as recorded in
-// app/tests/chain/onyxRealmDeploy.json. The indexer has no time field (F2950), so every fact carries its age as a block height
-// and no chart by date stands on it (F2974).
+// `realmFacts`: the facts are the realm's deploy, its first successful MsgAddPackage, as in
+// app/tests/chain/onyxRealmDeploy.json. The indexer has no time field, so every fact carries its age as a block height
+// and no chart by date stands on it.
 import { RealmDeployAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { indexerUrl } from "./asks.ts";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
-// A filter on a message's value lets a message of another type through (history.ts, 7k3): the type is chosen by `typeUrl`, and the reader
+// A filter on a message's value lets a message of another type through: the type is chosen by `typeUrl`, and the reader
 // still checks that the message it reads added the path asked.
 const DEPLOY_QUERY =
   'query($path: String!) { getTransactions(where: { success: { eq: true }, messages: { typeUrl: { eq: "add_package" }, value: { MsgAddPackage: { package: { path: { eq: $path } } } } } }, order: { heightAndIndex: ASC }, limit: 1) { block_height messages { value { __typename ... on MsgAddPackage { creator package { path } } } } } }';

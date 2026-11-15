@@ -3,7 +3,7 @@ import { statusEnvelope, rpcErrorEnvelope } from "./testing/envelopes.ts";
 import type { ChainFetch } from "./read.ts";
 import { readTransaction } from "./tx.ts";
 
-// 9d: one `tx` read of the hash, tm2's ResultTx (rpc/core/types/responses.go:249, onyx v1.5.0 toolchain), written from that source,
+// One `tx` read of the hash, tm2's ResultTx (rpc/core/types/responses.go:249, onyx v1.5.0 toolchain), written from that source,
 // NOT recorded. A hash the node has not stored is a -32603 "Internal error" whose `data` is `Could not find tx result for hash
 // #<UPPER HEX>` (state/errors.go:84); every other fault of the read (core/tx.go) comes the same way.
 const RPC = "https://rpc.onyx.testnets.gno.land:443";

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readFacts } from "./indexer.ts";
 import type { ChainFetch, ChainRead } from "./read.ts";
 
-// The package's own read of the indexer (D112), seen through StrykerJS by its own tests. onyx-1 has no `realmFacts` (F4875):
+// The package's own read of the indexer, seen through StrykerJS by its own tests. onyx-1 has no `realmFacts`:
 // the facts are the realm's deploy, as the app's indexer.test.ts reads it from onyx-1's recorded answers.
 const INDEXER = "https://indexer.onyx.example/graphql/query";
 const REALM = "gno.land/r/demo/poll";

@@ -17,11 +17,11 @@ interface Fields {
   // A tool Jarvis's allowlist names, or its fixed word for a name the model made up, and why a call was refused.
   tool?: string;
   reason?: string;
-  // An admin's change (10g): the setting, its value, and the account it names, written as its HMAC like the account.
+  // An admin's change: the setting, its value, and the account it names, written as its HMAC like the account.
   setting?: string;
   value?: number;
   subject?: string;
-  // A moderation act or a link (owners' moderation): what gave the right, "owner" or "staff"; the address that holds the namespace, written as
+  // A moderation act or a link: what gave the right, "owner" or "staff"; the address that holds the namespace, written as
   // its HMAC like the account; the way a link was made.
   as?: "owner" | "staff" | "maker";
   owner?: string;

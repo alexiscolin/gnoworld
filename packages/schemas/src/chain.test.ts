@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { QueryAnswer, StatusAnswer } from "./chain.ts";
 import { FunctionList } from "./functions.ts";
 
-// 5g-reads: the three shapes the browser reads from a chain's RPC. The bodies are written the way gno's source at v1.5.0 gives them
+// The three shapes the browser reads from a chain's RPC. The bodies are written the way gno's source at v1.5.0 gives them
 // (see app/tests/chain/chainFixture.ts: the envelopes are read from source, not recorded). Fields the reader does not read may
 // be there or not; only the ones it reads decide whether an answer is the right shape.
 const envelope = (base: Record<string, unknown>) => ({
@@ -130,7 +130,7 @@ describe("StatusAnswer, the node's /status", () => {
     expect(JSON.stringify(parsed)).not.toContain("surprise");
   });
 
-  // The node's network, its chain's id (D118): read when the status names it, which a universe's check needs; a status
+  // The node's network, its chain's id: read when the status names it, which a universe's check needs; a status
   // that names none is still a status, whose check refuses it.
   it("takes the node's network when its status names it, and none when it does not", () => {
     const named = {

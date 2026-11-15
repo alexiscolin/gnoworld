@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hasHidden, stripHidden } from "./hidden.ts";
 
-// L2: one rule for control and format characters (Cc, Cf), where call.ts and the card's schemas had each their own copy.
+// One rule for control and format characters (Cc, Cf), shared by call.ts and the card's schemas.
 const BIDI = "\u202e";
 const ZERO_WIDTH = "\u200b";
 const TAG = "\u{e0041}";

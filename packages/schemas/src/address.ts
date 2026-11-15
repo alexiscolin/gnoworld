@@ -17,7 +17,7 @@ function polymod(values: readonly number[]): number {
   return check;
 }
 
-// Why a string is no address, the first rule it breaks in this order: the login form says it (F674).
+// Why a string is no address, the first rule it breaks in this order: the login form says it.
 export const ADDRESS_PROBLEMS = ["empty", "case", "prefix", "characters", "length", "checksum"] as const;
 export type AddressProblem = (typeof ADDRESS_PROBLEMS)[number];
 

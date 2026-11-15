@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchBytes, requestInit, type ChainFetch, type ChainInit } from "./transport.ts";
 
 // The transport's own request, which read.test.ts reaches through readChain alone (always `no-store`): StrykerJS counts only
-// the package's own tests for its code, so the request's exact shape and the timeout's reason are held here (F5187).
+// the package's own tests for its code, so the request's exact shape and the timeout's reason are held here.
 const URL_OK = "https://rpc.onyx.example:443/status";
 
 afterEach(() => {

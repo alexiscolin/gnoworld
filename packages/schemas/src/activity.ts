@@ -1,4 +1,4 @@
-// How busy each room is, as the server answers it (slice 3's plan, 3h): each asked world's rooms and
+// How busy each room is, as the server answers it: each asked world's rooms and
 // their messages a minute, over the last five minutes.
 import { z } from "./zod.ts";
 

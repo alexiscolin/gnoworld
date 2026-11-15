@@ -1,4 +1,4 @@
-// A UTC day as the device keeps it (slice 8): the date part of ISO 8601, "2026-11-04". A stamp, a streak and the expedition count by it,
+// A UTC day as the device keeps it: the date part of ISO 8601, "YYYY-MM-DD". A stamp, a streak and the expedition count by it,
 // so a person's clock and time zone never split or join two days.
 import { z } from "./zod.ts";
 
