@@ -2054,11 +2054,11 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || kill -$CINTR "$PPID"; sleep 30; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
-	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; ppidlong) echo $$ >>"$SHARD_ROOT/suite.pid"; kill -INT "$PPID"; sleep 30 ;; termlong) echo $$ >>"$SHARD_ROOT/suite.pid"; kill -TERM "$PPID"; sleep 30 ;; *) exit "$INTR" ;; esac' \
+	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; ppidlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -INT "$PPID"; sleep 30 ;; termlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -TERM "$PPID"; sleep 30 ;; *) exit "$INTR" ;; esac' \
 	'	fi' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
@@ -2217,22 +2217,22 @@ out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an inte
 # run does not reach them with it, so the run stops them itself. A suite that would run 30 s more is dead when the run is, on an INT
 # (well before it could end by itself) and on a TERM, which would otherwise end the run alone and leave its suites behind.
 for sig in ppidlong termlong; do
-	rm -f "$hs/suite.pid"
-	began=$(date +%s)
+	rm -f "$hs/suite.pid" "$hs/signal.at"
 	out=$(INTR=$sig GROUPED=1 shards 1) && fail "harness_mutate passed after a $sig signal: $out"
 	[ -s "$hs/suite.pid" ] || fail "the suite never ran ($sig): $out"
-	[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
+	at=$(cat "$hs/signal.at" 2>/dev/null) || fail "the suite sent no $sig signal: $out"
+	[ $(($(date +%s) - at)) -lt 20 ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a suite running after a $sig signal"; }; done
 done
 # The same in the controls, run two at a time before any mutant: the run waited for the two in flight to end by
 # themselves, up to the limit of 600 s, with check.sh gone and its merge lock free. An INT or a TERM stops them; so does a control that fails
 # or hangs, for the one beside it.
 for sig in INT TERM; do
-	rm -rf "$hs/suite.pid" "$hs/sig.lock"
-	began=$(date +%s)
+	rm -rf "$hs/suite.pid" "$hs/sig.lock" "$hs/signal.at"
 	out=$(CINTR=$sig GROUPED=1 shards 2) && fail "harness_mutate passed after a $sig signal in its controls: $out"
 	[ "$(count suite.pid)" -ge 1 ] || fail "no control was in flight at the $sig signal: $out"
-	[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for its controls to end by themselves after a $sig signal ($(($(date +%s) - began)) s): $out"
+	at=$(cat "$hs/signal.at" 2>/dev/null) || fail "no control sent the $sig signal: $out"
+	[ $(($(date +%s) - at)) -lt 20 ] || fail "harness_mutate waited for its controls to end by themselves after a $sig signal ($(($(date +%s) - at)) s): $out"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after a $sig signal"; }; done
 done
 rm -rf "$hs/suite.pid" "$hs/sig.lock"
