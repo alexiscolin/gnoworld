@@ -1209,6 +1209,10 @@ def mutants():
         ('[ "$mode" = all ] || opts=', ': || opts=', "scans the range alone"),
     ):
         yield from each("scripts/scan_secrets.sh", find, replace, "hooks", f"scan_secrets --range {label}")
+    # A grafts file, the common folder's or GIT_GRAFT_FILE, shows git another history: no scan runs while one is there.
+    yield from each("scripts/scan_secrets.sh", '[ -z "${GIT_GRAFT_FILE:-}" ] ||', 'true ||', "hooks", 'scan_secrets refuses GIT_GRAFT_FILE')
+    yield from each("scripts/scan_secrets.sh", '--git-common-dir)/info/grafts', '--git-dir)/info/grafts', "hooks", 'scan_secrets refuses the grafts file of the common folder, from a linked worktree')
+    yield from each("scripts/scan_secrets.sh", '[ ! -e "$grafts" ] ||', 'true ||', "hooks", 'scan_secrets refuses a grafts file')
     # A merge's resolution is read against the merge git would make again, an octopus merge, which that cannot, is refused.
     yield from each("scripts/scan_secrets.sh", '--diff-filter=tuxdb $merges $text', '--diff-filter=tuxdb $text', "hooks", 'scan_secrets reads what a merge adds in its resolution')
     yield from each("scripts/scan_secrets.sh", 'merges="--remerge-diff"', 'merges="--diff-merges=first-parent"', "hooks", 'scan_secrets reads a merge against the merge git would make again, not the first parent')

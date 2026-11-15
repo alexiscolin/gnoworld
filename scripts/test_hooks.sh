@@ -4919,6 +4919,47 @@ out=$(cd "$mo" && sh "$rh/scan_secrets.sh" 2>&1) && fail "scan_secrets let an oc
 printf '%s\n' "$out" | grep -q "scan_secrets: an octopus merge" || fail "scan_secrets refused an octopus merge, over the whole history, without saying why: $out"
 mpushed "$mo" && fail "pre-push let an octopus merge through"
 (cd "$mo" && sh "$rh/scan_secrets.sh" --range "$ob" >/dev/null 2>&1) || fail "scan_secrets --range refused a history before the octopus merge"
+# Planted grafts make git show a push another history, as a replace ref does: <common git dir>/info/grafts and GIT_GRAFT_FILE both
+# still work under git 2.53, and GIT_NO_REPLACE_OBJECTS does not stop them. A clean commit grafted onto a commit the remote holds
+# hides the key commit under it; the scan refuses to run while either is there, whatever it is asked to scan, the hook with it, and
+# from a linked worktree too, whose own git folder holds no grafts but whose common one does.
+git -C "$pr" checkout -q -b grafted fresh && commit grafted.txt 'g = 1' && git -C "$pr" checkout -q trunk
+gtip=$(git -C "$pr" rev-parse grafted)
+# The refusal is the scan's own line, not the one it makes of git's hint about grafts (which says the word too).
+grefused() { grep -Eq "^scan_secrets: grafts \(" "$t/graft.out"; }
+hides() { if git -C "$pr" rev-list "$gtip" "^$held" 2>/dev/null | grep -q "$fk"; then fail "the test's graft hides nothing: $1"; fi; }
+printf '%s %s\n' "$gtip" "$held" >"$pr/.git/info/grafts"
+hides "a grafts file"
+pushed grafted && fail "pre-push scanned the history a grafts file showed, and sent a key unscanned"
+pushed trunk && fail "pre-push ran with a grafts file in the repository"
+printf 'refs/heads/trunk %s refs/heads/trunk %s\n' "$tk" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >"$t/graft.out" 2>&1) || :
+grefused || fail "pre-push refused with a grafts file without saying why: $(cat "$t/graft.out")"
+(cd "$pr" && sh "$rh/scan_secrets.sh" --range "$gtip" "^$held" >"$t/graft.out" 2>&1) && fail "scan_secrets --range ran with a grafts file in the repository"
+grefused || fail "scan_secrets --range refused with a grafts file without saying why: $(cat "$t/graft.out")"
+(cd "$pr" && sh "$rh/scan_secrets.sh" >"$t/graft.out" 2>&1) && fail "scan_secrets ran over the whole history with a grafts file in the repository"
+grefused || fail "scan_secrets refused the whole history with a grafts file without saying why: $(cat "$t/graft.out")"
+git -C "$pr" worktree add -q "$t/pushrange-wt" -b wtbranch trunk
+(cd "$t/pushrange-wt" && sh "$rh/scan_secrets.sh" --range "$gtip" "^$held" >"$t/graft.out" 2>&1) && fail "scan_secrets --range ran from a linked worktree whose common folder holds a grafts file"
+grefused || fail "scan_secrets --range, from a linked worktree, refused without saying why: $(cat "$t/graft.out")"
+printf '%s\n' "$krs" >"$kr/.git/info/grafts"
+# --staged reads the index against HEAD's tree, which no graft changes: it still finds a staged key, and runs.
+printf 'x = 1\n' >"$kr/ok.txt" && git -C "$kr" add ok.txt
+(cd "$kr" && sh "$rh/scan_secrets.sh" --staged >/dev/null 2>&1) || fail "scan_secrets --staged refused a clean file with a grafts file in the repository"
+printf 'aws = "%s"\n' "$key" >"$kr/s.txt" && git -C "$kr" add s.txt
+(cd "$kr" && sh "$rh/scan_secrets.sh" --staged >/dev/null 2>&1) && fail "scan_secrets --staged missed a staged key with a grafts file in the repository"
+git -C "$kr" rm -qf --cached ok.txt s.txt && rm "$kr/ok.txt" "$kr/s.txt" "$kr/.git/info/grafts"
+git -C "$pr" worktree remove --force "$t/pushrange-wt" && git -C "$pr" branch -q -D wtbranch
+rm "$pr/.git/info/grafts"
+printf '%s %s\n' "$gtip" "$held" >"$t/grafts"
+(export GIT_GRAFT_FILE="$t/grafts"; hides "GIT_GRAFT_FILE")
+(GIT_GRAFT_FILE="$t/grafts" pushed grafted) && fail "pre-push scanned the history GIT_GRAFT_FILE showed, and sent a key unscanned"
+(GIT_GRAFT_FILE="$t/grafts" pushed trunk) && fail "pre-push ran with GIT_GRAFT_FILE set"
+(cd "$pr" && GIT_GRAFT_FILE="$t/grafts" sh "$rh/scan_secrets.sh" --range "$gtip" "^$held" >"$t/graft.out" 2>&1) && fail "scan_secrets --range ran with GIT_GRAFT_FILE set"
+grefused || fail "scan_secrets --range refused GIT_GRAFT_FILE without saying why: $(cat "$t/graft.out")"
+(cd "$pr" && GIT_GRAFT_FILE="$t/no-such-grafts" sh "$rh/scan_secrets.sh" --range "$tk" "^$held" >/dev/null 2>&1) && fail "scan_secrets ran with a GIT_GRAFT_FILE naming no file"
+(cd "$pr" && GIT_GRAFT_FILE= sh "$rh/scan_secrets.sh" --range "$tk" "^$held" >/dev/null 2>&1) || fail "scan_secrets refused an empty GIT_GRAFT_FILE"
+pushed trunk || fail "pre-push refused a clean push once the grafts left"
+git -C "$pr" branch -q -D grafted
 out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --stagd 2>&1) && fail "scan_secrets took an unknown option for a whole-history scan"
 printf '%s\n' "$out" | grep -q "usage: scan_secrets.sh" || fail "scan_secrets refused an unknown option without its usage: $out"
 fi

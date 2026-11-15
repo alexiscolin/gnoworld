@@ -49,6 +49,11 @@ binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(e
 # saying so on stderr, so a scan that holds one is refused.
 merges="--remerge-diff"
 if [ "$mode" != staged ]; then
+	# A grafts file, which git still reads from the common folder (a linked worktree's own holds none) or where GIT_GRAFT_FILE points,
+	# makes git show a push another history, as a replace ref does; nothing in a scan that reads history can tell.
+	[ -z "${GIT_GRAFT_FILE:-}" ] || { echo "scan_secrets: grafts (GIT_GRAFT_FILE) would show git another history than the one pushed: unset it" >&2; exit 1; }
+	grafts=$(git rev-parse --path-format=absolute --git-common-dir)/info/grafts
+	[ ! -e "$grafts" ] || { echo "scan_secrets: grafts ($grafts) would show git another history than the one pushed: remove the file" >&2; exit 1; }
 	scope=--all
 	[ "$mode" = all ] || scope=$revs
 	octopus=$(set -f && git rev-list --min-parents=3 --full-history $scope | head -n 1)
