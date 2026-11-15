@@ -184,7 +184,7 @@ describe("a failure's reason, by its type first and by its code for a type nobod
 // message, and in data the hash, `error` (response.toString()) and `log` (the chain's, a TM2Error only); a null response
 // is `error: null`. The reason of a failure with a hash is data.log, else data.error, never the generic message.
 describe("ask: why a transaction Adena named a hash for failed (F5749)", () => {
-  const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+  const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   const failedWith = (data: unknown) => ({
     status: "failure",
     type: "TRANSACTION_FAILED",
