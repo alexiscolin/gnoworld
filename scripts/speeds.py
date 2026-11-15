@@ -3,10 +3,9 @@ run from the base; check_docs.py and patch_coverage.py read the table through ro
 
 Reads the paths of a change on stdin, one a line, and prints `tier1` when one is a tier-1 path or one it cannot place, `other` when none
 is; it always exits 0. Tier 1's backticked paths are the security paths (keys, the CSP, chain reads, login, roles, the worker,
-deployment), compared in NFC and with their case folded, as a Mac's disk reads names (F164); a folder is written with its slash. A table
+deployment), compared in NFC and with their case folded, as a Mac's disk reads names; a folder is written with its slash. A table
 it cannot read, a list it reads empty, a path it cannot place (quoted, absolute, rewritten: `..`, `.`, `//`, a backslash; padded, a
-control character, not UTF-8, a link or a path through one), and any other call (the merge check's two speeds and the radical mode's
-light gate left with check.sh's old lanes, D13168) are `tier1`."""
+control character, not UTF-8, a link or a path through one), and any other call are `tier1`."""
 import os
 import re
 import sys

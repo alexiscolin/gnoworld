@@ -1,19 +1,19 @@
 #!/bin/sh
 set -eu
-# pre-commit (D13173): no secret enters a commit, prose included; from Claude Code's sandbox no harness file either (D241); and there
+# pre-commit: no secret enters a commit, prose included; from Claude Code's sandbox no harness file either; and there
 # the staged files are formatted and the docs name only files that exist. The rest of the checks are scripts/check.sh's, which a
-# session runs before committing code, and GitHub's, which judge each pull request. In Alexis's shell nothing of the working tree
-# runs (F076): only the scan installed beside this hook, from main.
+# session runs before committing code, and GitHub's, which judge each pull request. In the owner's shell nothing of the working tree
+# runs: only the scan installed beside this hook, from main.
 # Git hands a hook GIT_DIR and GIT_INDEX_FILE, never these: a caller's object folder, or a copy of its common folder, would answer
-# the reads below with a HEAD of its choice, one that hides a staged harness file (7w2, F4923).
+# the reads below with a HEAD of its choice, one that hides a staged harness file.
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 . "$(dirname "$0")/records.sh"
-# The sandbox stops a shell's writes, not the file tools' (an agent's Edit of stryker.config.json passed its commit, f792bf47). A
+# The sandbox stops a shell's writes, not the file tools' (an agent's Edit of a harness file would pass its commit unseen). A
 # sandboxed command can unset SANDBOX_RUNTIME, never the sandbox's ban on writing the installed hooks: a hook that cannot open itself
-# for writing runs in the sandbox too. In a subshell: under dash, Linux's sh, a redirection `:` cannot open ends the whole shell (F13177).
+# for writing runs in the sandbox too. In a subshell: under dash, Linux's sh, a redirection `:` cannot open ends the whole shell.
 sandboxed=false
 if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0") 2>/dev/null; then sandboxed=true; fi
-# A path this disk may read as another is refused, from the sandbox and in Alexis's shell, a merge's too (F164, F151): a byte outside
+# A path this disk may read as another is refused, from the sandbox and outside it, a merge's too: a byte outside
 # ASCII (ſ is s on APFS: packageſ/ lands as packages/, a workspace pnpm installs), or a name equal but for case to another of the
 # tree, which no harness list can match (Packages/ is packages/). The index is what the commit holds. GitHub's changes job refuses
 # the same on its side.

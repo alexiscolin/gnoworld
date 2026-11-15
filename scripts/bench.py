@@ -1,10 +1,10 @@
-"""bench.py: the benches hold their budgets (docs/plans/slice-4.md §4; docs/HARNESS.md, "The gate").
+"""bench.py: the benches hold their budgets (docs/HARNESS.md, "The gate").
 
 Runs Vitest's benches (`*.bench.ts(x)`, the node project) and reads its report: each bench names its budget in
 brackets, `[0.2 ms]`, and the mean of its runs must stay under it. A bench with no budget, no sample (its function
 threw), no bench at all, or one a `*.bench.ts(x)` source names that the report lacks (a `describe.skip` around it, an
-`.only` beside it, a comment) fails: a measure nobody bounds guards nothing, and a bench switched off measures nothing. No gate runs it (D13168; four of its benches were red, F13182): run it by hand, alone, as a bench beside other work
-measures the machine's load. A bench measures a quiet machine (harness-c): before it runs, bench.py reads the load (load.py, beside it,
+`.only` beside it, a comment) fails: a measure nobody bounds guards nothing, and a bench switched off measures nothing. No gate runs it: run it by hand, alone, as a bench beside other work
+measures the machine's load. A bench needs a quiet machine: before it runs, bench.py reads the load (load.py, beside it,
 in tenths) and waits while the 1-minute load is not under the machine's cores, up to a ceiling; past it, it refuses, saying so, since a
 verdict on the code needs a machine that can measure it. No budget changes. BENCH_WAIT_CEILING and BENCH_WAIT_STEP (seconds) are the
 tests' switches. Usage: bench.py, from the repository root."""
@@ -22,7 +22,7 @@ from repo_files import BENCH, BENCH_FILE, BUDGET, listed
 
 VITEST = "node_modules/.bin/vitest"  # relative to the root the script runs from: a test puts its stub there
 LOAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "load.py")
-# s: how long to wait for a quiet machine (60, the harness audit, 2026-11-04: 600 at loads of 48 to 142 ended on a refusal all the same),
+# s: how long to wait for a quiet machine (60: a longer wait at loads of 48 to 142 ended on a refusal all the same),
 # and between two reads of the load
 CEILING, STEP = 60.0, 10.0
 

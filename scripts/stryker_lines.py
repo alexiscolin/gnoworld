@@ -1,5 +1,4 @@
-"""stryker_lines.py: GitHub's risk job's StrykerJS config, its `mutate` the code the branch changed since its base alone (Alexis, 2026-11-04:
-"Lignes de la tranche"), so a survivor in code it did not touch goes unseen, as those of the files it did not change do.
+"""stryker_lines.py: GitHub's risk job's StrykerJS config, its `mutate` the code the branch changed since its base alone, so a survivor in code it did not touch goes unseen, as those of the files it did not change do.
 
 StrykerJS 10.0.0 mutates a node only when its whole span lies inside one range (instrumenter syntax-helpers.js, locationIncluded), so a
 changed line widens to the top-level statements it lies in, as TypeScript's own parser reads them: a function, a class, a declaration, an

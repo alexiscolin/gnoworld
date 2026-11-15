@@ -9,7 +9,7 @@ import tempfile
 
 def git(*args):
     """git's output, failing loudly. Names print as they are: git quotes a path with an accent, "caf\\303\\251/a.ts", by default,
-    which names no file (CR5)."""
+    which names no file."""
     return subprocess.run(["git", "-c", "core.quotePath=false", *args], capture_output=True, text=True, check=True).stdout
 
 
@@ -91,7 +91,7 @@ def worktree(rev):
         with open(os.path.join(where, "owner"), "w") as f:
             f.write(str(os.getpid()))
         # A name of its own: git registers the copy as .git/worktrees/<basename>, and the sandbox refuses to create
-        # exactly `tree` there (F1191); two runs at once never share a name either.
+        # exactly `tree` there; two runs at once never share a name either.
         tree = os.path.join(where, "tree-" + os.path.basename(where))
         git("worktree", "add", "-q", "--detach", tree, rev)
         try:
@@ -104,7 +104,7 @@ def worktree(rev):
 def listing(root):
     """The paths git would track under root (so .gitignore holds), one deleted but still in the index included, or every
     path but git's own and the installed packages' when root is not in a repository or git cannot list it. Names come
-    NUL-ended (-z), so git quotes none, whatever its characters (a quoted name is no file: F1545)."""
+    NUL-ended (-z), so git quotes none, whatever its characters (a quoted name is no file)."""
     try:
         return [root / name for name in git("-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if name]
     except (OSError, subprocess.CalledProcessError):

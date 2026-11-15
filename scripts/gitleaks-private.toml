@@ -1,4 +1,4 @@
-# What would name a person or a machine once the repository is public (Alexis, 2026-10-17): a
+# What would name a person or a machine once the repository is public: a
 # path into a home folder, a service of the demo's host. Apart from gitleaks.toml, because
 # gitleaks' default allowlist hides /home/ paths. The CI's runner folder is not a person's.
 # A home folder starts a path: a users folder after a word (gno.land/r/gnoland/users, /api/users)

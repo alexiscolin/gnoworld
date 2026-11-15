@@ -1,15 +1,15 @@
-"""hidden.py: the characters no text of this repository holds raw (F5053), as one rule its readers share: check_docs.py
+"""hidden.py: the characters no text of this repository holds raw, as one rule its readers share: check_docs.py
 reads every file and the branch's commit messages for them, and commit-msg, in Claude Code's sandbox, each message as it is
-written (F5085). Run, it reads a message on its stdin, names each hidden character, and exits 1 when one is there."""
+written. Run, it reads a message on its stdin, names each hidden character, and exits 1 when one is there."""
 import re
 import sys
 import unicodedata
 
 # What shows nothing, or changes how the text around it reads: code that reads otherwise than it runs, words a reader never
-# sees but a model does (F5053). Unicode's Default_Ignorable_Code_Point (the zero-width characters, the variation
+# sees but a model does. Unicode's Default_Ignorable_Code_Point (the zero-width characters, the variation
 # selectors, the Hangul fillers, the tags and the rest of their block), the format characters (Cf: the bidi controls, the
 # BOM) and the line and paragraph separators (Zl, Zp: each ends a `//` comment in TypeScript), as Node 24.22.0's ICU 78.3
-# gives them. A table, so that every Python gives one verdict, whatever Unicode it knows (F5083, F5086); section check_docs
+# gives them. A table, so that every Python gives one verdict, whatever Unicode it knows; check_docs
 # holds it to the pinned Node's, range by range. A text that needs one writes it as an escape.
 UNICODE = "17.0"
 TABLE = (
@@ -21,7 +21,7 @@ TABLE = (
 )
 HIDDEN = re.compile("[" + "".join(f"{chr(a)}-{chr(b)}" for a, b in TABLE) + "]")
 # U+FE0E and U+FE0F pick an emoji's look, as text or as a picture. One is kept right after a character that shows and is no
-# ASCII, or in a keycap (`1`, U+FE0F, U+20E3); any other, a second in a row included, can carry hidden bits (F5086).
+# ASCII, or in a keycap (`1`, U+FE0F, U+20E3); any other, a second in a row included, can carry hidden bits.
 LOOKS = (0xFE0E, 0xFE0F)
 KEYCAP = re.compile("[0-9#*]" + chr(0xFE0F) + chr(0x20E3))
 
@@ -49,7 +49,7 @@ def hidden_in(where, text):
 
 def hidden_in_data(where, data):
     """hidden_in of data read as UTF-8, or one line alone when data is no UTF-8 text (a NUL, or a byte that is no UTF-8):
-    what it holds cannot be read, as UTF-16 writes U+202E as `2E 20` (F5088), and a binary has no escape to write (F5082)."""
+    what it holds cannot be read, as UTF-16 writes U+202E as `2E 20`, and a binary has no escape to write."""
     bad = data.find(b"\0")
     try:
         text = data.decode("utf-8")

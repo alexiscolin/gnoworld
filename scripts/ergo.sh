@@ -1,5 +1,5 @@
 #!/bin/sh
-# ergo.sh: the Ergo the server's tests start (slice 3b). It builds the pin of deploy/ergo/VERSION
+# ergo.sh: the Ergo the server's tests start. It builds the pin of deploy/ergo/VERSION
 # ("<tag> <commit>") into the tools' cache once, and again when the binary there is missing, of another
 # version, or not the one built (its SHA-256 beside it), then prints its path. Run from the root.
 set -eu
@@ -22,7 +22,7 @@ if [ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] && (cd "$dir" && sha
 	exit 0
 fi
 command -v go >/dev/null 2>&1 || refuse "go is needed to build Ergo $tag (docs/DEVELOPMENT.md)"
-# The clone, not the Go proxy: the tag's module path lacks its /v2, so the proxy refuses it (the spike).
+# The clone, not the Go proxy: the tag's module path lacks its /v2, so the proxy refuses it.
 [ -d "$dir/.git" ] || git clone -q --depth 1 --branch "$tag" https://github.com/ergochat/ergo.git "$dir" ||
 	refuse "cannot clone Ergo $tag"
 [ "$(git -C "$dir" rev-parse HEAD)" = "$commit" ] || refuse "the clone of $tag in $dir is not commit $commit"

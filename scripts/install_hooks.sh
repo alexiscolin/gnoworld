@@ -1,11 +1,11 @@
 #!/bin/sh
 # install_hooks.sh [<commit>]: puts the hooks of <commit>, main by default, and the scripts they run in git's own hooks folder,
-# where no merge, checkout or command in Claude Code's sandbox writes: no branch brings its own into Alexis's shell (F129). He
-# runs main's copy, never the working tree's, and the object itself, whatever a replace ref would show:
+# where no merge, checkout or command in Claude Code's sandbox writes: no branch brings its own into the owner's shell. Run
+# main's copy, never the working tree's, and the object itself, whatever a replace ref would show:
 # git --no-replace-objects show main:scripts/install_hooks.sh | sh
 set -eu
-export GIT_NO_REPLACE_OBJECTS=1 # the commit's own bytes, whatever a replace ref shows (F132)
-# The commit, read once: a ref moved while this runs (a session can move a work branch's) changes nothing it writes (L3).
+export GIT_NO_REPLACE_OBJECTS=1 # the commit's own bytes, whatever a replace ref shows
+# The commit, read once: a ref moved while this runs (a session can move a work branch's) changes nothing it writes.
 ref=$(git rev-parse --verify --quiet "${1:-main}^{commit}") || { echo "install_hooks: ${1:-main} is no commit" >&2; exit 1; }
 hooks="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"
 for hook in commit-msg pre-commit pre-merge-commit pre-push; do # without one, git checks nothing there
@@ -17,7 +17,7 @@ names=$(printf '%s\n' "$files" | sed 's|.*/||')
 twice=$(printf '%s\n' "$names" | sort | uniq -d)
 [ -z "$twice" ] || { echo "install_hooks: $ref holds two files named $twice, one of which would replace the other" >&2; exit 1; }
 mkdir -p "$hooks"
-# Any other file there but git's samples could run as a hook, or is left from an older install (D13173).
+# Any other file there but git's samples could run as a hook, or is left from an older install.
 others=$(ls -A "$hooks" | grep -v '\.sample$' | grep -vxF "$names" || :)
 printf '%s\n' "$others" | while IFS= read -r f; do [ -z "$f" ] || rm -rf -- "${hooks:?}/$f"; done
 for f in $files; do

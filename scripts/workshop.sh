@@ -9,16 +9,16 @@ root=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$root"
 pidfile="$root/.claude/tmp/workshop.pid" # a line a process: this script's pid, the process's, its port
 # Each process it starts runs under the workshop's own Seatbelt profile, by the system's sandbox-exec: Vite's servers, the backend and
-# ergo.sh's check run code a session writes, Vite's again at each edit (lot 2's S1, F4962). They write their own folders alone and read of
-# the home folder the code alone they run; the profile is given its folders as their real paths. It cannot hold where they listen
-# (F4977): 127.0.0.1 is their configs' (app/vite.config.ts's workshopServer, the server's and Ergo's).
+# ergo.sh's check run code a session writes, Vite's again at each edit. They write their own folders alone and read of
+# the home folder the code alone they run; the profile is given its folders as their real paths. It cannot hold where they listen:
+# 127.0.0.1 is their configs' (app/vite.config.ts's workshopServer, the server's and Ergo's).
 seatbelt="$root/scripts/workshop.sb" scratch=$(cd "${TMPDIR:-/tmp}" && pwd -P)
 home=$(cd "$HOME" && pwd -P)
 # The tailnet-preview skill's script, run from /: its python3 -c, as this script's own would without -I, imports first a module a
-# session planted in the folder it runs from (F4962).
+# session planted in the folder it runs from.
 preview="$HOME/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
 # This runs out of the sandbox, and a session writes .node-version: it is a version and nothing else (a `24.22.0/../../x` led PATH, and every
-# bare command after it, to a planted Node, F5540), and its Node a file of the user's own, never a link, found under nvm's folder.
+# bare command after it, to a planted Node), and its Node a file of the user's own, never a link, found under nvm's folder.
 version=$(head -n 1 .node-version 2>/dev/null || :) want="v$version"
 printf '%s\n' "$version" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' && [ "$(cat .node-version)" = "$version" ] || { echo "workshop: .node-version must be a version, as 24.22.0" >&2; exit 1; }
 node_bin="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
@@ -29,7 +29,7 @@ node_dir=$(cd -P "$node_bin/.." && pwd -P) # Node's own folder, its binary and i
 # The checkout the profile may read whole: the main one, a worktree's node_modules leading to its own. It is the parent of git's common
 # folder, found as worktree.sh finds it from this tree's .git (a folder here, or the file of a worktree naming <common>/worktrees/<id>),
 # never where node_modules/.pnpm leads, a link any session writes: one to a folder two levels under the home folder, or under /, made MAIN
-# the home folder or /, and the profile read the keys (F5539). It is a git checkout holding the profile, and neither the home folder nor above.
+# the home folder or /, and the profile read the keys. It is a git checkout holding the profile, and neither the home folder nor above.
 if [ -d "$root/.git" ]; then common=$root/.git
 else common=$(gitdir=$(sed -n 's/^gitdir: //p' "$root/.git" 2>/dev/null) && [ -n "$gitdir" ] && cd "$gitdir/../.." 2>/dev/null && pwd -P) || common=; fi
 case $common in */.git) main=${common%/.git} ;; *) main= ;; esac
@@ -54,8 +54,8 @@ boxed() {
 app_port=${WORKSHOP_APP_PORT:-5198} lab_port=${WORKSHOP_LAB_PORT:-5199}
 api_port=${WORKSHOP_API_PORT:-5195} irc_port=${WORKSHOP_IRC_PORT:-5196} ws_port=${WORKSHOP_WS_PORT:-5197} # the server's, Ergo's, Ergo's WebSocket
 unset WORKSHOP_APP_PORT WORKSHOP_LAB_PORT WORKSHOP_API_PORT WORKSHOP_IRC_PORT WORKSHOP_WS_PORT # each process is given its own, below
-# Process $1 serves port $2 when the listener is it or one of its descendants: the backend's server is a child of the process this starts
-# (F4961). Parents from lsof -R, as ps is refused where the hooks' tests run.
+# Process $1 serves port $2 when the listener is it or one of its descendants: the backend's server is a child of the process this starts.
+# Parents from lsof -R, as ps is refused where the hooks' tests run.
 listens() {
 	lsof -nP -a -p "$1" -iTCP:"$2" -sTCP:LISTEN >/dev/null 2>&1 && return 0
 	for listener in $(lsof -nP -iTCP:"$2" -sTCP:LISTEN -t 2>/dev/null); do
@@ -69,7 +69,7 @@ listens() {
 }
 
 # The last run of this checkout, while a process of it still serves: stopped, which ends its script (its end stops the rest and the tailnet).
-# The script's own pid is never killed: any session writes the pid file, and a pid in it may be anything of the user's (H9).
+# The script's own pid is never killed: any session writes the pid file, and a pid in it may be anything of the user's.
 if [ -f "$pidfile" ]; then
 	while read -r old_script old_server old_port; do
 		[ -n "${old_port:-}" ] && listens "$old_server" "$old_port" && lsof -a -p "$old_server" -d cwd -Fn 2>/dev/null | grep -qxF "n$root/app" || continue
@@ -90,7 +90,7 @@ fi
 shared=$([ -x "$preview" ] && [ -n "$hosts" ] && echo 1 || :)
 
 # The folder the backend's worlds job and prices timer write and the app's dev server serves their files from (app/tests/e2e/workshopData.mjs).
-# Kept from one run to the next, so a run serves the last files at once while its jobs read the chain again (Alexis, 2026-11-07).
+# Kept from one run to the next, so a run serves the last files at once while its jobs read the chain again.
 data="$root/.claude/tmp/workshop-data"
 mkdir -p "$data" || exit 1
 servers= names= # what this run started and put on the tailnet, for its end

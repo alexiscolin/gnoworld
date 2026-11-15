@@ -1,11 +1,11 @@
 #!/bin/sh
 # scan_secrets.sh [--staged | --range <revision>...]: gitleaks over what is staged, over the commits the revisions name (a commit,
-# ^commit, A..B; what a push sends, what a pull request adds: D13184, D13190), or over the whole history. Its rules
+# ^commit, A..B; what a push sends, what a pull request adds), or over the whole history. Its rules
 # are scripts/gitleaks.toml, then gitleaks-private.toml (names a public repository must not hold),
 # both files Claude cannot edit, and --config takes precedence over GITLEAKS_CONFIG(_TOML); a root
 # .gitleaksignore and gitleaks:allow comments, which could turn the scan off, are refused or ignored.
 # Git hands gitleaks every change as text, whatever an attribute, a NUL byte, a diff driver or a
-# replace ref would show instead (F130, F132).
+# replace ref would show instead.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 if [ -e .gitleaksignore ]; then # gitleaks reads it at the root whatever --gitleaks-ignore-path says
@@ -42,7 +42,7 @@ unset GIT_CURL_VERBOSE GIT_MERGE_VERBOSITY
 export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=never GIT_CONFIG_KEY_1=log.showRoot GIT_CONFIG_VALUE_1=true
 text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png
-# did), so the private rules skip those files; the secret rules read every file (F139).
+# did), so the private rules skip those files; the secret rules read every file.
 binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
 # What a merge adds in its resolution is a diff against neither parent, shown by no plain git log: --remerge-diff shows it, against the
 # merge git would make again (the other parent's side is no addition, as against the first parent alone). It skips an octopus merge,
@@ -74,7 +74,7 @@ tag_text() {
 }
 tags=""
 [ "$mode" != range ] || tags=$(tag_text)
-found=0 # both rule sets run, so a secret does not hide a private name beside it (F120)
+found=0 # both rule sets run, so a secret does not hide a private name beside it
 for config in gitleaks.toml gitleaks-private.toml; do
 	paths="" # every file, but for the private rules
 	[ "$config" = gitleaks.toml ] || paths="-- . $binaries"
@@ -87,7 +87,7 @@ for config in gitleaks.toml gitleaks-private.toml; do
 		# --log-opts replaces gitleaks's own log options, so they are given again before the text ones.
 		opts="--full-history --all --diff-filter=tuxdb $merges $text${paths:+ $paths}"
 		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $merges $text${paths:+ $paths}"
-		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first (F140).
+		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first.
 		err=$(set -f && git log -1 $opts 2>&1 >/dev/null) || { echo "scan_secrets: git cannot read the history with $opts" >&2; exit 1; }
 		# gitleaks reads git's stderr as a failure of git, logs it, and scans nothing: with its own exit code 0.
 		[ -z "$err" ] || { echo "scan_secrets: git writes to its stderr over this history, which gitleaks takes for no history: $err" >&2; exit 1; }

@@ -8,9 +8,9 @@ turns one `>=`, `>`, `<=`, `<`, `==`, `!=`, `&&`, `||`, `+` or `-` of a source's
 code (never its comments, strings or runes) into its partner, or shifts one
 integer literal by one, up or down. A package's mutants are copies of it in one
 temporary workspace, next to an untouched copy that must pass, all tested by one
-`gno test` run, whose time limit grows with its copies (F5051). There a test in
+`gno test` run, whose time limit grows with its copies. There a test in
 the package runs against its own copy, but a filetest against the first copy of
-its module in the workspace, the untouched one (F5050): so a mutant that run lets
+its module in the workspace, the untouched one: so a mutant that run lets
 survive, GAPS not listing it, is judged again alone, in a workspace of its own
 copy, where its filetests see it. A gap is not judged again, so a gap only a
 filetest kills stays a gap. A mutant that
@@ -38,15 +38,15 @@ import tempfile
 
 GAPS = {}
 # Mutations that are not guards: (file, text found exactly once, replacement).
-EXTRA = [# A guard that panics inside its call (F5056), switched off where its import stays used.
+EXTRA = [# A guard that panics inside its call, switched off where its import stays used.
          ("r/satellite/satellite.gno", "\truntime.AssertOriginCall()\n", "\tif false {\n\t\truntime.AssertOriginCall()\n\t}\n")]
-# A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
+# A run's time limit, a copy's share of it: 60 s at least. A fixed 60 s failed the slot
 # realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
 SECONDS_A_COPY = 1.5
 LEAST = 60
 # gno's timer starts once it has loaded the copies (gnovm/cmd/gno/test.go at chain/onyx, Load before the timer): a run
-# still going GRACE seconds past its limit has hung where no timer counts, and is stopped with no verdict (F5084). 60 s
-# is more than loading takes: 200 copies of the seal realm (removed since, D13197) took 6.81 s to load and test, alone.
+# still going GRACE seconds past its limit has hung where no timer counts, and is stopped with no verdict. 60 s
+# is more than loading takes: 200 copies of a realm took 6.81 s to load and test, alone.
 GRACE = 60
 
 MUST = re.compile(r"^\s*must[A-Z]\w*\(.*\)\s*$")
@@ -180,7 +180,7 @@ def run(pkg, packages, copies):
         # a slow mutant takes the time the fast ones leave, and each run of its own would start gno's workers again.
         limit = max(LEAST, math.ceil(SECONDS_A_COPY * len(dirs)))
         try:
-            # errors="replace": a failing test may print bytes that are no UTF-8, read as U+FFFD (F5062)
+            # errors="replace": a failing test may print bytes that are no UTF-8, read as U+FFFD
             out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
                                  errors="replace", timeout=limit + GRACE)
         except subprocess.TimeoutExpired:
@@ -203,7 +203,7 @@ def main():
     failed, seen = False, {}  # each mutant's key, and how many mutants carry it
     for pkg in sorted(packages):
         sources = [f for f in sorted(glob.glob(f"{pkg}/*.gno")) if not f.endswith(("_test.gno", "_filetest.gno"))]
-        # (key, file, source, may be dropped when it does not compile): a guard's key names its file, as a flip's (F5018)
+        # (key, file, source, may be dropped when it does not compile): a guard's key names its file, as a flip's
         cases = [(f"{f}: {label}", f, src, False) for f in sources for label, src in mutants(f)]
         flipped = [(label, f, src, drop) for f in sources for label, src, drop in flips(f)]
         cases += flipped
@@ -220,7 +220,7 @@ def main():
         dropped = 0
         for i, (label, file, src, droppable) in enumerate(cases, 1):
             got, want = verdict(out, i), "survives" if label in GAPS else "killed"
-            if got == "survives" and label not in GAPS:  # its filetests ran against m0: judged again alone (F5050)
+            if got == "survives" and label not in GAPS:  # its filetests ran against m0: judged again alone
                 try:
                     got = verdict(run(pkg, packages, [(file, src)]), 0)
                 except Stopped:

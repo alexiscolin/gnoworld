@@ -1,7 +1,7 @@
 #!/bin/sh
 # ci_changes.sh: what a change calls for on GitHub (gate.yml's `changes` job). The job runs the copy of this script, of
 # records.sh's harness list, of docs/REVIEW.md's tiers and of the scripts below taken from the commit the change is judged
-# against, so a change cannot rewrite the detector that judges it (the red team's tests 9 and 10). It writes nothing.
+# against, so a change cannot rewrite the detector that judges it. It writes nothing.
 # Usage, from the checked-out change: ci_changes.sh <event> <base commit> <the base commit's tree>
 # It prints name=value lines: base, then each flag, true or false. What it cannot read calls for the job.
 set -eu
@@ -14,7 +14,7 @@ esac
 # Each path whole, NUL-separated: git quotes a name holding a tab, a quote or a backslash, which a prefix would then miss.
 git cat-file -e "$base^{commit}" || { echo "ci_changes.sh: no commit $base to judge against" >&2; exit 1; }
 changed=$(git diff -z --no-renames --name-only "$base" HEAD | tr '\0' '\n')
-# What reaches main by GitHub's merge met no hook of a clone (D13173), so the change is refused, whatever the event, when the tree
+# What reaches main by GitHub's merge met no hook of a clone, so the change is refused, whatever the event, when the tree
 # holds a path this disk may read as another, as pre-commit refuses one from the sandbox (the base's records.sh, whose `folded` it is).
 rc=0
 folded=$(. "$root/.githooks/records.sh" && folded ls-tree -r -z --name-only HEAD) || rc=$?
@@ -44,7 +44,7 @@ tier1() {
 	[ "$(printf '%s\n' "$changed" | python3 -I "$root/scripts/speeds.py" --tier1 "$root" 2>/dev/null || :)" != other ]
 }
 # Each harness file of the base's list the change touches is declared on a line of a commit, `Harness-changed: <path> - why`, which
-# Alexis reads (F089, F5717), as the local merge check and pre-push's push of main asked before D13173; a list that cannot be read
+# a reviewer reads; a list that cannot be read
 # refuses.
 declared() { # $1: the path; stdin: the commit messages
 	while IFS= read -r line; do

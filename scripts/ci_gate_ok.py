@@ -1,8 +1,8 @@
-"""ci_gate_ok.py: the verdict of gate.yml's `gate-ok` job, the one check main will require (D13165). GitHub reports a job skipped by its
+"""ci_gate_ok.py: the verdict of gate.yml's `gate-ok` job, the one check main will require. GitHub reports a job skipped by its
 condition as a success, and skips a job whose needed job failed (docs.github.com, troubleshooting-required-status-checks), so this
 reads every job's result: a failed or cancelled job fails the gate, and so does a skipped one the change called for. The job runs
 the base commit's copy, so a change cannot loosen its own verdict; it also reads deploy/ and gno/ from git on its own, so a
-`changes` job that lies cannot skip deploy/test.sh or the realms' tests (the red team's test 9).
+`changes` job that lies cannot skip deploy/test.sh or the realms' tests.
 Usage, from the checked-out change, with NEEDS set to the job's `toJSON(needs)`: ci_gate_ok.py <event>. Exit 0 when the gate passes."""
 import json
 import os
@@ -36,7 +36,7 @@ def verdict(needs, event, changed):
     out = changes.get("outputs") or {}
     if changes.get("result") != "success" or not out.get("base"):
         bad.append(f"changes: {changes.get('result', 'missing')}, the gate cannot judge")
-    # A flag gate.yml's `outputs:` misspells, or that ci_changes.sh no longer prints, reads empty: never a "no".
+    # A flag gate.yml's `outputs:` misspells, or that ci_changes.sh does not print, reads empty: never a "no".
     unread = sorted(f for f in {f for flags in REQUIRED.values() for f in flags} if out.get(f) not in ("true", "false"))
     if unread:
         bad.append(f"changes gave no answer for {', '.join(unread)}")

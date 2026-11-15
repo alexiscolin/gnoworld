@@ -1,4 +1,4 @@
-"""check_migrations.py: a migration main has keeps its text and its place (F466).
+"""check_migrations.py: a migration main has keeps its text and its place.
 
 The server applies its migrations by index (packages/service/src/db.ts): one edited in place, moved or removed never
 reaches a database made before it. Each migration server/src/main.ts lists at the base must stand in the
@@ -13,7 +13,7 @@ import sys
 
 MAIN = "server/src/main.ts"
 LIST = re.compile(r"openDatabase\(config\.database, \[([^\]]*)\]")
-# Or main.ts opens it with the list server/src/migrations.ts exports (SV2), imported from there alone.
+# Or main.ts opens it with the list server/src/migrations.ts exports, imported from there alone.
 HELD = "server/src/migrations.ts"
 NAMED = re.compile(r'^import \{ migrations \} from "\./migrations\.ts";$[\s\S]*openDatabase\(config\.database, migrations\)', re.M)
 HELD_LIST = re.compile(r"export const migrations: readonly string\[\] = \[([^\]]*)\]")

@@ -1,7 +1,7 @@
-"""check_nginx.py: nginx accepts the image's config, and the built pages are served with their own policy (harness-c; GitHub's build job).
+"""check_nginx.py: nginx accepts the image's config, and the built pages are served with their own policy (GitHub's build job).
 
-5f's two high findings passed the gate and the review's first read, and only Alexis's Mac saw them: F2459 (a second map_hash_max_size,
-nginx refused to start) and F2460 (a slashed address got the bare policy). Docker is refused in the sandbox, so this runs a pinned nginx
+Two faults a gate and a review do not see: a second map_hash_max_size, which stops nginx from starting, and a slashed address that
+gets the bare policy. Docker is refused in the sandbox, so this runs a pinned nginx
 (1.30.6, the image's) from the tools' cache, with the checksum of the binary checked:
 
 1. `nginx -t` on deploy/web/nginx.conf as the image has it, with the build's table (app/build/csp.conf) where the image copies it, and
@@ -195,7 +195,7 @@ def main():
     bare = bare.group(1) if bare else None
     by_path = rules(headers.read_text())
     # A visitor's first load asks for every file of the build twice (deploy/test.sh does), so each zone's burst must hold twice its files or a
-    # first visit gets a 429 (F3385: 44 of 220 requests at a burst of 160): the hashed files under the files' zone, the rest under the visitors'.
+    # first visit gets a 429 (44 of 220 requests did, at a burst of 160): the hashed files under the files' zone, the rest under the visitors'.
     hashed = ("assets", "textures", "world-pictures")
     found = [p.relative_to(client).parts[0] for p in client.rglob("*") if p.is_file()]
     conf = pathlib.Path("deploy/web/nginx.conf").read_text()

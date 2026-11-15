@@ -1,25 +1,25 @@
 """guard.py: Claude Code's PreToolUse hook on Bash, WebFetch, Edit and Write (.claude/settings.json).
 
 - git: no hook skipped (--no-verify or a prefix of it, `commit -n`, a hooksPath override, a
-  GIT_CONFIG variable, commit-tree), no forced push; any other push asks Alexis first; git's own
+  GIT_CONFIG variable, commit-tree), no forced push; any other push asks first; git's own
   folders, never a command's (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE, --git-dir, --work-tree,
   core.worktree): a commit pointed at another one runs that folder's hooks, or none;
 - no recursive delete (rm -r, find -delete or -exec rm) of a path from a variable that may be empty, which
   reaches / or the current folder: only ${name:?}, which stops the shell first;
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey by its name (a copy under another name passes: the parser's canary,
-  phase 3d's lock of the key stores the wall), no fetched realm page or RPC node, no raw call to one from curl, wget (a scheme or none)
-  or an interpreter's words; the sandbox's network list does not hold in every session (D13174). Loading the gno skill before a .gno
-  file is written is a rule, no longer checked here (D13174);
+  the lock of the key stores is the wall), no fetched realm page or RPC node, no raw call to one from curl, wget (a scheme or none)
+  or an interpreter's words; the sandbox's network list does not hold in every session. Loading the gno skill before a .gno
+  file is written is a rule, not checked here;
 - a subagent's Edit or Write of a harness file (.githooks/records.sh's list, in the tree the file sits in, its path read
   through links, dots and the disk's case; .claude/tmp/, where reports go, is none): the sandbox stops a shell, never a file
-  tool, and two agents wrote stryker.config.json with Edit after their shell was refused (D240). The session's own edits
-  pass here: pre-commit refuses a harness file committed outside Alexis's Terminal (D241);
+  tool, so an agent whose shell was refused could write a harness file with Edit. The session's own edits
+  pass here: pre-commit refuses a harness file committed outside the owner's Terminal;
 - worktree.sh, which settings.json lets out of the sandbox, run alone as `sh scripts/worktree.sh` and plain words,
   from the project's root: from a subfolder those words run a script there, which the session can write, and behind
-  a cd, an assignment, a redirect or another command they would run something else outside the sandbox (F5058).
+  a cd, an assignment, a redirect or another command they would run something else outside the sandbox.
 Each command is split into its simple commands, looking inside `sh -c`, `eval`, `$(...)` and
 wrappers (env, xargs, timeout...), so none hides a call; a word that only mentions one (grep
-gnokey) is no call. What it cannot read it refuses (7w4): a program, git's subcommand or a commit's
+gnokey) is no call. What it cannot read it refuses: a program, git's subcommand or a commit's
 flags from a variable or a substitution, a list's words given to git, eval or a shell's -c of a
 value, xargs feeding git or a shell, an alias, zsh's ways of running a value as code. A seatbelt,
 not a wall: exit 2 blocks, and settings.json blocks on a crash."""
@@ -35,15 +35,15 @@ SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "fish"}
 WRAPPERS = {"env", "nohup", "time", "timeout", "nice", "stdbuf", "command", "builtin", "noglob", "exec", "xargs", "sudo", "doas"}
 KEYWORDS = {"!", "{", "}", "if", "then", "else", "elif", "do", "while", "until"}  # words that open a command, not name it
 # A function's body is commands too: `(` opens one form, and `{` the other where it opens a command, after `f()` or `function f`
-# (F4922: a call inside one passed unread); elsewhere `{` is a word (`-m {`: lot 2's S2-1). A process's `<(` and `>(` need none since
-# 7w4's R1: closed, scan() keeps it one word and reads its commands; left open, its `(` is refused as a glob qualifier.
+# (a call inside one would pass unread); elsewhere `{` is a word (`-m {`). A process's `<(` and `>(` need none:
+# closed, scan() keeps it one word and reads its commands; left open, its `(` is refused as a glob qualifier.
 SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", ";;", "|&"}
 # shlex keeps a run of these marks as one token (`;(`, `&&(`, `f()(`): each separator in it, and each redirection, is a token of its own.
 MARKS = re.compile(r"&>>?|[<>]&|>\||>>|&&|\|\||;;|\|&|[<>]\(|[;&|()<>]")
-TAKES_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "-s", "-k", "-n", "-I", "-P", "-L", "-d", "-a"}  # wrappers' options (exec -a: S7-1)
+TAKES_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "-s", "-k", "-n", "-I", "-P", "-L", "-d", "-a"}  # wrappers' options (exec -a)
 INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
 GIT_PLACES = {"GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE"}  # where git reads its hooks, config and work tree
-CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}  # where git looks for its global config: one of the command's own can set a hooks folder (F5541)
+CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}  # where git looks for its global config: one of the command's own can set a hooks folder
 HOMED = []  # the VAR=value words that gave one of them a value, wherever the line has them
 # Where git looks for its programs, the secret scan's among them: a folder of the command's own first in either puts a fake in front.
 PROGRAM_HOMES = {"PATH", "GIT_EXEC_PATH"}
@@ -62,27 +62,27 @@ UNGUARDED = re.compile(r"\$(?:\{(?![A-Za-z_]\w*:\?)|[A-Za-z_\d@*#?$!(-]|$)|`")
 FIND_OPTION = re.compile(r"-[HLPEXdsx]+|-[fD]|-O\d*|--")
 EXPANDS = re.compile(r"[$`]")  # a variable, a substitution or a backtick: a value the guard does not see
 GLOB, BRACE = r"[*?]|\[[^]]*\]", r"\{[^{}]*(,|\.\.)"  # what zsh turns into file names, and into several words
-# "$@", $*, ${a[@]} and zsh's $argv give a list's words, any flag among them (7w4's S4-4).
+# "$@", $*, ${a[@]} and zsh's $argv give a list's words, any flag among them.
 LISTS = re.compile(r"\$\{?[@*]|\[[@*]\]|\$\{?argv\b")
-# zsh's flags that run a value as code (S4-2): ~ globs it, qualifiers included; in (...), e substitutes, % expands prompt escapes,
+# zsh's flags that run a value as code: ~ globs it, qualifiers included; in (...), e substitutes, % expands prompt escapes,
 # which substitute under promptsubst, and P names a parameter whose subscript substitutes.
-RUNS_VALUE = re.compile(r"[\^=#+]*(~|\([^)]*[e%P#])")  # and (#), a character by its code: a `$` the reading never sees (S6-5)
+RUNS_VALUE = re.compile(r"[\^=#+]*(~|\([^)]*[e%P#])")  # and (#), a character by its code: a `$` the reading never sees
 FEEDERS = {"xargs", "gxargs", "parallel"}  # programs that build a command line from their stdin
 FEEDER_ARGS = {"-E", "-I", "-J", "-L", "-n", "-P", "-R", "-S", "-s", "-a", "-d"}  # their options that take the next word
-# Builtins that run their words as code, now or later (the chief's addition to 7w4): eval; trap, at a signal or the shell's exit;
+# Builtins that run their words as code, now or later: eval; trap, at a signal or the shell's exit;
 # zsh's sched, before a prompt, and zpty, under a terminal; let, whose subscripts substitute; bash's bind -x, complete -C and
-# compgen -C, at a key or a completion; GNU parallel, through a shell (R3); zstyle -e, at a lookup (S5-6). Their words are read as
+# compgen -C, at a key or a completion; GNU parallel, through a shell; zstyle -e, at a lookup. Their words are read as
 # one command line, as eval's.
 EVALS = {"eval", "trap", "sched", "zpty", "let", "bind", "complete", "compgen", "parallel", "zstyle"}
-# What xargs or parallel may run with words from their stdin (S5-8: `xargs env` ran a program stdin named): no wrapper, no shell.
+# What xargs or parallel may run with words from their stdin (`xargs env` would run a program stdin named): no wrapper, no shell.
 FED = {"grep", "rg", "rm", "wc", "cat", "sed", "ls", "echo", "printf", "basename", "dirname", "head", "tail", "touch", "mkdir",
        "chmod", "cp", "mv", "file", "stat", "du", "sort", "shasum", "realpath", "readlink", "test", "kill"}
 NAMERS = {"grep", "rg", "echo", "printf", "man", "which", "type"}  # programs that only read their words: a feeder among them is text
 # zsh's tables that name an alias, a command's path or a function's code (zsh/parameter): `aliases[g]=git` then `g push` runs git;
-# histchars and its older name, whose third character starts a comment (7w4's S5-2, S6-3); options, globsubst's and the rest (S6-2).
+# histchars and its older name, whose third character starts a comment; options, globsubst's and the rest.
 TABLE = r"((dis_)?([gs]?aliases|functions)|commands|histchars|HISTCHARS|options)"
 TABLES = re.compile(TABLE + r"(\[.*\])?\+?=", re.S)
-# Builtins that give a parameter named among their words a value (S5-4: `set -A aliases g git`, `read -A`, `printf -v`).
+# Builtins that give a parameter named among their words a value (`set -A aliases g git`, `read -A`, `printf -v`).
 ASSIGNERS = {"set", "read", "print", "printf", "zparseopts"} | SETTERS
 TABLE_GIVEN = ("zsh's aliases, commands or functions table, or histchars, given a value: a name the guard does not read runs a "
                "program, or a comment hides one; write it out, and to search for the word, use the Grep tool")
@@ -103,8 +103,8 @@ def git_place(word):
 
 def split_line(words):
     """env's -S, alone or after its options that take no argument (-iS, -0vS), or --split-string: the words of the line it splits,
-    then the words after it; None for any other option (-uSHELL is -u SHELL: lot 2's S2-2). env runs that line: a command, not one of
-    env's words. A line holding an escape or a variable is refused, which env expands as no shell does (BSD's \\_ is a space: S2-8)."""
+    then the words after it; None for any other option (-uSHELL is -u SHELL). env runs that line: a command, not one of
+    env's words. A line holding an escape or a variable is refused, which env expands as no shell does (BSD's \\_ is a space)."""
     joined = re.fullmatch(r"--split-string=(.*)|-[0iv]*S(.+)", words[0])
     if words[0] == "--split-string" or re.fullmatch(r"-[0iv]*S", words[0]):
         line, rest = (words[1] if len(words) > 1 else ""), words[2:]
@@ -154,7 +154,7 @@ unshield = lambda word: word.translate({ord(v): k for k, v in SHIELDED.items()})
 
 def closing(text, at, ends="()"):
     """Where the mark is that closes the one at `at` (a `(` by default, or ends[0]), past nested ones, quotes, escapes and comments;
-    None when the text holds none. A comment's apostrophe opens no quote (7w4, after round 3: `"$(print -l *(e:…:) # it's⏎)"` hid
+    None when the text holds none. A comment's apostrophe opens no quote (`"$(print -l *(e:…:) # it's⏎)"` would hide
     the substitution's code)."""
     depth, quote, k = 0, "", at
     while k < len(text):
@@ -179,25 +179,25 @@ def closing(text, at, ends="()"):
 
 def scan(text):
     """The text with every quoted or escaped mark and newline, and the whole of each $(...), <(...), >(...), `...` and ${...}, swapped for
-    characters of their own, so that only the shell's own separators split it (lot 1's R1: a quoted '{' split `git commit -m '{' -n`;
-    lot 2's S2-6 and lot 3's S3-4: a substitution's or an expansion's separators split it too); the commands those substitutions and
+    characters of their own, so that only the shell's own separators split it (a quoted '{' would split `git commit -m '{' -n`;
+    so would a substitution's or an expansion's separators); the commands those substitutions and
     expansions hold, each to be read in its turn; and whether a quote is still open at the end. $'...' is a quote whose backslash
-    escapes (S2-11). One character for one, so an offset in the text is the same in what it gives; and where each span starts. zsh's
-    flags that run an expansion's value as code are refused (7w4's S4-2: `${(e)x}`, `${~x}`)."""
+    escapes. One character for one, so an offset in the text is the same in what it gives; and where each span starts. zsh's
+    flags that run an expansion's value as code are refused (`${(e)x}`, `${~x}`)."""
     out, spans, starts, quote, i = [], [], [], "", 0
     while i < len(text):
         c, after = text[i], text[i + 1:i + 2]
         end = None
         if quote not in ("'", "$'"):
-            # A process's <(, >( or zsh's =( at a word's start alone (S5-10: `zsh =(echo …)` read its file): inside one,
-            # `<->(e:cmd:)` is a numeric glob with a qualifier (7w4's R1), and `a=(…)` an array.
+            # A process's <(, >( or zsh's =( at a word's start alone (`zsh =(echo …)` reads its file): inside one,
+            # `<->(e:cmd:)` is a numeric glob with a qualifier, and `a=(…)` an array.
             if after == "(" and (c == "$" or (c in "<>=" and not quote and (i == 0 or text[i - 1] in " \t\n;&|("))):
                 end = closing(text, i + 1)
             elif c == "$" and after == "{":
                 end = closing(text, i + 1, "{}")
                 if RUNS_VALUE.match(text[i + 2:end]):
                     refuse("zsh's ~, (e), (%) or (P) on an expansion, which runs its value as code: write the command out")
-                if re.match(r"[\^=#+~]*(\([^)]*\))?[\^=#+~]*" + TABLE + r"(\[[^]]*\])?:{0,2}=", text[i + 2:end]):  # S5-4, S6-4
+                if re.match(r"[\^=#+~]*(\([^)]*\))?[\^=#+~]*" + TABLE + r"(\[[^]]*\])?:{0,2}=", text[i + 2:end]):
                     refuse(TABLE_GIVEN)
             elif c == "`":
                 end = next((k for k in range(i + 1, len(text)) if text[k] == "`" and text[k - 1] != "\\"), None)
@@ -223,8 +223,7 @@ def scan(text):
     return "".join(out), spans, bool(quote), starts
 
 
-# A ( set against any word before it opens zsh's glob qualifiers, which run code (`*(e:cmd:)`, `*(+f)`: lot 3's S3-6; `/(e:cmd:)`:
-# 7w4's S4-2; `<->(e:cmd:)`: R1), and bash's extended globs; a function's `f()`, a substitution's `$(` and an array's `=(` are none,
+# A ( set against any word before it opens zsh's glob qualifiers, which run code (`*(e:cmd:)`, `*(+f)`, `/(e:cmd:)`, `<->(e:cmd:)`), and bash's extended globs; a function's `f()`, a substitution's `$(` and an array's `=(` are none,
 # and a process's `<(`, at a word's start, scan() hides.
 GLOB_QUALIFIER = re.compile(r"(?<=[^\s;&|()$=])\((?!\))")
 # A heredoc's mark this reader can settle: plain, quoted or escaped characters of a name, up to a blank or a mark.
@@ -232,7 +231,7 @@ MARK = re.compile(r"""(?:[\w.+-]|'[\w.+-]*'|"[\w.+-]*"|\\[\w.+-])+(?=[\s;&|()<>]
 
 
 # Programs that take a heredoc's body as text, never as commands: an allowlist, since any program the guard does not know may be a
-# shell (7w4's R5: `/bin/s? <<'E'` ran the body).
+# shell (`/bin/s? <<'E'` would run the body).
 READS_TEXT = {"cat", "tee", "echo", "printf", "true", ":", "git", "python", "python3", "node", "jq", "grep", "wc", "sort", "head", "tail",
               "diff"}
 
@@ -249,8 +248,8 @@ def reads_text(command):
 def bodies(text):
     """The text of a text that zsh never globs, as (start, end, kind) offsets: a heredoc's body no shell reads ("body", or "quoted"
     when its mark is quoted and its substitutions run nothing either), and a quote's text ("text": its `$(...)` and backticks are
-    code, left out). Their lines are no commands, and no glob qualifier runs there (7w4's S4-7: `feat(x)` in a commit message was
-    refused; R7: `print(2)` on a quote's second line). Read as the shell reads them: past quotes, comments, arithmetic and ${...},
+    code, left out). Their lines are no commands, and no glob qualifier runs there (`feat(x)` in a commit message, `print(2)` on a quote's
+    second line, are no qualifiers). Read as the shell reads them: past quotes, comments, arithmetic and ${...},
     inside $(...), backticks and processes; each body after the line that opens it, to its mark. A form this reader cannot settle (a
     continued line, a case's patterns, a mark it cannot read or never finds) ends the reading: what follows stays commands."""
     found, waiting, stack, i = [], [], [["code", None, 0]], 0  # a context: its kind, what closes it, where its command starts
@@ -272,7 +271,7 @@ def bodies(text):
             if end is None:
                 return found
             if kind == '"' and text[i + 1] == "{" and "'" in text[i:end]:
-                return found  # inside "...", zsh reads a ${...}'s ' as a character, closing() as a quote (S5-2)
+                return found  # inside "...", zsh reads a ${...}'s ' as a character, closing() as a quote
             i = end + 1
         elif two == "$(" or kind == "code" and two in ("<(", ">("):
             if kind == '"':
@@ -301,7 +300,7 @@ def bodies(text):
             return found  # its patterns close a ( never opened
         elif two == "<<" and not text.startswith("<<<", i):
             if any(context[1] == "`" for context in stack):
-                return found  # zsh ends a backtick at the next one, a body's included (S5-2)
+                return found  # zsh ends a backtick at the next one, a body's included
             k = i + 2 + (text[i + 2:i + 3] == "-")
             while text[k:k + 1] in (" ", "\t"):
                 k += 1
@@ -337,8 +336,8 @@ def bodies(text):
 
 def simple_commands(text, kept=()):
     """Each simple command's words, split at the shell's separators outside quotes and substitutions: line by line (a heredoc's body
-    too, which may be fed to a shell), and each command whose quotes hold a newline once more, whole (lot 2's S2-7; lot 3's S3-3: no
-    heredoc is taken out of that second reading, as a `<<` in quotes misled it, and git is read at any word of either). What `kept`
+    too, which may be fed to a shell), and each command whose quotes hold a newline once more, whole (no
+    heredoc is taken out of that second reading, as a `<<` in quotes would mislead it, and git is read at any word of either). What `kept`
     holds (bodies()) is text: no glob qualifier is looked for there, and a line it holds gives words after `:`, no command."""
     inside = lambda at: any(a <= at < b for a, b, _ in kept)
     offsets = list(itertools.accumulate([0] + [len(line) + 1 for line in text.split("\n")]))
@@ -350,10 +349,10 @@ def simple_commands(text, kept=()):
             refuse("a glob qualifier or an extended glob, which runs code in zsh: write the files out")
         lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
-        lexer.commenters = ""  # a `#` inside a word is the word's (lot 2's S2-5); a comment read as words fails closed
+        lexer.commenters = ""  # a `#` inside a word is the word's; a comment read as words fails closed
         try:
             tokens = list(lexer)
-        except ValueError:  # an unbalanced quote (a heredoc's body, a message over several lines): judge the raw words, as bare (S4-1)
+        except ValueError:  # an unbalanced quote (a heredoc's body, a message over several lines): judge the raw words, as bare
             tokens = [bare(w) for w in re.sub(r"([;|&()])", r" \1 ", unshield(line)).split()]
         # A line a body holds, or one a quote opened on a line before holds (not one that opens with it), is no command.
         fresh = lambda: [":"] if any(a <= at < b if kind != "text" else a < at < b for a, b, kind in kept) else []
@@ -361,9 +360,9 @@ def simple_commands(text, kept=()):
         for token in tokens + [";"]:
             for part in MARKS.findall(token) if set(token) <= set(";&|()<>") else [token]:
                 if part in SEPARATORS or part == "{" and (not words or words[0] == "function"):
-                    # A brace no quote holds expands into several words (S6-1: `git commit -m {y,-n}`): refused in a command that
+                    # A brace no quote holds expands into several words (`git commit -m {y,-n}`): refused in a command that
                     # names git, or where a name a variable or a glob gives starts it or stands before git's hooked subcommands
-                    # (S7-4: `caffeinate …/g[i]t commit`); a quoted one (`-m "fix {a,b}"`), shielded here, and a text's line are text.
+                    # (`caffeinate …/g[i]t commit`); a quoted one (`-m "fix {a,b}"`), shielded here, and a text's line are text.
                     if braced and words[:1] != [":"] and any(re.search(r"(^|/)=?git(-[\w-]+)?$", w) or re.search(
                             r"(^|/)[^/]*[$`*?\[][^/]*$", w) and (k == 0 or words[k + 1:k + 2] in (["commit"], ["merge"], ["pull"], ["push"]))
                             for k, w in enumerate(words)):
@@ -377,7 +376,7 @@ def simple_commands(text, kept=()):
 
 def shell_line(words):
     """The command line a shell is given with -c, among its leading options wherever it stands (`sh -x -c`, `bash -o posix -c`,
-    `bash -c --`: lot 3's S3-5); None when it is given none."""
+    `bash -c --`); None when it is given none."""
     given, i = False, 1
     while i < len(words):
         w = words[i]
@@ -395,15 +394,15 @@ def shell_line(words):
 
 def reads_unseen(words):
     """Whether a shell, or source or `.`, runs commands the guard cannot read: from a pipe, a redirected file, a here-string or a
-    process (lot 3's S3-5); a heredoc's lines are read, and a script named as a file is the harness's limit."""
+    process; a heredoc's lines are read, and a script named as a file is the harness's limit."""
     program, args = os.path.basename(words[0]), words[1:]
-    # stdin named by any path (S6-8: `/dev/./stdin`; S7-6: `~/../../dev/stdin`), its descriptors (`/dev/fd/0`), a glob or a variable
-    # naming the file (`/dev/std?n`, `$f`), or zsh's =(...) process (S5-10).
+    # stdin named by any path (`/dev/./stdin`, `~/../../dev/stdin`), its descriptors (`/dev/fd/0`), a glob or a variable
+    # naming the file (`/dev/std?n`, `$f`), or zsh's =(...) process.
     named = lambda w: (w.startswith("=(") or os.path.basename(w) == "stdin" or "/fd/" in w
                        or re.search(r"[*?\[$`]", os.path.basename(w)) is not None)
     if program in ("source", "."):  # the split gives `<(...)` as `<` and the process
         return not args or args[0] in ("<", ">") or named(args[0])
-    if args[:1] in (["--version"], ["--help"]):  # first, it prints and exits (7w4: `bash --version` was refused); read first alone,
+    if args[:1] in (["--version"], ["--help"]):  # first, it prints and exits (`bash --version` reads no stdin); read first alone,
         return False  # as an option's argument is no option: `bash --rcfile --version` reads stdin
     k, heredoc, stdin = 0, False, False
     while k < len(args):  # the split gives `<<` as two `<`, `<<<` as three
@@ -430,11 +429,11 @@ def reads_unseen(words):
 def commands(text):
     """The words of each simple command in a shell line, looking inside a shell's -c, `eval`, env -S, `$(...)`, `<(...)`, `>(...)`,
     backticks and ${...}; and a value given, as words a command may run. Each word read: a quoted heredoc body's substitutions run
-    nothing (7w4's S4-7)."""
+    nothing."""
     kept = bodies(text)
     text = text.replace("\\\n", "")  # a continued line is one line to the shell
-    # The substitutions of the whole text, and of each line, its quotes read as quotes and as characters (7w4's S5-1: an apostrophe
-    # in a comment or a body opened a quote in the whole text's reading, hiding every later `$(...)`, and an unquoted body's `it's
+    # The substitutions of the whole text, and of each line, its quotes read as quotes and as characters (an apostrophe
+    # in a comment or a body would open a quote in the whole text's reading, hiding every later `$(...)`, and an unquoted body's `it's
     # $(cmd)` runs cmd); a quoted body's run nothing.
     _, spans, _, starts = scan(text)
     found = list(zip(starts, spans))
@@ -445,10 +444,10 @@ def commands(text):
         if not any(a <= at < b for a, b, kind in kept if kind == "quoted"):
             yield from commands(inner)
     for raw in simple_commands(text, kept):
-        # A config file included (include.path, includeIf) sets what it likes, hooksPath and core.worktree too (7w2's review, S10).
+        # A config file included (include.path, includeIf) sets what it likes, hooksPath and core.worktree too.
         if any(w.upper().startswith("GIT_CONFIG") or any(k in w.lower() for k in ("hookspath", "include.path", "includeif.")) for w in raw):
             refuse("git's hooks overridden (core.hooksPath, a config file included, a GIT_CONFIG variable)")
-        # zsh's options that change what a line reads (7w4's S4-2, S5-5, S7-4): globsubst globs every value, qualifiers included,
+        # zsh's options that change what a line reads: globsubst globs every value, qualifiers included,
         # and emulate sh or ksh sets it; promptsubst runs a prompt's substitutions, print -P's; braceccl and extendedglob turn `-{n}`
         # and `-n#` into flags, shwordsplit a value into words; `:` runs nothing.
         if raw[:1] != [":"] and any(re.search("globsubst|promptsubst|braceccl|extendedglob|shwordsplit", w.lower().replace("_", ""))
@@ -456,14 +455,14 @@ def commands(text):
             refuse("zsh's globsubst, promptsubst, braceccl, extendedglob or shwordsplit, or emulate, which sets the first: a value's "
                    "globs, a prompt's substitutions or a flag run unseen; write the command out, and to search for the word, use the "
                    "Grep tool")
-        # xargs and parallel make a command line of their stdin (7w4's S4-4): what they feed git or a shell is unseen.
+        # xargs and parallel make a command line of their stdin: what they feed git or a shell is unseen.
         fed = next((k for k, w in enumerate(raw) if os.path.basename(w) in FEEDERS and raw[:1] != [":"]), len(raw))
         if any(os.path.basename(w).lstrip("=$") in SHELLS | {"git"} or os.path.basename(w).startswith("git-") for w in raw[fed + 1:]):
             refuse("xargs or parallel feeding git or a shell the words of its stdin, unseen: write the command out")
-        k = fed + 1  # the program it runs, past its options (R3: `xargs "$x" commit` ran git; S5-8: `xargs env` ran one stdin named)
+        k = fed + 1  # the program it runs, past its options (`xargs "$x" commit` would run git, `xargs env` one stdin named)
         while k < len(raw) and raw[k].startswith("-"):
             k += 2 if raw[k] in FEEDER_ARGS else 1
-        # Unless the command is a program that only reads its words (S6-12: `grep -rn xargs` names one, runs none; S7-1: a wrapper
+        # Unless the command is a program that only reads its words (`grep -rn xargs` names one, runs none; a wrapper
         # the guard does not know, `caffeinate xargs env`, runs it).
         if k < len(raw) and os.path.basename(raw[k]) not in FED and os.path.basename(raw[0]) not in NAMERS:
             refuse("xargs or parallel running a program none of FED, which stdin's words may turn into any: write the command out")
@@ -473,7 +472,7 @@ def commands(text):
         # git's folders given a value before the program, through env, or by export and its kin; unset and env -u remove them.
         if any(git_place(w) for w in given) or (words and words[0] in SETTERS and any(git_place(w) for w in words[1:])):
             refuse("git pointed at folders of the command's own (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE): their hooks run, or none")
-        # HOME and XDG_CONFIG_HOME, given as git's folders are: the line is refused below when it also runs git (F5541, H3).
+        # HOME and XDG_CONFIG_HOME, given as git's folders are: the line is refused below when it also runs git.
         HOMED.extend(w for w in given + (words[1:] if words and words[0] in SETTERS else [])
                      if ASSIGNMENT.fullmatch(w) and bare(w.split("=", 1)[0]).rstrip("+") in CONFIG_HOMES)
         # PATH and GIT_EXEC_PATH, given as those are, or by a builtin that reads or prints into a variable, or under a name a variable
@@ -487,7 +486,7 @@ def commands(text):
         elif words and words[0] in ("printf", "print"):
             names = [after for flag, after in zip(words[1:], words[2:]) if flag == "-v"]
         PATHED.extend(n for n in names if bare(n) in PROGRAM_HOMES or EXPANDS.search(n))
-        # A value may name a program run later, or be run (7w4's S4-3: `k=gnokey; $k list`): its words and its substitutions are read.
+        # A value may name a program run later, or be run (`k=gnokey; $k list`): its words and its substitutions are read.
         for value in [w.split("=", 1)[1] for w in given + (words[1:] if words and words[0] in SETTERS else []) if ASSIGNMENT.fullmatch(w)]:
             try:
                 yield [":"] + shlex.split(value)
@@ -495,15 +494,15 @@ def commands(text):
                 yield [":"] + [bare(w) for w in value.split()]
             for inner in scan(value)[1]:
                 yield from commands(inner)
-            if re.search(r"\[[^]]*\$[^]]*\(", value):  # a subscript evaluated later runs a `$(` its value may assemble (S6-5)
+            if re.search(r"\[[^]]*\$[^]]*\(", value):  # a subscript evaluated later runs a `$(` its value may assemble
                 refuse("a value holding a subscript with a `$` before a `(`, which an arithmetic evaluation runs: write it out")
         if words and words[0] in ("alias", "hash") and any("=" in w or w == "-p" or EXPANDS.search(w) for w in words[1:]):
             refuse("an alias, or a name hashed to a program, runs it under a name the guard does not read: write the program out")
-        # A parameter a builtin names after -A, -a, -v or -H, given by a variable, may be a table (S7-2: `t=aliases; set -A $t g git`).
+        # A parameter a builtin names after -A, -a, -v or -H, given by a variable, may be a table (`t=aliases; set -A $t g git`).
         if words and words[0] in ASSIGNERS and any(re.fullmatch(r"-[a-zA-Z]*[AavH]", w) and EXPANDS.search(after) or re.fullmatch(
                 r"-[a-zA-Z]*[AavH].+", w) and EXPANDS.search(w) for w, after in zip(words[1:], words[2:] + [""])):
             refuse(TABLE_GIVEN)
-        # A shell's options given by a variable may set globsubst (S7-3: `zsh -o ${o}subst`).
+        # A shell's options given by a variable may set globsubst (`zsh -o ${o}subst`).
         if words and os.path.basename(words[0]) in SHELLS and any(
                 (w.startswith(("-", "+")) or before in ("-o", "+o")) and EXPANDS.search(w) for before, w in zip([""] + words[1:], words[1:])):
             refuse("a shell's option a variable names: write the option out")
@@ -519,17 +518,17 @@ def commands(text):
         if raw[:1] != [":"] and any(TABLES.match(w) for w in raw):  # given a value wherever it stands, an element too
             refuse(TABLE_GIVEN)
         if words and words[0] in ASSIGNERS and any(re.fullmatch(r"(-[a-zA-Z]*)?" + TABLE + r"(\[.*\])?", w) for w in words[1:]):
-            refuse(TABLE_GIVEN)  # `set -A aliases …` and `set -Aaliases …` alike (S6-4)
+            refuse(TABLE_GIVEN)  # `set -A aliases …` and `set -Aaliases …` alike
         if words and (words[0] in ("setopt", "unsetopt") or words[0] == "set" and any(w in ("-o", "+o") for w in words[1:])) and any(
                 EXPANDS.search(w) for w in words[1:]):
             refuse("an option set by a name a variable builds (`setopt ${o}subst`, S6-2): write the option out")
-        # A shell's -c line wherever the shell stands (7w4's R2: `exec -a x zsh -c` and `caffeinate sh -c` ran theirs unread).
+        # A shell's -c line wherever the shell stands (`exec -a x zsh -c` and `caffeinate sh -c` would run theirs unread).
         runs = [shell_line(words[k:]) for k, w in enumerate(words) if os.path.basename(w) in SHELLS]
         for line, args in [run for run in runs if run is not None]:
             if EXPANDS.search(line):
                 refuse("a shell's -c line holding a variable or a substitution, which may be any code: write the command out")
             yield from commands(line)
-            yield [":"] + args  # $0 and the words the line is given, which it may run (7w4's S4-4)
+            yield [":"] + args  # $0 and the words the line is given, which it may run
         if words and os.path.basename(words[0]) in SHELLS and runs[0] is not None:
             pass  # the shell's own line, read above
         elif words and words[0] in EVALS:
@@ -552,7 +551,7 @@ def subcommand(words):
 
 def check_git(words, strict=True):
     """Refuse a skipped hook, a forced push or git's folders given; whether this is a push, which asks first. Strict, for git named or
-    a program a variable names (7w4's S4-3, S4-4), what may hide a flag is refused too: a list's words, a subcommand or -c's value
+    a program a variable names, what may hide a flag is refused too: a list's words, a subcommand or -c's value
     from an expansion, an expansion in a commit, merge or pull but as -m's or -F's value. A word a variable gives after another
     program's name (`cp "$a" "$b"`) is read for its literal flags alone."""
     if any(len(w) >= len("--no-veri") and "--no-verify".startswith(w) for w in words):
@@ -578,30 +577,30 @@ def check_git(words, strict=True):
             refuse("git commit, merge or pull given a variable or a substitution but as -m's or -F's value: write it out")
     if any(w.startswith(("--git-dir", "--work-tree")) or "core.worktree" in w.lower() for w in words[1:at]):
         refuse("git pointed at folders of the command's own (--git-dir, --work-tree, core.worktree): their hooks run, or none")
-    # -n among short options, -nm"msg" included (7w4: joined to a value it was unseen), up to the first that takes a value.
+    # -n among short options, -nm"msg" included (joined to a value it would be unseen), up to the first that takes a value.
     if sub == "commit" and any(m and "n" in m.group(1) for m in map(re.compile(r"-([a-zA-Z]*?)(?:[mFcCt]|$)").match, words[at + 1:])):
         refuse("git commit -n is --no-verify")
     if sub in ("commit-tree", "fast-import") or sub == "hash-object" and any("commit" in w for w in words[at + 1:]):
         refuse("git commit-tree, fast-import or hash-object of a commit makes commits no hook sees")
-    # They replay or write commits with no pre-commit (the chief's addition to 7w4; filter-branch and replay: S5-11), `--continue`
+    # They replay or write commits with no pre-commit (filter-branch and replay too), `--continue`
     # included; pull too, when it rebases, and a config that makes it.
     # A config key that makes a pull rebase (pull.rebase, branch.*.rebase, branch.autosetuprebase), or that a variable builds
-    # (S6-10: `pull$d.rebase`), set rather than read.
+    # (`pull$d.rebase`), set rather than read.
     keys = [w for w in words[at + 1:] if not w.startswith("-")]
     if sub == "config" and any("rebase" in w.lower() or EXPANDS.search(w) for w in keys) and not any(  # a read flag before the key
-            w in ("--get", "--get-all", "--get-regexp", "-l", "--list", "--unset", "--unset-all")  # (S7-10: after it, a value pattern)
+            w in ("--get", "--get-all", "--get-regexp", "-l", "--list", "--unset", "--unset-all")  # (after it, a value pattern)
             for w in itertools.takewhile(lambda w: w.startswith("-"), words[at + 1:])):
         refuse("git config making a pull rebase, or a key a variable builds: its commits no pre-commit sees; leave it unset")
     if sub in ("am", "cherry-pick", "rebase", "revert", "filter-branch", "replay", "update-ref") or sub == "pull" and any(
-            len(w.split("=")[0]) >= len("--reb") and "--rebase".startswith(w.split("=")[0])  # `--reb` is `--rebase` (S6-10)
+            len(w.split("=")[0]) >= len("--reb") and "--rebase".startswith(w.split("=")[0])  # `--reb` is `--rebase`
             or re.fullmatch(r"-[a-zA-Z]*r[a-zA-Z]*", w) for w in words[at + 1:]) or sub == "pull" and any(
             "rebase" in w.lower() for w in words[1:at]):
         refuse("git am, cherry-pick, rebase, revert, filter-branch, replay or update-ref, or pull --rebase, makes or moves commits no "
                "pre-commit saw: git merge the branch, or make the change and commit it")
-    # The stash's commits and subtree's no pre-commit saw either (S6-9): their making and their use outside `git stash`.
+    # The stash's commits and subtree's no pre-commit saw either: their making and their use outside `git stash`.
     if sub == "subtree" and any(w in ("add", "merge", "pull", "split", "--rejoin") for w in words[at + 1:]) or sub == "stash" and any(
             w in ("create", "store") for w in words[at + 1:]) or sub in ("reset", "branch", "checkout", "switch", "merge", "push",
-                                                                         "tag", "worktree") and any(  # S7-12: show and diff read
+                                                                         "tag", "worktree") and any(  # show and diff read
             re.match(r"stash($|[@^~:])", w) or "refs/stash" in w for w in free[1:]):
         refuse("git subtree add, merge, pull or split, git stash create or store, or the stash named outside git stash: their "
                "commits no pre-commit saw; commit the change itself")
@@ -609,7 +608,7 @@ def check_git(words, strict=True):
         refuse(f"git {sub} pushes with no pre-push hook")
     if any(w.lower().startswith("alias.") or w.lower().startswith("--config-env=alias.") for w in words[1:]):
         refuse("a git alias can carry any flag past these checks: write the command out")
-    pushing = sub == "push" or sub == "subtree" and "push" in words[at + 1:]  # `git subtree push` pushes too (lot 3's S3-2)
+    pushing = sub == "push" or sub == "subtree" and "push" in words[at + 1:]  # `git subtree push` pushes too
     if pushing and any(w.startswith("--exec-path") for w in words[1:at]):
         refuse("git's programs from a folder of the command's own (--exec-path=) on a push: the hooks' scan would run from it")
     if pushing and (any("f" in flag for flag in short) or any(w.startswith(("--force", "+")) or w == "--mirror" for w in words[2:])):
@@ -642,7 +641,7 @@ def runs_worktree_sh(words):
 
 def harness_file(path, cwd):
     """Whether `path` is a harness file of the tree it sits in, as .githooks/records.sh's harness() lists them: a folder, a file,
-    or a glob whose * crosses folders as git's pathspec does, blind to case as the disk is (F151); relative paths from `cwd`."""
+    or a glob whose * crosses folders as git's pathspec does, blind to case as the disk is; relative paths from `cwd`."""
     if not isinstance(path, str) or not path:
         return False
     full = os.path.realpath(os.path.join(cwd if isinstance(cwd, str) else ROOT, path))
@@ -664,7 +663,7 @@ def harness_file(path, cwd):
     specs = [s.lower() for s in shlex.split(listed.replace("\\\n", " ")) if s]
     if not specs:
         raise ValueError("no harness list")
-    # A letter the disk folds (ſ is s on APFS) matches no list: a path with one is taken for a harness file (F164).
+    # A letter the disk folds (ſ is s on APFS) matches no list: a path with one is taken for a harness file.
     return any(not name.isascii() or not name.startswith(".claude/tmp/") and any(name == s or name.startswith(s + "/") or fnmatch.fnmatchcase(name, s) for s in specs)
                for name in names)
 
@@ -688,40 +687,40 @@ if tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
     refuse("a realm page or an RPC node: read it with gno_render or gno_read")
 elif tool == "Bash":
     text = str(given.get("command", ""))
-    if "\0" in text:  # zsh drops it, and the words it runs are not the ones read here (7w4's S4-5)
+    if "\0" in text:  # zsh drops it, and the words it runs are not the ones read here
         refuse("a NUL byte, which the shell drops: write the command without it")
-    if re.search(r"\$[\^=#+]*~", text):  # $~x globs a value, qualifiers included (S4-2)
+    if re.search(r"\$[\^=#+]*~", text):  # $~x globs a value, qualifiers included
         refuse("zsh's $~, which runs a value's globs, qualifiers included: write the files out")
-    if re.search(r"\$'(?:[^'\\]|\\[^xuUcEe0-7])*\\[xuUcEe0-7]", text):  # `$'\x24(cmd)'` is a `$(` no reading sees (S5-7)
+    if re.search(r"\$'(?:[^'\\]|\\[^xuUcEe0-7])*\\[xuUcEe0-7]", text):  # `$'\x24(cmd)'` is a `$(` no reading sees
         refuse("a $'...' escape that writes a character by its code, a `$(` the guard cannot see among them: write it out")
     cwd = event.get("cwd")
     at_root = isinstance(cwd, str) and os.path.realpath(cwd) == ROOT
     alone = WORKTREE_CALL.fullmatch(text.strip()) is not None
     git_named = False
     for words in commands(text):
-        # Every word may be the program a wrapper runs (7w2's third lot, S3-1, S3-2): each check reads the command from each word on,
+        # Every word may be the program a wrapper runs: each check reads the command from each word on,
         # that word's name as a program's (=git, $'git' and a path give it), git-core's dashed programs as git and their name. So the
         # guard fails closed: `echo git commit -n`, `echo gnokey` and `grep gnokey` are refused, `echo git push` asks.
         for at, word in enumerate(words):
             name = os.path.basename(word).lstrip("=$")
             tail = [name] + words[at + 1:]
-            # A name a variable, a substitution or a backtick gives may be git's, or any program's (7w4's S4-3): read as git, as rm
+            # A name a variable, a substitution or a backtick gives may be git's, or any program's: read as git, as rm
             # and curl where it is the command's program, which is refused when a substitution's output gives it, or nothing follows.
             # A lone $ is a character, and a lone backtick the end of a substitution a line before opened: neither names a program. A
-            # glob or a brace names any (R4: `/usr/bin/gi? commit -n`).
+            # glob or a brace names any (`/usr/bin/gi? commit -n`).
             globbed = re.search(GLOB + "|" + BRACE, os.path.basename(word)) is not None
-            # find's `{}` is a file it finds, any program (S7-5: `-exec env {} commit -n`).
+            # find's `{}` is a file it finds, any program (`-exec env {} commit -n`).
             unseen = word not in ("$", "`") and ("`" in word or "$(" in word or "$" in os.path.basename(word) or globbed or "{}" in word)
-            # A glob alone is no program (a case's `*)`) unless a path's or a shell's name may match it (S5-9: `… | /bin/s?`); one
+            # A glob alone is no program (a case's `*)`) unless a path's or a shell's name may match it (`… | /bin/s?`); one
             # with words is; a variable alone is.
-            shell_glob = globbed and ("/" in word or re.search(BRACE, word) is not None  # a brace alone is words (S6-7: `""{zsh,-s}`)
+            shell_glob = globbed and ("/" in word or re.search(BRACE, word) is not None  # a brace alone is words (`""{zsh,-s}`)
                                       or word != "*" and any(fnmatch.fnmatchcase(n, os.path.basename(word)) for n in SHELLS))
             if unseen and at == 0 and ("`" in word or "$(" in word or (len(words) > 1 or shell_glob if globbed else len(words) == 1)):
                 refuse("a program a substitution's output or a glob names, or a variable alone: write the command out")
             git_named = git_named or name == "git" or name.startswith("git-") or unseen and at == 0
             if name == "git" or name.startswith("git-") or unseen:
                 # Strict but for a variable's word after another program's (`cp "$a" "$b"`), unless git's hooked subcommand
-                # follows it, past git's options (S6-11: `caffeinate $g commit $o`; S7-9: `caffeinate $g -C . commit $o`).
+                # follows it, past git's options (`caffeinate $g commit $o`, `caffeinate $g -C . commit $o`).
                 rest = ["git"] + ([name[len("git-"):]] if name.startswith("git-") else []) + words[at + 1:]
                 strict = not unseen or at == 0 or rest[subcommand(rest):subcommand(rest) + 1] in (["commit"], ["merge"], ["pull"])
                 push |= check_git(rest, strict)
