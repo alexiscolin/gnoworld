@@ -16,8 +16,8 @@ Review by risk, not line by line everywhere.
 
 The backticked tier-1 paths of this table are read by machines: by `.claude/workflows/branch.js` (its security lens), by
 `scripts/speeds.py --tier1`, which GitHub's detector runs from the base (a change with none of them skips the tier-1 jobs), and by
-`scripts/check_docs.py`. The tier-3 row is the reader's (since D13168 no machine reads it): it fails closed, folder by folder: a feature
-or design-system folder is interface only once this row names it, so a folder added tomorrow, and the files in `packages/ui/src/`'s own root,
+`scripts/check_docs.py`. The tier-3 row is the reader's (no machine reads it): it fails closed, folder by folder: a feature
+or design-system folder is interface only once this row names it, so a folder added later, and the files in `packages/ui/src/`'s own root,
 are read as tier 2. The `chat` and `realms` features are not listed: the guards they hold or use are tier-1 rows (the embed host list and
 its frame's sandbox, the warning before a realm page's link leaves, the link that stops `//host`), and the rest of them is read as
 tier 2 (state, queries, views) with the rest of the TypeScript this row does not list. A state or query file in a listed folder is tier 3 for the
@@ -56,15 +56,15 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 ## AI review before a merge
 
 Code written by an agent gets the same reading as anyone's, plus this. `/pre-merge`
-(`.claude/commands/pre-merge.md`) runs it, with the agents of `.claude/agents/`; from slice 5 a
-branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub's gate judges the pull request (`docs/HARNESS.md`,
+(`.claude/commands/pre-merge.md`) runs it, with the agents of `.claude/agents/`; a
+branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HARNESS.md`,
 "The gate"):
 
 1. **No tokens first.** check.sh on the committed tree, then GitHub's gate, StrykerJS on the changed tier-1 lines among
-   its jobs: a surviving mutant is a missing test, found without a model (in its job's log until F13184).
+   its jobs: a surviving mutant is a missing test, found without a model (it stays in its job's log).
 2. **The red pass, once per branch.** Before any code, the `test-auditor` reviews the branch's
    failing tests against the plan: complete, relevant, riskiest paths first, the threat model's
-   abuse cases present. Tier-1 and harness code alone (the speed plan, 2026-11-06). A fixer's tests get none.
+   abuse cases present. Tier-1 and harness code alone. A fixer's tests get none.
 3. **One combined review.** The `reviewer` agent reads the branch once: the tests' green pass on the
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
@@ -74,32 +74,30 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
    with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
    runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
    `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
-   missing fail the step). One review a pull request, before Alexis's merge (D13181). Each finding names its
+   missing fail the step). One review a pull request, before the owner's merge (D13181). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
-   (DORA's small batches; Alexis, 2026-10-22).
+   (DORA's small batches).
 4. **Reproduced before it is fixed:** a command, or a test seen failing, by the session (no agent
-   verifies the reviewers' findings: the `finding-verifier` gave 5 ledger rows in November, none high,
-   Alexis 2026-11-04; a fixer's rejection excepted, which a fresh reviewer checks, F5542). One nobody could reproduce stays `claimed`; a false positive
+   verifies the reviewers' findings; a fixer's rejection is the exception, which a fresh reviewer checks). One nobody could reproduce stays `claimed`; a false positive
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,
-   must fail (F345; the reviewer reads it, since `prove_fix.py` left with check.sh's old lanes, D13168).
+   must fail (no script proves it: the reviewer reads it, D13168).
 5. **High and medium fixed, low listed.** High and medium findings are fixed, test first. Low ones
-   and anything beyond the plan go to one list for Alexis with a recommendation (fix now, a backlog
+   and anything beyond the plan go to one list for the owner with a recommendation (fix now, a backlog
    row, or moot). A second round runs only for a high finding fixed in a tier-1 file, only its
-   lens, on the diff since the first; after three rounds the review stops and Claude and Alexis
+   lens, on the diff since the first; after three rounds the review stops and Claude and the owner
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
-   status and evidence, numbered in its slice's range from slice 12 (slice N: F N000 to N999, a hundred a
-   part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
+   status and evidence, numbered in its slice's range (slice N: F N000 to N999, a hundred a
+   branch, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
    evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
-   second run is no ledger row; nothing records one that GitHub's retry passed (D13168). What Alexis caught and missed
-   goes into the review log, with each branch's rounds, tokens and hours (measured against slice
-   4's). At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the
+   second run is no ledger row; nothing records one that GitHub's retry passed (D13168). What the owner caught and missed
+   goes into the review log, with each branch's rounds, tokens and hours. At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the
    log and the ledger, and proposes the rules and memories a repeated miss calls for, and the
-   rules, tests and checks to remove, each with what it costs and what it caught; Alexis accepts each.
+   rules, tests and checks to remove, each with what it costs and what it caught; the owner accepts each.
 7. **Measure the harness by its findings.** Each `/pre-merge` writes to the review log how many
    verified findings it found in the harness itself (`scripts/`, `.githooks/`, `.claude/`). If
    that number does not fall over three merges, the harness is simplified, not extended: a guard
@@ -114,12 +112,11 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
    product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
-   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A part may raise one
+   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A branch may raise one
    chunk's size cap by up to 256 B without asking, never the first screen's: the new cap, its size
-   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report
-   (Alexis, 2026-11-04).
+   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
 
-### A part's weight by its kind (Alexis, 2026-11-04)
+### A branch's weight by its kind
 
 | Kind | For | What runs |
 |---|---|---|
@@ -130,17 +127,17 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
 | Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
 
 The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
-A way to game a display's ranking or count (a ticker, a trend) is a low, kept for after the demo, never a round of its own.
+A way to game a display's ranking or count (a ticker, a trend) is a low, never a round of its own.
 
 ## Before a push
 
 Each merge lives on its branch. A push scans the whole history for secrets, and `main` is refused: it takes pull requests alone,
-merged by Alexis on GitHub once `gate-ok` is green (`.githooks/pre-push`, D13165). In Alexis's shell the hooks run nothing of the
-repository but that scan (F076); GitHub's gate runs the checks again on the pull request, from the base's scripts, and its changes
+merged by the owner on GitHub once `gate-ok` is green (`.githooks/pre-push`, D13165). In the owner's shell the hooks run nothing of the
+repository but that scan; GitHub's gate runs the checks again on the pull request, from the base's scripts, and its changes
 job refuses a harness file no commit declares on a line `Harness-changed: <path> - why` (D13173).
 
 ## Blind first
 
-Alexis reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). His notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
+The owner reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). The notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
-In the first slices, the author gives only the review card's items 1–3, 7 and 8: what to read, what to skim, what to try, each realm function's card, the risk and its undo. Alexis reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.
+The author gives only the review card's items 1–3, 7 and 8: what to read, what to skim, what to try, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.

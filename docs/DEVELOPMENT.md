@@ -4,8 +4,8 @@
 
 The README's "Install" lists what to install. `pnpm install` runs no script. The git hooks
 (no attribution lines, no secret, no non-ASCII path; from Claude Code's sandbox no harness file, and Prettier and check_docs on
-what is staged; in your own shell nothing of the working tree runs, F076) live in `.git/hooks`, where
-no merge, checkout or sandboxed command writes, so no branch brings its own (F129). Install
+what is staged; in your own shell nothing of the working tree runs) live in `.git/hooks`, where
+no merge, checkout or sandboxed command writes, so no branch brings its own. Install
 them, and again after a merge that changes them, from `main`, never from the working tree, and
 from the objects themselves, whatever a replace ref would show instead:
 
@@ -38,15 +38,15 @@ Each branch works in a worktree of its own, made from the root of a checkout who
 installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
 `sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
 `~/Server/gnoworld-wt` (made once, in your shell), where no session's shell writes but its own
-folder (Alexis, 2026-11-04; its file tools still can, F5095), which it may also be given in full.
+folder (its file tools still can), which it may also be given in full.
 Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
-outside the sandbox and must touch no other (F5058), and a base whose harness,
-`CLAUDE.md` or package files are not its tree's (F5098). No part's session writes a sibling there, moves
-one or plants one (7w3, F4893); the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
+outside the sandbox and must touch no other, and a base whose harness,
+`CLAUDE.md` or package files are not its tree's. No part's session writes a sibling there, moves
+one or plants one; the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
 what"). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
 relative links and a `.bin` of its own, through no link it did not make. Hand-made
-links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook`.
 `sh scripts/worktree.sh remove <name>`, from another tree,
 removes a worktree of that root that holds no change, staged file or untracked file (git's own
 check: its ignored files go with it, never what a link in it leads to) with its record, and keeps
@@ -56,14 +56,14 @@ checkout's root, with plain words (a bare `<name>`); the guard refuses any other
 `$(...)`, a `~`, an assignment, a redirect or another command in the call).
 A branch with an upstream is deleted in your shell: in a session `git branch -D` cannot write
 `.git/config`, so it deletes the branch but keeps its `branch.<name>` section, which a new branch
-of that name would inherit (F5113). A branch `worktree.sh` made has no such section.
+of that name would inherit. A branch `worktree.sh` made has no such section.
 After a merge that changes the lockfile, install in the main checkout
 (`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
 
 A session writes its own worktree only: never another session's, by any tool, nor runs a command
-that writes there (F5058). So a merge into a part's branch that changes the harness is Alexis's, in
-his terminal: the part's own sandbox refuses those files (F5055), and the chief writing them for it
-from his session was the hole F5058 names.
+that writes there. So a merge into a part's branch that changes the harness is the owner's, in
+the owner's terminal: the part's own sandbox refuses those files, and the chief writing them for it
+from its own session would write another session's worktree.
 
 ## Toolchain
 
@@ -83,12 +83,11 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 
 `scripts/check_nginx.py` (GitHub's build job; on the Mac by hand, `python3 -I scripts/check_nginx.py` once the app is built) runs
 `nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the built pages and asks each at its slashed, bare
-and `index.html` addresses (HARNESS.md); on GitHub, for an app change alone (F13186). Docker is refused in the sandbox, so on the Mac it needs an nginx at the image's version, 1.30.6
-(`deploy/web/Dockerfile`), in the tools' cache, and a run without it fails: it never skips. It was set up once on the Mac (the chief,
-2026-10-31); anyone who sets up another does the same:
+and `index.html` addresses (HARNESS.md); on GitHub, for an app change alone. Docker is refused in the sandbox, so on the Mac it needs an nginx at the image's version, 1.30.6
+(`deploy/web/Dockerfile`), in the tools' cache, and a run without it fails: it never skips. Anyone who sets up another does the same:
 
 1. Build nginx 1.30.6 from nginx.org's source release, its signature checked (`gpg --verify` of `nginx-1.30.6.tar.gz.asc` against the
-   key `D6786CE303D9A9022998DC6CC8464D549AF75C0A`, from `https://nginx.org/keys/pluknet.key`; the tarball was good). The prefix is the
+   key `D6786CE303D9A9022998DC6CC8464D549AF75C0A`, from `https://nginx.org/keys/pluknet.key`; the tarball must verify). The prefix is the
    pin's own folder: `./configure --prefix=$HOME/.cache/gnoworld-tools/nginx-1.30.6 --with-cc-opt=-I/opt/homebrew/opt/pcre2/include
    --with-ld-opt=-L/opt/homebrew/opt/pcre2/lib`, then `make` and `make install`.
 2. One local patch, in `src/os/unix/ngx_darwin_init.c`: the loop over the sysctls passes over `NGX_EPERM` as it does `NGX_ENOENT`. The
@@ -98,12 +97,10 @@ and `index.html` addresses (HARNESS.md); on GitHub, for an app change alone (F13
    with a line `Harness-changed: scripts/nginx.sha256 - why`. Recorded: `ad773dcb709c8cb21a0fecd1b50bac4511d1847d4e20fa68247967ac84897a68`.
    The check runs the binary only when its SHA-256 is the pinned one; a rebuilt binary has another and needs a new pin.
 5. GitHub's build job builds its own from the same release, the tarball checked against its SHA-256 (`3cf46f5e…`, signed by the
-   key above, checked 2026-11-14), with Ubuntu's pcre2 and zlib, and hands check_nginx.py that binary's checksum (F13176).
+   key above), with Ubuntu's pcre2 and zlib, and hands check_nginx.py that binary's checksum.
 
-The step passes on the real binary with no warning (the build's table is sized, F2454). Its logs go to a file of its own folder, not
-`/dev/stderr`, which the real `nginx -t` cannot open under the sandbox. F2459's and F2460's faults, planted by hand on a scratch copy,
-each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-final.md`); the stand-in for nginx in
-`scripts/test_hooks.sh` models them for every run.
+The step passes on the real binary with no warning (the build's table is sized). Its logs go to a file of its own folder, not
+`/dev/stderr`, which the real `nginx -t` cannot open under the sandbox. The stand-in for nginx in `scripts/test_hooks.sh` models the faults that fail it on the real binary, for every run.
 
 ## The gate and the harness
 
@@ -128,13 +125,12 @@ the whole config runs (`pnpm run mutate`; `pnpm run mutate:all` runs `stryker.al
 
 **Secrets** live in `deploy/secrets/`, one file each, gitignored and unreadable by Claude
 Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
-Anthropic key is Alexis's own for tests, then the company's.
+Anthropic key is the owner's own for tests.
 
 ## The workshop
 
-Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens on Vite's dev server, with hot reload,
-opened from the MacBook or a phone over Tailscale. `app/lab/` is gone, though `scripts/workshop.sh` and `app/lab.config.ts` still start
-a lab server that has no page to serve (to remove, a harness change). No
+Design is tried here before it lands: the app's screens on Vite's dev server, with hot reload,
+opened from the MacBook or a phone over Tailscale. `scripts/workshop.sh` and `app/lab.config.ts` also start a lab server that has no page to serve (`app/lab/` does not exist). No
 gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
 pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
 fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
@@ -150,12 +146,12 @@ off the tailnet, and so does any of them that stops; a second `pnpm workshop` in
 backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
-**The ping-pong** (Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout, each retouch of Claude's shows live in a
-couple of minutes; no gate runs at a turn's end, and a commit takes seconds (the secret scan, Prettier, the docs check: D13173); the
+**The ping-pong:** while your own `pnpm workshop` serves a checkout, each retouch of Claude's shows live in a
+couple of minutes; no gate runs at a turn's end, and a commit takes seconds (the secret scan, Prettier, the docs check); the
 gate, the tests and the review come once the batch is accepted. The code the workshop runs is outside Claude's sandbox, under a profile of its
 own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
 no keychain, no other app and no Unix socket but the system's. It cannot hold where that code listens, and its outbound network
-stays open (HARNESS.md's known limits, F204, F4977): the servers listen on 127.0.0.1 because their configs say so, and macOS's
+stays open (HARNESS.md's known limits): the servers listen on 127.0.0.1 because their configs say so, and macOS's
 firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends.
 
 Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
@@ -166,7 +162,7 @@ which. On the MacBook or the phone, open the https ones:
   the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
 - **`workshop-lab`:** the second name the script puts on the tailnet; with `app/lab/` gone, no page answers there.
 
-**The backend**, started once the app's server is on the tailnet (Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"):
+**The backend**, started once the app's server is on the tailnet :
 the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
 by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for Ergo and its WebSocket
 (`WORKSHOP_API_PORT`, `WORKSHOP_IRC_PORT`, `WORKSHOP_WS_PORT`), allowing the app's local address and its tailnet links as
@@ -202,9 +198,9 @@ network) and give the server `JARVIS=on`, its address and a key file; without th
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.
 
-**Landing a batch (« pose »):** when Alexis says « pose » and names the commits he validated, `/pose <commits>`
+**Landing a batch (« pose »):** when the owner says « pose » and names the commits validated, `/pose <commits>`
 (`.claude/commands/pose.md`) lands them alone: tests by risk, the gate's jobs run once, one review a pull request, pull requests of
-about 600 product lines, and a one-line push script each for Alexis (D13192).
+about 600 product lines, and a one-line push script each for the owner (D13192).
 
 ## The demo
 
@@ -240,30 +236,27 @@ development or test-GPU build only; a production build holds no trace of it.
   never skips. `memory.test.ts` runs the real codecs at their cap in a child with the image's flags and reads the peak resident memory,
   which must stay under the container's 256 MiB. What needs Docker (the reader's isolation, its way out, its guard rules) is
   `deploy/test-links.sh`, which `deploy/test.sh` sources: GitHub's deploy-stack job runs `deploy/test.sh` on a change to `deploy/`
-  (D13180), not yet on one to the reader or what it fetches (F13210), after which it is run by hand, from the commit you reviewed
+  (D13180), not on one to the reader or what it fetches, which is run by hand, from the commit you reviewed
   (docs/OPERATIONS.md); it needs the network for its controls (`example.com`).
 
 ## Jarvis's evals
 
 `evals/` is installed apart from the workspace (its own `pnpm-workspace.yaml`, with the workspace's supply-chain
 rules, and its own lockfile): `cd evals && pnpm install --frozen-lockfile --ignore-scripts`, once, in your shell, so
-no package's script runs there (F5317). They need Anthropic's key in a file
+no package's script runs there. They need Anthropic's key in a file
 and gnomcp 0.11.0, and cost money for each case not kept in `evals/.cache`:
 `ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh`. `run.sh` checks the evals' own types
 and Node tests first (`evals/test-*.ts`), then runs promptfoo's `eval` script, its results in `evals/results/`.
 The gate lints `evals/` (its tsconfig takes zod's and Node's types from jarvis's install, which every tree has); knip
 leaves it out, as promptfoo's binary resolves only where `evals/` is installed; `jarvis/src/routes.test.ts` holds the
 cases to jarvis's wire. `run.sh` runs the branch's own code with the key, in your shell: run it on a commit you have
-read (10j's security review, S1; question 10j-5).
+read.
 
 ## Slices
 
-One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
+One slice is worked at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
 plans it and cuts it into branches, each run in a session and a worktree of its own, two at once at
 most (`docs/HARNESS.md`, "Who does what").
 
-The order, from phase 0 to phase 3, is in [plans/backlog.md](plans/backlog.md), with the
+The order of work is in [plans/backlog.md](plans/backlog.md), with the
 concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.
-
-Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2; the seal realm and its reference client are out
-of the tree until then (D13197), in git's history.
