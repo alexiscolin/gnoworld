@@ -205,8 +205,9 @@ network) and give the server `JARVIS=on`, its address and a key file; without th
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.
 
-**Landing a batch:** the accepted retouches land in code as one part, test first, in a session that reads the diff of what the workshop
-showed.
+**Landing a batch (« pose »):** when Alexis says « pose » and names the commits he validated, `/pose <commits>`
+(`.claude/commands/pose.md`) lands them alone: tests by risk, the gate's jobs run once, one review a pull request, pull requests of
+about 600 product lines, and a one-line push script each for Alexis (D13192).
 
 ## The demo
 
