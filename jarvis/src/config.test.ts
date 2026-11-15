@@ -1120,6 +1120,14 @@ describe("the stack with no public front of its own", () => {
     expect(block(service("guard"), 4, "image")).toBe("    image: *guard-image");
   });
 
+  it("logs no visitor's address: web's access log holds the time, the request's path and the answer", () => {
+    const format = /^ *log_format \w+ (.*);$/m.exec(read("deploy/web/nginx.conf"))?.[1] ?? "";
+    expect(format).toContain("$status");
+    // The server keys addresses with a pepper; web's log, which Docker keeps, shows none. The limit zones still read it.
+    expect(format).not.toMatch(/_addr|remote_|forwarded|http_x_/);
+    expect(read("deploy/web/nginx.conf")).toMatch(/limit_req_zone \$proxy_protocol_addr zone=visitors/);
+  });
+
   it("opens no UDP but DNS, and no way into web: web is no one's to reach from the guard's network", () => {
     expect(rules()).not.toMatch(/-p udp -j ACCEPT/);
     const udp = [...rules().matchAll(/^.*-p udp.*$/gm)].map((match) => match[0].trim());

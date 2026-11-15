@@ -369,6 +369,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the worker served without the password" "no password, no /sw.js" \
 		nginx awk 'index($0, "location / {") { print "        location = /sw.js { auth_basic off; }" } { print }'
 	mutant "the server's own 404 page" "the app's own fallback" nginx sed '/error_page 404/d'
+	mutant "the visitor's address logged" "and no address of a visitor in web's log" nginx sed "s#log_format access '#log_format access '\$proxy_protocol_addr #"
 	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
@@ -886,6 +887,8 @@ PY
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
+	expect "and no address of a visitor in web's log (the test's visitors come from 203.0.113.0/24 and 198.51.100.0/24)" \
+		"$(docker logs "$web" 2>&1 | grep -cE '203\.0\.113\.|198\.51\.100\.' || true)" 0
 	# --- Ergo, the server and the way out, as the stack runs them.
 	ergo=$(docker compose -p "$project" $files ps -q ergo)
 	server=$(docker compose -p "$project" $files ps -q server)
