@@ -1,4 +1,4 @@
-// A policy violation inside the worker the worker's own global scope hears it, where the page's listener
+// A policy violation inside the worker: the worker's own global scope hears it, where the page's listener
 // never runs. It tells the open pages, which alone can write to the app's error channel; the journeys' fixture
 // is the listener (tests/e2e/fixtures.ts), as lint/app.config.ts allows console nowhere.
 export const VIOLATION = "csp-violation";

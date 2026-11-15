@@ -217,7 +217,7 @@ fi
 mkdir -p "$t/form/scripts" "$t/form/.githooks"
 { cat "$0"; printf 'if part Regress2 ; then\nfi\n'; } >"$t/form/scripts/test_hooks.sh"
 ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
-# No caller hands check.sh an option, which it refuses .
+# No caller hands check.sh an option, which it refuses.
 callers=$(grep -rnE 'scripts/check\.sh +-' "$hooks" "$here"/*.sh "$here/../.claude" "$here/../package.json" "$here/../.github" 2>/dev/null |
 	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#|^[^:]*/\.claude/tmp/' || :)
 [ -z "$callers" ] || fail "a caller hands check.sh an option it refuses: $callers"
@@ -2445,7 +2445,7 @@ printf 'refs/tags/main %s refs/tags/main %s\n' "$head" "$zero" | hook || fail "p
 # A branch's deletion sends nothing to scan, and is no refusal: a scan that would find a secret is not run.
 printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | hook || fail "pre-push refused a branch's deletion"
 (printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | LEAKS=1 hook) || fail "pre-push scanned a push that sends nothing"
-# A tree with uncommitted or untracked files pushes its commits as they are: no gate reads the tree .
+# A tree with uncommitted or untracked files pushes its commits as they are: no gate reads the tree.
 echo dirty >>"$w/a.ts" && touch "$w/stray.ts"
 push slice-1a || fail "pre-push refused a push from a tree with uncommitted files"
 git -C "$w" checkout -q -- a.ts && rm "$w/stray.ts"
@@ -5767,8 +5767,8 @@ done
 kill -9 "$victim"
 wait "$victim" 2>/dev/null || :
 [ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
-# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree` (
-# the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so would fail every run).
+# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree`
+# (the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so would fail every run).
 (cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import os, sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
 with worktree("HEAD") as a, worktree("HEAD") as b: print(a); print(b); print(*os.listdir(".git/worktrees"))' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
 [ "$(basename "$(sed -n 1p "$w/out")")" != "$(basename "$(sed -n 2p "$w/out")")" ] || fail "two copies held at once got one name: $(cat "$w/out")"
@@ -7035,8 +7035,8 @@ grep -qF '/usr/bin/sandbox-exec -f "$seatbelt"' "$here/workshop.sh" || fail "wor
 sed "s|/usr/bin/sandbox-exec |$w/bin/sandbox-exec |" "$here/workshop.sh" >"$w/root/scripts/workshop.sh"
 cp "$here/workshop.sb" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
 # The profile holds no rule on where its processes listen, which would read as a wall and be none: Seatbelt names no host but * and
-# localhost, and a bind or inbound rule on a local localhost lets a listener on 0.0.0.0, :: or the LAN's address through as on 127.0.0.1
-#. They listen on 127.0.0.1 as their configs say; macOS's firewall is the wall against the LAN.
+# localhost, and a bind or inbound rule on a local localhost lets a listener on 0.0.0.0, :: or the LAN's address through as on 127.0.0.1.
+# The boxed processes listen on 127.0.0.1 as their configs say; macOS's firewall is the wall against the LAN.
 sed 's/;.*//' "$here/workshop.sb" | tr '\n' ' ' | awk '{ n = split($0, rule, /[(](allow|deny)[ \t]+/)
 	for (i = 2; i <= n; i++) if (rule[i] ~ /^[^(]*network(-bind|-inbound|[*])/ && rule[i] ~ /[(]local[ \t][^)]*localhost/) exit 1 }' ||
 	fail "workshop.sb holds a bind or inbound rule on a local localhost, which lets a listener on every address through (F4977)"

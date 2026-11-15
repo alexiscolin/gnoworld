@@ -329,7 +329,7 @@ def mutants():
     yield from each("vitest.config.ts", "fileParallelism: false,", "", "probe", "core_chromium runs its files one after another")
     yield from each("vitest.config.ts", "screenshotFailures: false,", "", "probe", "core_chromium writes no screenshot beside the code")
     yield from each("vitest.config.ts", 'args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : []', "args: []", "probe", "core_chromium's Chromium runs in one process in the sandbox")
-    # Every Vitest run on the pinned Node (never StrykerJS's, on Homebrew's Node 26): the config refuses another.
+    # Every Vitest run on the pinned Node (StrykerJS on Homebrew's Node 26 gave other results): the config refuses another.
     yield from each("vitest.config.ts", "if (process.version !== PINNED)", "if (false)", "probe", "vitest.config.ts holds every run to the pinned Node")
     yield from each("vitest.config.ts", '.trim()', "", "probe", "the pinned Node is read without its newline")
     yield from each("vitest.config.ts", "benchmark: { include: BENCHES, exclude: [...configDefaults.exclude, STRYKER_TMP] },", "", "probe", "vitest runs the benches in the form the guards read (CR3)")
