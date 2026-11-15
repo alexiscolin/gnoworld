@@ -1193,6 +1193,7 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", 'GIT_CONFIG_VALUE_0=never', 'GIT_CONFIG_VALUE_0=always', "hooks", 'scan_secrets gives git no colour')
     yield from each("scripts/scan_secrets.sh", 'GIT_CONFIG_VALUE_1=true', 'GIT_CONFIG_VALUE_1=false', "hooks", 'scan_secrets gives git a diff for a root commit')
     yield from each("scripts/scan_secrets.sh", 'export GIT_CONFIG_COUNT=2', 'export GIT_CONFIG_COUNT=0', "hooks", 'scan_secrets gives git its own config')
+    yield from each("scripts/scan_secrets.sh", "unset GIT_CONFIG_PARAMETERS\nexport", "export", "hooks", "scan_secrets drops the push's own -c, which git reads after the scan's config")
     yield from each("scripts/scan_secrets.sh", '[ -z "$err" ] ||', 'true ||', "hooks", 'scan_secrets refuses a history git writes to stderr over')
     yield from each("scripts/scan_secrets.sh", 'grep -q "stderr is not empty" &&', 'grep -q "never in the output" &&', "hooks", "scan_secrets refuses gitleaks's stderr not empty")
     yield from each("scripts/scan_secrets.sh", '[ "${scanned:-0}" = 0 ] &&', 'false &&', "hooks", 'scan_secrets refuses a scan of no commit of a history with changes')

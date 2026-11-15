@@ -37,8 +37,10 @@ export GIT_NO_REPLACE_OBJECTS=1
 # What only adds output to git's stderr (the traces, a verbose curl or merge) makes gitleaks read no history, and pass: none reaches it.
 for var in $(env | sed -n 's/^\(GIT_TRACE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$var"; done
 unset GIT_CURL_VERBOSE GIT_MERGE_VERBOSITY
-# Config that changes what git log prints (colour, no diff for a root commit) does the same, in silence: git is given these afresh,
-# above the repository's config and a -c of the caller's (git reads these last).
+# Config that changes what git log prints (colour, no diff for a root commit) does the same, in silence: git is given these afresh.
+# They sit above the repository's config but below a -c of the caller's, which git reads after them (GIT_CONFIG_PARAMETERS, what
+# `git -c ... push` hands its hooks), so that is dropped: the scan's own entries are then the last command-line config git reads.
+unset GIT_CONFIG_PARAMETERS
 export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=never GIT_CONFIG_KEY_1=log.showRoot GIT_CONFIG_VALUE_1=true
 text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png

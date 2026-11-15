@@ -4775,6 +4775,11 @@ git -C "$kr" config log.showRoot false
 (cd "$kr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) && fail "scan_secrets let a key in a root commit through, over the whole history, with log.showRoot false"
 (cd "$kr" && sh "$rh/scan_secrets.sh" --range "$krs" >/dev/null 2>&1) && fail "scan_secrets --range let a key in a root commit through with log.showRoot false"
 git -C "$kr" config --unset log.showRoot
+# git reads a -c of the push (GIT_CONFIG_PARAMETERS) after the scan's own GIT_CONFIG_COUNT entries, so the scan drops it: a root
+# commit's key is shown by git log whatever `git -c log.showRoot=false push` says.
+(export GIT_CONFIG_PARAMETERS="'log.showroot'='false'"; cd "$kr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) && fail "scan_secrets let a key in a root commit through, over the whole history, with a -c log.showRoot=false of the push's"
+(export GIT_CONFIG_PARAMETERS="'log.showroot'='false'"; cd "$kr" && sh "$rh/scan_secrets.sh" --range "$krs" >/dev/null 2>&1) && fail "scan_secrets --range let a key in a root commit through with a -c log.showRoot=false of the push's"
+(export GIT_CONFIG_PARAMETERS="'log.showroot'='false'"; printf 'refs/heads/trunk %s refs/heads/trunk %s\n' "$krs" "$zero" | (cd "$kr" && sh "$rh/pre-push" origin "$t/no-such-remote.git" >/dev/null 2>&1)) && fail "pre-push let a key in a root commit through with a -c log.showRoot=false of the push's"
 # A git that writes to stderr whatever is given it (a corrupt commit-graph) is refused, the clean range with the rest.
 printf 'CGPH not a commit-graph file at all, but long enough\n' >"$pr/.git/objects/info/commit-graph"
 sr "$tk" "^$held" && fail "scan_secrets --range ran while git wrote to its stderr"
