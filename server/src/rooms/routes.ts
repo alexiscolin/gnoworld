@@ -1,5 +1,5 @@
-// The rooms' HTTP face (slice 3's plan, 3l): a world's moderators and the team make and archive its
-// rooms; on the Earth any signed-in account makes a public room too (D394), its name checked as a message is, and
+// The rooms' HTTP face: a world's moderators and the team make and archive its
+// rooms; on the Earth any signed-in account makes a public room too, its name checked as a message is, and
 // archives its own. Each call comes from a listed site in JSON (guard.ts), with the login's session; who may act is
 // checked before any work, an account makes 10 rooms an hour, and each act and refusal goes to the log.
 import { CreateRoom, RoomName, type Address, type MadeRoom } from "@gnoworld/schemas";
@@ -96,7 +96,7 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, log, no
     // The world's moderators and the team, and the maker of a room anyone made on the Earth.
     if (!mayCreateRoom(roles, who, world) && rooms.maker(`#${world}/${name}`) !== who) return refuse(c, "forbidden");
     if (!RoomName.safeParse(name).success) return refuse(c, "body");
-    // A room the roles file types is the file's, not the API's: archived, it would stay so after a fixed file (F2050).
+    // A room the roles file types is the file's, not the API's: archived, it would stay so after a fixed file.
     if (roles.worlds.get(world)?.rooms?.has(`#${world}/${name}`) === true) return refuse(c, "forbidden");
     // A realm's room is the realm's, made ahead for every listed realm: a hub's moderators do not archive it.
     if (rooms.isRealm(`#${world}/${name}`)) return refuse(c, "forbidden");

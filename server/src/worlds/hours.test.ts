@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { hoursOf, hoursRoute } from "./hours.ts";
 
-// A world's last day of messages an hour (8g), as a plate reads it: counts alone, 24 hours, an hour no sample read null.
+// A world's last day of messages an hour, as a plate reads it: counts alone, 24 hours, an hour no sample read null.
 const HOUR = 3_600_000;
 const AT = Date.parse("2026-11-04T10:25:00.000Z");
 const THIS_HOUR = Math.floor(AT / HOUR) * HOUR;

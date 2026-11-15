@@ -1,4 +1,4 @@
-// What the bot does with a verdict (ADR-0002 §6; slice 3's plan, 3j): a hidden line is redacted by the id
+// What the bot does with a verdict (ADR-0002 §6): a hidden line is redacted by the id
 // Ergo gave the line just scored, and its author is told why in plain words, with the rules. Every word
 // sent comes from this file, never from the message or the provider's answer.
 import type { Said } from "../irc/link.ts";

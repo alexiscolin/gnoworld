@@ -1,5 +1,5 @@
-// The pins' part of the chat (slice 4's 4d): the pins on the chat's database, asking Ergo through its link, who may pin
-// and read them, and what the link tells that ends a pin with its line (docs/decisions.md, 2026-10-27).
+// The pins' part of the chat: the pins on the chat's database, asking Ergo through its link, who may pin and read
+// them, and what the link tells that ends a pin with its line.
 import type { DatabaseSync } from "node:sqlite";
 import { PINS_MAX } from "@gnoworld/schemas";
 import type { Link, Said } from "../irc/link.ts";

@@ -4,7 +4,7 @@
 import { CATEGORIES, type Answer, type Category } from "./provider.ts";
 
 export type Thresholds = Partial<Record<Category, number>>;
-export type Decision = { action: "hide"; reason: Category } | { action: "pass" };
+type Decision = { action: "hide"; reason: Category } | { action: "pass" };
 
 export function decide({ flagged, scores }: Answer, thresholds: Thresholds): Decision {
   const minors: Category = "sexual/minors";

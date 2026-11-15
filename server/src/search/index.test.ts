@@ -12,7 +12,7 @@ import type { Typed } from "../rooms/types.ts";
 import { makeSearch, MAX_EDITS, MAX_ROWS, ROOM_CAP, SEARCH_TABLES } from "./index.ts";
 import { indexing } from "./wire.ts";
 
-// Slice 13, B1 (D13917, D13924): the lines of the rooms a reader may open, for 90 days and 2,048 a room.
+// The lines of the rooms a reader may open, for 90 days and 2,048 a room.
 const DAY = 24 * 60 * 60_000;
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -643,7 +643,7 @@ describe("expiry order under a limit", () => {
   });
 });
 
-// H1 of the security review: a room that leaves the searchable set after its lines were indexed.
+// A room that leaves the searchable set after its lines were indexed.
 describe("a room that became hidden or members after its lines were indexed (F13700)", () => {
   const HIDDEN: Typed = {
     worlds: new Map([
@@ -769,7 +769,7 @@ describe("the expiry's walk (F13706)", () => {
   });
 });
 
-// The surviving mutants of the day (slice 13): each test is named after the fault it guards.
+// The surviving mutants of the day: each test is named after the fault it guards.
 describe("what the index remembers of a room it does not hold", () => {
   const crewOnly = () => {
     const rooms = new Map<string, Room>([["#bubble/club", { type: "members", readers: "crew", hidden: false }]]);

@@ -1,4 +1,4 @@
-// Where the bot stopped in each room (ADR-0002 §6; slice 3's plan, 3j): the time of the last line of a run
+// Where the bot stopped in each room (ADR-0002 §6): the time of the last line of a run
 // settled in the order heard, so after an outage or a restart it asks Ergo for what came after, a line still
 // waiting on its check included, and the verdicts' key checks each once. A time, not a msgid: Ergo answers
 // nothing after a msgid it no longer holds, and a hidden line is gone from its history.
@@ -29,7 +29,7 @@ export interface Progress {
   // A line checked, seen before or dropped: the mark moves past each line settled in a row.
   settled: (line: Line) => void;
   // The mark held at `time`, the time a catch-up's next page starts from, or let go (undefined): while held
-  // it moves no further, and a live line settled meanwhile takes it past nothing never fetched (F707).
+  // it moves no further, and a live line settled meanwhile takes it past nothing never fetched.
   hold: (room: string, time: string | undefined) => void;
   // The rooms and the lines it holds, for the tests of its bound.
   size: () => { rooms: number; lines: number };

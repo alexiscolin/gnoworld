@@ -1,4 +1,4 @@
-// The realms the worlds job lists (D390, D413): the paths a realm room is made for, ahead or on a first open. One reader of the file for all
+// The realms the worlds job lists: the paths a realm room is made for, ahead or on a first open. One reader of the file for all
 // of them, read again when the job has written it anew (its modification time changed), never on each ask; a file that is missing, broken
 // or not the worlds' knows no realm. The paths come busiest world first, so a cap that falls short keeps the realms people call.
 import { readFileSync, statSync } from "node:fs";

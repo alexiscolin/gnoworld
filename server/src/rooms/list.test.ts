@@ -145,7 +145,7 @@ describe("GET /api/rooms?world=", () => {
     });
   });
 
-  // What the client's RoomList takes: the file's 50 sections and the others, 1,100 rooms a section (D394: the Earth's thousand).
+  // What the client's RoomList takes: the file's 50 sections and the others, 1,100 rooms a section (the Earth's thousand).
   // 50 named sections, then `count` rooms a guest sees after 100 it does not (#big/r0000 to r0099), all made
   // in reverse: the answer's order is the route's, and its cap counts the rooms a reader sees.
   const big = (count: number) => {
@@ -411,7 +411,7 @@ describe("GET /api/rooms?world=, a malformed world", () => {
   });
 });
 
-// D394: the Earth's public square: each room's counts, the team's rooms first, the others by use.
+// The Earth's public square: each room's counts, the team's rooms first, the others by use.
 describe("GET /api/rooms?world=earth, the public square", () => {
   const MIN = 60_000;
   const DAY = 24 * 60 * MIN;

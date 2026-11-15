@@ -1,4 +1,4 @@
-// A room's history, caught up page by page (slice 3's plan, 3j; slice 4's 4s, F707, F708): asked once Ergo
+// A room's history, caught up page by page: asked once Ergo
 // says the bot is in the room, one page in flight across all rooms, the room's mark held where its next page
 // starts from until the room is done.
 import type { Socket } from "node:net";
@@ -16,7 +16,7 @@ export interface Pages {
 }
 
 /** A chathistory batch open: its room, its lines and the last one's time; `fetch` when it answers a line asked for by
- * its id (fetch.ts, 4d), its lines then going to that question alone. */
+ * its id (fetch.ts), its lines then going to that question alone. */
 interface Page {
   room: string;
   lines: number;
@@ -32,7 +32,7 @@ export interface HistoryState {
   // The rooms whose history waits for its turn, and the room whose page is on its way.
   turns: string[];
   page: string | undefined;
-  // The lines asked for by their id (4d): they share Ergo's one order of history answers with the pages.
+  // The lines asked for by their id: they share Ergo's one order of history answers with the pages.
   lines: Fetches;
 }
 
@@ -44,7 +44,7 @@ export const freshHistory = (lineMs: number): HistoryState => ({
   lines: lineFetches(lineMs),
 });
 
-// Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
+// Half of a check's per-account queue, so a page never fills it with a live line waiting.
 const PAGE = 50;
 // The millisecond before a line's time, which Ergo wrote; the time itself for one with none before it, which only asks that
 // line again.
@@ -92,7 +92,7 @@ export function histories(
     state.batches.delete(ref);
     if (batch?.fetch === true) state.lines.closed(ref);
     if (batch === undefined || batch.fetch || batch.room !== state.page) return;
-    // A full page may have more after it, from its last line's millisecond, which may hold more (F542). A
+    // A full page may have more after it, from its last line's millisecond, which may hold more. A
     // page all in that one millisecond goes past it.
     // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
     const more = batch.lines >= PAGE && batch.last !== "";
@@ -141,7 +141,7 @@ export function replayed(state: HistoryState, message: IrcMessage): boolean {
   const batch = state.batches.get(message.tags.get("batch") ?? "");
   if (batch === undefined) return false;
   batch.lines += 1;
-  // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
+  // A time Date cannot read is no page's end: the next page starts from the last one read.
   const time = message.tags.get("time") ?? "";
   if (!Number.isNaN(Date.parse(time))) batch.last = time;
   return true;

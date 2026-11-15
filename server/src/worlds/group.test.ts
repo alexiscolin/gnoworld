@@ -16,8 +16,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { groupWorlds, keptPaths } from "./group.ts";
 
-// Onyx's 743 realm paths, 2026-11-01 00:11Z (onyxPaths.txt, copied from .claude/tmp/slice-5/recorded/7m-onyx-paths.txt, read
-// through gnomcp). The golden numbers come from a replica of the rule run on that list, not from the chain.
+// Onyx's 743 realm paths (onyxPaths.txt, read through gnomcp). The golden numbers come from a replica of the rule run on that list, not from the chain.
 const ONYX = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
   .split("\n")
   .filter((line) => line !== "");
@@ -34,7 +33,7 @@ describe("groupWorlds, a world is a product (decision of 2026-11-01, 11)", () =>
     expect(worlds).toHaveLength(525);
   });
 
-  // The chain's own realms (r/sys: names, users, params, validators…) are its machinery, not worlds (Alexis, 2026-11-07, D346).
+  // The chain's own realms (r/sys: names, users, params, validators…) are its machinery, not worlds.
   it("leaves out the chain's own realms, under r/sys", () => {
     expect(idsOf([r("sys/namereg/v0"), r("sys/users"), r("sys/params"), r("gnoswap/pool")])).toEqual(["gnoswap/pool"]);
   });
@@ -151,9 +150,9 @@ describe("groupWorlds, hostile paths", () => {
   });
 });
 
-// Variety is measured, not counted (ADR-0002 §3, 7b4): `alike` says when a glance would take two worlds for one. A view draws up to 40 bodies,
+// Variety is measured, not counted (ADR-0002 §3): `alike` says when a glance would take two worlds for one. A view draws up to 40 bodies,
 // a window of 40 in id order a system's worlds; ADR §3 expects a few close pairs, never many: two in a view, a ten-thousandth of all pairs.
-// Measured: none, here and ten times larger; class, minor, colour, rings and air alone leave 0.07% (the control); 7b's maps 0.93%.
+// Measured: none, here and ten times larger; class, minor, colour, rings and air alone leave 0.07% (the control).
 const VIEW = 40;
 const WORST_PAIRS = 2;
 const SHARE = 0.0001;
@@ -192,7 +191,7 @@ const recordedIds = () => groupWorlds(ONYX).map((world) => world.id);
 const tenTimes = (ids: readonly string[]) =>
   ids.flatMap((id) => Array.from({ length: 10 }, (_, n) => `${id}${String(n)}`));
 
-// F4108: the realm prefix a world's seed reads is written once, in core, and is the one the worlds' file accepts.
+// The realm prefix a world's seed reads is written once, in core, and is the one the worlds' file accepts.
 describe("the realm prefix", () => {
   it("is gno.land's realms', and the file's realm paths start with it", () => {
     expect(REALM_PREFIX).toBe("gno.land/r/");

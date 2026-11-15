@@ -1,5 +1,4 @@
-// What the server's IRC link remembers of one connection to Ergo, and the lines it reads to keep it (slice 3's
-// plan, 3h, 3j, 3l, 3m).
+// What the server's IRC link remembers of one connection to Ergo, and the lines it reads to keep it.
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Relayed } from "./relay.ts";
@@ -16,17 +15,17 @@ export interface State extends HistoryState {
   ready: boolean;
   // Each message of several lines open (draft/multiline), by its reference: held until its end, then read as one.
   several: Several;
-  // The rooms joined by send since this connection began, taken as joined once Ergo says so (3l).
+  // The rooms joined by send since this connection began, taken as joined once Ergo says so.
   asked: Set<string>;
   // The channels of a LIST under way, 10,000 at most.
   channels: string[] | undefined;
-  // The rooms' states asked of Ergo (3m).
+  // The rooms' states asked of Ergo.
   states: States;
-  // Its nick refused in a row, connection after connection: the third raises the alert (slice 3's max review).
+  // Its nick refused in a row, connection after connection: the third raises the alert.
   nickTaken: number;
-  // The hides sent and not yet taken, asked again when Ergo does not know the line yet (F2462).
+  // The hides sent and not yet taken, asked again when Ergo does not know the line yet.
   redacts: Redacts;
-  // The relays sent and not yet answered, by the label Ergo sends back (D430): each settles once, with whether Ergo took it.
+  // The relays sent and not yet answered, by the label Ergo sends back: each settles once, with whether Ergo took it.
   relays: Map<string, (took: Relayed) => void>;
 }
 
@@ -61,7 +60,7 @@ export function forget(state: State): void {
   state.relays.clear();
 }
 
-/** A command just sent: a JOIN is taken as joined once Ergo says so (3l), a REDACT waits for Ergo's word (F2462). */
+/** A command just sent: a JOIN is taken as joined once Ergo says so, a REDACT waits for Ergo's word. */
 export function sentOn(state: State, command: string, params: readonly string[]): void {
   if (command === "JOIN") state.asked.add(params[0] ?? "");
   else if (command === "REDACT") state.redacts.sent(params);
@@ -76,7 +75,7 @@ function relayAnswered(state: State, { tags, command }: IrcMessage): void {
     );
 }
 
-/** A reader that first settles the relay an answer's label names (D430), then reads the line as it does. */
+/** A reader that first settles the relay an answer's label names, then reads the line as it does. */
 export const answering =
   (state: State, read: (socket: Socket, message: IrcMessage) => void) =>
   (socket: Socket, message: IrcMessage): void => {

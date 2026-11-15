@@ -1,4 +1,4 @@
-// The login's HTTP face (slice 3's plan, 3c). Every POST comes from a listed Origin and in JSON (guard.ts).
+// The login's HTTP face. Every POST comes from a listed Origin and in JSON (guard.ts).
 // Each visitor's login calls are limited before any work, and a failed login gets one answer whatever
 // failed, its cause going to the log alone.
 import type { DatabaseSync } from "node:sqlite";
@@ -38,7 +38,7 @@ export function loginRoutes(
   const mintsByVisitor = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
   const mintsByAccount = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
 
-  // The visitor the web proxy names in X-Real-IP, believed only from that proxy (3e sets it).
+  // The visitor the web proxy names in X-Real-IP, believed only from that proxy.
   const visitorOf = (c: Context): string => readVisitor(c, proxy);
   const answer = (c: Context, error: ApiError["error"], status: Status): Response =>
     c.json({ error } satisfies ApiError, status);

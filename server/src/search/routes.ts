@@ -1,6 +1,6 @@
-// GET /api/search?q=&world=&room=&from=&link=1&since=&until=&before= (slice 13, B2; D13917, D13924; docs/plans/search.md §3 B, §4):
+// GET /api/search?q=&world=&room=&from=&link=1&since=&until=&before=:
 // the lines of one world's rooms that hold the words, for the reader only. The right is asked here, on every page, whatever the
-// room was when its lines came in: searchable (never a members or hidden room), not archived, and `mayRead` (F13700-sec: never
+// room was when its lines came in: searchable (never a members or hidden room), not archived, and `mayRead` (never
 // `mayRead` alone). A hidden, archived or unknown room is the empty page; a room the reader may not read is a 403, as the stream's.
 import { type Address, SEARCH_PAGE, SearchQuery, type SearchPage } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
@@ -18,7 +18,7 @@ import { snippetOf } from "./snippet.ts";
 /** Requests a minute: a visitor, and an account (its address is the key when the session is valid). */
 const SEARCH_PER_MINUTE = 20;
 const SEARCH_ACCOUNT_PER_MINUTE = 60;
-/** Searches a second across every visitor: the index is one synchronous connection, so per-visitor limits do not bound its load (F13770). */
+/** Searches a second across every visitor: the index is one synchronous connection, so per-visitor limits do not bound its load. */
 const SEARCH_PER_SECOND = 10;
 
 export interface Options {

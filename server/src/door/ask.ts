@@ -1,4 +1,4 @@
-// POST /api/jarvis/ask, the door (D42, D43, D44, D93, D13985): a question or a fixed ask to Jarvis from a room. Each check
+// POST /api/jarvis/ask, the door: a question or a fixed ask to Jarvis from a room. Each check
 // before any model call, cheapest first, each refusal a typed answer and a log line with no question: a listed site in JSON
 // (guard.ts), the session, the switch, the rate, strikes (paused), the share (capped), the first ask (early), the body and
 // size, the room's reading, the list (a strike), one question in flight (busy), then calls.ts: served answers, the quota,

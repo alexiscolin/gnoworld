@@ -1,7 +1,7 @@
-// The server's retention (slice 3's plan, 3n; decision 154): the bot's verdict records kept 180 days and
+// The server's retention: the bot's verdict records kept 180 days and
 // below a row cap, the oldest going first, one small batch a tick so a backlog never holds the
 // event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%,
-// and Ergo's data folder too, read-only (3n-b). The other stores purge themselves (nonces, tokens, tickets,
+// and Ergo's data folder too, read-only. The other stores purge themselves (nonces, tokens, tickets,
 // mutes) or hold one row a room or an account.
 import { lstatSync, readdirSync, type Stats } from "node:fs";
 import { join } from "node:path";
@@ -21,16 +21,16 @@ interface Options {
   // 150,000 verdicts of about 1.2 KB with their indexes (measured), 176 MB; 256 MB for the database.
   maxVerdicts?: number;
   maxBytes?: number;
-  // Rows a batch and batches a tick: one batch of 500 a tick, a backlog drained over the next ticks (F710).
+  // Rows a batch and batches a tick: one batch of 500 a tick, a backlog drained over the next ticks.
   batch?: number;
   batches?: number;
   // Ergo's data folder and its cap; none, no measure.
   ergoData?: { dir: string; maxBytes: number } | undefined;
   // The search index: its lines past 90 days or its row cap, in what a tick's budget leaves after the verdicts.
   search?: { expire: (limit: number) => number };
-  // The link cards (slice 13): their pages past 30 days or their caps, in what the search leaves of the budget.
+  // The link cards: their pages past 30 days or their caps, in what the search leaves of the budget.
   cards?: { expire: (limit: number) => number };
-  // Jarvis's kept answers (D13920): those past their time or the table's caps, after the cards, in what the budget leaves.
+  // Jarvis's kept answers: those past their time or the table's caps, after the cards, in what the budget leaves.
   kept?: { expire: (limit: number) => number };
   // Jarvis's public answers: past the cards' days or the table's caps, after the kept answers.
   said?: { expire: (limit: number) => number };
@@ -49,8 +49,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
   const { log, now = Date.now, maxVerdicts = 150_000, maxBytes = 256 * 1024 * 1024 } = options;
   const { batch = 500, batches = 1 } = options;
   const N = z.object({ n: z.number() });
-  // By verdicts_by_time, the oldest first, ties by row; a verdict pending its check stays, its settle to
-  // come (F598).
+  // By verdicts_by_time, the oldest first, ties by row; a verdict pending its check stays, its settle to come.
   const sql = {
     oldest: db.prepare(
       "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE action <> 'pending' ORDER BY at, rowid LIMIT ?)",
@@ -119,7 +118,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       let budget = batch * batches;
       // At most 10 a room: no batch.
       sql.pins.run(new Date(now() - ERGO_EXPIRE_MS).toISOString());
-      // The guests unused for 24 hours, with their ended strikes and mutes (D430).
+      // The guests unused for 24 hours, with their ended strikes and mutes.
       guests.purge();
       sql.said.run(Math.floor((now() - 25 * 60 * 60_000) / (60 * 60_000)));
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
@@ -132,7 +131,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       budget = expireOwned(budget);
       if (rises("verdicts", near(count(), maxVerdicts))) log("alert", { error: "verdicts_near_cap" });
       if (rises("database", near(N.parse(sql.used.get()).n, maxBytes))) log("alert", { error: "database_near_cap" });
-      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8).
+      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone.
       if (budget > 0) measureErgo();
       return budget <= 0;
     },
@@ -156,7 +155,7 @@ export function sizeOf(dir: string, lstat: (path: string) => Stats = lstatSync):
 }
 
 /** The retention at start, then every five minutes, until its stop; a tick that left a backlog is followed
- * at once by another, the event loop free between them, so the cap holds whatever comes in (F600). */
+ * at once by another, the event loop free between them, so the cap holds whatever comes in. */
 export function startRetention(db: DatabaseSync, options: Options & { everyMs?: number }): { stop: () => void } {
   const retention = makeRetention(db, options);
   let timer: ReturnType<typeof setTimeout> | undefined;

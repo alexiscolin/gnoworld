@@ -1,4 +1,4 @@
-// What the poll's reads become on the stream (slice 9g): each event told as it is, with its block's height, coalesced to 4
+// What the poll's reads become on the stream: each event told as it is, with its block's height, coalesced to 4
 // a second a room (a flood of one world cannot starve another's, nor the ticker's deploys); and the Earth's 24 h count, from block
 // times only: a transaction carries none, so a deploy waits for its block's frame, then is counted whether or not the ticker
 // was told of it (the count is the chain's truth). A round's tip tells the count too, so it ages out between deploys.

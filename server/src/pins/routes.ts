@@ -1,4 +1,4 @@
-// A room's pins over HTTP (slice 4's 4d; docs/plans/slice-4.md §3's threat model): GET /api/pins reads them, by the
+// A room's pins over HTTP: GET /api/pins reads them, by the
 // room's own rule of who reads (as /api/rooms and the stream), and POST /api/pins and POST /api/pins/unpin change them.
 // Each POST comes from a listed site in JSON (guard.ts) with the login's session; who may pin, a world's moderators and
 // the team, is checked before any work, and an account makes 30 requests a minute, each act and refusal logged.
@@ -12,12 +12,12 @@ import { once } from "../stream/stream.ts";
 import { visitorOf } from "../visitor.ts";
 import type { Pins } from "./pins.ts";
 
-// An account's pin and unpin requests a minute (docs/decisions.md, 2026-10-27).
+// An account's pin and unpin requests a minute.
 const PINS_PER_MINUTE = 30;
 interface Options {
   pins: Pins;
-  // What lets an account pin and unpin in a room, if anything: its world's moderators and the team, or its realm's owner (mayModerate). The
-  // visitor is the one the limits count, for the chain read behind an owner's right.
+  // What lets an account pin and unpin in a room, if anything: its world's moderators and the team, or its realm's
+  // owner (mayModerate). The visitor is the one the limits count, for the chain read behind an owner's right.
   mayPin: (room: string, who: string, visitor: string) => Promise<Right | false>;
   // The same right as a list shows it (`may`): read through a pool of its own, so lists never spend what a pin reads.
   mayShow: (room: string, who: string, visitor: string) => Promise<Right | false>;

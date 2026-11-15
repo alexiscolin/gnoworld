@@ -1,4 +1,4 @@
-// A person's balance (the card's first line): one `auth/accounts/<address>` read of the node, a store read and no eval, kept 60 s per address,
+// A person's balance (the card's first line): one `auth/accounts/<address>` read of the node, a store read and no eval, cached 60 s per address,
 // asked at most ten a second across every visitor (as many as the card lets in), a request in flight shared, the answer cut at 4 KB. What it cannot say it does not guess:
 // past the bucket or with the node down the balance is `unavailable`, never 0.
 import { accountAsk } from "@gnoworld/chain/asks";
@@ -9,9 +9,9 @@ import { abciQuery, Failure, type Send } from "./remote.ts";
 
 export type Balance = { state: "ok"; ugnot: string } | { state: "none" } | { state: "unavailable" };
 
-const KEPT_MS = 60_000;
+const CACHE_MS = 60_000;
 const READ = { ms: 5000, maxBytes: 4096 } as const;
-const KEPT_MOST = 10_000;
+const CACHE_MOST = 10_000;
 const UNAVAILABLE: Balance = { state: "unavailable" };
 
 // The chain's denom is `[a-z/][a-z0-9_.:/-]{2,127}`, so a realm's coins (`/gno.land/r/demo/foo:bar`) are accepted.
@@ -61,12 +61,12 @@ export function balanceReader({
   now: () => number;
   perSecond?: number;
 }): BalanceReader {
-  // A balance read is kept a minute; one the node could not give is not.
-  const kept = keptFlights<Balance>({
+  // A balance read is cached a minute; one the node could not give is not.
+  const cached = keptFlights<Balance>({
     now,
     perSecond,
-    most: KEPT_MOST,
-    until: (balance) => (balance.state === "unavailable" ? undefined : now() + KEPT_MS),
+    most: CACHE_MOST,
+    until: (balance) => (balance.state === "unavailable" ? undefined : now() + CACHE_MS),
   });
   const read = async (address: string): Promise<Balance> => {
     try {
@@ -76,7 +76,7 @@ export function balanceReader({
     }
   };
   return (address) => {
-    const asked = kept(address, () => read(address));
+    const asked = cached(address, () => read(address));
     return asked === "limit" ? Promise.resolve(UNAVAILABLE) : asked;
   };
 }

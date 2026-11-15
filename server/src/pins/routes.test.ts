@@ -8,7 +8,7 @@ import type { Right } from "../roles/mayModerate.ts";
 import { pinsRoutes } from "./routes.ts";
 import type { Pins } from "./pins.ts";
 
-// Slice 4's 4d: GET /api/pins, POST /api/pins and POST /api/pins/unpin (docs/plans/slice-4.md §3's threat model, §7). Who reads follows the
+// GET /api/pins, POST /api/pins and POST /api/pins/unpin. Who reads follows the
 // room's own rule (as /api/rooms and the stream), who pins is the room's world's moderators and the team, checked
 // before any work, and what is pinned is the line Ergo holds, named by its id alone.
 const ORIGIN = "https://gnoworld.test";
@@ -39,7 +39,7 @@ function setup({
 }: {
   answer?: "pinned" | "already" | "not_found" | "full" | "refused" | "unavailable";
   breaks?: "list" | "add";
-  // The room's right as the server gives it from step 2 of part 4: asynchronous, naming what gave it (an owner's, the owner's address).
+  // The room's right as the server gives it: asynchronous, naming what gave it (an owner's, the owner's address).
   right?: (room: string, who: string, visitor: string) => Promise<Right | false>;
   // What the list's `may` asks, the display pool's: the action's by default.
   show?: (room: string, who: string, visitor: string) => Promise<Right | false>;
@@ -237,7 +237,7 @@ describe("pinning a line", () => {
     expect(t.events().join("\n")).toContain("pin_refused");
   });
 
-  // The number is the decision's (docs/decisions.md, 2026-10-27), not the code's own.
+  // The number is a decided limit, not the code's own.
   it("takes 30 pins a minute from one account, then refuses before asking Ergo, and again after the minute", async () => {
     const t = setup({ answer: "already" });
     for (let n = 0; n < 30; n += 1)
@@ -272,7 +272,7 @@ describe("pinning a line", () => {
     expect(added).not.toContain("text m2");
   });
 
-  // The audit log of an unpin names what the pin's does: the room, the line, the account (as the log hashes it), no text (G10).
+  // The audit log of an unpin names what the pin's does: the room, the line, the account (as the log hashes it), no text.
   it("logs the room, the line's id and the account of an unpin too, and its account is the one that unpinned", async () => {
     const t = setup();
     await t.pin({ room: "#bubble/games", msgid: "m2" }, { who: "mod" });
@@ -353,7 +353,7 @@ describe("unpinning a line", () => {
   });
 });
 
-// Part 4 (docs/plans/owners-moderation.md, section 3): the right is asynchronous and says what gave it. An owner of the realm's namespace
+// The right is asynchronous and says what gave it. An owner of the realm's namespace
 // pins in its rooms, the log names the account and the owner, and a right that cannot be computed refuses before Ergo is asked.
 const hmac = (who: string): string =>
   createHmac("sha256", "a-pepper-of-forty-characters-0123456789").update(who).digest("hex");

@@ -1,4 +1,4 @@
-// A universe's one poll of its public indexer over HTTP (slice 9g, answer 9g-4, by Alexis): once a block it asks the tip, and when
+// A universe's one poll of its public indexer over HTTP: once a block it asks the tip, and when
 // the tip moved it asks the transactions after the cursor, a page at a time, each row read by message.ts. The cursor is a place,
 // (height, index), moved as each row is delivered, so a block of any size is read across pages and rounds and a slow indexer still
 // advances. A failed round backs off with a jitter and leaves the cursor; a transaction is read once by its hash (the hashes are

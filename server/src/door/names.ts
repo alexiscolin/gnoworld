@@ -1,5 +1,5 @@
-// Whether an account has a name on the mainnet (D43, D92), for its quota: one vm/qeval of r/sys/users through the chain
-// package, on a node whose status names the mainnet's chain (D120), the server's one way out (net.ts) its transport, with
+// Whether an account has a name on the mainnet, for its quota: one vm/qeval of r/sys/users through the chain
+// package, on a node whose status names the mainnet's chain, the server's one way out (net.ts) its transport, with
 // its timeout and its answer capped. A failed read means none, the lower quota, never the higher. The answers are kept
 // 10,000 accounts at most: a name an hour, none ten minutes, a failure a minute.
 import { readEvaluated } from "@gnoworld/chain/node";
@@ -20,7 +20,7 @@ interface Options {
   max?: number;
 }
 
-// The mainnet's node, and when it was last seen on its chain: its status is read once a minute (10h's review, V7).
+// The mainnet's node, and when it was last seen on its chain: its status is read once a minute.
 interface Node {
   rpc: string;
   chainId: string;
@@ -36,7 +36,7 @@ const MAX_BYTES = 64 * 1024;
 
 /** Whether an account has a name on the mainnet: its record in r/sys/users, missing or deleted, by that realm's own nil
  * check (users.gno, store.gno, read on gnoland-1), through the RPC's vm/qeval; undefined when the read fails, the node
- * being another chain's included. The expression is a fixed one over a parsed address (D114). */
+ * being another chain's included. The expression is a fixed one over a parsed address. */
 async function readName(node: Node, account: Address): Promise<boolean | FailureKind> {
   const expression = `gno.land/r/sys/users.ResolveAddress("${account}").IsDeleted()`;
   const read = await readEvaluated(node.rpc, expression, {
@@ -70,7 +70,7 @@ export function makeNames({
   // The Map's first account is the one read longest ago: an account is set again at each read.
   const known = new Map<string, { named: boolean; until: number }>();
   const node: Node = { rpc, chainId, send, now, seen: new Map() };
-  // A failed read is logged a minute at most, its kind alone, so a node of another chain is seen (10h's review, V9).
+  // A failed read is logged a minute at most, its kind alone, so a node of another chain is seen.
   let quietUntil = -Infinity;
   return async (account) => {
     const at = now();

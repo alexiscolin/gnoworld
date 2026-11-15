@@ -12,7 +12,7 @@ import { cliDocument } from "./cliProof.ts";
 import { linkRoutes, serverLinks } from "./linkRoutes.ts";
 import type { Links } from "./links.ts";
 
-// Part 4 of the owners' moderation (docs/plans/owners-moderation.md, section 5 and the threat model's rows): /api/links. Every route has the
+// The /api/links routes. Every route has the
 // guard (a listed Origin, JSON for a POST, no-store), the session, strict bodies, one refusal shape, and limits of its own. A session that
 // signed more than 10 minutes ago is `unauthenticated` (the answer words have no "stale": the page signs in again, as for no session).
 const ORIGIN = "https://gnoworld.test";
@@ -792,7 +792,7 @@ describe("with the real links, across the routes (part 4's red pass)", () => {
   });
 });
 
-// D13940 (M2): a command-line key releases itself with no session. The same gates but the session: a listed Origin, JSON, strict bodies, a
+// A command-line key releases itself with no session. The same gates but the session: a listed Origin, JSON, strict bodies, a
 // limit of their own per visitor and /64 and a cap of release codes pending in all; every answer the same for a linked and a free address.
 describe("POST /api/links/release/challenge and /release/verify", () => {
   const challengeB = { address: B };

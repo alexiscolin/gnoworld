@@ -1,4 +1,4 @@
-// A second rate rule, beside check.ts's 20 messages a minute (decisions f0c19ce, F1123): 100 lines a minute an account,
+// A second rate rule, beside check.ts's 20 messages a minute: 100 lines a minute an account,
 // a message of several lines counting each of its lines. Counted in memory, so a restart forgets it and the database
 // keeps its shape.
 import { remember } from "../remember.ts";
@@ -21,7 +21,7 @@ export interface LineRate {
   held: () => number;
 }
 
-/** The lines each account sent; the account touched longest ago is forgotten past 10,000, never by time (F1710, F1727). */
+/** The lines each account sent; the account touched longest ago is forgotten past 10,000, never by time. */
 export function lineRate(): LineRate {
   // The account touched longest ago first: a Map keeps insertion order, and a touched account goes to the back.
   const accounts = new Map<string, Seen[]>();

@@ -43,20 +43,20 @@ const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
 
 const config = loadConfig(process.env);
-// Checked at boot, so a bad roles file never starts a server; the bot's link (3h) reads it.
+// Checked at boot, so a bad roles file never starts a server; the bot's link reads it.
 const roles = loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
 const db = openDatabase(config.database, migrations);
-// The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
-// The search index (slice 13): the retention expires its lines, the chat feeds it.
+// The search index: the retention expires its lines, the chat feeds it.
 const search = makeSearch(db, { roles, now: Date.now });
-// The link cards (slice 13): the chat makes the flow, and the retention reads it once it exists; a card is checked by OpenAI or not shown.
+// The link cards: the chat makes the flow, and the retention reads it once it exists; a card is checked by OpenAI or not shown.
 const cards = cardsBoot(config);
-// What Jarvis's door asks of the chat (D13985): the accounts heard speak, and the answers kept until a line is taken.
+// What Jarvis's door asks of the chat: the accounts heard speak, and the answers kept until a line is taken.
 const chainId = (): string | undefined =>
   config.universes === undefined ? undefined : defaultUniverse(config.universes).chainId;
 const translations = translationsBoot();
 const memory = doorMemory(db, config.origins, { now: Date.now, chainId });
+// The verdicts kept 180 days and below their cap, now and every five minutes, Ergo's folder measured.
 const retention = startRetention(db, {
   log,
   ergoData: config.ergoData,
@@ -75,11 +75,11 @@ const { prices, worlds, previews, hubs, tokens, trending, network, balance, list
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
-// The login's sessions, read for the rooms' routes (3l) and the rooms a reader may see (3m).
+// The login's sessions, read for the rooms' routes and the rooms a reader may see.
 const { session, signedAt } = makeLogin(db, { chains: config.chains, now: Date.now });
-// The first signals (9h) and the chain in the rooms (9g), told on the one stream; the chain none without both data files.
+// The first signals and the chain in the rooms, told on the one stream; the chain none without both data files.
 const { stream, signals, chain } = bootSignals({ app, db, roles, config, log, session });
-// Jarvis's door (10g): a question from a room, held to its account's quota, to jarvis on the network only the two share;
+// Jarvis's door: a question from a room, held to its account's quota, to jarvis on the network only the two share;
 // none without JARVIS_URL. Its quotas, allowlist and jarvis's budgets change on the admin API alone.
 const door =
   config.jarvis === undefined
@@ -100,7 +100,7 @@ const chat = startChat(
     spared: spared(roles),
     ...guestSettings(config, roles),
   },
-  // Who is here keeps its history beside the database (7h); a database held in memory keeps none.
+  // Who is here keeps its history beside the database; a database held in memory keeps none.
   {
     log,
     pepper: config.pepper,
@@ -117,10 +117,10 @@ const chat = startChat(
 cards.attach(chat.cards);
 memory.said.attach(chat.said);
 app.route("/api/activity", chat.activity);
-// The guest chat (D430): a name and a cookie, then a line the bot says; both answer 404 under GUEST_CHAT=off.
+// The guest chat: a name and a cookie, then a line the bot says; both answer 404 under GUEST_CHAT=off.
 if (chat.guest !== undefined) app.route("/api/guest", chat.guest);
 if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
-// The markets row's sparklines (8i): the prices timer's day, a 404 while it has none or without the timer.
+// The markets row's sparklines: the prices timer's day, a 404 while it has none or without the timer.
 app.route("/api/markets/history", historyRoutes(prices?.history ?? (() => undefined)));
 // The chat's /trending card: the last 7 days' most called worlds, the last pass's, a 404 while it has none.
 app.route("/api/trending", trendingRoutes(trending));
@@ -141,7 +141,7 @@ app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
 translations.attach(chat, app, { session, config, log });
-// Search (slice 13, B2): the lines of one world's rooms a reader may open, the right asked again on every page.
+// Search: the lines of one world's rooms a reader may open, the right asked again on every page.
 app.route(
   "/api/search",
   searchRoutes({
@@ -156,7 +156,7 @@ app.route(
     now: Date.now,
   }),
 );
-// Each world's unread count (slice 13): the places a page forwards, counted against the search index's lines.
+// Each world's unread count: the places a page forwards, counted against the search index's lines.
 unreadBoot(app, { db, roles, archived: chat.rooms.archived, session, origins: config.origins, log, now: Date.now });
 // A call's detail, read from the default universe's indexer and kept by hash; none without the universes' file.
 if (config.universes !== undefined)
@@ -171,9 +171,9 @@ if (config.universes !== undefined)
     }),
   );
 const ahead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck, listing });
-// The owner's right and the links (owners' moderation, part 4): the pins ask the right, /api/links lists and makes the links.
+// The owner's right and the links: the pins ask the right, /api/links lists and makes the links.
 mountOwners(app, { db, config, hubs, chat, spared: spared(roles), session, signedAt, log });
-// Whether it is on, told to any page; off with no door at all (10u-a).
+// Whether it is on, told to any page; off with no door at all.
 app.route("/api/jarvis", stateRoutes({ on: door?.settings.on ?? false }));
 if (door !== undefined)
   mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });

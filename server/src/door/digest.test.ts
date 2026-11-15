@@ -9,9 +9,9 @@ import { digestRoutes } from "./digest.ts";
 import type { Jarvis } from "./jarvis.ts";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
-// 10k: POST /api/jarvis/digest. Each check before any work, in order: the site and the type, the session, the switch,
+// POST /api/jarvis/digest. Each check before any work, in order: the site and the type, the session, the switch,
 // the rate, the body, a question left; then jarvis, its answer passed on once it parses. A digest jarvis made takes
-// one question of the asker's quota, one from its cache none (10k-1, D195).
+// one question of the asker's quota, one from its cache none.
 type Digested = Awaited<ReturnType<Jarvis["digest"]>>;
 const opened: DatabaseSync[] = [];
 afterEach(() => {

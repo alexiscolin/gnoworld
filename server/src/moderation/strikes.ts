@@ -1,4 +1,4 @@
-// An account's strikes (decision 146; slice 3's plan, 3k): its own lines hidden in one world's rooms since
+// An account's strikes: its own lines hidden in one world's rooms since
 // a time, read from the verdicts, where an account is its pepper-keyed hash, never the address.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import { roomWorld } from "../rooms/rooms.ts";
 import { accountKey, lineTime } from "./check.ts";
 import type { Mutes } from "./mute.ts";
 
-// The verdicts by account and time: a strike's count and a line's rate read them (3k).
+// The verdicts by account and time: a strike's count and a line's rate read them.
 export const STRIKE_TABLES = `
 CREATE INDEX verdicts_by_account ON verdicts (account, at);
 `;
@@ -39,7 +39,7 @@ interface StrikeOptions {
 
 /** After a hide: the account muted in the line's world once some window of the setting's minutes, holding the
  * line's own time, holds as many strikes there as the setting says, unless the roles file spares it. Checks
- * settle in any order, so a hide later than the line counts too (the max review). */
+ * settle in any order, so a hide later than the line counts too. */
 export function makeStrike(
   db: DatabaseSync,
   { pepper, now, mute, mutes, spared }: StrikeOptions,
@@ -47,7 +47,7 @@ export function makeStrike(
   const strikes = makeStrikes(db, pepper);
   const Own = z.object({ at: z.number() }).optional();
   const own = db.prepare("SELECT at FROM verdicts WHERE msgid = ?");
-  // The time its hide was written at: a line with no server-time of its own read the clock then, and would again here (F13188).
+  // The time its hide was written at: a line with no server-time of its own read the clock then, and would again here.
   const timeOf = (said: Said): number => Own.parse(own.get(said.msgid))?.at ?? lineTime(said, now);
   return (said) => {
     const world = roomWorld(db, said.room);

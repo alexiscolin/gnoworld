@@ -1,4 +1,4 @@
-// The chain a room's world lives on, for a function Jarvis explains (D13920): the server serves one universe, its default
+// The chain a room's world lives on, for a function Jarvis explains: the server serves one universe, its default
 // one, and every room it holds belongs to a world of it. A room the server does not hold (a ghost, a private message) has none.
 import type { DatabaseSync } from "node:sqlite";
 

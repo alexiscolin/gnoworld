@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { snippetOf } from "./snippet.ts";
 
-// Slice 13, B2: a hit's text cut to 240 characters around the first word found, the words' ranges as offsets into that text.
+// A hit's text cut to 240 characters around the first word found, the words' ranges as offsets into that text.
 const slice = (text: string, marks: [number, number][]): string[] => marks.map(([from, to]) => text.slice(from, to));
 
 describe("snippetOf, the words found", () => {

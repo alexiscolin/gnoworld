@@ -1,4 +1,4 @@
-// A world is a product (decision of 2026-11-01, 11): its realms grouped under the id core's `worldIdOf` reads from a path alone.
+// A world is a product: its realms grouped under the id core's `worldIdOf` reads from a path alone.
 import { worldIdOf } from "@gnoworld/core";
 import { RealmPath, WORLDS_CAPS } from "@gnoworld/schemas/indexer";
 
@@ -8,7 +8,7 @@ export interface Group {
   readonly realms: string[];
 }
 
-// The chain's own realms (names, users, params, validators…): its machinery, never a world (Alexis, 2026-11-07, D346).
+// The chain's own realms (names, users, params, validators…): its machinery, never a world.
 const SYSTEM = "gno.land/r/sys/";
 
 /** Whether `path` is one of the chain's own realms, which no pass reads nor writes. */

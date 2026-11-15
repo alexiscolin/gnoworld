@@ -1,4 +1,4 @@
-// The index failing never stops the chat or the retention (T8): a step that throws is logged under `event` and answers its fallback.
+// The index failing never stops the chat or the retention: a step that throws is logged under `event` and answers its fallback.
 import type { Log } from "@gnoworld/service/log";
 
 export const guarded =

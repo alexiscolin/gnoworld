@@ -7,7 +7,7 @@ import type { Raw } from "./rawClient.ts";
 import { cleanUp, guest, join, login, msgid, oper, say, start, stops, sync } from "./ergoKit.ts";
 import { chatFor, RULES, TABLES } from "./ergoChat.ts";
 
-// The chat over the real Ergo (3j to 3m): the bot hides, catches up, mutes, makes rooms and keeps them.
+// The chat over the real Ergo: the bot hides, catches up, mutes, makes rooms and keeps them.
 
 afterEach(cleanUp);
 
@@ -24,7 +24,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const flagged = await say(alice, "#bubble", "I will hurt you");
     // The bot's verdict, which the full gate's load slows past the 2 s a line's echo takes.
     await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`), 10_000);
-    // The notice can reach the author before their own echo, and `say` has then read past it, so all they received is searched (F4055).
+    // The notice can reach the author before their own echo, and `say` has then read past it, so all they received is searched.
     const notice = `NOTICE ${author} :Your message in #bubble was hidden: violence. The rules: https://gno.world/rules`;
     await expect.poll(() => alice.lines().filter((line) => line.includes(notice)), { timeout: 10_000 }).toHaveLength(1);
     await expect.poll(() => verdicts().length).toBe(2);
@@ -32,7 +32,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
   });
 
-  // The red pass's R1: Ergo gives a reader without draft/multiline each part as a line of its own, the id on the
+  // Ergo gives a reader without draft/multiline each part as a line of its own, the id on the
   // first alone, so a line past the first would go unchecked; the link asks for the capability.
   it("checks a message of several lines whole, its last line the flagged one, and hides it by the id of its batch", async () => {
     const e = await start();
@@ -52,7 +52,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(verdicts()).toHaveLength(1);
   });
 
-  // G4 (F1123): a message of 40 lines is 40 of an account's 100 lines a minute, as Ergo relays and stamps it, so
+  // A message of 40 lines is 40 of an account's 100 lines a minute, as Ergo relays and stamps it, so
   // the third of them within the minute is hidden as too fast, the first two kept and judged.
   it(
     "hides as too fast the third message of 40 lines in a minute, the first two checked and kept",
@@ -77,7 +77,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     },
   );
 
-  // G5 of the green pass: Ergo's +C refuses a part that STARTS with a CTCP's mark (not ACTION) and no other, so these
+  // Ergo's +C refuses a part that STARTS with a CTCP's mark (not ACTION) and no other, so these
   // batches are relayed and kept, to readers with the capability, to plain clients line by line, and to history.
   // The page folds none of them, so the bot must hide each by the id of its opening line, unjudged.
   it.each([
@@ -116,7 +116,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     },
   );
 
-  // F2651, F2653: Ergo writes a line into its SQLite history after relaying it, and waits up to 10 s for a writer
+  // Ergo writes a line into its SQLite history after relaying it, and waits up to 10 s for a writer
   // that holds the database (irc/sqlite/history.go busy_timeout). The bot's hide reaches Ergo in that gap and is
   // refused UNKNOWN_MSGID until the write lands: the asks must outlast the hold, not just a quick race.
   it.each([[300], [2000]])(
@@ -469,7 +469,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       },
     );
 
-    // The client of slice 4's 4b reads the public rooms as a guest: it joins them and asks for their history.
+    // The client reads the public rooms as a guest: it joins them and asks for their history.
     it(
       "lets a guest join and read the history of the open and announcement rooms, of no accounts or members room (4b)",
       { timeout: 20_000 },
@@ -669,14 +669,14 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     // Two passes and more.
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(changed()).toBe(before);
-    // Passes that kept running (F577): an invite taken off by hand comes back.
+    // Passes that kept running: an invite taken off by hand comes back.
     chief.send("SAMODE #bubble/crew -I crew0");
     await expect.poll(invites, { timeout: 5000 }).toBe(100);
     expect(changed()).toBeGreaterThan(before);
   });
 });
 
-// 4d-dm-bar (docs/decisions.md, 2026-10-27): the message bar in a direct message rests on Ergo v2.19.1 carrying each act
+// The message bar in a direct message rests on Ergo v2.19.1 carrying each act
 // between two accounts as in a room: tags on a PRIVMSG or TAGMSG to a nick, a REDACT reaching both and kept to the
 // line's author (irc/server.go:1327-1334).
 describe("a direct message's bar on the real Ergo", { timeout: 40_000 }, () => {

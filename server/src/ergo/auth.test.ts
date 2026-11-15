@@ -124,7 +124,7 @@ describe("Ergo's auth script, answered by the server", () => {
     expect(await ask(sent)).toBe(NO);
   });
 
-  // auth.ts:87: what comes after the answer is never read, a ticket in it never spent.
+  // What comes after the answer is never read, a ticket in it never spent.
   it("reads nothing a client writes after its answer", async () => {
     const { tickets, port, events } = await setup();
     const [first, second] = [tickets.mint(ME), tickets.mint(ME)];
@@ -395,7 +395,7 @@ describe("Ergo's auth script, answered by the server", () => {
 });
 
 describe("listenAt", () => {
-  // auth.ts:110: a socket a crash left where Ergo dials is removed before the server listens there; a file never is (below).
+  // A socket a crash left where Ergo dials is removed before the server listens there; a file never is (below).
   it("removes a stale socket at its path before it listens", async () => {
     const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
     const server = authServer(db, { log: logger(PEPPER, () => true) });
@@ -410,7 +410,7 @@ describe("listenAt", () => {
     expect(files.unlinked).toEqual([path]);
   });
 
-  // The sandbox binds no Unix socket, so only the refusals are tried here; the bind is 3e's operator test.
+  // The sandbox binds no Unix socket, so only the refusals are tried here; the bind is the operator's test.
   it("refuses a path it cannot listen on, naming the setting, and leaves a file there as it was", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gnoworld-auth-"));
     try {

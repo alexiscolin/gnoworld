@@ -1,5 +1,5 @@
-// A world's last day of messages an hour (slice 8, 8g; a plate's "ACTIVITY · LAST 24 H", frames 26 and 40), from the history who is here
-// keeps (presence.ts, 7t3): its busiest sample of each hour, an hour no sample read null, and its pace now. Served at GET
+// A world's last day of messages an hour (a plate's "ACTIVITY · LAST 24 H"), from the history who is here
+// keeps (presence.ts): its busiest sample of each hour, an hour no sample read null, and its pace now. Served at GET
 // /api/presence/hours?world= beside who is here (present.ts); counts alone.
 import { HubSlug, PRESENCE_HOURS, type PresenceHours } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";

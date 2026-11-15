@@ -59,7 +59,7 @@ import {
 } from "./ergoKit.ts";
 import type { Relayed } from "../irc/relay.ts";
 
-// Every expectation comes from .claude/tmp/ergo-spike/RESULTS.md, section 3 (Ergo v2.19.1, run for real).
+// Every expectation was observed on a real Ergo v2.19.1.
 
 afterEach(cleanUp);
 
@@ -130,7 +130,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
 
-  // F1492 holds the store is SQLite, not a ring: a room nobody registered keeps its lines across a restart too.
+  // The store is SQLite, not a ring: a room nobody registered keeps its lines across a restart too.
   it("keeps the history of a room nobody registered across a restart (F1492)", { timeout: 40_000 }, async () => {
     const e = await start({ dir: keptFolder() });
     const chief = await lobby(e);
@@ -146,7 +146,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await reader.expect(replayed("PRIVMSG #lobby :unregistered-marker-1$"));
   });
 
-  // 4e, decided by Alexis (docs/decisions.md): Ergo sets +R on every connection at its registration
+  // Ergo sets +R on every connection at its registration
   // (default-user-modes, irc/server.go:445, v2.19.1), so an account that asks nothing hears no guest.
   it("refuses a guest's direct message to an account that sent no MODE, and lets an account's through", async () => {
     const e = await start();
@@ -443,7 +443,7 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await noPlayback.expect(/:HistServ!HistServ@localhost PRIVMSG #lobby :alice sent a TAGMSG/);
   });
 
-  // F1492: the room's history is Ergo's SQLite store (history.persistent, unregistered-channels), which holds no
+  // The room's history is Ergo's SQLite store (history.persistent, unregistered-channels), which holds no
   // count of items, only expire-time: the 2,048 of channel-length is the in-memory ring of a room not persisted.
   // The reader pages back from the latest item to the first line, 1,000 items a page (chathistory-maxmessages).
   it(
@@ -533,7 +533,7 @@ describe("history and tags", { timeout: 30_000 }, () => {
     expect(obs.lines().slice(seen).join("\n")).not.toContain("TAGMSG");
   });
 
-  // 4f: who is typing, relayed live to the room's members (IRCv3's +typing), as the page shows it.
+  // Who is typing, relayed live to the room's members (IRCv3's +typing), as the page shows it.
   it("relays an account's +typing to the room's members live", async () => {
     const { members } = await room(["alice", "obs"]);
     const [alice, obs] = members;
@@ -542,12 +542,12 @@ describe("history and tags", { timeout: 30_000 }, () => {
     expect(await obs.expect(/ TAGMSG #lobby$/)).toMatch(/^@(\S*;)?\+typing=active[;\s].*:alice!/);
   });
 
-  // 4f: the reading place Ergo keeps for an account and tells each of its sessions (draft/read-marker).
+  // The reading place Ergo keeps for an account and tells each of its sessions (draft/read-marker).
   it("tells each session of an account the room's place as it joins, then every other one a later place set", async () => {
     const { e } = await room([]);
     const one = await login(e, "alice");
     await join(one, "#lobby");
-    // From the server's own name, no user source, as core's fromServer reads it (the green pass's G8).
+    // From the server's own name, no user source, as core's fromServer reads it.
     expect(one.lines().join("\n")).toMatch(/^(@\S+ )?:[^!@\s]+ MARKREAD #lobby \*$/m);
     const id = await say(one, "#lobby", "read me");
     const time = /time=([^;\s]+)/.exec(one.lines().find((l) => l.includes(id)) ?? "")?.[1] ?? "";
@@ -626,7 +626,7 @@ describe("moderation", { timeout: 40_000 }, () => {
     await forbidden(alice, bob, "another author");
   });
 
-  // The menu's green pass (G14): the page reads Ergo's own refusal (core's refusedOf), not the scripted Ergo's copy.
+  // The page reads Ergo's own refusal (core's refusedOf), not the scripted Ergo's copy.
   it("refuses another's line and an unknown msgid as the page reads them, and names no line for no room", async () => {
     const e = await start();
     await lobby(e);
@@ -1287,7 +1287,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
 });
 
 describe("the template's limits and privacy (slice 3's max review)", { timeout: 30_000 }, () => {
-  // The composer's budget (core's compose, 4c): Ergo relays an account's line of exactly it, under its nick, user
+  // The composer's budget (core's compose): Ergo relays an account's line of exactly it, under its nick, user
   // and cloak, and refuses one byte more rather than cut it (allow-truncation off).
   it("relays an account's line of the composer's whole budget, 510 bytes relayed, and refuses one byte more", async () => {
     const e = await start();
@@ -1457,7 +1457,7 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
   });
 });
 
-// draft/multiline (slice 4, docs/decisions.md row 255): the template turns it on with the composer's caps (core's
+// draft/multiline: the template turns it on with the composer's caps (core's
 // compose); Ergo relays a message of several lines to a reader with the capability as one batch, its id on the
 // opening line, replays it so inside a history page, and refuses one past its caps (irc/handlers.go, v2.19.1).
 describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () => {
@@ -1552,7 +1552,7 @@ describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () 
     expect(logged(chief)).not.toMatch(/PRIVMSG #lobby :a{10}/);
   });
 
-  // The red pass's R10: the caps counted as Ergo counts them (every break billed one byte, a blank line a line),
+  // The caps counted as Ergo counts them (every break billed one byte, a blank line a line),
   // so the composer's last byte and last line go, and its part budget is Ergo's (a part over it: 417, none relayed).
   it(`relays a message at exactly ${String(MULTILINE_LINES)} lines and ${String(MULTILINE_BYTES)} bytes, blank lines inside, whole`, async () => {
     const e = await start();
@@ -1593,9 +1593,8 @@ describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () 
   });
 });
 
-// Moved here from relaymsg.test.ts: a test sits beside the file it tests.
 describe("RELAYMSG: the bot says a guest's line (D430)", () => {
-  // The chat for everyone speaks through the bot (D430, docs/plans/chat-for-everyone-spike.md, section 1): Ergo's RELAYMSG on the
+  // The chat for everyone speaks through the bot: Ergo's RELAYMSG on the
   // pinned build, with the rendered template's `server.relaymsg` and the `relaymsg` capability of the bot's class.
   afterEach(cleanUp);
 

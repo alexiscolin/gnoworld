@@ -1,6 +1,7 @@
-// The link cards' flow (slice 13, L3; docs/plans/link-previews.md §3): a line that passed moderation, its first https link read by the link
-// reader, the card's text and picture checked in one call, then told. One fetch per URL per TTL, whoever posts it; nothing the page reads
-// ever fetches. A card never exists before its check passed, and a line's removal sticks.
+// The link cards' flow: a line that passed moderation, its first https link read by the link
+// reader, the card's text and picture checked in one call, then told. One fetch per URL per TTL,
+// whoever posts it; nothing the page reads ever fetches. A card never exists before its check
+// passed, and a line's removal sticks.
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { cardLinkOf, GUEST_PREFIX, normalisedUrl } from "@gnoworld/core";

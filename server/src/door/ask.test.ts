@@ -20,7 +20,7 @@ import { KEPT_TABLES, makeKept } from "./kept.ts";
 import { makeServed } from "./served.ts";
 import type { Offered } from "./said.ts";
 
-// 10g: POST /api/jarvis/ask, each check before any work, in the brief's order (D42, D43, D44, D93).
+// POST /api/jarvis/ask, each check before any work, in the order the door makes them.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
 const ORIGIN = "https://gnoworld.test";
 const PEER = "203.0.113.7";
@@ -43,7 +43,7 @@ const LINES = () => [
 ];
 type Asked = Awaited<ReturnType<Jarvis["ask"]>>;
 const ANSWER = (): JarvisAnswer => ({ status: "answered", markdown: "It closes today.", buttons: [] });
-// What jarvis gives the door: the answer and its cost, which the page never reads (D13985).
+// What jarvis gives the door: the answer and its cost, which the page never reads.
 const PAID = (cost = 1000): JarvisPaidAnswer => ({
   status: "answered",
   markdown: "It closes today.",
@@ -486,7 +486,7 @@ describe("a question to Jarvis", () => {
   });
 });
 
-// 10u-g, D13985 and D13986: every misuse that can be told without a model is stopped before any model call.
+// Every misuse that can be told without a model is stopped before any model call.
 describe("a question's answer offered to the room", () => {
   it("a fixed ask is never relayed, nor is a declined question", async () => {
     const { ask, offers } = setup();
@@ -936,7 +936,6 @@ describe("Jarvis's guards before any model call", () => {
   });
 });
 
-// 10u-g, the red pass's findings and the chief's answers (D13985, D13986).
 describe("Jarvis's guards, second round", () => {
   const distinct = (at: number, room = "#bubble") => ({ body: { question: `a question number ${String(at)}`, room } });
   const hashed = createHmac("sha256", PEPPER).update(ANNA).digest("hex");
@@ -1203,7 +1202,6 @@ describe("Jarvis's guards, second round", () => {
   });
 });
 
-// 10u-g step 4 (D13988): the review's fixes.
 describe("Jarvis's guards, step 4", () => {
   const distinct = (at: number) => ({ body: { question: `a question number ${String(at)}`, room: "#bubble" } });
 
@@ -1317,7 +1315,7 @@ describe("Jarvis's guards, step 4", () => {
   });
 });
 
-// 10u-g round 2 (the security review): the share read again before the question goes, a lost connection charged, a
+// The share read again before the question goes, a lost connection charged, a
 // failing read leaving nothing behind.
 describe("Jarvis's guards, round 2", () => {
   const distinct = (at: number) => ({ body: { question: `a question number ${String(at)}`, room: "#bubble" } });

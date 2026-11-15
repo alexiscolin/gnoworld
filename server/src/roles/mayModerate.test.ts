@@ -11,9 +11,9 @@ import { makeOwners } from "./owners.ts";
 import { isTeam, mayCreateRoom, spared, type Roles } from "./roles.ts";
 import { staffOf } from "../rooms/types.ts";
 
-// Part 4 of the owners' moderation (docs/plans/owners-moderation.md, section 3's "Part 4" and 6): the one place that gives an owner's right.
+// The owners' moderation: the one place that gives an owner's right.
 // A right is the roles file's (`moderates`, unchanged) or the holder of the room's namespace being the account or one of its identity, read
-// on the world's own chain. Each test is named after the fault it catches (the security review's traps, 1 to 9, and F13831).
+// on the world's own chain. Each test is named after the fault it catches.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const MOD = Address.parse("g1m68zzc430znqyxzv6jsfz45hgccacx3mk6qajw");
 const OWNER = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");

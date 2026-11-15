@@ -8,7 +8,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import { QUOTA_TABLES } from "./quota.ts";
 import { DAY_TABLES, makeDay, SHARE, STRIKES } from "./day.ts";
 
-// D13985 points 4 and 5: an account's strikes and its own spend, per UTC day, kept in the server's database.
+// An account's strikes and its own spend, per UTC day, kept in the server's database.
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const DAY = 24 * 60 * 60_000;
 const ANNA = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

@@ -1,4 +1,4 @@
-// Each realm's rollup (slice 13a), a pass of it after the worlds' file: the chain's calls above the height kept, read a page at a time
+// Each realm's rollup, a pass of it after the worlds' file: the chain's calls above the height kept, read a page at a time
 // (history.ts's walk), dated by their blocks' times (blockDays.ts), kept in the database (rollupStore.ts); then one file per realm of the
 // worlds' file, named by its path's hash, shed to its gzip cap. A fault is logged by its kind and never undoes the worlds' pass.
 import { rollupName } from "@gnoworld/core";
@@ -53,13 +53,13 @@ export async function readRollup(
   const reading = readingOf({ ...reader, rich: true }, options.isStopped);
   const ask = (heights: readonly number[]) => timesOf(reading, heights);
   // A realm the list holds, or one a successful call proves deployed (a list may miss it this pass); a failed call may name any path.
-  const kept = (row: Row, path: string) =>
+  const wanted = (row: Row, path: string) =>
     options.known.has(path) || (row.success && RealmPath.safeParse(path).success);
   try {
     const anchor = store.anchor();
     if (anchor !== undefined && !(await anchorHolds(reading, anchor))) store.reset();
     await walkCalls(reading, store.height(), async (rows, through) => {
-      const mine = rows.map((row) => ({ ...row, calls: row.calls.filter(({ path }) => kept(row, path)) }));
+      const mine = rows.map((row) => ({ ...row, calls: row.calls.filter(({ path }) => wanted(row, path)) }));
       const dated = await daysOf(
         mine.flatMap(({ height, calls }) => (calls.length > 0 ? [height] : [])),
         ask,

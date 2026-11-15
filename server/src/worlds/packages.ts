@@ -1,4 +1,4 @@
-// What the worlds job reads of a package, once (slice 7, 7c): its imports and exported functions from `vm/qdoc`, one query
+// What the worlds job reads of a package, once: its imports and exported functions from `vm/qdoc`, one query
 // (gnovm/pkg/doc/json_doc.go:18-28 at v1.5.0, read from the source: gnomcp has no route to it), and its deployer from the
 // `[addpkg]` creator the chain stamps into gnomod.toml (keeper.go:637-639), read with `vm/qfile`. Code does not change, so a
 // package already known is never asked again. Every answer is capped, parsed and filtered; a name that does not fit the

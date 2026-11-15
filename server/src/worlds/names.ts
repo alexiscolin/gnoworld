@@ -1,4 +1,4 @@
-// The names registered for deployers' addresses (slice 7, 7c), one `vm/qeval` each through core's builder, the only place the
+// The names registered for deployers' addresses, one `vm/qeval` each through core's builder, the only place the
 // expression is composed. The answer is typed text, `("name" string)`; anything else (no name registered, a panic, a longer or
 // odd text) is no name. A network fault ends the pass, a refusal by the chain only leaves that address without one.
 import { nameAsk } from "@gnoworld/chain/asks";

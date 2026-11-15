@@ -97,7 +97,7 @@ describe("who reads a room", () => {
   });
 });
 
-// Slice 9h, D214: a world's first words are served to anyone with their author's address, so only a line of a room open to
+// A world's first words are served to anyone with their author's address, so only a line of a room open to
 // all to read and write, and listed, can be them.
 describe("the rooms whose lines may be a world's first words", () => {
   it("are the open and listed ones: no announcement, accounts, members or hidden room, and a room the file does not type is open", () => {
@@ -164,7 +164,7 @@ describe("a realm's room, which no file types", () => {
   });
 });
 
-// Slice 13, B1 (D13924): the rooms whose lines the index holds are those a guest or an account may read, listed or not
+// The rooms whose lines the index holds are those a guest or an account may read, listed or not
 // hidden: open, announcement and accounts rooms, never a members room, never a hidden one.
 describe("the rooms the search index holds", () => {
   const typed = {

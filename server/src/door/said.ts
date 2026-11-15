@@ -1,4 +1,4 @@
-// Jarvis's public, kept answers (D13067, D13089): an answer to a personal question, judged like a guest's line (the room's
+// Jarvis's public, kept answers: an answer to a personal question, judged like a guest's line (the room's
 // rules, the provider), said once under Jarvis's nick as a plain excerpt, and kept by its line's id so every reader draws the card.
 // A members room's answer, a refused one and any fault stay the asker's private card, and never strike the asker: the words are the
 // model's. Readers get the fly buttons alone. Allowances are spent before the first await.

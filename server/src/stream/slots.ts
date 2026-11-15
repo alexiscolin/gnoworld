@@ -27,7 +27,7 @@ function slots(perVisitor: number, total: number) {
   };
 }
 
-// The chat's places and the Earth's apart: a stream that follows the Earth's room alone takes the Earth's (F5775).
+// The chat's places and the Earth's apart: a stream that follows the Earth's room alone takes the Earth's.
 export function admission({ perVisitor = 4, total = 1000, earthTotal = 1000 }: Budgets) {
   const chat = slots(perVisitor, total);
   const earth = slots(perVisitor, earthTotal);

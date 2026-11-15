@@ -1,4 +1,4 @@
-// A room's name checked as a message of its world is (D394): the world's rules read it as words (hyphens as spaces), then the
+// A room's name checked as a message of its world is: the world's rules read it as words (hyphens as spaces), then the
 // provider; a name the provider could not read is left unchecked, which the route answers by refusing, never by making the room.
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
@@ -12,7 +12,7 @@ interface Options {
   thresholds: Thresholds;
 }
 
-export type NameVerdict = "pass" | "hide" | "unchecked";
+type NameVerdict = "pass" | "hide" | "unchecked";
 
 export function makeNameChecker({ rulesOf, provider, thresholds }: Options) {
   return async (world: string, name: string): Promise<NameVerdict> => {

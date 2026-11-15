@@ -1,6 +1,6 @@
-// The login (ADR-0002 §4; slice 3's plan, 3c): the server writes the whole text a wallet signs and keeps
+// The login (ADR-0002 §4): the server writes the whole text a wallet signs and keeps
 // it with a single-use nonce; one verified proof makes one token, of which only the SHA-256 is stored.
-// The token renews on use for 30 days and ends 90 days after its login whatever the use (decision 143).
+// The token renews on use for 30 days and ends 90 days after its login whatever the use.
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { verifyArbitrarySignature } from "@adena-wallet/sdk";
@@ -21,19 +21,19 @@ CREATE INDEX tokens_by_expiry ON tokens (expires_at);
 CREATE INDEX tokens_by_address ON tokens (address, signed_at);
 `;
 
-// The host a challenge was written for (F427), added after 3c's file: a migration of its own, so a file
-// made before takes it, and with a default, so the image before still writes a nonce (no host's).
+// The host a challenge was written for: a migration of its own, so an existing file takes it, and with a
+// default, so an older image still writes a nonce (no host's).
 export const NONCE_HOST = `
 ALTER TABLE nonces ADD COLUMN host TEXT NOT NULL DEFAULT '';
 `;
 
-// The change an admin signs with a nonce (10g, ADR-0002 §6), none for a login's: a login spends a nonce with none alone,
-// a change one with its own, so neither signature ever stands for the other (Alexis, 10g-3).
+// The change an admin signs with a nonce (ADR-0002 §6), none for a login's: a login spends a nonce with none alone,
+// a change one with its own, so neither signature ever stands for the other.
 export const NONCE_ACTION = `
 ALTER TABLE nonces ADD COLUMN action TEXT;
 `;
 
-// A link's code (owners' moderation, part 2): its kind is the way it is proved, NULL for a login's and an admin change's,
+// A link's code: its kind is the way it is proved, NULL for a login's and an admin change's,
 // the account that asked and the address to link. The two spends above take NULL alone, so no code stands for another.
 export const NONCE_LINK = `
 ALTER TABLE nonces ADD COLUMN kind TEXT CHECK (kind IN ('adena', 'cli'));
@@ -86,11 +86,11 @@ export interface Login {
   verify: (
     request: VerifyRequest,
     mayCreate: () => boolean,
-    // The host the proof comes from: its challenge's own, or the nonce is not this one's (F427).
+    // The host the proof comes from: its challenge's own, or the nonce is not this one's.
     host: string,
   ) => Promise<{ token: string; maxAge: number } | "nonce" | "proof" | "new_account">;
   session: (token: string | undefined) => Address | undefined;
-  // When a live session's token was signed, in ms; undefined for none, an ended one or an unknown (D13985, a session's age).
+  // When a live session's token was signed, in ms; undefined for none, an ended one or an unknown.
   signedAt: (token: string | undefined) => number | undefined;
   logout: (token: string | undefined) => void;
 }
@@ -107,7 +107,7 @@ interface Options {
   verify?: Verify;
   nonceCap?: number;
   // The admin console's login and changes (ADR-0002 §6): its own host's pending nonces counted alone, so a public flood
-  // never fills its cap (Alexis, 10g-6), and a session of one hour from its signature (10g-7).
+  // never fills its cap, and a session of one hour from its signature.
   console?: boolean;
 }
 
@@ -120,8 +120,8 @@ export function makeSigned(
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces WHERE kind IS NULL"),
-    // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000, measured by the finding-verifier); the console's
-    // calls are few, and the public path keeps the global count, so a flood costs it nothing more (Alexis, 10g-6).
+    // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000); the console's calls are few, and
+    // the public path keeps the global count, so a flood costs it nothing more.
     countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ? AND kind IS NULL"),
     addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, action, expires_at) VALUES (?, ?, ?, ?, ?, ?)"),
     spendLogin: db.prepare(
@@ -192,8 +192,8 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
     live: db.prepare("SELECT address, signed_at, expires_at FROM tokens WHERE hash = ? AND expires_at > ?"),
     renew: db.prepare("UPDATE tokens SET expires_at = ? WHERE hash = ?"),
     end: db.prepare("DELETE FROM tokens WHERE hash = ?"),
-    // An account keeps its newest tokens only: logins nobody uses would otherwise fill the disk (F435).
-    keepNewest: db.prepare(
+    // An account keeps its newest tokens only: logins nobody uses would otherwise fill the disk.
+    dropOldTokens: db.prepare(
       `DELETE FROM tokens WHERE address = ? AND rowid NOT IN
         (SELECT rowid FROM tokens WHERE address = ? ORDER BY signed_at DESC, rowid DESC LIMIT ?)`,
     ),
@@ -214,7 +214,7 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
       sql.purgeTokens.run(at);
       const token = randomBytes(32).toString("base64url");
       sql.addToken.run(sha256(token), address, at, at + sliding);
-      sql.keepNewest.run(address, address, tokensPerAccount);
+      sql.dropOldTokens.run(address, address, tokensPerAccount);
       return { token, maxAge: cap / 1000 };
     },
 

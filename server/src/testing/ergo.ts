@@ -1,6 +1,6 @@
-// A real Ergo for a test (slice 3b): the binary scripts/ergo.sh built from the pin, the one template
-// the stack renders too, loopback ports of its own, and an auth script that answers by passphrase as
-// the spike's did. stop() ends it and removes the folder it made; so does a test process that exits.
+// A real Ergo for a test: the binary scripts/ergo.sh built from the pin, the one template
+// the stack renders too, loopback ports of its own, and an auth script that answers by passphrase.
+// stop() ends it and removes the folder it made; so does a test process that exits.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
@@ -191,7 +191,7 @@ function writeAuthScript(dir: string, script: ErgoOptions["authScript"], operPas
   return path;
 }
 
-// The spike's auth.py in Node: one JSON line in, one answer out, chosen by the passphrase.
+// One JSON line in, one answer out, chosen by the passphrase.
 const AUTH_SCRIPT = `import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 const lines = createInterface({ input: process.stdin });

@@ -1,4 +1,4 @@
-// The UTC day of a call (slice 13a), from its block's own time as the indexer gives it: a few rounds of blocks asked per day boundary, each
+// The UTC day of a call, from its block's own time as the indexer gives it: a few rounds of blocks asked per day boundary, each
 // span cut into as many parts as a request holds, never a height-to-date line, fifty to a request (onyx-1 answered fifty in 246 ms,
 // onyxRollup.json).
 import { blockTimes } from "@gnoworld/chain/asks";

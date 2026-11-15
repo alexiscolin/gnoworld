@@ -1,4 +1,4 @@
-// The token worlds' pass (slice 13), last of the worlds job: grc20's events above the height kept, a page at a time, each checked on its own,
+// The token worlds' pass, last of the worlds job: grc20's events above the height kept, a page at a time, each checked on its own,
 // the transfers dated by their blocks (blockDays.ts) and replayed into the database (tokenStore.ts). A fault is logged by its kind and keeps
 // every batch before it; no visitor ever reaches the indexer, and no eval is made.
 import { tokenEventsAbove, tokenEventsInBlock, tokenHeightAbove } from "@gnoworld/chain/tokenAsks";
@@ -32,7 +32,7 @@ function attributesOf(attrs: readonly { key: string; value: string }[] | undefin
 }
 
 // One event of a page: a token event checked, `undefined` for any other (not grc20's, or of no kind we replay), `"skipped"` for one that is
-// no event at all. An event of a token whose attributes fail is `bad`, so its token is no longer believed.
+// no event at all. An event of a token whose attributes fail is `bad`, so its token is not believed.
 function eventOf(raw: unknown): TokenEvent | undefined | "skipped" {
   const row = EventRow.safeParse(raw);
   if (!row.success) return "skipped";

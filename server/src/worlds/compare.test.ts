@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BATCH_MIN, compareLists } from "./compare.ts";
 
 // New families and batches are found by comparing the list read now with the one read last time: the chain gives no deploy
-// date through the paths (7c-notes.md), and one transaction can deploy many packages (chain-feasibility.md, item 11).
+// date through the paths, and one transaction can deploy many packages.
 const r = (rest: string): string => `gno.land/r/${rest}`;
 const many = (namespace: string, count: number): string[] =>
   Array.from({ length: count }, (_, i) => r(`${namespace}/app${String(i)}/v0`));

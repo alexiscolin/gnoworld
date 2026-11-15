@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { makePresence, PRESENCE_DAYS, PRESENCE_WORLDS_MAX } from "./presence.ts";
 
-// The presence history (slice 7, 7c): the people present in each world's chat, sampled by the server, kept per hour for 14 days,
-// so a world can be compared with its own past ("rising", plan §9 question 6) and a vitality can remember. It holds counts of
+// The presence history: the people present in each world's chat, sampled by the server, kept per hour for 14 days,
+// so a world can be compared with its own past ("rising") and a vitality can remember. It holds counts of
 // people and no name of one.
 const HOUR = 3_600_000;
 const T0 = Date.parse("2026-11-01T10:00:00.000Z");
@@ -107,7 +107,7 @@ describe("makePresence", () => {
     expect(presence.history("a/known")).toEqual([{ at: T0, people: 3 }]);
   });
 
-  // 7t3's security review: a seat given to the busier by its busiest hour let one burst of 500 worlds shut every real world out for 14
+  // A seat given to the busier by its busiest hour let one burst of 500 worlds shut every real world out for 14
   // days. A world entering takes the seat of the one quiet longest (its last hour above none the oldest, then its busiest hour the smallest,
   // then its id first), unless that one was active this very hour with at least its count: a flood keeps its seats only by staying busy.
   const full = (count: number, presence: ReturnType<typeof makePresence>) => {
@@ -139,7 +139,7 @@ describe("makePresence", () => {
     expect(presence.history("ns/w0000"), "the least busy, first by id").toEqual([]);
   });
 
-  // The second round of 7t3's review: a held world not yet counted this hour looked quiet to a newcomer listed before it in the same sample,
+  // A held world not yet counted this hour looked quiet to a newcomer listed before it in the same sample,
   // which took its seat and its 14 days; chain worlds come by id, so a flood under ids that sort first wiped every real world's history.
   it("counts the sample's held worlds before any newcomer, so one listed after a newcomer keeps its seat and its history", () => {
     const { presence, clock } = make();
@@ -257,7 +257,7 @@ describe("makePresence", () => {
       }
       presence.save();
       expect(readFileSync(file).byteLength).toBeLessThanOrEqual(8 * 1024 * 1024);
-      // 336 hours of 500 worlds: 120 ms bare, past Vitest's 5 s once StrykerJS's per-test coverage instruments the store (F3505).
+      // 336 hours of 500 worlds: 120 ms bare, past Vitest's 5 s once StrykerJS's per-test coverage instruments the store.
     }, 60_000);
 
     it("loads no more worlds than the cap from a file that holds more", () => {

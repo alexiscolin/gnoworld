@@ -256,7 +256,7 @@ describe("checking a message", () => {
     expect(await check(stamped(20, 20, OTHER))).toEqual({ action: "pass" });
   });
 
-  // A second rate rule (docs/decisions.md f0c19ce, F1123): 100 lines a minute an account, a message of several lines
+  // A second rate rule: 100 lines a minute an account, a message of several lines
   // counting each of its lines, beside the 20 messages; counted in memory, so a restart forgets it.
   const lines = (count: number, { n, ms }: { n: number; ms: number }, account = OLD) => {
     const text = Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
@@ -303,7 +303,7 @@ describe("checking a message", () => {
   });
 
   it("counts an account's lines whatever the server's clock did between them, Ergo's stamps alone counting (R1)", async () => {
-    // S1 as reported forgot an account 60 s after the server last heard of it; both clocks jump 61 s before each line.
+    // The rate forgot an account 60 s after the server last heard of it; both clocks jump 61 s before each line.
     vi.useFakeTimers();
     const { check, clock } = setup(() => Promise.resolve(answer()));
     const verdicts = [];
@@ -334,7 +334,7 @@ describe("checking a message", () => {
       reason: "not_their_edit",
     });
     expect(await check({ ...said("hello, fixed", "m3"), edits: "m1" })).toEqual({ action: "pass" });
-    // A line it never checked: no owner to tell, hidden as an edit it cannot place (F549).
+    // A line it never checked: no owner to tell, hidden as an edit it cannot place.
     expect(await check({ ...said("an edit of nothing", "m4"), edits: "m9" })).toEqual({
       action: "hide",
       reason: "unknown_edit",
@@ -342,7 +342,7 @@ describe("checking a message", () => {
     expect(asked).toEqual(["hello", "hello, fixed"]);
   });
 
-  // The red pass (slice-4-room-edit): an edit sent right after its line, the line's check still waiting on the provider,
+  // An edit sent right after its line, the line's check still waiting on the provider,
   // is placed all the same: the queue starts an account's lines in the order they came, and a check claims its line's
   // row before it waits on anything.
   it("places an edit sent right after its line, the line's check still waiting on the provider, through the queue", async () => {

@@ -1,5 +1,5 @@
-// A room's pins (slice 4's 4d; docs/decisions.md, 2026-10-27): the line as Ergo held it when a moderator pinned it,
-// kept in the server's database, since Ergo keeps a channel's metadata for registered channels alone and ours are not.
+// ponytail: a room's pins: the line as Ergo held it when a moderator pinned it, kept in the server's database, since Ergo keeps
+// a channel's metadata for registered channels alone and ours are not.
 // A pin is read from Ergo by its id, never taken from the page; it ends with its line: a delete, a hide or an edit by
 // the author drops it, and a re-read of each pin (check) drops those Ergo no longer holds.
 import type { DatabaseSync } from "node:sqlite";
@@ -140,7 +140,7 @@ export function makePins({ db, fetch, now, max }: Options): Pins {
     },
     async check(room) {
       const all = Ids.parse(db.prepare("SELECT msgid FROM pins WHERE room = ? ORDER BY rowid").all(room));
-      // ponytail: a room's pins one after another, ten at most; a link slower than that wants them side by side.
+      // One after another, ten at most a room; a slower link would want them side by side.
       for (const { msgid } of all) if ((await fetch(room, msgid)) === "gone") drop(room, msgid);
     },
   };

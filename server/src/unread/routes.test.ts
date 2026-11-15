@@ -10,7 +10,7 @@ import type { Typed } from "../rooms/types.ts";
 import { makeUnread, UNREAD_TABLES, type Unread as UnreadStore } from "./store.ts";
 import { unreadRoutes } from "./routes.ts";
 
-// GET /api/unread and POST /api/unread: an account's own places in, its own counts out (docs/plans/slice-13-unread.md, "Threat model").
+// GET /api/unread and POST /api/unread: an account's own places in, its own counts out.
 const MINUTE = 60_000;
 const T0 = Date.parse("2026-11-13T12:00:00.000Z");
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");

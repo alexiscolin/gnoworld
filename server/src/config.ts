@@ -33,24 +33,24 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
-  // The guest chat (D430): its switch, and the new names an hour a visitor and in all, and the guests living at once (plan 3.3).
+  // The guest chat: its switch, and the new names an hour a visitor and in all, and the guests living at once.
   guests: { on: boolean; perVisitor: number; perHour: number; living: number };
-  // The worlds that can be first charted (D218): every world when none is named.
+  // The worlds that can be first charted: every world when none is named.
   firstToChart: ReadonlySet<string> | undefined;
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
-  // Ergo's data folder, mounted read-only, and the bytes it may fill before the alert's 80% (3n-b).
+  // Ergo's data folder, mounted read-only, and the bytes it may fill before the alert's 80%.
   ergoData: { dir: string; maxBytes: number } | undefined;
-  // The file the prices timer writes (5l): absolute, none by default, so no timer.
+  // The file the prices timer writes: absolute, none by default, so no timer.
   markets: string | undefined;
-  // The file the worlds job writes (7c): absolute, none by default, so no job; it needs `universes`.
+  // The file the worlds job writes: absolute, none by default, so no job; it needs `universes`.
   worlds: string | undefined;
-  // The file the preview job writes (8f): absolute, none by default, so no job; it needs `universes` and OpenAI's key, its check.
+  // The file the preview job writes: absolute, none by default, so no job; it needs `universes` and OpenAI's key, its check.
   previews: string | undefined;
   // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
   universes: string | undefined;
-  // The hubs' data file (slice 9g): with the universes' it starts the chain's polls, one a universe; none, no chain.
+  // The hubs' data file: with the universes' it starts the chain's polls, one a universe; none, no chain.
   hubs: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;
@@ -59,17 +59,17 @@ export interface Config {
     // An account hidden `strikes` times in `windowMinutes` is muted for `minutes`, `max` at once a world.
     mute: { strikes: number; windowMinutes: number; minutes: number; max: number };
   };
-  // Jarvis's door (10g): none without jarvis's address.
+  // Jarvis's door: none without jarvis's address.
   jarvis: DoorConfig | undefined;
   // The admin API's own listener (ADR-0002 §6): none without its port.
   admin: AdminConfig | undefined;
   // The realms' two-sentence explanations: a seed file read at the start, none by default, and the new ones Jarvis may make a day.
   explain: { seed: string | undefined; perDay: number };
-  // Link cards (slice 13, D13906): a kill switch, off by default, with the link reader's address; the thresholds a card is held to.
+  // Link cards: a kill switch, off by default, with the link reader's address; the thresholds a card is held to.
   cards: CardsConfig;
 }
 
-// Built at each read, not at import: StrykerJS can only turn on a mutant that runs inside a test (F412).
+// Built at each read, not at import: StrykerJS can only turn on a mutant that runs inside a test.
 const settingsSchema = () =>
   z
     .object({
@@ -83,7 +83,7 @@ const settingsSchema = () =>
         .string()
         .min(1)
         .default(fileURLToPath(new URL("../roles.json", import.meta.url))),
-      // The chains a login may name (decision 142), the demo's by default; never none.
+      // The chains a login may name, the demo's by default; never none.
       CHAINS: z
         .string()
         .default("onyx-1,gnoland-1")
@@ -97,18 +97,18 @@ const settingsSchema = () =>
         .transform(Number)
         .pipe(z.number().max(1000))
         .default(5),
-      // GUEST_CHAT=off puts the site back to read-only guests (plan section 8): both guest routes answer 404, nothing is relayed.
+      // GUEST_CHAT=off puts the site back to read-only guests: both guest routes answer 404, nothing is relayed.
       GUEST_CHAT: z.enum(["on", "off"]).default("on"),
       GUEST_NAMES_PER_VISITOR_HOUR: whole(1000, 10),
       GUEST_NAMES_PER_HOUR: whole(10_000, 600),
       GUEST_LIVING: whole(50_000, 5000),
-      // The worlds that can be first charted (D218): unset, every world (D210); else slugs, at least one.
+      // The worlds that can be first charted: unset, every world; else slugs, at least one.
       FIRST_TO_CHART_WORLDS: z
         .string()
         .transform((text) => text.split(","))
         .pipe(z.array(z.string().refine((slug) => Key.safeParse(slug).success)))
         .optional(),
-      // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
+      // The socket Ergo's auth script dials: an absolute path, within what a socket's address holds.
       AUTH_SOCKET: z
         .string()
         .regex(/^\/./)
@@ -122,15 +122,15 @@ const settingsSchema = () =>
         .pipe(z.number().max(65_535))
         .default(6667),
       ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
-      // Ergo's data folder, measured (3n-b): absolute, each part a name (no "", "." or ".."), so never the root a
-      // walk would take whole, however spelled (F636).
+      // Ergo's data folder, measured: absolute, each part a name (no "", "." or ".."), so never the root a
+      // walk would take whole, however spelled.
       ERGO_DATA: absolute.optional(),
       ERGO_DATA_MB: whole(1_048_576, 1024),
-      // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
+      // The prices timer's file, written as ERGO_DATA is: no trailing slash, so a file's name.
       MARKETS_FILE: absolute.optional(),
-      // The worlds job's file (7c), written like MARKETS_FILE; the job reads the chain UNIVERSES_FILE names as default.
+      // The worlds job's file, written like MARKETS_FILE; the job reads the chain UNIVERSES_FILE names as default.
       WORLDS_FILE: absolute.optional(),
-      // The preview job's file (8f), written like MARKETS_FILE: the default universe's hubs' pages, each checked before it is written.
+      // The preview job's file, written like MARKETS_FILE: the default universe's hubs' pages, each checked before it is written.
       PREVIEWS_FILE: absolute.optional(),
       UNIVERSES_FILE: absolute.optional(),
       EXPLAIN_SEED_FILE: absolute.optional(),
@@ -156,7 +156,7 @@ const settingsSchema = () =>
       MUTE_STRIKES: whole(99, 3),
       MUTE_WINDOW_MINUTES: whole(1440, 10),
       MUTE_MINUTES: whole(10_080, 5),
-      // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
+      // Ergo's ban list holds 100 a room: the mutes leave the moderators their share of it.
       MUTE_MAX: whole(100, 50),
       ...cardSettings(),
       ...doorSettings(),

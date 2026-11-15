@@ -1,5 +1,4 @@
 // A test's IRC connection: it sends lines and waits for lines, and parses nothing.
-// ponytail: core/irc's parser takes over once the bot's link reads IRC (3h).
 import { once } from "node:events";
 import { connect } from "node:net";
 

@@ -5,7 +5,7 @@ import { MARKETS_HISTORY_MOST, MarketsHistory } from "@gnoworld/schemas/indexer"
 import { afterAll, describe, expect, it } from "vitest";
 import { historyRoutes, makeHistory, SEED_BELOW } from "./history.ts";
 
-// The prices' day (8i): each token's price at each read, 288 at most, kept in a file so a restart keeps the day.
+// The prices' day: each token's price at each read, 288 at most, kept in a file so a restart keeps the day.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
 const STEP = 5 * 60_000;
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-history-"));

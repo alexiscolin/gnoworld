@@ -1,6 +1,6 @@
 // The default universe, from the data the app is built from (app/data/universes.json, copied into the server's image): its id,
 // its RPC (the host the prices timer reads the block height from and the egress proxy lets out besides CoinGecko's and
-// OpenAI's) and its chain's id, which that node's status must name (D120), its indexer (the worlds job reads the realm list
+// OpenAI's) and its chain's id, which that node's status must name, its indexer (the worlds job reads the realm list
 // from it), and its hubs' pages (the preview job). A file goes through the data's own schema, so what the build accepted is
 // what the server reads; a bad file stops the server at boot, naming the file and nothing of what it held, a file it cannot
 // read (missing, or past 1 MiB as every data file) with its reason as the cause.
@@ -49,7 +49,7 @@ export function hubWorlds(universesFile: string): Map<string, string> {
   );
 }
 
-/** Every realm the default universe's hubs list, each once, by its path: the pages the preview job captures (8f), the team's own list. */
+/** Every realm the default universe's hubs list, each once, by its path: the pages the preview job captures, the team's own list. */
 export function hubRealms(universesFile: string): string[] {
   return [...new Set(defaultHubs(universesFile).flatMap((hub) => hub.realms ?? []))].toSorted();
 }

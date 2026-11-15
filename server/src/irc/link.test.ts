@@ -1740,7 +1740,7 @@ describe("the IRC link's account (the max review)", () => {
   });
 });
 
-// draft/multiline (slice 4, R1 of the red pass): Ergo gives a reader without the capability the parts of a message
+// draft/multiline: Ergo gives a reader without the capability the parts of a message
 // as lines of their own, the id on the first alone (irc/client.go, v2.19.1), so the link asks for it and reads the
 // batch as the one message it is: its text whole to the checks, its id and time from the opening line.
 describe("the IRC link, a message of several lines (draft/multiline)", () => {
@@ -1812,7 +1812,7 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
     );
   });
 
-  // G1 and G5 of the green pass: the bot moderates the text readers fold, or it hides the message by the id of its
+  // The bot moderates the text readers fold, or it hides the message by the id of its
   // opening line, never a part of it and never none. Its text, which no one reads, is a stand-in.
   const hidden = (msgid: string, time: string) => ({ room: "#bubble", account: "g1a", msgid, time, unreadable: true });
   // What the link said, but for its text: the parts' text never reaches the check of a hidden message.

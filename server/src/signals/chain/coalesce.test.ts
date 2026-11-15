@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeCoalescer } from "./coalesce.ts";
 
-// Slice 9g: a flood is cut to 4 events a second a room at most, in any second, not in each clock second: 4 at the end of one
+// A flood is cut to 4 events a second a room at most, in any second, not in each clock second: 4 at the end of one
 // and 4 at the start of the next would be 8 in a second. The chain is the truth; a refused event leaves a gap the heights show.
 describe("the coalescer", () => {
   it("lets 4 events through in a second and refuses the fifth, the first four kept", () => {
@@ -85,7 +85,7 @@ describe("the coalescer", () => {
   });
 });
 
-// F5792: an account that puts four cheap events at the head of each second must not decide what a room shows: one event an
+// An account that puts four cheap events at the head of each second must not decide what a room shows: one event an
 // actor in a room's second, the four-cap kept.
 describe("the coalescer's fairness between actors", () => {
   it("lets one event of an actor through in a room's second, and the others' after it", () => {

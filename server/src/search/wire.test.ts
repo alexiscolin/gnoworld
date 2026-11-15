@@ -12,7 +12,7 @@ import { fakeErgo, message, PASSWORD, welcome, type Peer } from "../testing/fake
 import { makeSearch, type Search } from "./index.ts";
 import { indexing } from "./wire.ts";
 
-// Slice 13, B1: the index as the chat hangs it: lines enter through what moderation let through, leave by a REDACT, change by
+// The index as the chat hangs it: lines enter through what moderation let through, leave by a REDACT, change by
 // their author's edit, and are asked of Ergo again when the link joins a room.
 const ORIGIN = "https://gnoworld.test";
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
@@ -301,7 +301,7 @@ describe("the index failing never stops the chat (T8)", () => {
   });
 });
 
-// The surviving mutants of the day (slice 13): the wiring on its own, with no index and with no link.
+// The surviving mutants of the day: the wiring on its own, with no index and with no link.
 describe("indexing, with no index or no link", () => {
   const said: Said = { room: "#bubble", account: "g1a", msgid: "m1", text: "hi", time: new Date(0).toISOString() };
   const parts = () => ({ recent: { passed: vi.fn(), taken: vi.fn() }, link: () => undefined });

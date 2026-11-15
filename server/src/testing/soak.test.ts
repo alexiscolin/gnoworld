@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 const SOAK = fileURLToPath(new URL("soak.ts", import.meta.url));
-// Set from the first run (2026-10-22, the feat commit says the numbers); only ever lowered.
+// Set from the first run; only ever lowered.
 const GROWTH = 0.1;
 
 describe("the check, soaked", () => {

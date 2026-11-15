@@ -3,7 +3,7 @@ import { answer } from "./answers.ts";
 import { AUTHOR, gate, MOD, pinsFor } from "./ergoPins.ts";
 import { cleanUp, join, login, say, start, sync } from "./ergoKit.ts";
 
-// Slice 4's 4d, pins, over the real Ergo (docs/plans/slice-4.md §7): a moderator pins a line by its id, the server
+// Pins over the real Ergo: a moderator pins a line by its id, the server
 // reads its text from Ergo, a deleted or hidden line leaves the pins, and they outlast the chat's own restart.
 afterEach(cleanUp);
 
@@ -61,7 +61,7 @@ describe("a moderator pins a line", { timeout: 40_000 }, () => {
   });
 
   // The bot's own hide comes back to it as a REDACT of its own: a pin made while the line's check was held goes with
-  // the hide (4d's R1). Pinning after the hide is another case, below.
+  // the hide. Pinning after the hide is another case, below.
   it("drops the pin when the bot hides the line after it was pinned", async () => {
     const e = await start();
     const held = gate();
@@ -80,7 +80,7 @@ describe("a moderator pins a line", { timeout: 40_000 }, () => {
     await expect.poll(async () => (await list("#bubble")).pins, { timeout: 10_000 }).toEqual([]);
   });
 
-  // The author's edit replaces the line; the pin held the older text, which the author may have taken back (R6). Another
+  // The author's edit replaces the line; the pin held the older text, which the author may have taken back. Another
   // account's edit of it, which the bot would refuse as a correction, is no one's to unpin it by.
   it("drops the pin when its author edits the line, and keeps it for another account's edit", async () => {
     const e = await start();
@@ -101,7 +101,7 @@ describe("a moderator pins a line", { timeout: 40_000 }, () => {
   });
 
   // Ergo keeps the replaced line at its msgid, since an edit is only a tag: a pin of it would publish the words the author
-  // took back (F1480). The page pins the correcting line's own id.
+  // took back. The page pins the correcting line's own id.
   it("refuses a line its author edited, and still pins a later one", async () => {
     const e = await start();
     const { list, pin } = await pinsFor(e);
@@ -141,7 +141,7 @@ describe("a moderator pins a line", { timeout: 40_000 }, () => {
   });
 
   // Ergo keeps no event for a REDACT and replays none: a delete made while the chat was down is seen only by asking
-  // Ergo for each pin again once the link is back in the room (4d's R5, docs/decisions.md, 2026-10-27).
+  // Ergo for each pin again once the link is back in the room.
   it("drops a pin whose line its author deleted while the chat was down, and keeps the others", async () => {
     const e = await start();
     const first = await pinsFor(e);

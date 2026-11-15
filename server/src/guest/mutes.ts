@@ -1,5 +1,5 @@
-// A guest's strikes and its mute (D430): the server never relays a muted guest's line, so no Ergo ban is needed. Strikes and
-// mutes key on the visitor, so a new name earns no new allowance, and on the world, as the account mutes do (3k).
+// A guest's strikes and its mute: the server never relays a muted guest's line, so no Ergo ban is needed. Strikes and
+// mutes key on the visitor, so a new name earns no new allowance, and on the world, as the account mutes do.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Guest } from "./guests.ts";

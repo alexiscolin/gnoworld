@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { jsonOf } from "@gnoworld/core";
 import { secure, watchOf } from "./watch.ts";
 
-// Slice 9g: which realms tie to which world, from the data's own hubs (app/data/hubs.json), and which indexer addresses are read.
+// Which realms tie to which world, from the data's own hubs (app/data/hubs.json), and which indexer addresses are read.
 const WORLD = (slug: string, universe: string, realms?: string[]) => ({
   slug,
   name: slug,

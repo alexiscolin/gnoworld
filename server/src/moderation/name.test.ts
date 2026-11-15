@@ -5,7 +5,7 @@ import type { Answer } from "./provider.ts";
 import { withBreaker } from "./check.ts";
 import { makeNameChecker } from "./name.ts";
 
-// A room's name goes through what a message of its world goes through (D394): the world's rules, then the provider.
+// A room's name goes through what a message of its world goes through: the world's rules, then the provider.
 const RULES: Rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 
 const setup = (provider: ((text: string) => Promise<Answer | "unchecked">) | undefined, clock = { now: 0 }) => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { jpegSize } from "./jpeg.ts";
 
-// The picture's real size is read from its first frame header; the reader's claim about it is never taken (slice 13, L3).
+// The picture's real size is read from its first frame header; the reader's claim about it is never taken.
 const SOI = [0xff, 0xd8];
 const be = (n: number): number[] => [n >> 8, n & 0xff];
 /** A segment: marker, a length that counts itself, then the payload. */

@@ -1,4 +1,4 @@
-// The real Ergo's tests of the pins (slice 4's 4d): the chat as main starts it on a database, and the pins' routes as main
+// The real Ergo's tests of the pins: the chat as main starts it on a database, and the pins' routes as main
 // mounts them, a moderator and an author as the session's accounts, and a check held back until a test lets it go.
 import { Address, PinList } from "@gnoworld/schemas";
 import { makeApp } from "../app.ts";

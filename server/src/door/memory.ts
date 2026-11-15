@@ -1,4 +1,4 @@
-// What the door remembers beside its quota (D13985), made once for the chat, which feeds it, and the ask route, which reads
+// What the door remembers beside its quota, made once for the chat, which feeds it, and the ask route, which reads
 // it: the accounts heard in the chat (100,000, the one heard longest ago forgotten first), the answers kept, the strikes
 // and shares in the database, and the hosts a link may name: the server's own sites and gno.land, with their subdomains.
 import type { DatabaseSync } from "node:sqlite";

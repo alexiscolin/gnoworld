@@ -1,4 +1,4 @@
-// A room's type in Ergo (slice 3's plan, 3m): the flags it carries, who is on its invite list and who is
+// A room's type in Ergo: the flags it carries, who is on its invite list and who is
 // voiced, from the roles file; who reads it and who sees it listed. Ergo holds the line (+i, +R, +m): the
 // server only asks for it. A room the file does not type is open; an archived one is read-only and
 // unlisted whatever its type. Read whole in review: a wrong answer here opens a room.
@@ -78,7 +78,7 @@ export function mayRead(roles: Typed, room: string, who: string | undefined): bo
 export const publicRoom = (roles: Typed, room: string): boolean =>
   !["members", "members-write"].includes(typeOf(roles, room).type);
 
-/** A room whose lines may be a world's first words (slice 9h, D214): open to everyone to read and write, and listed. A
+/** A room whose lines may be a world's first words: open to everyone to read and write, and listed. A
  * first words' author is served to anyone and drawn on a banner, so no members, announcement, accounts or hidden room. */
 export const openRoom = (roles: Typed, room: string): boolean => {
   const { type, hidden } = typeOf(roles, room);
@@ -99,7 +99,7 @@ export function listed(roles: Typed, room: string, who: string | undefined): boo
 /** Whether the file hides the room: only its world's moderators and the team see it in the lists. */
 export const hiddenRoom = (roles: Typed, room: string): boolean => typeOf(roles, room).hidden;
 
-/** A room whose lines the search index holds (D13924): any a reader may open that is not hidden, so open, announcement and
+/** A room whose lines the search index holds any a reader may open that is not hidden, so open, announcement and
  * accounts rooms; never a members room. Who reads a hit is asked again at query time (`mayRead`). */
 export const searchable = (roles: Typed, room: string): boolean => {
   const { type, hidden } = typeOf(roles, room);

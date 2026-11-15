@@ -1,4 +1,4 @@
-// The recent lines of each public room (Alexis, 10g-1): the last 30 lines moderation let through, 8 KiB of text a room,
+// The recent lines of each public room: the last 30 lines moderation let through, 8 KiB of text a room,
 // 10,000 rooms, in memory alone, so a question to Jarvis carries what was said where it was asked. A line taken from its
 // room, or replaced by its author's edit, leaves at once; one taken before moderation let it through never comes in.
 import type { Said } from "../irc/link.ts";
@@ -15,15 +15,15 @@ export interface RecentLines {
   edited: (said: Said) => void;
   // A room's lines, oldest first, each by a number for who said it, the asker 0.
   recent: (room: string, asker: string) => JarvisAsk["lines"];
-  // The id of a room's last line moderation let through, public room or not (D13985, a served answer's key).
+  // The id of a room's last line moderation let through, public room or not (a served answer's key).
   last: (room: string) => string | undefined;
 }
 
 interface Options {
   isPublic: (room: string) => boolean;
-  // Told the account of each line moderation let through, in any room (D13985, the account's first ask).
+  // Told the account of each line moderation let through, in any room (the account's first ask).
   heard?: { said: (account: string) => void } | undefined;
-  // Told the room of each line taken or replaced, whose served answers go (D13985).
+  // Told the room of each line taken or replaced, whose served answers go.
   changed?: ((room: string) => void) | undefined;
   // Told the room and id of each line taken or replaced, whose kept public answer goes.
   answers?: { drop: (room: string, msgid: string, line?: { account: string; text: string }) => void } | undefined;
@@ -56,8 +56,8 @@ export function makeRecentLines({ isPublic, heard, changed, answers }: Options):
   // The Map's first room is the one written longest ago: a room is set again at each line.
   const rooms = new Map<string, { lines: Kept[]; bytes: number }>();
   // The lines gone: a room's line taken (`room id`), or replaced by its author (`room id account`), each its own mark, so
-  // no later mark of another kind or account stands for it (F5270, as pins.ts's `replaced`), and a line gone whether it
-  // was kept yet or not, so it never comes in or back (F5109).
+  // no later mark of another kind or account stands for it (as pins.ts's `replaced`), and a line gone whether it
+  // was kept yet or not, so it never comes in or back.
   const gone = new Map<string, true>();
   const lasts = new Map<string, string>();
   const key = (...parts: string[]): string => parts.join(" ");

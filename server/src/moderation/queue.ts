@@ -1,4 +1,4 @@
-// The check's queue (slice 3's plan, 3i): fair per account, so one account's flood holds another's line
+// The check's queue: fair per account, so one account's flood holds another's line
 // back by one at most, and an account holds a share of it only; four checks at once; capped, a line past
 // the cap left unchecked with the alert. Its oldest line's age is logged every 30 s, the alert past 2 min.
 import type { Log } from "@gnoworld/service/log";

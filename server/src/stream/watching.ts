@@ -1,4 +1,4 @@
-// Who follows the stream, counted at each ask (D352, D374); the stream's clients, seen by what is counted of them.
+// Who follows the stream, counted at each ask; the stream's clients, seen by what is counted of them.
 export interface Watcher {
   /** The worlds it counts on, the stream's own choice (stream.ts). */
   readonly counted: ReadonlySet<string>;
@@ -6,7 +6,7 @@ export interface Watcher {
   readonly visitor: string;
 }
 
-// Who has a stream open (D352): a guest once by its visitor, whatever its streams and tabs; an account once. ponytail: counted at each
+// Who has a stream open: a guest once by its visitor, whatever its streams and tabs; an account once. ponytail: counted at each
 // ask, over 2,000 clients at most.
 export function watchingOf(clients: ReadonlySet<Watcher>): { guests: number; accounts: ReadonlySet<string> } {
   const accounts = new Set<string>();
@@ -18,7 +18,7 @@ export function watchingOf(clients: ReadonlySet<Watcher>): { guests: number; acc
   return { guests: guests.size, accounts };
 }
 
-// Who follows each world (D374): a guest once by its visitor key, whatever its streams on that world, an account once; a guest on two
+// Who follows each world: a guest once by its visitor key, whatever its streams on that world, an account once; a guest on two
 // worlds counts on each. ponytail: counted at each ask, 2,000 clients at most and 25 rooms each.
 export function watchingIn(
   clients: ReadonlySet<Watcher>,

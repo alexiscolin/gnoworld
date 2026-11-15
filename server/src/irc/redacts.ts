@@ -1,4 +1,4 @@
-// The hides the link sent and Ergo has not yet taken (F2462). Ergo relays a room's line to its members, then writes it
+// The hides the link sent and Ergo has not yet taken. Ergo relays a room's line to its members, then writes it
 // into its history (channel.go:1418, then 1424), so a REDACT sent on the line just read can arrive first and be
 // refused UNKNOWN_MSGID: the id is not yet known, nothing was hidden. Only a REDACT the link sent itself is asked
 // again, a few times and a little later, on the same connection; the author's NOTICE and the strike are not sent twice,

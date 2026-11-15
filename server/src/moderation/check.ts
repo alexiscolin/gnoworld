@@ -1,4 +1,4 @@
-// Checking one message (slice 3's plan, 3i): claimed by its id first, so it is checked once even when
+// Checking one message: claimed by its id first, so it is checked once even when
 // the live line and a catch-up race, an unchecked one again when it comes back; then its world's rules,
 // the provider and the decision. Each verdict keeps what it used, the account as its HMAC, never the text.
 import { createHmac } from "node:crypto";
@@ -35,7 +35,7 @@ interface Options {
   rulesOf: (room: string) => Rules | undefined;
   // None without a key: every message is then unchecked, and nothing leaves. Already behind the breaker (checker.ts's providerOf).
   provider: ((text: string) => Promise<Answer | "unchecked">) | undefined;
-  // A room whose lines may go to the provider (3m: a members room's never leave), all by default.
+  // A room whose lines may go to the provider (a members room's never leave), all by default.
   publicRoom?: (room: string) => boolean;
   thresholds: Thresholds;
   pepper: string;
@@ -80,15 +80,15 @@ export function withBreaker<Input = string>(
 export const accountKey = (pepper: string, account: string): string =>
   createHmac("sha256", pepper).update(account).digest("hex");
 
-/** A line's time: Ergo's server-time when it set one, so a caught-up backlog keeps its own pace (3k). */
+/** A line's time: Ergo's server-time when it set one, so a caught-up backlog keeps its own pace. */
 export const lineTime = (said: Said, now: () => number): number =>
   said.time === undefined ? now() : Date.parse(said.time);
 
-// More lines than this in a minute of Ergo's time are too fast (3k): twice 3h's activity cap, which
+// More lines than this in a minute of Ergo's time are too fast: twice the room activity cap, which
 // counts a room's heat, not a fault.
 const RATE = { lines: 20, ms: 60_000 };
 
-/** A hide that could not be done: the line is checked again when it comes back (3j). */
+/** A hide that could not be done: the line is checked again when it comes back. */
 export function checkAgain(db: DatabaseSync, msgid: string): void {
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE msgid = ?").run(msgid);
 }
@@ -120,11 +120,11 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
   const known = lineKnown(db);
-  // An edit's line: none, its author's, another's, or one it never checked (F549).
+  // An edit's line: none, its author's, another's, or one it never checked.
   const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
     edits === undefined ? "none" : !known(edits) ? "unknown" : owns(edits, key) ? "own" : "other";
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
-  // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
+  // A line a stopped process left pending is checked again when it comes back (the bot runs as one process).
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
   // The world's rules, which a new account, a line too fast or another's edit may break.
   const byRules = (said: Said, rules: Rules, { hashed, at }: { hashed: string; at: number }) => {

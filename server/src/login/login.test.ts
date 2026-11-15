@@ -57,7 +57,7 @@ describe("the nonces' table", () => {
     const folder = mkdtempSync(join(tmpdir(), "gnoworld-nonces-"));
     try {
       const file = join(folder, "gnoworld.sqlite");
-      // As 3c and 3d made it: their migrations, in their order.
+      // The migrations, in their order.
       openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
       const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       try {
@@ -749,7 +749,7 @@ describe("the token", () => {
 
 describe("verifyProof", () => {
   it("still takes a proof made once and written out, so a new SDK that signs other bytes shows here", async () => {
-    // Made by testing/signer.ts on 2026-10-22, with SDK 0.1.1; the document is ADR-036's, by hand.
+    // Made by testing/signer.ts with SDK 0.1.1; the document is ADR-036's, by hand.
     const text = [
       "Sign in to gnoworld (login, version 1)",
       "",
@@ -816,7 +816,7 @@ function highS(signature: Buffer): Buffer {
   return Buffer.concat([signature.subarray(0, 32), Buffer.from((order - s).toString(16).padStart(64, "0"), "hex")]);
 }
 
-// 10g (ADR-0002 §6): a change an admin signs afresh, through the login's own nonce and verifier, never a login's.
+// ADR-0002 §6: a change an admin signs afresh, through the login's own nonce and verifier, never a login's.
 describe("a signed action", () => {
   const HEAD = ["Change gnoworld's settings (admin, version 1)", "", "Jarvis: the daily quota is 20 questions"];
   const ACTION = '{"setting":"quota","questions":20}';
@@ -971,7 +971,7 @@ describe("a signed action", () => {
   });
 });
 
-// 10g (ADR-0002 §6; Alexis, 10g-6 and 10g-7): the admin console's login, on its own listener: its pending nonces counted
+// ADR-0002 §6: the admin console's login, on its own listener: its pending nonces counted
 // for its own host alone, and a session of one hour from its signature.
 describe("the admin console's login", () => {
   const CONSOLE = "admin.gnoworld.test";

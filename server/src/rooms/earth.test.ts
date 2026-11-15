@@ -46,7 +46,7 @@ const setup = () => {
       at,
     );
   };
-  // A guest's relayed line leaves no verdict: the room's count for its hour is the line (D430).
+  // A guest's relayed line leaves no verdict: the room's count for its hour is the line.
   const said = (room: string, at: number) => {
     guestSaid(db)(room, at);
   };

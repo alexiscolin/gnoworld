@@ -12,7 +12,7 @@ import type { Explanations } from "./store.ts";
 // A seed of every realm of a chain is a few hundred kilobytes; this is far above and far below a file that would hold the process.
 const MAX_BYTES = 8 * 1024 * 1024;
 
-export interface SeedCounts {
+interface SeedCounts {
   ready: number;
   refused: number;
   /** Rows left as they were: a ready row of Jarvis's. */

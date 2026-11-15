@@ -1,4 +1,4 @@
-// The rollup's build (slice 13a, plan §4): a page's calls kept in the state, then a realm's file shed to its cap, at n, 4n and 16n calls,
+// The rollup's build: a page's calls kept in the state, then a realm's file shed to its cap, at n, 4n and 16n calls,
 // which should grow linearly. An in-memory database each run, opened in its setup. Measured by scripts/bench.py, run by hand.
 import type { DatabaseSync } from "node:sqlite";
 import { bench, describe } from "vitest";

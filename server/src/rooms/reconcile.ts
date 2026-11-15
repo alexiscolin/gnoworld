@@ -1,4 +1,4 @@
-// The rooms' reconciler (slice 3's plan, 3m): each room as Ergo holds it, read through the link (its
+// The rooms' reconciler: each room as Ergo holds it, read through the link (its
 // flags, its invite list, who is in it with what power), made what its type says by the fewest commands.
 // It runs when the link is in its rooms, on a timer and on a JOIN, so an operator's drift or a lost
 // channel comes back, and a member taken off the file is put out. Read whole in review: a wrong command
@@ -40,7 +40,7 @@ function powerChanges({ nick, powers }: RoomState["present"][number], voice?: Re
  * says, or put out of a closed room they are not invited to, the bot's own op taken first when it lacks it. */
 export function changes(room: string, state: RoomState, want: Desired): [Command, ...string[]][] {
   const out: [Command, ...string[]][] = listChanges(state, want).map((mode) => ["SAMODE", room, ...mode]);
-  // Looked up for each of up to 10,000 people (F592).
+  // Looked up for each of up to 10,000 people.
   const [invited, voice] = [new Set(want.invites), new Set(want.voiced)];
   const kicks: [Command, ...string[]][] = [];
   for (const person of state.present.filter(({ nick }) => nick !== NICK)) {
@@ -50,7 +50,7 @@ export function changes(room: string, state: RoomState, want: Desired): [Command
     out.push(...powers.map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
     if (outside) kicks.push(["KICK", room, person.nick, "not on this room's list"]);
   }
-  // Back by SAJOIN after a restart, the bot is no channel operator (slice 3's max review): its op first.
+  // Back by SAJOIN after a restart, the bot is no channel operator: its op first.
   const bot = state.present.find(({ nick }) => nick === NICK)?.powers ?? "";
   if (kicks.length > 0 && !/[~&@]/.test(bot)) out.unshift(["SAMODE", room, "+o", NICK]);
   return [...out, ...kicks];
@@ -62,7 +62,7 @@ interface Options {
   state: (room: string) => Promise<RoomState | undefined>;
   send: (command: Command, params: readonly string[]) => boolean;
   log: Log;
-  // Who is in a room, by nick, as each read finds them (7h: who-is-here counts them).
+  // Who is in a room, by nick, as each read finds them: who-is-here counts them.
   seen?: ((room: string, present: readonly string[]) => void) | undefined;
 }
 
@@ -71,7 +71,7 @@ export interface Reconciler {
   ask: (room?: string) => void;
   // As ask, settling once no room waits.
   pass: (room?: string) => Promise<void>;
-  // Someone else joined a room: only a room whose type voices someone has a change to make (F582).
+  // Someone else joined a room: only a room whose type voices someone has a change to make.
   joined: (room: string) => void;
   // Each room's flags put on at once, before any state is read: sent with the link's JOINs, a room Ergo
   // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history). An open
@@ -90,7 +90,7 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
       room,
       now.present.map(({ nick }) => nick),
     );
-    // What the link sent: a link down or a form lines.ts refuses changes nothing, and logs nothing (F581).
+    // What the link sent: a link down or a form lines.ts refuses changes nothing, and logs nothing.
     const sent = changes(room, now, desired(room)).filter(([command, ...params]) => send(command, params));
     if (sent.length === 0) return;
     log("room_reconciled", { room });

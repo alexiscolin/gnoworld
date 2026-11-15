@@ -52,7 +52,7 @@ describe("replaceFile", () => {
   });
 });
 
-// Two files that go together (7n2: the worlds and their count): both temporaries are written before either is renamed, so a reader never
+// Two files that go together (the worlds and their count): both temporaries are written before either is renamed, so a reader never
 // gets a new one beside an old one for want of room or of rights. Only a rename that fails after the first went can part them.
 describe("replaceFiles", () => {
   it("writes every file, each readable by others, and leaves nothing beside them", () => {

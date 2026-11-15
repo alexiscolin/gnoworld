@@ -1,4 +1,4 @@
-// The tickets that log a person into Ergo (slice 3's plan, 3d): 256 random bits minted for a session's
+// The tickets that log a person into Ergo: 256 random bits minted for a session's
 // account, of which only the SHA-256 is stored, good once and for 60 seconds. Ergo's auth script hands
 // one back as the SASL passphrase; the account it names must be the ticket's, written canonically.
 import { createHash, randomBytes } from "node:crypto";

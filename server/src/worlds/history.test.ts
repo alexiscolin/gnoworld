@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fakeChain, INDEXER, pagedCalls, type CallRow } from "../testing/fakeWorldsChain.ts";
 import { HISTORY_MAX_BYTES, HISTORY_MAX_PAGES, HISTORY_PAGE, HISTORY_READ_BYTES, readHistories } from "./history.ts";
 
-// The worlds job's one read of the indexer (7k3): every call of the chain, a page at a time, counted for the realms asked. onyx-1's own
+// The worlds job's one read of the indexer: every call of the chain, a page at a time, counted for the realms asked. onyx-1's own
 // answers to its queries are recorded in onyxIndexer.json. History holds DIRECT calls only, and a line may be a failed transaction: a
 // count is a count of attempts, and a realm with none is not dead.
 const PATH = "gno.land/r/samcrew/launchpad/market/v1";
@@ -100,7 +100,7 @@ describe("readHistories", () => {
     expect(await histories([])).toEqual({ [PATH]: none, [OTHER]: none });
   });
 
-  // One odd call must not stop every realm's counts on every pass, as one odd answer stopped one realm's before (the red pass's F1).
+  // One odd call must not stop every realm's counts on every pass.
   describe("an odd call in the chain", () => {
     it("counts a call whose caller is no address as a call with none, and says it left something out", async () => {
       const rows = [{ block_height: 1, messages: [msg(PATH, 'g1"; evil')] }, call(2, CALLER_A)];
@@ -113,7 +113,7 @@ describe("readHistories", () => {
     });
 
     // onyx-1 declares a call's path and caller never null (onyxIndexer.json, "the call's type"); a server that sends null or leaves the key
-    // out costs that call alone (the review of 7k3).
+    // out costs that call alone.
     it.each([
       ["leaves its key out", { __typename: "MsgCall", caller: CALLER_A }],
       ["sends it as null", { __typename: "MsgCall", pkg_path: null, caller: CALLER_A }],
@@ -269,7 +269,7 @@ describe("readHistories", () => {
       expect(chain.asked).toHaveLength(HISTORY_MAX_PAGES);
     });
 
-    // The security review of 7k3: 500 pages of 4 MiB, each call from another address, ran the server past its 512 MB.
+    // 500 pages of 4 MiB, each call from another address, ran the server past its 512 MB.
     it("gives up as too many once its answers pass the bytes one read may take, every realm without a history", async () => {
       let height = 0;
       const sizes: number[] = [];
@@ -467,8 +467,8 @@ describe("readHistories", () => {
   });
 });
 
-// onyx-1's indexer answering the job's queries, as given (onyxIndexer.json, recorded on 2026-11-04 by 7k3): the per-realm filter 7c wrote was
-// refused there, so no history was ever read (F4870).
+// onyx-1's indexer answering the job's queries, as given (onyxIndexer.json): a per-realm filter is
+// refused there.
 describe("readHistories against onyx-1's recorded answers", () => {
   interface Recorded {
     what: string;

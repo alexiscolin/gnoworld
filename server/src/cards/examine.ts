@@ -1,5 +1,5 @@
-// One page of the link cards, read (or its stored answer reused) and checked (slice 13, L3), what the queue's job does before the lines
-// waiting on it are told.
+// One page of the link cards, read (or its stored answer reused) and checked: what the queue's job
+// does before the lines waiting on it are told.
 import type { Log } from "@gnoworld/service/log";
 import type { Thresholds } from "../moderation/decide.ts";
 import type { CardFlowOptions } from "./flow.ts";

@@ -7,7 +7,7 @@ import { makeProgress, PROGRESS_TABLES } from "./catchup.ts";
 import { VERDICT_TABLES, type Verdict } from "./check.ts";
 import { moderate } from "./way.ts";
 
-// A line's way once heard (3h to 3k), apart from the chat since 10g: what each verdict does, and when the mark moves.
+// A line's way once heard, apart from the chat: what each verdict does, and when the mark moves.
 const said = (): Said => ({ room: "#bubble", account: "g1a", msgid: "m1", text: "hello" });
 
 const opened: DatabaseSync[] = [];

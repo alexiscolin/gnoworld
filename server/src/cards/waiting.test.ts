@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Waiting } from "./waiting.ts";
 
-// Slice 13, L3: the lines waiting on a page being read: 1,000 a page, 20,000 in all, the oldest going first.
+// The lines waiting on a page being read: 1,000 a page, 20,000 in all, the oldest going first.
 const line = (msgid: string, room = "r1", author = "alice") => ({ room, msgid, author });
 
 describe("Waiting", () => {

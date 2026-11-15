@@ -1,7 +1,6 @@
-// The door's client of jarvis (D42, D94): one HTTP call a question, a translation or a digest (10k) to the address a
-// setting names, on the network only
-// the two share, through the server's one way out (net.ts) with its own timeout, longer than the loop's worst, and
-// stopped with the request that asked. It forwards no session, no cookie and no account. What comes back is read up to
+// The door's client of jarvis: one HTTP call a question, a translation or a digest to the address a setting names, on the
+// network only the two share, through the server's one way out (net.ts) with its own timeout, longer than the loop's worst,
+// and stopped with the request that asked. It forwards no session, no cookie and no account. What comes back is read up to
 // 1 MiB and parsed with the client's own schema before anything passes it on; a failure is a value, never a hang.
 import {
   JARVIS_KEY_HEADER,
@@ -23,7 +22,7 @@ import type { Secret } from "@gnoworld/service/settings";
 export type Failure = "down" | "lost" | "slow" | "failed" | "shape" | "gone" | "refused";
 
 // What a status jarvis answers with means, any other its failure: what its schemas refuse is the asker's request (400),
-// a jarvis starting or draining is not ready (503, D93), one past its own time slow (504) (F5314).
+// a jarvis starting or draining is not ready (503), one past its own time slow (504).
 function failureOfStatus(status: number): Failure {
   switch (status) {
     case 400:

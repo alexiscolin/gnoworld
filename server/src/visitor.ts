@@ -48,7 +48,7 @@ function prefix(address: string, count: 3 | 4): string {
 export const visitorOf = (c: Context, proxy: string | undefined): string =>
   visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
 
-/** The same visitor in a wider bucket: an IPv6 address by its /48, an IPv4 address as itself (D430). */
+/** The same visitor in a wider bucket: an IPv6 address by its /48, an IPv4 address as itself. */
 export function visitor48(peer: string, header: string | undefined, proxy: string | undefined): string {
   const address = addressOf(peer, header, proxy);
   return isIP(address) === 6 ? prefix(address, 3) : address;

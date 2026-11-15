@@ -1,4 +1,4 @@
-// A guest's line, judged by the server before the bot says it (D430): the room it may speak in, its mute, its rates, its rules, the
+// A guest's line, judged by the server before the bot says it: the room it may speak in, its mute, its rates, its rules, the
 // provider's verdict, then the relay. Every limit is spent before the first await, so lines sent at once share the allowance.
 import { GUEST_PREFIX } from "@gnoworld/core";
 import { limiter } from "../limit.ts";

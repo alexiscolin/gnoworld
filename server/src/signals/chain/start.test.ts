@@ -10,9 +10,9 @@ import { NAMEREG, registration } from "../../testing/chainRecorded.ts";
 import { POLL_MS } from "./poll.ts";
 import { readChainData, RETRY_MS, startChain } from "./start.ts";
 
-// Slice 9g: the server's wiring, from the data's files to a page's stream, with a fake indexer behind `send`: a recorded call to
+// The server's wiring, from the data's files to a page's stream, with a fake indexer behind `send`: a recorded call to
 // a world's realm becomes `event: chain` to its room, an indexer with no https address is skipped and said, a stop cancels every
-// timer. The settings it needs: UNIVERSES_FILE (existing) and HUBS_FILE (new), both absolute.
+// timer. The settings it needs: UNIVERSES_FILE and HUBS_FILE, both absolute.
 const universe = (id: string, indexer: string) => ({
   id,
   name: id,
@@ -269,8 +269,8 @@ describe("the chain on the server", () => {
   });
 });
 
-// F5773: a round that fails at boot must not lose what came between the history read and its first success.
-// F5788: the day's count asked again keeps one cancel, not one a minute.
+// A round that fails at boot must not lose what came between the history read and its first success.
+// The day's count asked again keeps one cancel, not one a minute.
 describe("the day's count asked again", () => {
   const retries = <T extends { ms: number }>(timers: T[]) => timers.filter(({ ms }) => ms === RETRY_MS);
 

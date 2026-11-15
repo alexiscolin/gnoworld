@@ -6,8 +6,7 @@ import { migrations } from "../migrations.ts";
 import { SEARCH_TABLES } from "../search/index.ts";
 import { CARD_TABLES } from "./store.ts";
 
-// L3 (docs/plans/link-previews.md §7 "migrations.ts": the tables, expand only): the cards' migration is appended after search's, never inserted,
-// and migrations.test.ts pins its SHA-256 (the builder appends it to PINNED, which this test cannot hold before the SQL exists).
+// The cards' migration is appended after search's, never inserted, and migrations.test.ts pins its SHA-256.
 const Column = z.object({ name: z.string(), type: z.string(), notnull: z.number(), pk: z.number() });
 const columns = (db: ReturnType<typeof openDatabase>, table: string) =>
   z.array(Column).parse(db.prepare(`SELECT name, type, "notnull", pk FROM pragma_table_info('${table}')`).all());

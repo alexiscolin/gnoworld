@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { migrations } from "../migrations.ts";
 import { chainsOf } from "./chain.ts";
 
-// D13920: the chain a room's world lives on, for a function Jarvis explains.
+// The chain a room's world lives on, for a function Jarvis explains.
 const opened: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of opened.splice(0)) db.close();

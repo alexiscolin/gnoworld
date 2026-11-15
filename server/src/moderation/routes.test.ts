@@ -8,7 +8,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import type { Right } from "../roles/mayModerate.ts";
 import { moderationRoutes } from "./routes.ts";
 
-// Part 4 (docs/plans/owners-moderation.md, D13936): an owner hides a line and mutes an account in its worlds' rooms, over the bot's own
+// An owner hides a line and mutes an account in its worlds' rooms, over the bot's own
 // functions (REDACT, `mutes.mute`). Each route is guarded like the pins' (Origin, JSON, session, strict body, right, 30 a minute) and logs
 // the acting account, the owner and `as`. The world of a mute is read from the room, never from the body.
 const ORIGIN = "https://gnoworld.test";

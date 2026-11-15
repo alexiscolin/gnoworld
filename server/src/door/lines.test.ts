@@ -4,7 +4,7 @@ import { said as said_ } from "../irc/lines.ts";
 import type { Said } from "../irc/link.ts";
 import { makeRecentLines } from "./lines.ts";
 
-// 10g (Alexis, 10g-1): each public room's last lines moderation let through, in memory, for Jarvis's question.
+// Each public room's last lines moderation let through, in memory, for Jarvis's question.
 const ASKER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9";

@@ -1,4 +1,4 @@
-// A room's state as the link reads it from Ergo (slice 3's plan, 3m): MODE gives its flags (324), SAMODE I
+// A room's state as the link reads it from Ergo: MODE gives its flags (324), SAMODE I
 // its invite list (346, 347), NAMES who is in it with their prefixes (353, 366), answered in that order.
 // Ergo's text is read, never trusted: a nick with a space, a comma or a control character is left out.
 import type { IrcMessage } from "@gnoworld/core";
@@ -41,7 +41,7 @@ export function roomStates(timeoutMs: number): States {
       const [, account] = /^([^!@*?]+)!\*@\*$/.exec(mask) ?? [];
       if (state.invites.length < MAX) state.invites.push(account ?? mask);
     },
-    // Before its 324, a NAMES answers the bot's own JOIN, written just before the question (F579).
+    // Before its 324, a NAMES answers the bot's own JOIN, written just before the question.
     "353": (state, [, , , names = ""]) => {
       if (state.flags === undefined) return;
       for (const name of names.split(" ")) {

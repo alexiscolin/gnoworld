@@ -23,7 +23,7 @@ interface Parts extends Options {
 export function linesAfter(db: DatabaseSync, settings: Settings, options: Parts) {
   const { log, now, pepper, stream, ask, link } = options;
   const { recent, answers } = recentFor(db, settings, { door: options.door, log, now, ask, link });
-  // Every line the bot passed, the guests' relayed ones too, goes to the recent lines and to the index (F13700).
+  // Every line the bot passed, the guests' relayed ones too, goes to the recent lines and to the index.
   const index = indexing(options.search, log, { recent, link });
   const passed = passedLines({ roles: settings, recent: index.recent, stream, signals: options.signals });
   // The link cards, once a line has passed: their flow checks the card behind the chat's one breaker.

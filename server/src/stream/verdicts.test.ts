@@ -64,7 +64,7 @@ function setup() {
 const room = (name: string) => `room=${encodeURIComponent(name)}`;
 const ids = (...list: string[]) => `ids=${encodeURIComponent(list.join(","))}`;
 
-// 4g (docs/decisions.md, 2026-10-26): a line older than the stream's replay has its verdict asked here.
+// A line older than the stream's replay has its verdict asked here.
 describe("GET /api/verdicts", () => {
   it("answers each line's verdict it holds, checked or hidden, and leaves out one unchecked, pending or unknown", async () => {
     const answer = await setup().ask(
@@ -94,7 +94,7 @@ describe("GET /api/verdicts", () => {
     expect(body.verdicts).toEqual([{ msgid: "passed", state: "checked" }]);
   });
 
-  // The rule GET /api/rooms and the stream keep (3m): a members room's lines to its members alone.
+  // The rule GET /api/rooms and the stream keep: a members room's lines to its members alone.
   it("answers a members room to its member, and refuses it to a guest and to an account not of it", async () => {
     const t = setup();
     const asked = `${room("#bubble/crew")}&${ids("crew")}`;
@@ -129,7 +129,7 @@ describe("GET /api/verdicts", () => {
     expect(await answer.json()).toEqual({ error: "refused" });
   });
 
-  // F876: each length at its bound.
+  // Each length at its bound.
   it("takes a room of 64 characters, and ids of one and of 128 characters", async () => {
     const t = setup();
     expect((await t.ask(`${room("#".padEnd(64, "b"))}&${ids("passed")}`)).status).toBe(200);

@@ -1,4 +1,4 @@
-// The asks refused without a model (D13985): a long piece of writing (a poem, an essay, a story, 500 words or more), code
+// The asks refused without a model: a long piece of writing (a poem, an essay, a story, 500 words or more), code
 // of another language or stack with no gno, realm or package named, a long text pasted to translate, an instruction to
 // ignore its instructions, a link written as a link to a host off the list. Bypassable by design: a determined asker
 // rewords, and the day's caps (strikes, share, room) catch the rest. Left to the model: code with no language named, a short

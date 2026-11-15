@@ -1,6 +1,7 @@
-// The link reader's client (slice 13, L3; docs/plans/link-previews.md §3 step 3): `POST /card {url}` to the reader on the network only the two
-// share. The body is the page's URL and nothing else (no cookie, no account, no line); the call has a timeout and follows no redirect (the one way
-// out, net.ts); the answer is read up to a cap before it is parsed; anything but a 200 of JSON is the reader being down.
+// The link reader's client: `POST /card {url}` to the reader on the network only the two share. The
+// body is the page's URL and nothing else (no cookie, no account, no line); the call has a timeout
+// and follows no redirect (the one way out, net.ts); the answer is read up to a cap before it is
+// parsed; anything but a 200 of JSON is the reader being down.
 import { Failure, readJson, send as netSend } from "@gnoworld/service/net";
 
 const READER_MS = 8000;

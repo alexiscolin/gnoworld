@@ -1,4 +1,4 @@
-// The door's routes in the app (10g, 10k, 10u-g): a question, a kept answer and a realm's digest, each its own path
+// The door's routes in the app: a question, a kept answer and a realm's digest, each its own path
 // and rate, under /api/jarvis; one memory of the accounts' mainnet names serves the question's quota and the digest's.
 import type { Hono } from "hono";
 import type { Log } from "@gnoworld/service/log";

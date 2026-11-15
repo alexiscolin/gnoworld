@@ -1,5 +1,5 @@
-// The link cards' retention (slice 13, L3; docs/plans/link-previews.md §4 "Storage growth"): pages past 30 days, then past the row cap, then past
-// the picture bytes' cap, oldest first, at most `limit` a tick; the lines of a page that went follow, uncounted.
+// The link cards' retention: pages past 30 days, then past the row cap, then past the picture
+// bytes' cap, oldest first, at most `limit` a tick; the lines of a page that went follow, uncounted.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 

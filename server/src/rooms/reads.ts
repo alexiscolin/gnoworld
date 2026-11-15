@@ -1,4 +1,4 @@
-// The chain reads one unlisted realm path may cause (D413), every one bounded: per visitor and in all an hour, a few in flight at once,
+// The chain reads one unlisted realm path may cause, every one bounded: per visitor and in all an hour, a few in flight at once,
 // one flight for a path however many ask it, and a path found missing remembered for an hour in a map of a fixed size. Each check and
 // its spend sit before the first await, so asks in flight together are counted as they start.
 import { makeFlights } from "../flights.ts";

@@ -1,6 +1,5 @@
-// What the public indexer's subscription sent, recorded by slice 9's chief, read only, 2026-11-05 about 14:05 JST on Onyx (onyx-1),
-// from SHARED/recordings/samples.json: each frame as `graphql-transport-ws` carries it (a `next` with its payload), the
-// transactions as the indexer's `getTransactions` gave them. Slice 9g's tests read these, never a live indexer.
+// What the public indexer's subscription sent on Onyx (onyx-1), read only: each frame as `graphql-transport-ws` carries it
+// (a `next` with its payload), the transactions as the indexer's `getTransactions` gave them. The tests read these, never a live indexer.
 export const NAMEREG = "gno.land/r/sys/namereg/v0";
 // Two registrations (MsgCall Register), a call to a realm of an account, a realm's deploy (MsgAddPackage).
 const registrations: readonly string[] = [

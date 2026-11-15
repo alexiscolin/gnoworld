@@ -1,6 +1,6 @@
 // The history's first day from CoinGecko's own past (the markets row's sparklines, so they show a curve from the first pass instead of a line
 // of one to three points): one read of /coins/markets with sparkline=true gives each coin's price over the last 7 days as
-// `sparkline_in_7d.price` (https://docs.coingecko.com/reference/coins-markets, read 2026-11-07: "Sparkline price data for the last 7 days"; the page
+// `sparkline_in_7d.price` (https://docs.coingecko.com/reference/coins-markets: "Sparkline price data for the last 7 days"; the page
 // states neither the points' spacing nor their number, nor a limit, nor an attribution). The points are taken as evenly spaced over the seven days,
 // and the last day is resampled to the history's own interval, MARKETS_HISTORY_MOST prices a day, by linear interpolation, oldest first.
 import { MARKETS_HISTORY_MOST } from "@gnoworld/schemas/indexer";

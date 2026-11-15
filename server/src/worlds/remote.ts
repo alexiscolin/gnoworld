@@ -1,4 +1,4 @@
-// The worlds job's reads of a chain and its indexer (slice 7, 7c), shared by its readers, on top of the server's one way out
+// The worlds job's reads of a chain and its indexer, shared by its readers, on top of the server's one way out
 // (net.ts): an answer's text, UTF-8 checked, and an abci_query through the envelope QueryAnswer describes, base64 checked.
 import { abciQueryOf } from "@gnoworld/chain/abci";
 import type { AbciAsk } from "@gnoworld/chain/asks";

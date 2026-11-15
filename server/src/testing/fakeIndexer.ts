@@ -1,4 +1,4 @@
-// A fake public indexer for the chain's tests (slice 9g): it answers the queries the server really sends (packages/chain's
+// A fake public indexer for the chain's tests: it answers the queries the server really sends (packages/chain's
 // transactions.ts) by reading their words: the tip, the rows after a place up to a tip bound, a page's size, a row's place alone,
 // the time of a block. The realms' filter is not evaluated: the rows it holds are the matching ones.
 export interface FakeRow {

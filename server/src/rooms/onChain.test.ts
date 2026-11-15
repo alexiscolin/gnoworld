@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, RPC } from "../testing/fakeWorldsChain.ts";
 import { chainHas } from "./onChain.ts";
 
-// D413: whether the chain holds a realm the worlds job does not list. vm/qpaths with the path as its prefix and a limit of one
+// Whether the chain holds a realm the worlds job does not list. vm/qpaths with the path as its prefix and a limit of one
 // (checked with gnomcp on onyx: `gno.land/r/sys/namereg/v0` answers itself, `gno.land/r/sys/nothere` answers nothing).
 const ON_CHAIN = [
   "gno.land/r/sys/namereg/v0",

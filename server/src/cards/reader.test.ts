@@ -4,8 +4,7 @@ import { send as netSend } from "@gnoworld/service/net";
 import { describe, expect, it, vi } from "vitest";
 import { readerClient } from "./reader.ts";
 
-// L3 (docs/plans/link-previews.md §3 step 3, §4 "A compromised reader"): the call to the link reader carries the page's URL and nothing else,
-// has a timeout, follows no redirect (net.ts's send), reads a capped body, and takes anything but a 200 of JSON for the reader being down.
+// The call to the link reader carries the page's URL and nothing else, has a timeout, follows no redirect (net.ts's send), reads a capped body, and takes anything but a 200 of JSON for the reader being down.
 const URL_ = "http://link_reader:8084";
 const reply = (body: string, status = 200) =>
   vi.fn<typeof netSend>(() => Promise.resolve(new Response(body, { status })));

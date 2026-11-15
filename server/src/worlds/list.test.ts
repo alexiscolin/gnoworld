@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, RPC } from "../testing/fakeWorldsChain.ts";
 import { LIST_MAX_BYTES, LIST_MAX_PATHS, LIST_MAX_QUERIES, LIST_MAX_TOTAL, readRealmPaths } from "./list.ts";
 
-// vm/qpaths answers the paths joined by a newline, sorted, with no metadata (handler.go:233 at v1.5.0; 7c-notes.md). Its limit
+// vm/qpaths answers the paths joined by a newline, sorted, with no metadata (handler.go:233 at v1.5.0). Its limit
 // is 1,000 by default and 10,000 at most, and a limit over the cap is lowered, not refused.
 const ONYX = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
   .split("\n")

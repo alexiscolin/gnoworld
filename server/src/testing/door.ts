@@ -1,4 +1,4 @@
-// What the door's translation and digest tests share (10k): two accounts with their sessions, the site, and the public
+// What the door's translation and digest tests share: two accounts with their sessions, the site, and the public
 // app with the routes under test mounted where main mounts the door, a POST to it as a page sends one, and the log's
 // lines, their time left out.
 import { Address } from "@gnoworld/schemas";

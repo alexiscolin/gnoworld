@@ -5,7 +5,7 @@ import type { Link, Said } from "../irc/link.ts";
 import { PIN_TABLES } from "./pins.ts";
 import { pinsFor } from "./wire.ts";
 
-// What the link tells the pins' part of the chat: a line that replaces another, its author's edit (R12 of redpass2-4dx),
+// What the link tells the pins' part of the chat: a line that replaces another, its author's edit,
 // as the chat hands it on, without the real link or Ergo.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

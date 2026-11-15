@@ -14,7 +14,7 @@ import type { Rules } from "../roles/roles.ts";
 import { ensureNamed } from "../rooms/rooms.ts";
 import { fakeErgo, message, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
 
-// The wiring of the guest chat in the chat's start (D430): what the route is given, as the server gives it.
+// The wiring of the guest chat in the chat's start: what the route is given, as the server gives it.
 const ORIGIN = "https://gnoworld.test";
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const RULES: Rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };

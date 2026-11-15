@@ -1,4 +1,4 @@
-// POST /api/guest and POST /api/guest/say (D430): a name and a cookie, then a line the server judges before the bot says it.
+// POST /api/guest and POST /api/guest/say: a name and a cookie, then a line the server judges before the bot says it.
 // An account never takes a guest's name: its login session wins on both routes. GUEST_CHAT=off answers 404 to both, doing nothing.
 import type { DatabaseSync } from "node:sqlite";
 import { GuestSayRequest, type ApiError, type Guest as GuestAnswer, type GuestSaid } from "@gnoworld/schemas";

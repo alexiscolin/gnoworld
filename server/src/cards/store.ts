@@ -1,5 +1,6 @@
-// The link cards' tables and their rows (slice 13, L3; D13906): one row a page (`link_cards`: its state, texts and re-encoded picture) and one a
-// line (`line_cards`: its key and its author's HMAC, never its text). A line's removal is a flag that outlives its edits; an empty `key` means no card now.
+// The link cards' tables and their rows: one row a page (`link_cards`: its state, texts and
+// re-encoded picture) and one a line (`line_cards`: its key and its author's HMAC, never its text).
+// A line's removal is a flag that outlives its edits; an empty `key` means no card now.
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { LinkCard, ReaderCard } from "@gnoworld/schemas";
 import { z } from "zod";

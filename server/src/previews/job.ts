@@ -1,4 +1,4 @@
-// The preview job (8f, slice 7's 7l; ADR-0002 §7 "Preview captures"): every six hours it reads the home page of each realm the team's data
+// The preview job: every six hours it reads the home page of each realm the team's data
 // lists through the default universe's RPC (vm/qrender, the way out's host already), keeps its first part, has the moderation check read
 // that very part, and writes previews.json beside and renamed over. One call at a time, a pause apart, each capped in time and size. No
 // check, no capture: a page the check hides is dropped, one it could not read keeps only what an earlier check passed. Nothing a chain
@@ -175,7 +175,7 @@ export async function runPreviews(options: PreviewsOptions): Promise<Outcome> {
       if (capture !== undefined) kept.push(capture);
     }
     if (isStopped()) return fail("stopped");
-    // No read reached anyone (the way out not there yet): the last file stays, and the pass runs again soon (repeat.ts's waits, F4872).
+    // No read reached anyone (the way out not there yet): the last file stays, and the pass runs again soon (repeat.ts's waits).
     if (!pass.reached && pass.unreached !== undefined) return fail(pass.unreached);
     const kind = written(settled, kept);
     if (kind !== undefined) return fail(kind);

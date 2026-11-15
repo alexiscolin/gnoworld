@@ -13,7 +13,7 @@ afterEach(() => {
   for (const db of opened.splice(0)) db.close();
 });
 
-// The Earth with a typed room of each kind, a realm's room made ahead (D413) and an Earth player room (D394), which no file types.
+// The Earth with a typed room of each kind, a realm's room made ahead and an Earth player room, which no file types.
 const ROLES: Typed = {
   worlds: new Map([
     [

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { loadRealmCount, type Deploy } from "./count.ts";
 
-// Slice 9g: the Earth's realms deployed in the last 24 hours, counted by BLOCK time (a transaction has none, a block has one),
+// The Earth's realms deployed in the last 24 hours, counted by BLOCK time (a transaction has none, a block has one),
 // from nothing stored: a restarted server asks the indexer for the day again, so the count is the same before and after.
 const NOW = Date.parse("2026-11-05T12:00:00.000Z");
 const ago = (ms: number): string => new Date(NOW - ms).toISOString();

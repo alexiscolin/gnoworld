@@ -1,4 +1,4 @@
-// The replay of grc20's events (slice 13) into the token tables: a token announced once, its transfers applied to balances and supply, each
+// The replay of grc20's events into the token tables: a token announced once, its transfers applied to balances and supply, each
 // transaction one transfer of a token a day. A balance below zero, a name announced twice, a transfer to oneself or more rows than the cap for one token
 // mark a token `ambiguous`: its balances are dropped and it shows no holders. Amounts are BigInt here and decimal text in the table.
 import { rollupName } from "@gnoworld/core";

@@ -1,4 +1,4 @@
-// Jarvis's kept answers, in the server's database so a restart keeps them (D13920): a function's explanation 7 days, shared
+// Jarvis's kept answers, in the server's database so a restart keeps them: a function's explanation 7 days, shared
 // across rooms, keyed by chain, realm and function (it read the code alone: no room lines, no live tool); a room's "here" 1 hour,
 // its own, gone when a line of the room is taken. Only an `answered` is kept. A part of a key is validated before it exists.
 import type { DatabaseSync } from "node:sqlite";
@@ -52,7 +52,7 @@ export function keptKey(ask: JarvisQuestion, chain: string | undefined): string 
 }
 
 /** The key an ask is in flight and served under, and the one it is kept under. An explanation is the same in every room: it is
- * both under its kept key, which holds none (D13920). */
+ * both under its kept key, which holds none. */
 export function keysOf(
   ask: JarvisQuestion,
   at: { last: string | undefined; account: string; chain: string | undefined },

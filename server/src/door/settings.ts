@@ -1,24 +1,23 @@
-// The door's settings and the admin API's (docs/plans/slice-10.md, 10g; D92 to D96), read with the server's own
-// (config.ts), each none by default: no JARVIS_URL, no door, and Jarvis off unless JARVIS=on; no ADMIN_PORT, no admin
-// API. A setting of either given
-// without the one that opens it stops the server, as a door meant that would not open. The quotas and the allowlist
-// here are first values alone: the database keeps them from the first start (quota.ts).
+// The door's settings and the admin API's, read with the server's own (config.ts), each none by default: no JARVIS_URL,
+// no door, and Jarvis off unless JARVIS=on; no ADMIN_PORT, no admin API. A setting of either given without the one that
+// opens it stops the server, as a door meant that would not open. The quotas and the allowlist here are first values
+// alone: the database keeps them from the first start (quota.ts).
 import { Address, ASK_WAIT_S, DOOR_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
 import { host, isOrigin, keyFile, list, port, type Secret, whole } from "@gnoworld/service/settings";
 
 export interface DoorConfig {
-  // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
+  // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value.
   on: boolean;
-  // jarvis's address on the network only the two share (D42): a bare origin.
+  // jarvis's address on the network only the two share: a bare origin.
   url: string;
-  // What the door proves itself to jarvis with, in a header of every request; required once jarvis is on (10u-g2).
+  // What the door proves itself to jarvis with, in a header of every request; required once jarvis is on.
   key: Secret | undefined;
   timeoutMs: number;
   questionChars: number;
   first: { quota: number; quotaUnnamed: number; unlimited: Address[] };
   // The mainnet's RPC, where an account's name is read (names.ts): a bare https origin; and its chain's id, which the
-  // node's status must name (D120).
+  // node's status must name.
   namesRpc: string;
   namesChain: string;
 }

@@ -1,4 +1,4 @@
-// The lines the server's IRC link writes and reads (slice 3's plan, 3h, 3j, 3k): each through formatLine;
+// The lines the server's IRC link writes and reads: each through formatLine;
 // the commands the bot may send, each in its only forms; a room's message as the link hands it on.
 import { formatLine, GUEST_PREFIX, isCountryCode, JARVIS_NICK, toIrcCommand, type IrcMessage } from "@gnoworld/core";
 
@@ -41,7 +41,7 @@ function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): bool
   return /^(?:[+-][Iv]|-[qaoh])$/.test(mode) && person(arg);
 }
 
-// A guest's line by RELAYMSG (D430): a room, a nick only the server builds (anon/ and two words and four base32 characters, 32
+// A guest's line by RELAYMSG: a room, a nick only the server builds (anon/ and two words and four base32 characters, 32
 // at most) or Jarvis's one, a text of one line with no control character, the whole line within the 510 bytes of IRC. The room
 // and the text are never the guest's to shape beyond that.
 const guestNick = (nick: string): boolean =>
@@ -58,9 +58,9 @@ function relayForm([room = "", nick = "", text = "", ...more]: readonly string[]
   );
 }
 
-// A REDACT in one room; a NOTICE to one account, by Ergo's shape of a name (letters, digits, - and _: F655); a
-// room's mode (roomMode); a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason
-// (3m). Another command has no form.
+// A REDACT in one room; a NOTICE to one account, by Ergo's shape of a name (letters, digits, - and _); a
+// room's mode (roomMode); a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason.
+// Another command has no form.
 const FORMS = new Map<string, (params: readonly string[]) => boolean>(
   Object.entries({
     REDACT: ([room = ""]: readonly string[]) => ROOM.test(room),
@@ -95,7 +95,7 @@ export function joins(rooms: readonly string[]): string[] {
 }
 
 // Ergo's time, in server-time's form alone, so a mark is always a time Ergo can read back; and the id an
-// edit names (+gnoworld/edit, 3b's table), 128 characters at most, or the line is no edit.
+// edit names (+gnoworld/edit), 128 characters at most, or the line is no edit.
 function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; country?: string } {
   const [time = "", edits = "", country = ""] = [
     tags.get("time"),
@@ -112,10 +112,10 @@ function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; count
 
 // A line to a room's voices or operators (STATUSMSG: +#room, @#room, any of ~&@%+ before the name) is the room's
 // line too: Ergo relays it to those members and keeps no history of it (channel.go, #959), so it is read for the
-// rules, the check and the strikes, and its hide is refused (F723).
+// rules, the check and the strikes, and its hide is refused.
 const STATUS = /^[~&@%+]+(?=#)/;
 
-// The bot's own line, or a relayed one (D430): said for a guest after the server judged it, so nothing to check, count or hide
+// The bot's own line, or a relayed one: said for a guest after the server judged it, so nothing to check, count or hide
 // again. A connection can take no nick with the relay's separator, so this holds whatever the tags say.
 const sender = (source: string | undefined): string => source?.split("!")[0] ?? "";
 const relayed = (source: string | undefined): boolean => sender(source).includes("/");
@@ -127,7 +127,7 @@ const accountOf = ({ tags, source }: IrcMessage, answering: boolean): string =>
 
 // A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
 // account and the id Ergo set, from someone else, with text. `answering`: the answer to a question about one line, where a
-// relayed guest's line is a line too, its account the anon nick as the relay's own record has it (F13720).
+// relayed guest's line is a line too, its account the anon nick as the relay's own record has it.
 export function said(message: IrcMessage, joined: ReadonlySet<string>, answering = false): Said | undefined {
   const {
     tags,

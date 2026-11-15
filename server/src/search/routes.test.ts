@@ -12,8 +12,8 @@ import type { Typed } from "../rooms/types.ts";
 import { makeSearch, SEARCH_TABLES, type Search } from "./index.ts";
 import { searchRoutes } from "./routes.ts";
 
-// Slice 13, B2 (D13917, D13924): GET /api/search answers a reader only with the lines that reader may read, asked again on every
-// page and whatever the room was when the line came in (F13700-sec: never `mayRead` alone). docs/plans/search.md §3 B, §4.
+// GET /api/search answers a reader only with the lines that reader may read, asked again on every
+// page and whatever the room was when the line came in (never `mayRead` alone).
 const MINUTE = 60_000;
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv"); // invited to #bubble/crew

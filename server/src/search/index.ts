@@ -1,6 +1,6 @@
-// The search index (slice 13, B1; D13917, D13924): the lines of the rooms a reader may open, newest 2,048 a room and 90 days, in
+// The search index the lines of the rooms a reader may open, newest 2,048 a room and 90 days, in
 // SQLite beside the rest and with its own full-text table. A line enters once moderation let it through, and leaves with its
-// REDACT, its expiry or the room's cap. Nothing here reads for a reader: B2's route does, by `mayRead`.
+// REDACT, its expiry or the room's cap. Nothing here reads for a reader: the search route does, by `mayRead`.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { GONE } from "../door/lines.ts";
@@ -11,13 +11,13 @@ import { ERGO_EXPIRE_MS } from "../retention/retention.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { searchable, type Typed } from "../rooms/types.ts";
 
-// Ergo's channel-length: a line it no longer serves cannot be opened from a hit (Q4).
+// Ergo's channel-length: a line it no longer serves cannot be opened from a hit.
 export const ROOM_CAP = 2048;
 export const MAX_ROWS = 400_000;
 // A line edited more often than this leaves the index: its edits are rows too, and the index errs toward less.
 export const MAX_EDITS = 50;
 
-// `world` is in the full-text table too, so a query's match starts from the asked world's lines (F13756).
+// `world` is in the full-text table too, so a query's match starts from the asked world's lines.
 // `line_edits` holds the id of every edit folded into a line (foldEdits, packages/core/src/chat/shown.ts), so a REDACT of any of them finds
 // its row. FTS5's `secure-delete` zeroes a removed line's words in the index, which `PRAGMA secure_delete` does not reach (SQLite 3.53.4).
 export const SEARCH_TABLES = `
@@ -67,7 +67,7 @@ export interface Search {
   /** Removes at most `limit` rows, those past 90 days first, then the oldest over the row cap; the number removed. */
   expire: (limit: number) => number;
   size: () => number;
-  /** B2: the lines of `rooms` that hold every word of `q`, newest first, `limit` at most, from the cursor on. */
+  /** The lines of `rooms` that hold every word of `q`, newest first, `limit` at most, from the cursor on. */
   query: (query: Query) => Found;
   /** Asks Ergo for each of a room's lines, the oldest first, and drops those it no longer holds. */
   reconcile: (room: string, fetch: (room: string, msgid: string) => Promise<Fetched>) => Promise<void>;
@@ -107,7 +107,7 @@ export function makeSearch(db: DatabaseSync, { roles, now, maxRows = MAX_ROWS }:
     count: db.prepare("SELECT count(*) AS n FROM lines"),
     ids: db.prepare("SELECT msgid FROM lines WHERE room = ? ORDER BY at, rowid"),
   };
-  // A line taken (`room id`) or edited (`room id account`) before it came in, as door/lines.ts keeps them (F5109, F5270): the
+  // A line taken (`room id`) or edited (`room id account`) before it came in, as door/lines.ts keeps them: the
   // bot's check is asynchronous, so a REDACT or an edit can be heard before its line passes. Two maps, so a flood of edits
   // naming no line cannot push a REDACT's mark out.
   const taken = new Map<string, true>();
@@ -116,7 +116,7 @@ export function makeSearch(db: DatabaseSync, { roles, now, maxRows = MAX_ROWS }:
   const held = (room: string): boolean => room.startsWith("#") && searchable(roles, room);
   const size = (): number => Count.parse(sql.count.get()).n;
   const remove = (room: string, msgid: string): void => {
-    // Whatever the room is now: a room made hidden after its lines were indexed still loses a deleted line (F13700).
+    // Whatever the room is now: a room made hidden after its lines were indexed still loses a deleted line.
     if (held(room)) remember(taken, [key(room, msgid), true], GONE);
     sql.drop.run(room, msgid, msgid);
   };

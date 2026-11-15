@@ -1,6 +1,6 @@
-// The roles file (decisions 147 and 149): the team, the trusted, and each world's moderators and
-// anti-spam rules; since 3m, each world's groups of accounts and the type of its rooms; since 4b, the
-// sections its rooms are listed in. Who may do what is answered from it alone. Read whole in review: a
+// The roles file: the team, the trusted, and each world's moderators and
+// anti-spam rules, its groups of accounts, the type of its rooms and the
+// sections they are listed in. Who may do what is answered from it alone. Read whole in review: a
 // wrong line here hands out power.
 import { jsonOf } from "@gnoworld/core";
 import { readFileSync } from "node:fs";
@@ -23,7 +23,7 @@ function slug() {
   return z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 }
 
-// A room's type (3m): who joins it, who reads it and who speaks in it (rooms/types.ts). Only a members
+// A room's type: who joins it, who reads it and who speaks in it (rooms/types.ts). Only a members
 // room names its readers, and a members-write room its writers too; hidden leaves it out of the lists.
 function room() {
   const Group = slug();
@@ -44,7 +44,7 @@ function ownRoom(slug: string, name: string): boolean {
   );
 }
 
-// A section of a world's rooms (4b): a name for the lists, and its room ids, in the order to show them.
+// A section of a world's rooms: a name for the lists, and its room ids, in the order to show them.
 function section() {
   return z.strictObject({ name: z.string().min(1).max(64), rooms: z.array(z.string()).max(500) });
 }
@@ -103,7 +103,7 @@ function schema() {
       team: Addresses,
       trusted: Addresses,
       worlds: z.array(world(Addresses)).refine((worlds) => unique(worlds.map(({ slug }) => slug))),
-      // The rules of a world the file does not list (D380, D430): a realm's room is judged by them, and a guest's words start from them.
+      // The rules of a world the file does not list: a realm's room is judged by them, and a guest's words start from them.
       defaults: rules().optional(),
     })
     .superRefine(({ team, trusted, worlds }, ctx) => {
@@ -134,7 +134,7 @@ export type Room =
   | { type: "members"; readers: string; hidden: boolean }
   | { type: "members-write"; readers: string; writers: string; hidden: boolean };
 
-/** A named list of a world's rooms, in the order a reader sees them (4b). */
+/** A named list of a world's rooms, in the order a reader sees them. */
 export interface Section {
   name: string;
   rooms: readonly string[];
@@ -157,7 +157,7 @@ export interface Roles {
   >;
 }
 
-// ponytail: read at start, so a change waits for a restart; slice 12's console will watch the file.
+// ponytail: read at start, so a change waits for a restart.
 export function loadRoles(path: string): Roles {
   let text: string;
   try {
@@ -196,8 +196,8 @@ export const isTeam = (roles: Roles, who: Address): boolean => roles.team.has(wh
 
 export const isTrusted = (roles: Roles, who: Address): boolean => isTeam(roles, who) || roles.trusted.has(who);
 
-/** Who the automatic mute spares (decision 146): the team and the trusted, by the account Ergo names; a
- * world's moderator by that role alone is not (decision 149). Their lines are still checked and hidden. */
+/** Who the automatic mute spares: the team and the trusted, by the account Ergo names; a
+ * world's moderator by that role alone is not. Their lines are still checked and hidden. */
 export const spared =
   (roles: Roles) =>
   (account: string): boolean => {
@@ -211,6 +211,5 @@ export function moderates(roles: Roles, who: Address, slug: string): boolean {
   return world !== undefined && (isTeam(roles, who) || world.moderators.has(who));
 }
 
-/** Who may make and archive a world's rooms (3l): its moderators and the team, as `moderates`; rights
- * earned by activity are a later slice's (decision 162). */
+/** Who may make and archive a world's rooms: its moderators and the team, as `moderates`. */
 export const mayCreateRoom = (roles: Roles, who: Address, slug: string): boolean => moderates(roles, who, slug);

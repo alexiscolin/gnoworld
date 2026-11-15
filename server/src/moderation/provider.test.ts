@@ -4,7 +4,7 @@ import { logger } from "@gnoworld/service/log";
 import { moderationClient } from "./provider.ts";
 
 // The answers OpenAI's own API description shows for POST /v1/moderations, byte for byte
-// (github.com/openai/openai-openapi, branch manual_spec, 498c71dd, read 2026-10-22): omni-moderation-latest's,
+// (github.com/openai/openai-openapi, branch manual_spec, 498c71dd): omni-moderation-latest's,
 // and an older model's without the illicit categories.
 const OMNI = readFileSync(new URL("answers/omni.json", import.meta.url), "utf8");
 const OLDER = readFileSync(new URL("answers/text-007.json", import.meta.url), "utf8");
@@ -130,7 +130,7 @@ describe("the moderation client", () => {
     [`${category}'s score below 0`, changed("category_scores", category, -0.1)],
   ]);
 
-  // An answer of a shape it does not know raises the alert: the provider changed under us (decision 153).
+  // An answer of a shape it does not know raises the alert: the provider changed under us.
   it.each([
     ["an answer missing categories, the older model's", OLDER],
     ["a category the client does not know, in the scores", changed("category_scores", "new/kind", 0.1)],
@@ -176,9 +176,8 @@ describe("the moderation client", () => {
   });
 });
 
-// L3 (docs/plans/link-previews.md §7 "moderation/provider.ts"): the client's input is a string, as every caller gives it, or a card's text
-// with its picture as a data URL. A string goes out as it did; parts go out as OpenAI's multi-modal input (text and image_url), read
-// in the guide of 2026-11-11 (platform.openai.com/docs/guides/moderation). The answer is read as before.
+// The client's input is a string, as every caller gives it, or a card's text with its picture as a data URL. Parts go
+// out as OpenAI's multi-modal input (text and image_url): platform.openai.com/docs/guides/moderation.
 const IMAGE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ";
 
 const partsClient = () => {

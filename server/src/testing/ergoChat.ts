@@ -1,4 +1,4 @@
-// The chat as main starts it, over a real Ergo (3j to 3m): its tables, its rules, a provider that flags
+// The chat as main starts it, over a real Ergo: its tables, its rules, a provider that flags
 // "hurt", and chatFor, which waits until the bot is in its rooms.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
@@ -33,7 +33,7 @@ interface More {
   worlds?: Parameters<typeof startChat>[1]["worlds"];
   reconcileMs?: number;
   team?: ReadonlySet<string>;
-  // The account of a session's token, for the routes that ask who reads (4d's pins).
+  // The account of a session's token, for the routes that ask who reads (the pins).
   session?: (token: string | undefined) => string | undefined;
   // What answers each line's check, in place of the one that flags "hurt": a test holds a check back with it.
   provider?: (text: string) => Promise<Answer>;

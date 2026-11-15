@@ -1,4 +1,4 @@
-// The owners' moderation as the server wires it (part 4): the owner's right from the default universe's chain, the links' routes, and the
+// The owners' moderation as the server wires it: the owner's right from the default universe's chain, the links' routes, and the
 // right the pins ask. Without UNIVERSES_FILE no chain is read, so no owner holds a namespace.
 import type { DatabaseSync } from "node:sqlite";
 import type { Address } from "@gnoworld/schemas";

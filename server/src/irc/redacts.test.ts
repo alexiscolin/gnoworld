@@ -6,7 +6,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// The hides the link sent and Ergo has not taken (F2462), driven without a socket: time is the test's.
+// The hides the link sent and Ergo has not taken, driven without a socket: time is the test's.
 const HIDE = ["#bubble", "m1", "a word this world bans"] as const;
 const BASE = 10;
 const setup = () => {

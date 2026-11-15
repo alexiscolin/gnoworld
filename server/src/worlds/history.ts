@@ -1,6 +1,6 @@
-// What the worlds job reads of an indexer (slice 7, 7c; 7k3): every call of the chain, a page at a time by height, each counted for the realm
-// it names: calls, callers and the last height of a call. The queries are those onyx-1's indexer answered on 2026-11-04 (onyxIndexer.json):
-// it refused 7c's per-realm filter, and took 1.2 to 1.5 s for each realm's. History holds DIRECT calls only, and a line may be a failed
+// What the worlds job reads of an indexer every call of the chain, a page at a time by height, each counted for the realm
+// it names: calls, callers and the last height of a call. The queries are those onyx-1's indexer answered (onyxIndexer.json):
+// it refused a per-realm filter, and took 1.2 to 1.5 s for each realm's. History holds DIRECT calls only, and a line may be a failed
 // transaction: a count is a count of attempts, and a realm with none is not dead. No file body is asked (a deploy carries its whole source).
 import { callsAbove, callsFirst, callsInBlock, type IndexerAsk } from "@gnoworld/chain/asks";
 import { isAddress } from "@gnoworld/core";
@@ -9,7 +9,7 @@ import { z } from "zod";
 import { jsonOrFail } from "@gnoworld/service/net";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 
-/** The most bytes of one answer: ten pages' worth at onyx-1's 194 bytes a transaction (387 KB for 2,000, 2026-11-04). */
+/** The most bytes of one answer: ten pages' worth at onyx-1's 194 bytes a transaction (387 KB for 2,000). */
 export const HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 /** The transactions a page asks: onyx-1's 6,860 in four pages. */
 export const HISTORY_PAGE = 2_000;

@@ -1,8 +1,8 @@
-// The admin API's Jarvis part (ADR-0002 §6; D47, D96): on its own listener, never the public API's. Every call comes from
+// The admin API's Jarvis part (ADR-0002 §6): on its own listener, never the public API's. Every call comes from
 // a listed admin site in JSON (guard.ts), with a session whose account is in the roles file's team, checked first; an
 // account makes 30 calls a minute. GET / reads the values; a change is made in two steps, POST /challenge then POST
 // /change, its text the action in words, signed afresh through the login's own nonce and verifier (login.ts's
-// makeSigned), then made at once, the quotas and the allowlist in the server's database, a budget by jarvis (D45). Each
+// makeSigned), then made at once, the quotas and the allowlist in the server's database, a budget by jarvis. Each
 // change and refusal is logged: who, what and when, every account by its HMAC.
 import {
   JarvisChange,
@@ -127,7 +127,7 @@ export function adminRoutes(options: Options): Hono<Guarded> {
     if (typeof proved === "string") return refuse(c, proved, { account: who });
     const { by, change } = Stored.parse(JSON.parse(proved.action));
     const parsed = JarvisChange.parse(change);
-    // Past a verified proof, a refusal says what was asked: jarvis may have applied a budget it did not answer (F5107).
+    // Past a verified proof, a refusal says what was asked: jarvis may have applied a budget it did not answer.
     const asked = { account: who, ...logged(parsed) };
     // Asked by this account: another team member's challenge is not this one's to sign.
     if (by !== who) return refuse(c, "by", asked);

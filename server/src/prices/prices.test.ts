@@ -16,7 +16,7 @@ import { logger } from "@gnoworld/service/log";
 import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import { MAX_BYTES, startPrices } from "./prices.ts";
 
-// CoinGecko's /simple/price as it answered on 2026-10-30 (api.coingecko.com, keyless, read in this session) for
+// CoinGecko's /simple/price as it answered (api.coingecko.com, keyless) for
 // ids=bitcoin,gno-land,atomone with vs_currencies=usd, include_24hr_change and include_last_updated_at. An id it does
 // not know is left out of the answer, not an error (nosuchcoin, same request).
 const ANSWER = {
@@ -103,7 +103,7 @@ const settled = async (calls: Call[], count: number): Promise<void> => {
     expect(calls).toHaveLength(count);
   });
 };
-// A tick ends by one of two signs, awaited and never slept on (F2750): its good answer, written as this read's
+// A tick ends by one of two signs, awaited and never slept on: its good answer, written as this read's
 // (the clock is fixed at NOW, so a file of another time is not it yet), or its failure, logged.
 const wrote = async (file: string): Promise<void> => {
   await vi.waitFor(() => {
@@ -196,7 +196,7 @@ describe("the prices timer: a good answer", () => {
     expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual(TOKENS);
     // A write in place keeps the file's inode; a rename brings another one.
     expect(statSync(file).ino).not.toBe(before);
-    // The prices' day beside it (8i), and no temporary.
+    // The prices' day beside it, and no temporary.
     expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
   });
 
@@ -536,7 +536,7 @@ describe("the prices timer: its own way out, with no send given", () => {
       startPrices({ file, log: logger("a-pepper-of-forty-characters-0123456789", () => undefined), now: () => NOW }),
     );
     await wrote(file);
-    // One price read a pass, and the week's seed once at most beside it (the batch's review).
+    // One price read a pass, and the week's seed once at most beside it.
     const paths = fetched.mock.calls.map(([asked]) => new URL(asked).pathname);
     expect(paths.filter((path) => path === "/api/v3/simple/price")).toHaveLength(1);
     expect(paths.filter((path) => path === SEED_PATH).length).toBeLessThanOrEqual(1);
@@ -743,14 +743,14 @@ describe("the prices timer: when it runs", () => {
   });
 });
 
-// The timer's way out (slice 5 part 2, 5l; decision 151; threat model "server's way out"): the proxy lets out the hosts
+// The timer's way out: the proxy lets out the hosts
 // its list names, so the list is what keeps the timer from reaching any other. deploy/test.sh proves it on the running
 // stack; this reads the files, where Docker is not needed.
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("the egress proxy's list", () => {
-  // The block height (decision of 2026-10-31) adds the default universe's RPC, the door's names (D120) the mainnet's node, the
-  // worlds job (7c) the indexers; universes.test.ts ties them to their sources.
+  // The block height adds the default universe's RPC, the door's names the mainnet's node, the
+  // worlds job the indexers; universes.test.ts ties them to their sources.
   it("lets out CoinGecko's, OpenAI's, the default universe's RPC, the names' node and the indexers, and no other host", () => {
     const acl = read("../../../deploy/egress/acl.yaml");
     const hosts = [...acl.matchAll(/^\s+-\s+(\S+)\s*$/gm)].map((match) => match[1]);
@@ -833,14 +833,14 @@ describe("deploy/test.sh", () => {
   });
 });
 
-// The home's block height (decision of 2026-10-31, "je valide tes reco"; morning.md, point 17): the same timer reads the default
+// The home's block height: the same timer reads the default
 // universe's height from its RPC through the server's one way out, and writes it with the prices, so no visitor's browser asks an
 // RPC. The envelope is the one packages/chain/src/testing/envelopes.ts writes from gno's source (`statusEnvelope`).
 const RPC = "https://rpc.onyx.testnets.gno.land:443";
 // The default port is dropped from the address asked: the origin as a URL writes it.
 const STATUS_URL = "https://rpc.onyx.testnets.gno.land/status";
 const BLOCK_TIME = "2026-10-31T11:59:10.123456789Z";
-// Its node names the default universe's chain (D118), unless a test names another or none (null).
+// Its node names the default universe's chain, unless a test names another or none (null).
 const status = (height: string | number, time: string = BLOCK_TIME, network: string | null = "onyx-1") => ({
   jsonrpc: "2.0",
   id: "",
@@ -930,7 +930,7 @@ describe("the prices timer: the block height", () => {
     });
   });
 
-  // The average seconds between blocks (D354): from the block just read and the one in the file the timer last wrote.
+  // The average seconds between blocks: from the block just read and the one in the file the timer last wrote.
   describe("the interval between blocks", () => {
     const keep = (block: unknown) => {
       const folder = fresh();
@@ -1065,7 +1065,7 @@ describe("the prices timer: the block height", () => {
     expect(call?.ms).toBe(10_000);
   });
 
-  // The default universe's chain (D118): its node's status must name it, or the height is no height of that universe.
+  // The default universe's chain: its node's status must name it, or the height is no height of that universe.
   it("writes the height of a node whose status names the default universe's chain", async () => {
     const { calls, file } = withRpc({ height: json(status(786661, BLOCK_TIME, "onyx-1")) }, { chainId: "onyx-1" });
     await wrote(file);

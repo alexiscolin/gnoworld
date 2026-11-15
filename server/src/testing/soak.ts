@@ -1,4 +1,4 @@
-// The check's soak (slice 3's plan, 3i), run by soak.test.ts in a process of its own with --expose-gc:
+// The check's soak, run by soak.test.ts in a process of its own with --expose-gc:
 // 100,000 messages through the queue and the checker, half from accounts never seen again (addresses are
 // free), a fake provider answering at once, and the heap after a collection at each of 10 checkpoints,
 // printed as JSON. LEAK=1 keeps every message, the control that shows the bound can fail.
@@ -12,7 +12,7 @@ import { answer } from "./answers.ts";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const log = logger(PEPPER, () => true);
-// The verdicts' index by account as main opens them: a line's rate reads it (3k).
+// The verdicts' index by account as main opens them: a line's rate reads it.
 const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, STRIKE_TABLES]);
 const nothing = answer();
 const check = makeChecker({

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
-// 10g: D43's quota per account and UTC day, its allowlist, and both kept in the server's database (D47, D95).
+// The quota per account and UTC day, its allowlist, and both kept in the server's database.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
 const ANNA = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const BEN = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
