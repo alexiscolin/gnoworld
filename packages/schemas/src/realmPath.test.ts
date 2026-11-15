@@ -110,6 +110,7 @@ describe("isRealmPath alone, gno's grammar for a realm's path (mempackage.go:49-
   });
 
   it.each([
+    ["empty", ""],
     ["a name ending in _test", "gno.land/r/demo/foo_test"],
     ["a dot after the realm, the expression's cut", "gno.land/r/demo/x.Foo()"],
     ["a leading newline", "\ngno.land/r/demo/x"],
