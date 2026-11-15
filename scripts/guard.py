@@ -48,6 +48,14 @@ HOMED = []  # the VAR=value words that gave one of them a value, wherever the li
 # Where git looks for its programs, the secret scan's among them: a folder of the command's own first in either puts a fake in front.
 PROGRAM_HOMES = {"PATH", "GIT_EXEC_PATH"}
 PATHED = []  # the words that may have given one of them a value, wherever the line has them
+# The class, whatever its spelling: a word naming one of them, or zsh's `path` array tied to PATH, or a startup file a shell sources
+# before its command (BASH_ENV, ENV, ZDOTDIR), in an assignment, an array element (`path[1,0]=`), an assigning expansion (`${PATH::=`,
+# `${PATH:=`, `${PATH=`) or a declaration (`typeset -a path`, `set -A path`). Read in the raw text of a line that pushes, a quote or a
+# substitution hiding nothing from it; a plain read (`$PATH`, `${PATH}`) and a longer name (MYPATH) are no match.
+SETS_PROGRAM_HOME = re.compile(
+    r"(?<![\w$-])(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?:\[[^\]]*\])?\+?="
+    r"|\$\{[!~^=+#]*(?:\([A-Za-z]+\))?(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?:\[[^\]]*\])?:{0,2}="
+    r"|(?<![\w$-])(?:typeset|declare|local|integer|float|set\s+-A)\b[^;&|\n]*(?<![\w$-])(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?![\w=-])")
 SETTERS = {"export", "declare", "typeset", "readonly", "local"}  # builtins that give a variable a value or export it
 # git's global options whose argument may come as the next word (git 2.53), beside -c and -C; --git-dir and --work-tree are refused.
 GIT_TAKES_ARG = {"-c", "-C", "--namespace", "--config-env", "--attr-source", "--shallow-file"}
@@ -738,8 +746,8 @@ elif tool == "Bash":
     if HOMED and git_named:
         refuse("HOME or XDG_CONFIG_HOME given a value on a line that runs git: git reads its global config there, whose hooks folder skips "
                "every hook (F5541); give them in no line that runs git")
-if PATHED and push:
-    refuse("PATH or GIT_EXEC_PATH given a value on a line that pushes: the hooks' scan, found there, could be a fake; give them in no "
+if (PATHED or tool == "Bash" and SETS_PROGRAM_HOME.search(text)) and push:
+    refuse("PATH, path, GIT_EXEC_PATH, BASH_ENV, ENV or ZDOTDIR given a value on a line that pushes: the hooks' scan, found there, could be a fake; give them in no "
            "line that pushes")
 if push:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",

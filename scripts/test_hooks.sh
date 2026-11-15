@@ -3796,6 +3796,20 @@ for cmd in 'printf %s PATH; git push origin x' 'read line <<< x; git push origin
 	'export FOO=1; git push origin x'; do
 	sh_ "$cmd" 0
 done
+# The class, not its spellings: on a line that pushes, any word naming PATH, path (zsh's array tied to PATH), GIT_EXEC_PATH, or a
+# startup file a shell reads (BASH_ENV, ENV, ZDOTDIR) in an assignment, an array element, an assigning expansion or a declaration is
+# refused, however it is spelled; reading one (`$PATH`), and another name that ends the same way, are not.
+for cmd in 'path=(/tmp/p $path); git push origin x' 'path+=(/tmp/p); git push origin x' 'path[1,0]=/tmp/p; git push origin x' \
+	': ${PATH::=/tmp/p:$PATH}; git push origin x' ': ${PATH:=/tmp/p}; git push origin x' ': ${PATH=/tmp/p}; git push origin x' \
+	'typeset -a path; git push origin x' 'set -A path /tmp/p $path; git push origin x' "BASH_ENV=/tmp/p/e bash -c 'git push origin x'" \
+	"ENV=/tmp/p/e sh -c 'git push origin x'" "ZDOTDIR=/tmp/p zsh -c 'git push origin x'" 'GIT_EXEC_PATH[1]=/tmp/p; git push origin x'; do
+	sh_ "$cmd" 2
+done
+sh_ "$(printf 'path=(/tmp/p $path)\ngit push origin x')" 2
+for cmd in 'echo $PATH && git push origin x' 'echo ${PATH} $path; git push origin x' 'git push origin x' 'MYPATH=/tmp/p git push origin x' \
+	'my_path=x git push origin x' 'git status; path=(/tmp/p $path)' 'git commit -m "path=(/tmp/p)"' 'echo ${x:-PATH=y}; git push origin x'; do
+	sh_ "$cmd" 0
+done
 # A global option whose argument comes as the next word is not the subcommand, or `commit -n` and a forced push would pass,
 # and a push would get no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
 sh_ 'git --namespace x commit -n -m y' 2
