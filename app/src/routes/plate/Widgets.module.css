@@ -1,4 +1,4 @@
-/* The plate's squares (slice 13): hub cards on the twelve columns; the narrow plate's tighter card padding is the plate's to set (its container is
+/* The plate's squares: hub cards on the twelve columns; the narrow plate's tighter card padding is the plate's to set (its container is
    37.5 rem, Panel). */
 @layer components {
   /* raw: the narrow plate (37.5 rem, as the grid's own container query) */

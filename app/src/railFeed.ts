@@ -1,5 +1,5 @@
-// What the rail reads (7i): the worlds' file, and who is here, asked at once and each minute while a rail shows (the server's answer keeps a
-// minute too), never while the tab is hidden; the names and visits first, never waiting on the server (F3778).
+// What the rail reads: the worlds' file, and who is here, asked at once and each minute while a rail shows (the server's answer keeps a
+// minute too), never while the tab is hidden; the names and visits first, never waiting on the server.
 import { createStore } from "zustand/vanilla";
 import type { CosmosWorld } from "./space/cosmosWorld.ts";
 import type { Known } from "./railWorlds.ts";

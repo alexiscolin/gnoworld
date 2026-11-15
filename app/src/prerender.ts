@@ -1,4 +1,4 @@
-// The pages the build writes ahead (ADR-0002 §2: no rendering server): each place of the data files at its path and at
+// The pages the build writes ahead (no rendering server): each place of the data files at its path and at
 // its canonical address, and the list. A page found at neither is not written, and the host answers 404.
 import type { Place } from "@gnoworld/core";
 

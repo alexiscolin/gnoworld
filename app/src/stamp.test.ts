@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { stampOf } from "./stamp.ts";
 
 // When a file was read, as the home writes it (the block's line, the posts): a clock time, a date before today, and no time at all for one
-// too far ahead of ours. Moved from the markets row's tests when the row stopped writing it (D345).
+// too far ahead of ours.
 describe("stampOf", () => {
   const NOW = new Date("2026-10-31T06:07:00.000Z");
   it.each([

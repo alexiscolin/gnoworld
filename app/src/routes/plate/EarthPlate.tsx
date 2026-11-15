@@ -1,4 +1,4 @@
-// The Earth's plate (slice 13, D567): the adapter that gives the model what the chat knows of a universe's general room, who is here, from
+// The Earth's plate: the adapter that gives the model what the chat knows of a universe's general room, who is here, from
 // how many countries, the messages an hour and the latest on X, with no block of the chain.
 import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { EARTH_CHAT as EARTH } from "../../features/chat/index.ts";

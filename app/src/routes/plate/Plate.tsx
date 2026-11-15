@@ -1,4 +1,4 @@
-// The plate, below its title (slice 13, D566): its blocks in their order, each drawn only from what the model holds. The hero (the status and rank
+// The plate, below its title: its blocks in their order, each drawn only from what the model holds. The hero (the status and rank
 // at the kicker's row, the lede, the actions, the talk bar), the figures band, then the bento of twelve columns: calls per day with who calls it,
 // the chat's hours, what only this kind has, what it can do, its page and Try it, around it, the squares; the links out last. The zones are a
 // zone step apart (--plate-zone, 48 px, 32 on a narrow plate), the cards in a zone a Stack step. Its code comes after the first screen: the routes

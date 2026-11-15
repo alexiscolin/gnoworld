@@ -1,7 +1,7 @@
-// The cosmos's own addresses (D344): the home's page shows the whole cosmos far out at `/universe` and a namespace's system at
-// `/s/<namespace>`, the Earth's system at `/s/gnoland` like any other; the home's own path is the Earth's first screen (D501).
+// The cosmos's own addresses: the home's page shows the whole cosmos far out at `/universe` and a namespace's system at
+// `/s/<namespace>`, the Earth's system at `/s/gnoland` like any other; the home's own path is the Earth's first screen.
 
-/** What the cosmos's addresses say (D344): the whole cosmos far out, or a system, the Earth's with none named. */
+/** What the cosmos's addresses say: the whole cosmos far out, or a system, the Earth's with none named. */
 export type CosmosAt = { readonly view: "universe" } | { readonly view: "system"; readonly system: string | undefined };
 
 const UNIVERSE_PATH = "/universe";
@@ -23,13 +23,13 @@ export function cosmosAt(pathname: string): CosmosAt | undefined {
   }
 }
 
-/** The namespaces whose worlds orbit the Earth, in the home's system (D401): their system is the home's, at the home's own path. */
+/** The namespaces whose worlds orbit the Earth, in the home's system: their system is the home's, at the home's own path. */
 export const HOME_NAMESPACES: readonly string[] = ["gov", "gnoland", "sys", "demo"];
 
 /** Whether `system` is the home's: none named, or a namespace that orbits the Earth. */
 export const isHome = (system: string | undefined): boolean => system === undefined || HOME_NAMESPACES.includes(system);
 
-/** The id the Earth's system goes by in an address and as a place (D501): its own page, `/s/gnoland`, as any system's. */
+/** The id the Earth's system goes by in an address and as a place: its own page, `/s/gnoland`, as any system's. */
 export const HOME_SYSTEM = "gnoland";
 
 /** The address of a system of the cosmos, `/s/<namespace>`: the Earth's at `/s/gnoland`, whichever of its namespaces is named. */
@@ -38,7 +38,7 @@ export const systemPath = (system: string | undefined): string =>
 
 const REALM_PATH = /^\/r\/([^/]+)\//;
 
-/** The system round the page at `pathname` (D383): a realm's namespace, a system's own, none (the Earth's) anywhere else. The views' bar's
+/** The system round the page at `pathname`: a realm's namespace, a system's own, none (the Earth's) anywhere else. The views' bar's
  * System goes there. */
 export function systemOfPage(pathname: string): string | undefined {
   const at = cosmosAt(pathname);

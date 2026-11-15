@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cardsApi, pictureOf } from "./cards.ts";
 import type { Fetcher } from "./http.ts";
 
-// The browser's client of the link cards (server/src/cards/routes.ts, mounted at /api/cards; link-previews L4): every answer through its
+// The browser's client of the link cards (server/src/cards/routes.ts, mounted at /api/cards): every answer through its
 // schema, the picture's address of one shape alone.
 const KEY = "a".repeat(64);
 const CARD = {

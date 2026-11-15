@@ -4,7 +4,7 @@ import { REALM_FACTS_CAPS, RealmDeployAnswer } from "@gnoworld/schemas/indexer";
 import recorded from "../../../tests/chain/onyxRealmDeploy.json" with { type: "json" };
 import { readRealmFacts } from "./indexer.ts";
 
-// 5k, the indexer reader: onyx-1's recorded answers (8g, F4875: `realmFacts` was never defined there) and the faults on a fake fetch, as
+// The indexer reader: onyx-1's recorded answers (`realmFacts` is not defined there) and the faults on a fake fetch, as
 // rpc.test.ts does. The body a fault test builds is the recorded shape: a deploy's transaction, its MsgAddPackage.
 const INDEXER = "https://indexer.onyx.testnets.gno.land/graphql/query";
 const REALM = "gno.land/r/gnoland/wugnot";

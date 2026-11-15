@@ -1,4 +1,4 @@
-// The header's two pills (D424, D444): where one is, the three levels of space, System and World each named by the place it leads to (the
+// The header's two pills: where one is, the three levels of space, System and World each named by the place it leads to (the
 // page's own, else the last this tab saw, the Earth's home the first time), and the chat full (?chat=full) of that world beside it; and
 // how one looks at it: space or the Map (space from above).
 import { realmName } from "@gnoworld/core";
@@ -54,7 +54,7 @@ function systemAt(universe: UniverseView, pathname: string): Spot | undefined {
 /** The views' pill from the page at `pathname`: Galaxy, then its system and its world, else the last seen, else the Earth's; and that
  * world, which the chat opens from a page that holds none. */
 export function levelsOf(universe: UniverseView, pathname: string): { levels: Level[]; world: Spot } {
-  // None seen yet, the Earth's system: its own page, `/s/gnoland`, never the home's first screen (D501).
+  // None seen yet, the Earth's system: its own page, `/s/gnoland`, never the home's first screen.
   const home = { path: universe.isDefault ? systemPath(undefined) : universe.home.path, name: "gno.land" };
   const system = systemAt(universe, pathname) ?? seen.system ?? home;
   const world = worldAt(universe, pathname) ?? seen.world ?? { path: universe.earth.path, name: "Earth" };
@@ -121,7 +121,7 @@ function Way(props: {
 // The full chat of the page at `href` where it holds one, else of `world`.
 const chatOf = (href: string, world: Spot) => fullChatHref(holdsChat(href.split("?")[0] ?? href) ? href : world.path);
 
-/** The chat full of the page in view, else of the world the World level leads to (D444): beside that level, after a divider, and in the
+/** The chat full of the page in view, else of the world the World level leads to: beside that level, after a divider, and in the
  * cream while it is open. A page with a chat under the dock's width is its chat already: none there. */
 export function ChatWay({ world }: { world: Spot }) {
   const pathname = useDrawnPath();
@@ -149,8 +149,8 @@ export function ChatWay({ world }: { world: Spot }) {
   );
 }
 
-/** How one looks at the place in view (D424, D427): space, or space flat (the Map). `world`: the page is a world's, which has no Map yet
- * (Alexis, 2026-11-09): none there, nor in the full chat, a Map asked on the way in left. */
+/** How one looks at the place in view: space, or space flat (the Map). `world`: the page is a world's, which has no Map:
+ * none there, nor in the full chat, a Map asked on the way in left. */
 export function Ways({ world }: { world: boolean }) {
   const { search } = useLocation();
   const away = world || asksFull(new URLSearchParams(search));

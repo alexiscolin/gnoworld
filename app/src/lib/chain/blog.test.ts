@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { latestPosts } from "./blog.ts";
 
-// gno.land's blog page (D13931): the page recorded through gnomcp from gnoland-1, the posts' titles, slugs and days, and the newest picked.
+// gno.land's blog page: the page recorded through gnomcp from gnoland-1, the posts' titles, slugs and days, and the newest picked.
 const RECORDED = readFileSync(new URL("../../../tests/chain/recorded/gnoland-1-blog-home.md", import.meta.url), "utf8");
 const entry = (title: string, slug: string, day: string) => `### [${title}](/r/gnoland/blog:p/${slug})\n${day}\n`;
 // The newest post of a page: the first of its newest.

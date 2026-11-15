@@ -1,6 +1,5 @@
-// The site's Content-Security-Policy (ADR-0002 §9; slice 3's plan, 3f), written once at build time for
-// every host: nothing loads unless named, nothing from another host but the accepted players' frames, no eval. React Router writes inline
-// scripts in each pre-rendered page, so the build allows exactly those, by their SHA-256 (F341).
+// The site's Content-Security-Policy (ADR-0002 §9), written once at build time for every host: nothing loads unless named, nothing from another host but the accepted players' frames, no eval. React Router writes inline
+// scripts in each pre-rendered page, so the build allows exactly those, by their SHA-256.
 import { formOf } from "./cspForms.ts";
 
 import { connectSrc, originsOf } from "./cspOrigins.ts";
@@ -17,8 +16,8 @@ const DIRECTIVES = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
-  // The accepted services' players, each loaded on a click (slice 4's 4g; docs/decisions.md, 2026-10-26), by the
-  // path of each one's player, not its whole host (F885); Imgur's form is not read yet.
+  // The accepted services' players, each loaded on a click, by the path of each one's player, not its
+  // whole host; Imgur's form is not read yet.
   "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/",
   // These three fall back to nothing, not to default-src.
   "base-uri 'none'",
@@ -26,8 +25,8 @@ const DIRECTIVES = [
   "frame-ancestors 'none'",
 ];
 
-// A page's policy holds its own scripts' hashes alone (5f), and the RPC origins connect-src names (5g, cspOrigins.ts): about 600
-// characters a page, some 20 worlds under Cloudflare Pages' 2,000-character line and 100 rules (F2452). A page's JSON-LD (5e)
+// A page's policy holds its own scripts' hashes alone, and the RPC origins connect-src names (cspOrigins.ts): about 600
+// characters a page, some 20 worlds under Cloudflare Pages' 2,000-character line and 100 rules. A page's JSON-LD
 // is a data block and has no hash.
 export function policy(hashes: readonly string[], origins: readonly string[] = []): string {
   for (const hash of hashes) {
@@ -43,7 +42,7 @@ export function policy(hashes: readonly string[], origins: readonly string[] = [
 }
 
 // The guards below are built inside functions, never as module-level constants: StrykerJS leaves a module-level constant
-// unmutated (ignoreStatic), so a guard written there is one no test is measured against (.claude/rules/typescript.md, F412).
+// unmutated (ignoreStatic), so a guard written there is one no test is measured against (.claude/rules/typescript.md).
 
 // A tag's attributes as the HTML parser reads them: a > inside quotes ends nothing.
 function attributesSource(): string {
@@ -56,7 +55,7 @@ function scriptTags(): RegExp {
 }
 
 // The attributes of a tag by name, the first of a repeated one, as the HTML parser keeps it: a name inside another attribute's
-// value is no attribute (F2360).
+// value is no attribute.
 function attributesOf(attributes: string): Map<string, string> {
   const found = new Map<string, string>();
   // One attribute: its name (a slash, a space or a quote starts the next), then its value, quoted or not.
@@ -118,7 +117,7 @@ export async function pagePolicies(
     const page = pages[file] ?? "";
     refuseMarkup(page);
     const scripts = inlineScripts(page);
-    // F2450: each form once, in React Router's order (the fallback page has no scroll restoration): a second one, well formed,
+    // Each form once, in React Router's order (the fallback page has no scroll restoration): a second one, well formed,
     // is a planted script. A page that holds fewer is no harm.
     let last = -1;
     for (const text of scripts) {
@@ -145,7 +144,7 @@ const FILE_ERROR = "csp: a page's name holds only a-z, 0-9, /, ., _ and -";
 
 // The addresses a host answers a page at: for _headers, the paths asked; for nginx's table, $uri, which is the path asked
 // until try_files (a 401 answers before it), then the file it serves, joined without merging slashes: `/w/bubble/` is
-// served from `/w/bubble//index.html` (deploy/web/nginx.conf's `try_files $uri $uri/index.html`, F2460).
+// served from `/w/bubble//index.html` (deploy/web/nginx.conf's `try_files $uri $uri/index.html`).
 function addresses(file: string): { headers: string[]; nginx: string[] } {
   if (file === "index.html") return { headers: ["/"], nginx: ["/", "//index.html", "/index.html"] };
   if (file.endsWith("/index.html")) {
@@ -184,7 +183,7 @@ function rows(found: [string, string][], line: (path: string, csp: string) => st
 }
 
 // The map's hash sizes (ngx_hash_init, nginx 1.30 src/core/ngx_hash.c): a key takes a pointer, then its length and bytes rounded
-// up to a pointer; a bucket holds four of the longest and the pointer that ends it, and the table four slots a key (F2454).
+// up to a pointer; a bucket holds four of the longest and the pointer that ends it, and the table four slots a key.
 function hashSizes(table: readonly [string, string][]): string {
   const pointer = 8;
   const longest = Math.max(0, ...table.map(([path]) => pointer + Math.ceil((path.length + 2) / pointer) * pointer));
@@ -199,7 +198,7 @@ function refuseRules(rules: number, cap: number): void {
   if (rules > cap) throw new RangeError(`csp: _headers holds ${String(rules)} rules, past a host's ${String(cap)}`);
 }
 
-// The policy of a path no page names (F2451): a host without a 404 page answers it with the home, one with the fallback
+// The policy of a path no page names: a host without a 404 page answers it with the home, one with the fallback
 // answers it with that, so it names the scripts of both and their connect origins, and nothing else.
 function anywhere(policies: Readonly<Record<string, string>>): string {
   const documents = ["index.html", "__spa-fallback.html"];
@@ -212,7 +211,7 @@ function anywhere(policies: Readonly<Record<string, string>>): string {
 
 // The policies as `_headers` takes them (the catch-all `/*` first; every other rule detaches it, then sets its own), and as
 // nginx's map of the answer's path: a page has its own, any other answer the bare one, as does each of `workers` (the service
-// worker's script): they fetch no RPC, so 'self' alone (docs/decisions.md, 2026-10-31).
+// worker's script): they fetch no RPC, so 'self' alone.
 export function outputs(
   policies: Readonly<Record<string, string>>,
   workers: readonly string[] = [],

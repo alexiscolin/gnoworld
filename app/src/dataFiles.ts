@@ -1,7 +1,7 @@
-// The data files, read and checked when the app builds (slice 5's 5c; docs/plans/slice-5.md §3, "Data files"): each is
+// The data files, read and checked when the app builds: each is
 // JSON in app/data, parsed by its Zod schema in packages/schemas, and a fault stops the build with one line a fault:
 // `<file>: <row>.<field>: <what is wrong>`, e.g. `news.json: [1].id: duplicate id "n1"`. The services read theirs the
-// same way through @gnoworld/service's readDataFile, a package the app's build does not depend on (D129).
+// same way through @gnoworld/service's readDataFile, a package the app's build does not depend on.
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { hubWorldOf, placeIn, worldIdOf } from "@gnoworld/core";
@@ -36,7 +36,7 @@ const SCHEMAS = {
   onAir: OnAir,
 };
 
-/** The most a data file may weigh: a file past it is refused before it is read (the plan's "a huge file"). */
+/** The most a data file may weigh: a file past it is refused before it is read. */
 export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };

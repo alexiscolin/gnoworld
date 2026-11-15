@@ -53,7 +53,7 @@ describe("a lens's light", () => {
 });
 
 // Who is here names a world by its room's world, a slug ("nym-alexiscolin000-gnogolf-<ten hex>"); the lenses by the worlds' file's id: a
-// world of someone's namespace was never lit by Live, the two never met.
+// world of someone's namespace is lit by Live only through that match.
 describe("Live's worlds", () => {
   it("light a namespace's world by its file's id, a hub's by its own, never the Earth", () => {
     const rooms = roomWorlds(["nym-alexiscolin000/gnogolf", "govdao"], [{ slug: "govdao" }]);

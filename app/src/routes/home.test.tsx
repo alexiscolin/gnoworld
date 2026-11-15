@@ -34,7 +34,7 @@ vi.mock("../features/universe/railLazy.ts", () => ({
 }));
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
-  // F3267, 8i: the kicker says gno.land · live now as frame 6, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
+  // The kicker says gno.land · live now as frame 6, and the one heading is the hero's line, its figure's room kept while the number comes.
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land · live now<\/p>/);
   expect(headingOf(html)).toBe("Worlds in Onyx");
   expect(html).toContain('<a href="/w/bubble"');
@@ -43,7 +43,7 @@ test("home links to each world by its name, at the world's path", async () => {
   expect(html).toContain(">GovDAO</a>");
 });
 
-// 7d6: the hero counts what the cosmos draws, from the worlds' file, never the page's list (hubs.json said 2 over 533).
+// The hero counts what the cosmos draws, from the worlds' file, never the page's list (hubs.json said 2 over 533).
 test("counts in its hero the worlds the cosmos draws, once their file has come, and no number before", async () => {
   useWorldsCount.mockReturnValue(534);
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -53,7 +53,7 @@ test("counts in its hero the worlds the cosmos draws, once their file has come, 
   expect(await render({ path: "/", Component: Home, loader }, "/")).not.toMatch(/data-hero="number"[^>]*>\d/);
 });
 
-// 7n: the line keeps the figure's room while the number comes, so the actions beside it do not slide; a read that brought none falls back.
+// The line keeps the figure's room while the number comes, so the actions beside it do not slide; a read that brought none falls back.
 test("keeps the line's figure while its number comes, and names the worlds without one once none came", async () => {
   useWorldsCount.mockReturnValue(undefined);
   const coming = await render({ path: "/", Component: Home, loader }, "/");
@@ -74,7 +74,7 @@ test("counts another universe's worlds by its page's list: no cosmos is drawn th
   useWorldsCount.mockReturnValue(undefined);
 });
 
-// 7n: the number came only from the scene, so a home whose scene never runs (no WebGL, a refused GPU, a phone) lost it for good; 7n2: it reads
+// The number must not depend on the scene: a home whose scene never runs (no WebGL, a refused GPU, a phone) would lose it for good. It reads
 // the worlds' count, not their file, so a phone asks nothing of the cosmos before View in space.
 test("asks the worlds' count for its hero's number on the default universe's home alone, whether the scene runs or not", async () => {
   useWorldsCount.mockClear();
@@ -93,8 +93,8 @@ test("asks for the worlds on the default universe's home alone: universes are ne
   expect(useSpace).toHaveBeenLastCalledWith(undefined);
 });
 
-// 7i: the rail beside the cosmos links each world to its page, the Earth's and the hubs' as the page lists them, through the page's router.
-// The rail is its own lazy chunk now and takes the places as its props (the cosmos is handed none: D431's hero and rail).
+// The rail beside the cosmos links each world to its page, the Earth's and the hubs' as the page lists them, through the page's router.
+// The rail is its own lazy chunk and takes the places as its props (the cosmos is handed none).
 test("hands the rail the places it links to", async () => {
   railProps.length = 0;
   await render({ path: "/", Component: Home, loader }, "/");
@@ -103,18 +103,18 @@ test("hands the rail the places it links to", async () => {
     worlds: [
       expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
       expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
-      // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts, ping-pong of 2026-11-07..09): their pages stay routable.
+      // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts): their pages stay routable.
     ],
   });
 });
 
-// 7i: where the rail stands it stands for the page's list of worlds, which steps aside (Hero.module.css).
+// Where the rail stands it stands for the page's list of worlds, which steps aside (Hero.module.css).
 test("marks its list of worlds as the one a rail stands for", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   expect(html).toMatch(/<nav aria-label="Worlds"[^>]*data-rail="none"/);
 });
 
-// ADR-0003 §2, 2d: a kicker names the page's list of worlds, inside it, so it steps aside with it where the rail stands (7i).
+// ADR-0003 §2: a kicker names the page's list of worlds, inside it, so it steps aside with it where the rail stands.
 test("names its list of worlds with a Worlds kicker, inside the list's own box and before its links", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   const list = /<nav aria-label="Worlds"[^>]*>(.*?)<\/nav>/s.exec(html)?.[1] ?? "";
@@ -122,8 +122,8 @@ test("names its list of worlds with a Worlds kicker, inside the list's own box a
   expect(list).toContain('href="/w/bubble"');
 });
 
-// ADR-0003 §3: one filled call at a time, as the device says the reader is new (F4501); on the default universe's home alone, where the
-// cosmos's labels say "Start here" (F4508).
+// ADR-0003 §3: one filled call at a time, as the device says the reader is new; on the default universe's home alone, where the
+// cosmos's labels say "Start here".
 describe("home's actions for a newcomer", () => {
   const actionsOf = (html: string) => /<div [^>]*data-hero="actions"[^>]*>/.exec(html)?.[0] ?? "";
   afterEach(() => {
@@ -166,21 +166,21 @@ test("home's tags are the universe's, not-found's or failure's", async () => {
   expect(meta(args(undefined, new Error("the chain did not answer")))).toEqual(failedPageMeta());
 });
 
-// Every route catches its own errors (docs/ARCHITECTURE.md; F329).
+// Every route catches its own errors (docs/ARCHITECTURE.md).
 test("home shows its own alert when it fails, with a way home", async () => {
   const html = await render(failing, "/");
   expect(html).toContain('role="alert"');
   expect(alertOf(html)).toMatch(BACK_HOME);
 });
 
-// The app may be what failed: the way home loads the document again (F325).
+// The app may be what failed: the way home loads the document again.
 test("home's way out of a failure loads the document again", async () => {
   const alert = alertOf(await render(failing, "/", { slot: true }));
   expect(alert).toMatch(BACK_HOME);
   expect(alert).not.toContain("data-routed");
 });
 
-// The browser serves the pages the build wrote, from the same data (F2208).
+// The browser serves the pages the build wrote, from the same data.
 test("the browser's loader gives each pre-rendered home what the build's does", () => {
   expectClientAsBuild("cosmos", clientLoader, loader);
 });
@@ -237,7 +237,7 @@ describe("home's hero", () => {
   });
 });
 
-// Slice 5m (frames 1 to 8): the hero's line. The ticker, the markets row and the on-air lines are gone (D431, D425), with the home's stream.
+// Frames 1 to 8: the hero's line, with no ticker, markets row or on-air lines.
 describe("home's live line", () => {
   test("still claims nobody online, with the live line in", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");

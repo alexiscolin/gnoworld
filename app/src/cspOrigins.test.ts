@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { connectOrigins, connectSrc, originsOf, rpcOrigins } from "./cspOrigins.ts";
 
-// Slice 5 part 2, 5g: the origins connect-src names beside 'self', from the data and nothing else (the plan's §3: "a data
-// file's rpc naming a host that reads visitors" shows in the CSP, an http: one stops the build).
+// The origins connect-src names beside 'self', from the data and nothing else: a data file's rpc naming a host that
+// reads visitors shows in the CSP, an http: one stops the build.
 const ONYX = "https://rpc.onyx.testnets.gno.land";
 const GNOLAND = "https://rpc.gno.land";
 // Written out, as the data holds them (app/data/universes.json): the default port is written in the data, not in the origin.
@@ -74,8 +74,7 @@ describe("connectSrc and originsOf", () => {
   });
 });
 
-// R-F3, F2952 (Alexis, 2026-10-31): a universe of the data brings its indexer's origin to connect-src with its RPC's; no table
-// by chain id names one any more, and an indexer that is no bare https origin stops the build as an RPC does.
+// A universe of the data brings its indexer's origin to connect-src with its RPC's, and an indexer that is no bare https origin stops the build as an RPC does.
 describe("connectOrigins", () => {
   const onyx = {
     rpc: "https://rpc.onyx.testnets.gno.land:443",
@@ -118,7 +117,7 @@ describe("connectOrigins", () => {
   });
 });
 
-// F2819's public-host rule (F3376): the indexer is data now, so a host that is no public name must stop the build.
+// The public-host rule: the indexer is data, so a host that is no public name must stop the build.
 describe("a public host only (F2819, F3376)", () => {
   // The forms URL() folds into a loopback or private address, and the private ranges: a public host ends in a name. `.local`,
   // `.internal` and `.localhost` are private names, refused on purpose.

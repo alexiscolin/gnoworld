@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cardPath, shortPath } from "./shortPath.ts";
 
-// The two looks of a realm's path (D13015): the plate's rows and the link card's caption (the previews' test cases, moved here).
+// The two looks of a realm's path: the plate's rows and the link card's caption.
 describe("cardPath", () => {
   it("writes a path of 20 characters or fewer whole", () => {
     expect(cardPath("gno.land/r/gov/dao")).toBe("gno.land/r/gov/dao");

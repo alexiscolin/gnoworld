@@ -37,8 +37,8 @@ function fakeSource() {
 
 const CHECKED: StreamEvent = { msgid: "m1", room: "#bubble/games", state: "checked" };
 
-// 4g: the server's verdicts' stream (server/src/stream/stream.ts, /api/stream?rooms=), a link's player waiting on
-// "checked"; an event of a state this page does not know is dropped, said once (F675, slice 4's plan §1).
+// The server's verdicts' stream (server/src/stream/stream.ts, /api/stream?rooms=), a link's player waiting on
+// "checked"; an event of a state this page does not know is dropped, said once.
 describe("followVerdicts: the room's verdicts, as the server streams them", () => {
   it("opens the stream of the room it follows, its name encoded, and hands on each verdict", () => {
     const source = fakeSource();
@@ -70,7 +70,7 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(said).toEqual(["verdict_unknown"]);
   });
 
-  // F890: after its replay, the stream says when it began following, on the server's clock.
+  // After its replay, the stream says when it began following, on the server's clock.
   it("hands on the stream's word of when it began following, in ms, and drops a word of another shape once", () => {
     const source = fakeSource();
     const times: number[] = [];
@@ -89,7 +89,7 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(said).toEqual(["since_unknown"]);
   });
 
-  // F888: EventSource gives up on an answer not 200 (a 429, a restart's 502), and no verdict comes after it.
+  // EventSource gives up on an answer not 200 (a 429, a restart's 502), and no verdict comes after it.
   it("says once the stream ended for good, never while the browser reconnects it, nor once the page stopped", () => {
     const source = fakeSource();
     let ends = 0;
@@ -129,7 +129,7 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
   });
 });
 
-// Slice 9h: the stream's `signal` event, read through the Signal schema as the verdicts are; an event of another shape is
+// The stream's `signal` event, read through the Signal schema as the verdicts are; an event of another shape is
 // dropped, said once, and the verdicts go on.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const CHART: Signal = { kind: "chart", world: "fresh-mint", account: ALICE, at: "2026-11-05T12:00:00.000Z" };
@@ -188,7 +188,7 @@ describe("followVerdicts: the first signals", () => {
   });
 });
 
-// The page's chat follows the one stream of the page (D215): the signals reach the store through it, so the page's own
+// The page's chat follows the one stream of the page: the signals reach the store through it, so the page's own
 // follower hands them on as it hands the verdicts.
 describe("pageVerdicts: the page's own stream", () => {
   afterEach(() => {

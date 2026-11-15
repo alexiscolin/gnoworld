@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { PICTURES, RERUN, staleWorlds, worldIds } from "../../tests/tools/pictureInputs.ts";
 import { pictureOf } from "./worldPictures.ts";
 
-// Alexis 2026-11-06: the chat's planets are pictures of the real ones, taken once; a picture older than what its look is made from fails.
+// The chat's planets are pictures of the real ones, taken once; a picture older than what its look is made from fails.
 describe("worldPictures", () => {
   it("gives a world's picture as a path of the site, and none for a world nobody took", () => {
     expect(pictureOf("earth")).toMatch(/^\/world-pictures\/earth\.[0-9a-f]{8}\.webp$/);

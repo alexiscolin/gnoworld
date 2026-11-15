@@ -1,5 +1,5 @@
 // A value kept in the page and in one word of the address (?key=value), which the router never hears: a pick is no page, so it moves
-// nothing but what reads it, and a shared link opens with it (the space's tag, D425; its map, D427). None on the server.
+// nothing but what reads it, and a shared link opens with it (the space's tag, its map). None on the server.
 import { useSyncExternalStore } from "react";
 import { createStore } from "zustand/vanilla";
 

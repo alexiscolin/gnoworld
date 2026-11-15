@@ -1,4 +1,4 @@
-// A realm's rollup file (slice 13a), served beside the worlds' file under the hash of the realm's path (core's rollupName): the site's own, so its
+// A realm's rollup file, served beside the worlds' file under the hash of the realm's path (core's rollupName): the site's own, so its
 // answer passes a size cap and the schema before anything reads it. A read that fails is no rollup, never a throw: the plate leaves its calls blocks out.
 import { rollupName } from "@gnoworld/core";
 import { RealmRollup } from "@gnoworld/schemas/indexer";

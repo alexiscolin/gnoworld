@@ -26,7 +26,7 @@ import {
   toFunctions,
 } from "./rpc.ts";
 
-// 5g-reads: the four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
+// The four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
 // which answers are RECORDED through gnomcp and which are READ from gno's source at v1.5.0; a title says "recorded" or "read".
 // The chains run newer code than that source: no test here proves what a browser receives.
 const RPC = {
@@ -651,7 +651,7 @@ describe("readEval", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  // Slice 13, B: a read's typed arguments go through evalCall's serializer (core's readArgs), or nothing is asked.
+  // A read's typed arguments go through evalCall's serializer (core's readArgs), or nothing is asked.
   it("asks the call with its arguments as Go literals", async () => {
     const fetcher = answering(queryEnvelope({ data: "(5 int64)" }));
     const params = [
@@ -825,7 +825,7 @@ describe("readFunctions, the traps", () => {
   }
 
   describe("for any qfuncs answer", () => {
-    // The plan's property: each call the names give parses, by gno's own cut, into the realm and one Name().
+    // Each call the names give parses, by gno's own cut, into the realm and one Name().
     const parse = (data: string) => {
       const slash = data.indexOf("/");
       const head = slash >= 0 ? data.slice(0, slash) : "";

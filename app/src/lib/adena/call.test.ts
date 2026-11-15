@@ -201,7 +201,7 @@ describe("callContract: the way through", () => {
         fc.constantFrom("Increment", "Register", "Vote", "X"),
         fc.array(fc.string({ unit: "grapheme" }), { maxLength: 6 }),
         async (realm, func, graphemes) => {
-          // The request refuses control and format characters (D231).
+          // The request refuses control and format characters.
           const args = graphemes.map((text) => stripHidden(text, "\n\t"));
           const request = CallRequest.parse({ ...REQUEST, realm, func, args });
           const adena = new Fake();
@@ -374,7 +374,7 @@ describe("callContract: a call on the wrong network is stopped before signing", 
     expect(adena.names).toEqual([GA, GN, SN, AN, SN, GN, "DoContract"]);
   });
 
-  // A success-status answer typed as a failure is malformed, whatever its type says (F5664): it ends the call.
+  // A success-status answer typed as a failure is malformed, whatever its type says: it ends the call.
   it.each(["REDUNDANT_CHANGE_REQUEST", "UNADDED_NETWORK"])(
     "stops, signing nothing, on a switch answered as a success typed %s",
     async (type) => {
@@ -847,7 +847,7 @@ describe("callContract: one request at a time, whoever asks Adena", () => {
   });
 });
 
-// F5728: once DoContract was asked the popup may have sent the call whatever Adena answers (adena-wallet bc5a7b5a,
+// Once DoContract was asked the popup may have sent the call whatever Adena answers (adena-wallet bc5a7b5a,
 // approve-transaction-main/index.tsx:584-660: the hash exists before the broadcast); such a failure is `maybe-sent`.
 describe("callContract: a failure after DoContract was asked may have been sent (F5728)", () => {
   const HASH = SENT.hash;

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { keep, SAVED_KEPT, UNREAD_KEPT, type SavedLine } from "./keep.ts";
 import { pageKeep } from "./page.ts";
 
-// What an account keeps on its device (slice 4's 4d; ADR-0002 "Saved messages and drafts: Device", "Mark unread: 0, on
+// What an account keeps on its device (ADR-0002 "Saved messages and drafts: Device", "Mark unread: 0, on
 // the device"): the lines it saved, and for each room the reading place it asked to go back to. Both are the device's
 // alone: no other device of the account sees them. What the device gives back is checked; one that refuses keeps nothing.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -89,7 +89,7 @@ describe("the lines an account saved, on its device", () => {
   });
 
   // A newer page may add a field or a form: this page reads what it knows, and writes back what it did not read, so an
-  // older tab never takes a newer page's lines with it (F1489, the code review's CR10).
+  // older tab never takes a newer page's lines with it.
   it("writes back the lines it could not read, beside its own", () => {
     const device = storage();
     const newer = { ...saved("m2"), pinnedBy: "a newer page" };
@@ -124,7 +124,7 @@ describe("the lines an account saved, on its device", () => {
     });
   });
 
-  // The saved lines' twin of the case above, for the places (R4 of redpass2-4dx).
+  // The saved lines' twin of the case above, for the places.
   it("keeps the key for places it could not read, when it sets none of its own", () => {
     const device = storage();
     device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ "#newer": { at: "a newer form" } }));
@@ -137,7 +137,7 @@ describe("the lines an account saved, on its device", () => {
   });
 
   // What is held back is what the last read found: a line another tab withdrew since is not written back, and a read
-  // that fails leaves the held set as it was (R5 of redpass2-4dx).
+  // that fails leaves the held set as it was.
   it("writes back only what its last read could not read: a line another tab withdrew does not return", () => {
     const device = storage();
     const newer = { ...saved("m2"), pinnedBy: "a newer page" };

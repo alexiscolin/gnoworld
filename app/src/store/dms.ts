@@ -1,4 +1,4 @@
-// Direct messages' slice of the store (slice 4's 4e): each conversation an account has with another, by that
+// Direct messages' slice of the store: each conversation an account has with another, by that
 // account, its newest lines in time order, each once. Ergo's lines reach it as they reach the rooms' slice; a
 // guest has none, nor does a partner that is no account's address.
 import type { IrcMessage, Line, Reaction } from "@gnoworld/core";
@@ -23,7 +23,7 @@ export interface DmSlice {
   /** Direct messages by the account they are with, each its newest lines (the store's window), the conversation
    * heard last last. */
   dms: Readonly<Record<string, readonly Line[]>>;
-  /** The reactions to each conversation's lines, by partner, as a room's (4d's DM bar): only a conversation held has any. */
+  /** The reactions to each conversation's lines, by partner, as a room's: only a conversation held has any. */
   dmReactions: Readonly<Record<string, readonly Reaction[]>>;
   /** What Ergo refused of the page's acts in a conversation, by partner, until the page said so: the line whose delete it
    * refused, and a reaction (a partner not connected, 401). */
@@ -38,7 +38,7 @@ export interface DmSlice {
     /** A new session: the last one's conversations forgotten, an account's being its own, its device given; none for a guest. */
     begin: (device?: DmDevice) => void;
     /** A line Ergo refused, its partner not connected unless `offline` is false: its draft back on the device, the
-     * refusal counted, with the `tags` the line went with when the draft is back (CR2). */
+     * refusal counted, with the `tags` the line went with when the draft is back. */
     refused: (partner: string, draft: string, how?: { offline?: boolean; tags?: RefusedTags | undefined }) => void;
     /** Ergo refused an act of the page's in a conversation: a delete of the line, or a reaction. */
     actRefused: (partner: string, act: { deleted: string } | { reacted: true }) => void;
@@ -50,7 +50,7 @@ export interface DmSlice {
 /** The conversations kept at most, those heard last: a room's bound (max-channels-per-client). */
 export const DMS_KEPT = 100;
 
-// What a reaction or a delete (4d's DM bar) changes of a conversation held: nothing, and no notice, when it changes none.
+// What a reaction or a delete changes of a conversation held: nothing, and no notice, when it changes none.
 function actsOn(
   { dms, dmReactions }: Pick<DmSlice, "dms" | "dmReactions">,
   message: IrcMessage,
@@ -108,7 +108,7 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
           set({ dms: {}, dmRefused: {}, dmReactions: {}, dmActRefused: {} });
       },
       refused: (partner, draft, { offline = true, tags } = {}) => {
-        // Back on the device where no draft waits: one typed since stays (CR7); the tags follow a draft put back alone.
+        // Back on the device where no draft waits: one typed since stays; the tags follow a draft put back alone.
         const back = putBack(device?.drafts, partner, draft);
         const { dmRefused } = get();
         const count = (dmRefused[partner]?.count ?? 0) + 1;

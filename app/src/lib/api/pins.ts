@@ -1,4 +1,4 @@
-// The browser's client of a room's pins (server/src/pins/routes.ts, mounted at /api/pins; slice 4's 4d), through the
+// The browser's client of a room's pins (server/src/pins/routes.ts, mounted at /api/pins), through the
 // one JSON call of lib/api/http.ts: GET for the pins, POST to pin and to unpin. Each answer must name the room asked.
 import { PinId, PinList, RoomId } from "@gnoworld/schemas";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";

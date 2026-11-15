@@ -207,7 +207,7 @@ describe("connect", () => {
     expect(await connect(new Wallet(over))).toEqual({ ok: false, reason });
   });
 
-  // Each reason the schema gives, written out here (F674).
+  // Each reason the schema gives, written out here.
   it.each([
     ["", "empty"],
     ["G1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5", "case"],
@@ -303,7 +303,7 @@ describe("signLogin", () => {
     expect(adena.asked).toEqual([{ call: "SignArbitrary", args: [{ signer: ADDRESS, data: TEXT }] }]);
   });
 
-  // Nothing trims, folds or normalises the text: Adena gets these very characters (decision 141).
+  // Nothing trims, folds or normalises the text: Adena gets these very characters.
   it.each([
     ["spaces around", "  Sign in  "],
     ["a CRLF", "Sign\r\nin"],
@@ -473,7 +473,7 @@ describe("signLogin and the extension's version (sign-in needs 1.22.2)", () => {
   });
 });
 
-// Each hostile wallet ends in one named result, for the login's two calls alike (F5665).
+// Each hostile wallet ends in one named result, for the login's two calls alike.
 describe("a wallet that throws or lacks a method ends in one result", () => {
   const whole: Record<string, (...args: unknown[]) => unknown> = {
     AddEstablish: () => ok("CONNECTION_SUCCESS", {}),
@@ -538,8 +538,8 @@ describe("a wallet that throws or lacks a method ends in one result", () => {
   );
 });
 
-// What commit e0cae601 changed without a test (F5666): a failure of a type nobody knows is read by its code, and a failure
-// typed as another call's success is malformed again, as is its own success type as a failure (F5666, Alexis 2026-11-05).
+// A failure of a type nobody knows is read by its code, and a failure typed as another call's success is malformed, as is
+// its own success type as a failure.
 describe("a failure's type and code, for the login's calls", () => {
   const failure = (type: string, code: number) =>
     Promise.resolve({ code, status: "failure", type, message: "", data: {} });

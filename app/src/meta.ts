@@ -41,7 +41,7 @@ export function ecosystemMeta(ecosystem: Ecosystem | undefined): MetaDescriptor[
   });
 }
 
-/** /list goes to the home with the search palette open (D355): a page that is no place, never indexed. */
+/** /list goes to the home with the search palette open: a page that is no place, never indexed. */
 export function listMeta(): MetaDescriptor[] {
   return unindexed("Places");
 }

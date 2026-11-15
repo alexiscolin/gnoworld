@@ -5,7 +5,7 @@ import { HOST_AT_ONCE, pageFetch } from "../query/policy.ts";
 import { jarvisApi, pageJarvisApi } from "./jarvis.ts";
 import { jarvisState } from "./jarvisState.ts";
 
-// 10u-a: the browser's client of the door's /api/jarvis/state and /api/jarvis/ask (the question's route, server/src/door/ask.ts).
+// The browser's client of the door's /api/jarvis/state and /api/jarvis/ask (the question's route, server/src/door/ask.ts).
 const ROOM = "#bubble";
 const ANSWERED = {
   status: "answered",

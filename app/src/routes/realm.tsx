@@ -1,5 +1,5 @@
 // A realm's view: /r/<path> in the default universe, /net/<id>/r/<path> in another. A client route with no page written
-// ahead (docs/plans/slice-5-part-2.md §1): the static host's fallback serves it under the catch-all's policy, and the
+// ahead: the static host's fallback serves it under the catch-all's policy, and the
 // browser's loader answers the 404 for a path that is no realm's. The page is read from the chain inside the view.
 import { labelName, worldIdOf } from "@gnoworld/core";
 import { data, useLoaderData, useLocation, type MetaArgs } from "react-router";
@@ -52,6 +52,6 @@ export default function Realm() {
 }
 
 export function ErrorBoundary() {
-  // Inside the plate, as any page's content is: never loose at the screen's corner (D535).
+  // Inside the plate, as any page's content is: never loose at the screen's corner.
   return <PlaceFrame label="Realm" plate={<RouteError noun="realm" size="place" />} />;
 }

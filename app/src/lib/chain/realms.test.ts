@@ -2,7 +2,7 @@ import { WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { describe, expect, it, vi } from "vitest";
 import { readWorlds, WORLDS_URL } from "./realms.ts";
 
-// The worlds' file, this site's own (slice-7 §3): it came from a chain, so it passes a size cap and a schema, and a read that fails leaves
+// The worlds' file, this site's own: it came from a chain, so it passes a size cap and a schema, and a read that fails leaves
 // the cosmos with its fixed places. Never a throw, for the scene has nothing to do with one.
 const WORLD = {
   id: "gnoswap/pool",

@@ -1,5 +1,5 @@
-// The chain's slice of the store (slice 9g): what the stream told of the chain, and nothing else (ADR-0002 §4: nothing is
-// optimistic, a room shows "kaito voted yes" only from the chain's event). A world's calls, each with its block height. Every part is
+// The chain's slice of the store: what the stream told of the chain, and nothing else (nothing is optimistic: a room
+// shows "kaito voted yes" only from the chain's event). A world's calls, each with its block height. Every part is
 // bounded, and a batch of events is one set.
 import type { ChainEvent } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";

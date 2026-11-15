@@ -84,7 +84,7 @@ beforeEach(() => {
   noObservers();
 });
 
-// The plate's blocks are a chunk asked once the page has loaded (world.tsx's `loaded`, D567): the build writes the frame, the kicker and the
+// The plate's blocks are a chunk asked once the page has loaded (world.tsx's `loaded`): the build writes the frame, the kicker and the
 // title; the lede, the actions and the figures are drawn in the DOM once it has run, the chain not answering.
 const drawn = async (path: string, ready: string) => {
   fakeStream();
@@ -112,7 +112,7 @@ describe("a world's page", () => {
     expect(html).toContain("the BUBBLE token, its governance");
   });
 
-  // 7e: the world's planet stands beside the plate as the Earth's does, in a place the page keeps while the scene may yet come.
+  // The world's planet stands beside the plate as the Earth's does, in a place the page keeps while the scene may yet come.
   test("keeps the place of the world's planet, waiting for the scene", async () => {
     for (const path of ["/w/bubble", "/w/govdao"])
       expect(await render(route(), path)).toMatch(/<div[^>]*data-globe[^>]*data-world="waiting"[^>]*><\/div>/);
@@ -124,13 +124,12 @@ describe("a world's page", () => {
     expect(html).toMatch(/<p role="status">Loading the chat…<\/p>/);
   });
 
-  // Slice 5p: no world has a capture yet (the capture job is slice 7), so a world's page shows no preview of it: no
-  // figure, picture, video, frame or picture of any kind, and no social image in its tags. A preview added here later
-  // must come with its capture, and with this test changed in its own commit.
+  // No world has a capture, so a world's page shows no preview of it: no figure, picture, video, frame or picture of any
+  // kind, and no social image in its tags.
   test("a world with no capture shows no preview: no picture on its page, no og:image in its tags", async () => {
     const html = await render(route(), "/w/bubble");
     expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed)\b|data-preview/i);
-    // The main action's icon (frame 26) comes with the plate's chunk: the first paint draws nothing at all.
+    // The main action's icon comes with the plate's chunk: the first paint draws nothing at all.
     expect(html).not.toMatch(/<svg\b/i);
     const tags = JSON.stringify(meta(metaArgs(bubbleOf())));
     expect(tags).not.toMatch(/og:image|twitter:image|"image"/i);
@@ -151,7 +150,7 @@ describe("a world's page", () => {
     expect(html).not.toContain("No world here");
   });
 
-  // The app may be what failed: the way home loads the document again (F325).
+  // The app may be what failed: the way home loads the document again.
   test.each(failures)("goes home by loading the document again on %s", async (_, failing) => {
     const html = await render(route(failing), "/w/bubble", { slot: true });
     expect(alertOf(html)).toMatch(BACK_HOME);
@@ -178,13 +177,13 @@ describe("a world's page", () => {
     expect(() => clientLoader(at("/w/nowhere"))).toThrow(expect.objectContaining({ init: { status: 404 } }));
   });
 
-  // Any throw passed the case above; only React Router's 404 selects the not-found page (F382).
+  // Any throw passed the case above; only React Router's 404 selects the not-found page.
   test("throws React Router's 404 in the browser for a world that does not exist", () => {
     expect(() => clientLoader(at("/w/nowhere"))).toThrow(expect.objectContaining({ init: { status: 404 } }));
   });
 });
 
-// F376: React Router matches /W/bubble to the world route and the world is found by its name alone: the path's own
+// React Router matches /W/bubble to the world route and the world is found by its name alone: the path's own
 // case is checked too, in the browser (React Router 8.4.0 drops `caseSensitive` on the client).
 describe("a world's page, by the case of its path (F376)", () => {
   test.each([
@@ -224,8 +223,8 @@ describe("a world's page, by the case of its path (F376)", () => {
   });
 });
 
-// Slice 5j, 8g (frames 22, 93, 104): the plate's kicker says what the world is, "GAMES · DAPP"; a world the data gives no kind is a hub. The crumb
-// "Universe > Games > dApp" is gone with the plate's rebuild (D428, D567): the header's levels say where it is (the plan space-simple).
+// The plate's kicker says what the world is, "GAMES · DAPP"; a world the data gives no kind is a hub. There is no crumb: the
+// header's levels say where it is.
 describe("a world's page, its kicker", () => {
   const kickerOf = async (path: string) => {
     const html = await render(route(), path);
@@ -245,7 +244,7 @@ describe("a world's page, its kicker", () => {
   });
 });
 
-// Slice 5r (frames 90 to 97, 102 to 107): a world's page is a plate, with no 3D and the chat's slot as it was.
+// A world's page is a plate, with no 3D and the chat's slot.
 describe("a world's plate", () => {
   const plateOf = async () => {
     const html = await render(route(), "/w/bubble");
@@ -256,7 +255,7 @@ describe("a world's plate", () => {
     const { html, tag } = await plateOf();
     expect(tag).toContain('aria-label="Bubble"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    // The description is the plate's chunk's (D567), drawn after the title, in the plate.
+    // The description is the plate's chunk's, drawn after the title, in the plate.
     const { plate, box } = await drawn("/w/bubble", "the BUBBLE token, its governance");
     expect(box.querySelectorAll("h1")).toHaveLength(1);
     expect(plate?.textContent).toContain("Games · dApp");
@@ -275,7 +274,7 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/here now|messages now|<canvas\b|data-value=|data-hour=/i);
   });
 
-  // Follow and Share are the plate's chunk's, in words (D13915 reverses D536's icons): the build writes neither, nor a Share the clipboard
+  // Follow and Share are the plate's chunk's, in words: the build writes neither, nor a Share the clipboard
   // of the build could not serve.
   test("offers Follow and Share once the plate has come, and the build writes neither", async () => {
     expect((await plateOf()).html).not.toMatch(/>(Follow|Share)</);
@@ -288,7 +287,7 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/connected worlds/i);
   });
 
-  // The plate's first figure, who is here now (the activity chart's frame, "0 msgs/h now", is gone with the plate's rebuild): 0 while no room told.
+  // The plate's first figure, who is here now: 0 while no room told.
   test("shows who is here now as 0 while no count has come, with no bars", async () => {
     const { plate } = await drawn("/w/bubble", "the BUBBLE token");
     const figures = plate?.querySelector("section[aria-label='Figures']");
@@ -301,13 +300,13 @@ describe("a world's plate", () => {
   test("has a main action: a link in the plate to the chat on the page, which the page holds", async () => {
     const { plate, box } = await drawn("/w/bubble", "the BUBBLE token");
     const links = [...(plate?.querySelectorAll("a") ?? [])];
-    // The crumb's link to the universe is gone (D428): the one action is the plate's only link for a world with no realm.
+    // The one action is the plate's only link for a world with no realm.
     expect(links.map((link) => link.getAttribute("href"))).toEqual(["#chat"]);
     expect(links[0]?.textContent).toBe("Say hi in the chat");
     expect(box.querySelector("#chat")).not.toBeNull();
   });
 
-  // F2865: the page reads and tabs in the order it is drawn on a computer, the plate first; a phone draws the chat above it by CSS
+  // The page reads and tabs in the order it is drawn on a computer, the plate first; a phone draws the chat above it by CSS
   // alone (worldPage.spec.ts).
   test("keeps the chat's slot in the page, after the plate opens", async () => {
     const { html } = await plateOf();
@@ -315,7 +314,7 @@ describe("a world's plate", () => {
   });
 });
 
-// Slice 9g (F5784, frames 20 to 35): a world's page follows its main room's stream once it has run, and the room draws as a card the call
+// A world's page follows its main room's stream once it has run, and the room draws as a card the call
 // the stream tells for its own world and universe, never one of another's.
 // The chat comes once space's door has, 2.5 s at most (useSpace's FIRST_SCREEN_MS), and with it the room's stream: here no scene draws.
 const DOOR = 4_000;
@@ -364,7 +363,7 @@ describe("a world's page and the chain's stream", () => {
       },
       { timeout: DOOR },
     );
-    // GovDAO pins Vote (D271): the chat's bar has its pills and cards too, apart from what the place says.
+    // GovDAO pins Vote: the chat's bar has its pills and cards too, apart from what the place says.
     expect(probing.place).toHaveProperty("pinned");
     expect({ ...probing.place, pinned: undefined }).toMatchObject({
       slug: "govdao",

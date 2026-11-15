@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pageDevice, passportFile, readPassportFile } from "./device.ts";
 import { DEFAULT_SETTINGS, DEVICE_EMPTY, FOLLOWS_KEPT } from "./fields.ts";
 
-// What this device keeps for whoever uses it (slice 8; the plan's threat model, "Device store"): each field one key, read through its
+// What this device keeps for whoever uses it: each field one key, read through its
 // schema; garbage, a huge file and another version never crash nor lie; an entry that is none is dropped and kept aside, written back; a
 // device that refuses is read as unreadable. And the passport's file: export then import is the identity, a bad file changes nothing.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";

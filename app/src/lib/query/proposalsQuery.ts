@@ -1,4 +1,4 @@
-// A realm's proposals as a query (5k): kept by chain and realm, so a plate seen again shows them at once, read again quietly once five minutes old,
+// A realm's proposals as a query: kept by chain and realm, so a plate seen again shows them at once, read again quietly once five minutes old,
 // and a vote signed on the realm makes them stale (keys.ts's invalidateRealm). A list that did not come whole is no answer: it throws, and the
 // last good one stays.
 import { queryOptions } from "@tanstack/react-query";

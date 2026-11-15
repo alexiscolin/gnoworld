@@ -14,7 +14,7 @@ const tagmsg = (from: string, to: string) =>
   read(`@msgid=t;account=${from};+draft/react=👍;+reply=m1 :${from}!u@h TAGMSG ${to}`);
 const redact = (from: string, to: string) => read(`@msgid=r;account=${from} :${from}!u@h REDACT ${to} m1`);
 
-// 4d-dm-bar: a direct message's reactions and deletes are TAGMSGs and REDACTs to a nick, which dmOf (lines alone)
+// A direct message's reactions and deletes are TAGMSGs and REDACTs to a nick, which dmOf (lines alone)
 // does not read; Ergo names the target as the sender wrote it, so each side sees its own nick or its partner's.
 describe("withOf: the conversation a reaction or a delete belongs to", () => {
   it.each([
@@ -37,7 +37,7 @@ describe("withOf: the conversation a reaction or a delete belongs to", () => {
     expect(withOf(message, ME)).toBeUndefined();
   });
 
-  // /code-review on 4d's DM bar (CR8): dmOf folds the case of my nick, withOf did not, so a partner writing it in capitals
+  // dmOf folds the case of my nick, withOf did not, so a partner writing it in capitals
   // had its line taken and its reaction and delete dropped, its own delete staying on my screen.
   it.each([
     ["a reaction", tagmsg(ALICE, ME.toUpperCase())],
@@ -52,7 +52,7 @@ describe("withOf: the conversation a reaction or a delete belongs to", () => {
     ).toBe(ALICE);
   });
 
-  // The second red pass on the DM bar (R1): toLowerCase folds more than Ergo does (the Kelvin sign K is a k, and bech32
+  // toLowerCase folds more than Ergo does (the Kelvin sign K is a k, and bech32
   // addresses hold k), so a nick that is not mine was taken for mine. Ergo folds A to Z alone.
   it("does not take a nick that only looks like mine under Unicode folding for mine", () => {
     const kelvin = ME.replace("k", "\u212A");
@@ -89,7 +89,7 @@ const lineOf = (id: string, from: string, edits?: string): Line => ({
 });
 const act = (held: Held, message: IrcMessage) => afterAct(held, message, 1000);
 
-// /code-review on 4d's DM bar (CR3): a REDACT names one line; the corrections of it a partner's client did not send its
+// A REDACT names one line; the corrections of it a partner's client did not send its
 // own REDACT for (refused, flood-limited, past the outbox's window) showed, as plain lines, the words just deleted.
 describe("afterAct: a delete takes the corrections of the line with it", () => {
   const redactOf = (from: string, id: string) => read(`@msgid=r;account=${from} :${from}!u@h REDACT ${ME} ${id}`);
@@ -127,14 +127,14 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     expect(act(held, redactOf(ALICE, "m1")).lines).toEqual([guest]);
   });
 
-  // R1: a REDACT from a nick that only Unicode folding makes mine must not take my correction of a line it names.
+  // A REDACT from a nick that only Unicode folding makes mine must not take my correction of a line it names.
   it("leaves my correction when the sender's nick only looks like my account's under Unicode folding", () => {
     const held = { lines: [lineOf("m2", ME, "m1"), lineOf("m3", ME)], reactions: undefined };
     const spoof = redactOf(ME.replace("k", "\u212A"), "m1");
     expect(act(held, spoof).lines.map((line) => line.id)).toEqual(["m2", "m3"]);
   });
 
-  // R4: my own echo, and a partner's delete of a line of mine that left the window.
+  // My own echo, and a partner's delete of a line of mine that left the window.
   it("takes my own corrections with my own delete, as Ergo echoes it to me", () => {
     const held = { lines: [lineOf("m1", ME), lineOf("m2", ME, "m1"), lineOf("m3", ALICE)], reactions: undefined };
     const echo = read(`@msgid=r;account=${ME} :${ME}!u@h REDACT ${ALICE} m1`);
@@ -154,7 +154,7 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     expect(act(held, redactOf(ALICE, "m9"))).toBe(held);
   });
 
-  // F1958: the room's R1 hole. redactIn sends the line's REDACT first; Ergo refused it (no echo), then the correction's
+  // redactIn sends the line's REDACT first; Ergo refused it (no echo), then the correction's
   // went through: the page must not bring the words edited out back while the line is held.
   it("holds back the author's delete of a correction alone while its line is held (F1958)", () => {
     const held = { lines: [lineOf("m1", ALICE), lineOf("m2", ALICE, "m1")], reactions: undefined };
@@ -184,13 +184,13 @@ describe("afterAct: a reaction", () => {
   });
 });
 
-// /code-review on 4d's DM bar (complexity): a typing TAGMSG, every 3 s from a partner, reads no line and no reaction.
+// A typing TAGMSG, every 3 s from a partner, reads no line and no reaction.
 describe("afterAct: a TAGMSG with no reaction", () => {
   it("is the same object, its lines and reactions never read", () => {
     const reading = () => {
       throw new Error("read");
     };
-    // Every way to read an array: a property, an index, the length, the iterator, a key list (R3).
+    // Every way to read an array: a property, an index, the length, the iterator, a key list.
     const sealed = <T extends object>(array: T): T =>
       new Proxy(array, { get: reading, has: reading, ownKeys: reading, getOwnPropertyDescriptor: reading });
     const held = { lines: sealed([lineOf("m1", ME)]), reactions: sealed([]) };

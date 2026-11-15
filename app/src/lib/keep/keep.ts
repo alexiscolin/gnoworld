@@ -1,4 +1,4 @@
-// What an account keeps on its device (slice 4's 4d; ADR-0002's "Saved messages and drafts: Device" and "Mark unread:
+// What an account keeps on its device (ADR-0002's "Saved messages and drafts: Device" and "Mark unread:
 // 0, on the device"): the lines it saved, and for each room the reading place it asked to go back to, each in one key
 // of the page's storage under its address. Neither goes to any other device. What the device gives back is checked: a
 // line or a place that is none is dropped and the good ones kept; text that is no list forgets the key; a device that

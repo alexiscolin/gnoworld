@@ -1,4 +1,4 @@
-// This reader's visits to the worlds (7h), which the device keeps as flags: what makes a new world no longer uncharted to them. Read by the
+// This reader's visits to the worlds, which the device keeps as flags: what makes a new world no longer uncharted to them. Read by the
 // cosmos's labels and a world's scene, and by the search palette's chips for the new and the unvisited.
 import { readFlag } from "./flags.ts";
 

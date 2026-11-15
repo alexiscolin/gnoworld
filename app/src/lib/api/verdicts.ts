@@ -1,4 +1,4 @@
-// The browser's client of the lines' verdicts (server/src/stream/verdicts.ts, mounted at /api/verdicts; slice 4's 4g),
+// The browser's client of the lines' verdicts (server/src/stream/verdicts.ts, mounted at /api/verdicts),
 // through the one JSON call of lib/api/http.ts: a line older than the stream's replay gets its verdict here. The
 // answer must name the room asked and the lines asked alone.
 import { LineVerdicts, VERDICTS_ASKED } from "@gnoworld/schemas";

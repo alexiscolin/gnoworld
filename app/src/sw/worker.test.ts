@@ -219,7 +219,7 @@ test("a listed file held with other bytes is dropped at once, and fetched again 
 });
 
 // worker.ts's kept(): a file its cache holds that this version does not list is no file of its own: never counted as held, nor deleted
-// there (8n, tier-1 coverage).
+// there.
 test("a file the cache holds and the list does not is neither counted held nor deleted", async () => {
   const stores: Stores = new Map();
   const first = await installed(scope({ stores }));
@@ -302,7 +302,7 @@ test("activate takes the open pages, drops the older layout's cache, and leaves 
   expect(worker.clients.claim).toHaveBeenCalledOnce();
 });
 
-// F172: a tab still on the version before keeps working until the next update.
+// A tab still on the version before keeps working until the next update.
 test("the version before is kept when the next takes over, and the one before that is dropped", async () => {
   const stores: Stores = new Map();
   const a = await running(stores, PRECACHE, "A ");
@@ -371,7 +371,7 @@ test("a shell file is answered from the cache: a page, its fallback, a script", 
   expect(site.network).toEqual([]);
 });
 
-// F175: the version running answers a new tab with its own page, whatever waits to take over.
+// The version running answers a new tab with its own page, whatever waits to take over.
 test("a page opened while a newer version waits is the running version's, not the newer one's", async () => {
   const stores: Stores = new Map();
   const running_ = await running(stores, PRECACHE, "A ");
@@ -400,7 +400,7 @@ test("a page is found by its path alone: a query or a fragment-less variant stil
   expect(site.network).toEqual([]);
 });
 
-// F172: the file only the version before lists is still in the cache, though the host dropped it.
+// The file only the version before lists is still in the cache, though the host dropped it.
 test("a file only the version before listed is answered from its cache after the next took over, not asked of the host", async () => {
   const stores: Stores = new Map();
   await running(stores, PRECACHE, "A ");
@@ -444,7 +444,7 @@ test("a cache that is not the worker's never answers: its copy of a hashed file 
 });
 
 // No version lists the scene's chunk, so a copy in one of the worker's caches can only have been planted there. This narrows one way
-// of carrying a planted file into the next version; the page open during an update is another, which it does not close (F181's row).
+// of carrying a planted file into the next version; the page open during an update is another, which it does not close.
 test("the scene's chunk is left to the browser: a copy in the worker's own caches is never served", async () => {
   const stores: Stores = new Map();
   const site = await running(stores, PRECACHE, "");

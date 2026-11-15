@@ -1,6 +1,6 @@
 // The frame of a place's page in space (frames 22, 93, 104): the planet's place the page lays out and the scene draws in, the plate at the
 // left, the dock at the right, and space's foot (SpaceFoot.tsx). A world's page and a realm's are this frame; only the plate's content and the dock's
-// chat differ. On a computer the planet stands larger than the window, lit at three quarters (D458).
+// chat differ. On a computer the planet stands larger than the window, lit at three quarters.
 import type { ReactNode } from "react";
 import { Panel, Stack } from "@gnoworld/ui";
 import { chatHeld, LOADING } from "../features/chat/index.ts";
@@ -12,7 +12,7 @@ import { useApp } from "../storeContext.tsx";
 import place from "./globe.module.css";
 import styles from "./world.module.css";
 
-/** Whether the window `query` names frames the planet close (D458): never where the settings ask for low quality, whose frame keeps
+/** Whether the window `query` names frames the planet close: never where the settings ask for low quality, whose frame keeps
  * today's pixels. */
 export function useFraming(query: string): boolean {
   const low = useApp(({ device }) => device.settings.quality === "low");

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Fetcher } from "./http.ts";
 import { MARKETS_MAX_BYTES, readMarkets } from "./markets.ts";
 
-// Slice 5m: the browser's one read of markets.json, the file 5l's timer writes and nginx serves at /markets.json. The page
+// The browser's one read of markets.json, the file the server's timer writes and the web container serves. The page
 // shows what the file says or a state; it never shows a price the schema refused, and never a state that hides which one it is.
 const GOOD = {
   source: "CoinGecko",

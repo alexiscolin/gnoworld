@@ -1,4 +1,4 @@
-// What a realm is doing as figures (D530, the proposal's band): its calls with the last thirty days beside them, its callers, its last call and
+// What a realm is doing as figures: its calls with the last thirty days beside them, its callers, its last call and
 // who imports it. A figure no source gave is a word in its place ("Never"), never a made zero; with no rollup the worlds' file's counts stand,
 // with no line and no time.
 import { grouped, type Figure } from "@gnoworld/ui";

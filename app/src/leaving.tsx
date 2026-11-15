@@ -1,4 +1,4 @@
-// The warning before a link off the site (plan §3, ADR-0002 §4): a page we do not control may wear a trusted name. The link is a button, so
+// The warning before a link off the site: a page we do not control may wear a trusted name. The link is a button, so
 // no click, middle click or "open in a new tab" goes there unasked; pressing it opens a dialog that names the host the address really goes
 // to and shows the whole address. Only the dialog's own link leaves. A realm's page, the calendar and the bell share it.
 import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";

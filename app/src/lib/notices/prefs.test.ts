@@ -40,7 +40,7 @@ const on = (device: ReturnType<typeof storage>, account: Address) => noticePrefs
 const rooms = (count: number) =>
   Object.fromEntries(Array.from({ length: count }, (_, at) => [`#bubble/r${String(at)}`, "none" as const]));
 
-// 4f-n: a room's notification mode (all, mentions, none) kept on the device, each account's apart (ADR-0002, "Menu and
+// A room's notification mode (all, mentions, none) kept on the device, each account's apart (ADR-0002, "Menu and
 // settings": notifications are a setting of the device).
 describe("an account's notification modes on the device", () => {
   it("knows no mode of its own until one is kept, then gives it back, each account's apart", () => {

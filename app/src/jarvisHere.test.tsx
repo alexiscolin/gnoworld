@@ -15,8 +15,8 @@ import {
   type JarvisItem,
 } from "./jarvisHere.ts";
 
-// 10u-a: the cards of Jarvis the page keeps, and where Jarvis opens from, and when it does not. No pill in the header (D342, D343): the account menu's Jarvis and the chat's
-// quick actions Jarvis and Catch up. Off, or not known yet, they stay greyed "soon" as today, and nothing opens. Kept apart from
+// The cards of Jarvis the page keeps, and where Jarvis opens from, and when it does not. No pill in the header: the account menu's Jarvis and the chat's
+// quick actions Jarvis and Catch up. Off, or not known yet, they stay greyed "soon", and nothing opens. Kept apart from
 // QuickActions.test.tsx and AccountMenu.test.tsx, which are display-only (vitest.config.ts).
 const items = (box: HTMLElement) => all(box, '[role="menuitem"]');
 const named = (box: HTMLElement, name: string) => items(box).find((item) => item.textContent.startsWith(name));

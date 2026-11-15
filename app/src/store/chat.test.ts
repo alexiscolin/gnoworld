@@ -131,7 +131,7 @@ describe("the store's chat slice", () => {
     expect(t.notified()).toBe(before + 1);
   });
 
-  // The green pass (G1): the New mark waits on a room's history, which a live line before it must not stand for.
+  // The New mark waits on a room's history, which a live line before it must not stand for.
   it("keeps that a room's history came, an empty page too, and not before", () => {
     const t = following();
     t.heard(said("#bubble", "a", "live"));
@@ -140,7 +140,7 @@ describe("the store's chat slice", () => {
     expect(t.room("#bubble")?.paged).toBe(true);
   });
 
-  // The code review (CR3): each connection's page waited on, not the first's alone.
+  // Each connection's page waited on, not the first's alone.
   it("forgets that a room's history came when the link drops", () => {
     const t = following();
     t.page("#bubble", []);
@@ -302,7 +302,7 @@ describe("the store's chat slice", () => {
   });
 });
 
-// 4c's message menu: Ergo's refusal of a delete stays with its room until the page has said it.
+// Ergo's refusal of a delete stays with its room until the page has said it.
 describe("the store's chat slice: a delete Ergo refused", () => {
   const refusal = (room: string, id: string) =>
     read(`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`);
@@ -331,7 +331,7 @@ describe("the store's chat slice: a delete Ergo refused", () => {
   });
 });
 
-// The room edit's red pass (R1): a correction is a line of its own, so a REDACT of its line must not leave it showing the
+// A correction is a line of its own, so a REDACT of its line must not leave it showing the
 // deleted words, and a refused delete of the line must never bring the words edited out back.
 describe("the store's chat slice: a deleted line's corrections", () => {
   const corrected = (id: string, edits: string, { text, account = "alice" }: { text: string; account?: string }) =>
@@ -399,7 +399,7 @@ describe("the store's chat slice: a deleted line's corrections", () => {
   });
 });
 
-// 4f: who is typing in each room (IRCv3's +typing), on the store's clock.
+// Who is typing in each room (IRCv3's +typing), on the store's clock.
 describe("the store's chat slice: who is typing", () => {
   const typing = (room: string, nick: string, state: string) =>
     read(`@+typing=${state};time=${T0};account=${nick} :${nick}!u@h TAGMSG ${room}`);
@@ -417,7 +417,7 @@ describe("the store's chat slice: who is typing", () => {
     expect(t.room("#bubble")?.typing).toBeUndefined();
   });
 
-  // The red pass (R6): the page's clock, the line's time an hour off.
+  // The page's clock, the line's time an hour off.
   it("counts a typist's 6 s from its own clock, never the line's time", () => {
     vi.useFakeTimers({ now: Date.parse(T0) });
     const t = following();
@@ -434,7 +434,7 @@ describe("the store's chat slice: who is typing", () => {
     expect(t.notified()).toBe(before);
   });
 
-  // The red pass (R17): noise makes no room and tells no one; a flood of one nick is one typist.
+  // Noise makes no room and tells no one; a flood of one nick is one typist.
   it("stays quiet on typing in a room it does not follow, to a nick, and a done from nobody", () => {
     const t = following();
     const before = t.notified();
@@ -460,7 +460,7 @@ describe("the store's chat slice: who is typing", () => {
   });
 });
 
-// 4f: each room's reading place (Ergo's draft/read-marker), forward alone, on the store's clock.
+// Each room's reading place (Ergo's draft/read-marker), forward alone, on the store's clock.
 describe("the store's chat slice: the reading place", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -476,7 +476,7 @@ describe("the store's chat slice: the reading place", () => {
     expect(t.room("#bubble/games")?.read).toBeUndefined();
   });
 
-  // The red pass (R17): a place for a room not followed makes no room and tells no one.
+  // A place for a room not followed makes no room and tells no one.
   it("keeps no place for a room it does not follow, and tells no one", () => {
     const t = following();
     const before = t.notified();
@@ -485,7 +485,7 @@ describe("the store's chat slice: the reading place", () => {
     expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
   });
 
-  // The red pass (R13): the store reads a place against its own clock.
+  // The store reads a place against its own clock.
   it("reads a place more than 5 minutes past its clock as none", () => {
     vi.useFakeTimers({ now: Date.parse(T0) });
     const t = following();
@@ -503,7 +503,7 @@ describe("the store's chat slice: the reading place", () => {
   });
 });
 
-// 4d: a room keeps the reactions Ergo relays and replays (TAGMSG, draft/react) beside its lines: the newest of an
+// A room keeps the reactions Ergo relays and replays (TAGMSG, draft/react) beside its lines: the newest of an
 // account to a line with an emoji, in time order, the newest REACTIONS_KEPT; the page counts them (core's reactionsOn).
 describe("the store's chat slice: reactions", () => {
   const reacted = (room: string, id: string, { to = "m1", emoji = "👍", who = "alice", time = T0 } = {}) =>
@@ -556,13 +556,13 @@ describe("the store's chat slice: reactions", () => {
 
   it("notifies once of a reaction heard twice, and no one of a TAGMSG that is no reaction or of a room not followed", () => {
     const t = following();
-    // The first page of a room is told once (4f's paged mark): the count starts after it.
+    // The first page of a room is told once (the paged mark): the count starts after it.
     t.page("#bubble", []);
     const before = t.notified();
     t.heard(reacted("#bubble", "r1"));
     t.heard(reacted("#bubble", "r1"));
     expect(t.notified()).toBe(before + 1);
-    // A TAGMSG of a tag no one reads (+typing is 4f's, and tells its room).
+    // A TAGMSG of a tag no one reads (+typing tells its room).
     t.heard(read(`@msgid=r2;time=${T0};account=alice;+example=1 :alice!u@h TAGMSG #bubble`));
     t.heard(reacted("#garden", "r3"));
     t.page("#bubble", [reacted("#bubble", "r4", { emoji: "nice" })]);
@@ -579,7 +579,7 @@ describe("the store's chat slice: reactions", () => {
     expect(t.store.getState().chat.rooms).toEqual({});
   });
 
-  // A reaction names a msgid; another room's line of that msgid is not its line (R8).
+  // A reaction names a msgid; another room's line of that msgid is not its line.
   it("keeps a reaction naming another room's line in its own room, the other room untouched", () => {
     const t = following();
     t.heard(said("#bubble", "m1", "hello"));
@@ -603,7 +603,7 @@ describe("the store's chat slice: reactions", () => {
           }),
         );
     expect(t.room("#bubble")?.reactions).toHaveLength(1000);
-    // The green pass (G12): the window's size itself, not a bound of it.
+    // The window's size itself, not a bound of it.
     expect(REACTIONS_KEPT).toBe(1000);
   });
 
@@ -626,7 +626,7 @@ describe("the store's chat slice: reactions", () => {
   });
 });
 
-// R10: a room's reaction Ergo refused is said until the page has said it.
+// A room's reaction Ergo refused is said until the page has said it.
 describe("the store's chat slice: a reaction Ergo refused", () => {
   it("keeps a refused reaction with its room until it is dismissed, a refused delete's dismissal with it", () => {
     const t = following();

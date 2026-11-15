@@ -1,5 +1,5 @@
-// The views' pill's fill, one for the three views (D369): it stands under the current view's link and glides to the next one as the page
-// changes. The links move while it goes (in the full chat their names fold and the pill's left edge runs, D503), so the fill is the link's
+// The views' pill's fill, one for the three views: it stands under the current view's link and glides to the next one as the page
+// changes. The links move while it goes (in the full chat their names fold and the pill's left edge runs), so the fill is the link's
 // own place as it stands each frame plus a gap that dies away without a turn: it never goes past its link and back, as a target read once
 // did when the names then folded. Places are the pill's own (a link's box less the pill's), so a move of the header as a whole is not one.
 import { motionWelcome } from "@gnoworld/ui";

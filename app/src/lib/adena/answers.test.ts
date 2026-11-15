@@ -11,7 +11,7 @@ const answer = (status: string, type: string, rest: { code?: number; data?: unkn
   ...rest,
 });
 
-// Each Adena method's success types, once, for every caller (F5663): the login and a call read this one table.
+// Each Adena method's success types, once, for every caller: the login and a call read this one table.
 describe("SUCCESSES: what each Adena method answers when it succeeds", () => {
   const table: [string, string[]][] = [
     ["AddEstablish", ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"]],
@@ -53,8 +53,8 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
     });
   });
 
-  // F5666 (decision of 2026-11-05, reverses that half of e0cae601): this test said "failed" for ALREADY_CONNECTED on GetAccount;
-  // that type is another call's success, so it is malformed, as every success type of another method is.
+  // ALREADY_CONNECTED on GetAccount: that type is another call's success, so it is malformed, as every success type of
+  // another method is.
   it("takes ALREADY_CONNECTED as malformed for a call that does not list it", async () => {
     expect(await ask(() => answer("failure", "ALREADY_CONNECTED", { code: 4001 }), "GetAccount")).toStrictEqual({
       ok: false,
@@ -63,7 +63,7 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
     });
   });
 
-  // F5666: a failure typed as another method's success is suspect, whatever its code says: malformed, no type, no log.
+  // A failure typed as another method's success is suspect, whatever its code says: malformed, no type, no log.
   const pairs = Object.entries(SUCCESSES).flatMap(([method, own]) =>
     Object.values(SUCCESSES)
       .flat()
@@ -95,7 +95,7 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
     });
   });
 
-  // A malformed answer has no type: a caller that branches on the type (switchTo) must not take it for a real one (F5664).
+  // A malformed answer has no type: a caller that branches on the type (switchTo) must not take it for a real one.
   it.each(["REDUNDANT_CHANGE_REQUEST", "UNADDED_NETWORK"])(
     "gives a success typed %s no type: it is malformed",
     async (type) => {
@@ -180,7 +180,7 @@ describe("a failure's reason, by its type first and by its code for a type nobod
   });
 });
 
-// F5749: TRANSACTION_FAILED as adena-wallet bc5a7b5a answers it (approve-transaction-main/index.tsx:596-633): the generic
+// TRANSACTION_FAILED as adena-wallet bc5a7b5a answers it (approve-transaction-main/index.tsx:596-633): the generic
 // message, and in data the hash, `error` (response.toString()) and `log` (the chain's, a TM2Error only); a null response
 // is `error: null`. The reason of a failure with a hash is data.log, else data.error, never the generic message.
 describe("ask: why a transaction Adena named a hash for failed (F5749)", () => {

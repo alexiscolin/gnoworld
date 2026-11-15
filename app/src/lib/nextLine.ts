@@ -1,5 +1,5 @@
 // The roving focus of a vertical list (WAI-ARIA's composite widgets): the arrows up and down, Home and End move the focus among its items,
-// round the ends; a key held with a modifier is the browser's or the system's. A room's lines (4c) and the cosmos's rail (7i) move so.
+// round the ends; a key held with a modifier is the browser's or the system's. A room's lines and the cosmos's rail move so.
 const MOVES = ["ArrowUp", "ArrowDown", "Home", "End"];
 
 /** A key pressed, with its modifiers, from the page or from React alike. */

@@ -1,4 +1,4 @@
-// The notices' slice of the store (slice 4's 4f-n): what the account was told (a mention, a reply, a message to it), which
+// The notices' slice of the store: what the account was told (a mention, a reply, a message to it), which
 // of that it has not seen, each room's mode, and what each room and conversation counts. A notice is unseen until the
 // reader has seen its place up to its time: by the page's own mark (the end of the room reached, the tab shown) or by
 // Ergo's reading place for the room (a read on another device). The modes are read from the account's device at its

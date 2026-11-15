@@ -1,4 +1,4 @@
-// The country an account's lines show (ADR-0001 §7, D395): its time zone's by default, the one it chooses instead, or none once it hides
+// The country an account's lines show (ADR-0001 §7): its time zone's by default, the one it chooses instead, or none once it hides
 // it; on the device, never finer than a country. What the device gives back is written into a line of the chat, so it is outside data.
 import { isCountryCode } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
@@ -14,7 +14,7 @@ const NONE = "none";
 
 // What the device keeps for `account`: a country, the mark that it hides one, or NONE, anything else forgotten; nothing when the device
 // cannot be read, which may hold a hidden choice.
-const keptChoice = (account: Address, storage: () => DraftStorage): string | undefined =>
+const deviceChoice = (account: Address, storage: () => DraftStorage): string | undefined =>
   readKept<string>(storage, keyOf(account), {
     empty: NONE,
     check: (raw) => (typeof raw === "string" && (raw === HIDDEN || isCountryCode(raw)) ? raw : undefined),
@@ -22,7 +22,7 @@ const keptChoice = (account: Address, storage: () => DraftStorage): string | und
 
 /** The country `account` chose on this device; none until it chooses, once it hid it, or when the device cannot be read. */
 export function keptCountry(account: Address, storage: () => DraftStorage = pageStorage): string | undefined {
-  const kept = keptChoice(account, storage);
+  const kept = deviceChoice(account, storage);
   return kept === HIDDEN || kept === NONE ? undefined : kept;
 }
 
@@ -56,7 +56,7 @@ export function shownCountry(
   countries: readonly { code: string }[],
   storage: () => DraftStorage = pageStorage,
 ): string | undefined {
-  const kept = keptChoice(account, storage);
+  const kept = deviceChoice(account, storage);
   if (kept === undefined || kept === HIDDEN) return undefined;
   return kept === NONE ? zoned(countries) : kept;
 }

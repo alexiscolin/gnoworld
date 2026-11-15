@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canCopy, copyAddress, copyText } from "./copy.ts";
 
-// Share and the arrival banners copy the world's address the same way (the review's F5629): whether the browser can, and
+// Share and the arrival banners copy the world's address the same way: whether the browser can, and
 // what came of it, in words.
 afterEach(() => {
   vi.unstubAllGlobals();

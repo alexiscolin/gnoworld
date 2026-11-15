@@ -1,5 +1,5 @@
-// A realm's page, built as a world's (D375, frames 26 and 93): the same frame (placeFrame.tsx) and the same chat, with the realm's own
-// planet, which the cosmos draws for the realm's world and the flight flew to (D362). The plate holds the realm's crumbs, short name,
+// A realm's page, built as a world's: the same frame (placeFrame.tsx) and the same chat, with the realm's own
+// planet, which the cosmos draws for the realm's world and the flight flew to. The plate holds the realm's crumbs, short name,
 // lede, actions, talk bar, figures, page, functions, around it and facts (routes/plate); the dock is the world's chat, given the realm's place.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
@@ -19,7 +19,7 @@ import { PlaceFrame } from "./placeFrame.tsx";
 // The plate's blocks come in a chunk once the first screen has drawn: the frame and the title.
 const RealmPlate = lazy(() => import("./plate/RealmPlate.tsx"));
 
-// The realm's room, asked of the server once when the world's list lacks it (D390, D392). The server's bot opens a room made a moment
+// The realm's room, asked of the server once when the world's list lacks it. The server's bot opens a room made a moment
 // after it answers, so the list is asked again till it holds the room, then the page's lists are told (gnodice's "opens soon").
 // A refused ask, or a room still missing after the tries, is "failed": the dock says so and offers another go, never an empty column.
 const LISTED_TRIES = 10;
@@ -95,7 +95,7 @@ export function realmTalk(realm: string, worlds: Parameters<typeof realmRoom>[1]
   return { talk: world, room, inWorld: room.split("/")[1] };
 }
 
-// The realm's chat: its room, made on the first open (useRoomMade), in its world (D389 to D392). The same element docks beside the
+// The realm's chat: its room, made on the first open (useRoomMade), in its world. The same element docks beside the
 // page or stands alone, full (full.ts).
 function useRealmChat({ realm, chain }: RealmAt, known: boolean) {
   const universe = site.universeAt(useLocation().pathname);
@@ -189,7 +189,7 @@ function RealmPlace({
               Realm · <OwnerLink realm={found.realm} namespace={namespace} />
             </Kicker>
             <Panel.Title id="realm-title">{name}</Panel.Title>
-            {/* The rest of the plate comes in a chunk once the first screen has drawn (D566): its blocks are the realm's own reads. */}
+            {/* The rest of the plate comes in a chunk once the first screen has drawn: its blocks are the realm's own reads. */}
             <Suspense fallback={null}>
               {loaded && <RealmPlate found={found} name={name} talk={talk} room={room} onRing={setRing} />}
             </Suspense>

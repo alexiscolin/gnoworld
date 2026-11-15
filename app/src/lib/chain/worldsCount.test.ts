@@ -2,7 +2,7 @@ import { WORLDS_COUNT_MAX_BYTES } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
 import { readWorldsCount, WORLDS_COUNT_URL } from "./worldsCount.ts";
 
-// The worlds' count (7n2), this site's own file beside the worlds' file: the home's hero reads it for its number, a few bytes, so a phone asks
+// The worlds' count, this site's own file beside the worlds' file: the home's hero reads it for its number, a few bytes, so a phone asks
 // nothing of the cosmos before View in space. The server's job wrote it from a chain, so it passes a size cap and a schema; a read that fails
 // is no count, never a throw.
 const COUNT = { version: 1, universe: "onyx", updated: "2026-11-01T00:11:00Z", count: 534 };

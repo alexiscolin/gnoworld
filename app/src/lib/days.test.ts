@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ago, agoText, clock, dayKey, dayName, moment, shortDay } from "./days.ts";
 
-// The day over a result or a banner, as the canvas words it: Today, Yesterday, else the weekday for the last week, else "4 Nov" (D13015), the year only when it is not this year's.
+// The day over a result or a banner, as the canvas words it: Today, Yesterday, else the weekday for the last week, else "4 Nov", the year only when it is not this year's.
 const reader = { timeZone: "UTC" };
 const now = new Date("2026-11-11T12:00:00Z");
 

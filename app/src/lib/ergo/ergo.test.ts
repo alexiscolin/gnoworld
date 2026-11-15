@@ -330,7 +330,7 @@ describe("connectErgo's handshake", () => {
     expect(t.backoffs()).toHaveLength(1);
   });
 
-  // Each step moves on its own line alone: a line of another step, or none, sends nothing (pre-merge 4b).
+  // Each step moves on its own line alone: a line of another step, or none, sends nothing.
   it("sends its ticket on Ergo's AUTHENTICATE + alone, never on another line after the ACK", async () => {
     const t = setup();
     await t.settle();
@@ -827,7 +827,7 @@ describe("connectErgo's stop", () => {
   });
 });
 
-// A visitor not logged in reads the public rooms as a guest (Alexis, 2026-10-25): no ticket, no SASL, a nick of
+// A visitor not logged in reads the public rooms as a guest: no ticket, no SASL, a nick of
 // its own drawn at random, another drawn when Ergo says one is taken.
 describe("connectErgo as a guest", () => {
   const guest = async (nicks?: (string | Error)[]) => {
@@ -1163,7 +1163,7 @@ describe("drawGuestNick", () => {
   });
 });
 
-// An Ergo with no draft/multiline (docs/decisions.md, 2026-10-26): it NAKs the whole request, so the page asks again
+// An Ergo with no draft/multiline: it NAKs the whole request, so the page asks again
 // without the capability and the chat goes on, its drafts sent a line at a time.
 describe("connectErgo, an Ergo that offers no draft/multiline", () => {
   const guest = async () => {
@@ -1185,7 +1185,7 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
 
   it("says whether the connection sends several lines at once: only once connected, only on an ACK holding it", async () => {
     const full = await guest();
-    // F1915: unknown (undefined), not false, until the nick comes: a draft restored before the welcome is not refused.
+    // Unknown (undefined), not false, until the nick comes: a draft restored before the welcome is not refused.
     expect(full.client.multiline()).toBeUndefined();
     full.s.say(`:ergo CAP * ACK :${CAPS}`);
     expect(full.client.multiline()).toBeUndefined();
@@ -1222,7 +1222,7 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
     expect(t.s.sent.filter((line) => line.startsWith("CAP REQ"))).toHaveLength(2);
   });
 
-  // G2 of the green pass: the first NAK of the next connection must again be the whole list's, answered by the
+  // The first NAK of the next connection must again be the whole list's, answered by the
   // request without draft/multiline; if it were final, an Ergo without the capability would fail on each reconnection.
   it("degrades again on its next connection, whose first NAK is no final one", async () => {
     const t = await guest();

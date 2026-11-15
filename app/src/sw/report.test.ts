@@ -35,7 +35,7 @@ function worker({ pages = 2, listing = true } = {}) {
 }
 const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-// F468: the page's journeys listen for these messages; a worker's violation is invisible to them otherwise.
+// The page's journeys listen for these messages; a worker's violation is invisible to them otherwise.
 test("a policy violation inside the worker is told to every open page, with the directive it broke and what it blocked", async () => {
   const { scope, violate, heard, sent, asked } = worker();
   reportViolations(scope, vi.fn());

@@ -19,7 +19,7 @@ const server = (answer: { status: number; json?: unknown }) => {
 };
 const ANSWER = { room: "#bubble/games", verdicts: [{ msgid: "m1", state: "checked" }] };
 
-// 4g (docs/decisions.md, 2026-10-26): the verdicts of lines older than the stream's replay, asked of the server.
+// The verdicts of lines older than the stream's replay, asked of the server.
 describe("the lines' verdicts, from the server", () => {
   it("asks GET /api/verdicts for the room and the ids, encoded, the cookie to this site alone, no body", async () => {
     const { api, sent } = server(json(200, ANSWER));

@@ -1,10 +1,10 @@
-// The origins connect-src names beside 'self' (slice 5 part 2, 5g, 5k): the universes' https RPC and their chains' public
+// The origins connect-src names beside 'self': the universes' https RPC and their chains' public
 // indexers, both read from the data at build.
 // The data's `rpc` and `indexer` end up in a header, so only a bare lower-case https host and port is ever written (csp.ts holds the rest).
 
 import { isPublicOrigin } from "@gnoworld/core";
 
-// A bare https origin on a public name, as a CSP source list takes it (F2819: the rule is core's, shared with the server).
+// A bare https origin on a public name, as a CSP source list takes it (the rule is core's, shared with the server).
 function isOrigin(origin: string): boolean {
   return isPublicOrigin(origin);
 }

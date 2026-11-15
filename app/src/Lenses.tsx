@@ -1,4 +1,4 @@
-// The tags at the hero's foot (D425), in place of the markets row: plain words at rest, cream with its count and × when picked (the counts
+// The tags at the hero's foot: plain words at rest, cream with its count and × when picked (the counts
 // at rest are More's); Live's amber dot while someone is in a world. One at a time; the light is space's and the rail's
 // (lenses.ts). The row keeps its height whatever it holds, and fades in once the worlds' file is read: nothing above it moves.
 import { PHONE_QUERY } from "@gnoworld/core";
@@ -28,8 +28,7 @@ function reach(lit: Lit, lens: LensId, system: string | undefined): number {
   return system === undefined ? set.size : [...set].filter((id) => inSystem(id, system)).length;
 }
 
-// Each tag's mark, the design system's own (Alexis, 2026-11-09: "plus gros et peut-être avec icône"); Live's is its dot, amber while someone
-// is in a world.
+// Each tag's mark, the design system's own; Live's is its dot, amber while someone is in a world.
 const ICONS: Record<Exclude<LensId, "live">, IconName> = {
   active: "spark",
   games: "star",
@@ -95,7 +94,7 @@ export function Lenses({ universe, system }: { universe: string; system?: string
   const lit = useLit();
   const followed = useApp((state) => worldsFollowedIn(state.device.follows, universe).join("\n"));
   // The worlds' file is read at once on a computer, where space reads it anyway; on a phone, whose home preloads none of it, at the reader's
-  // first touch, so a phone that only looks pays nothing (the hero never asked it before, worldsFile.ts).
+  // first touch, so a phone that only looks pays nothing.
   useEffect(() => {
     if (!matchMedia(PHONE_QUERY).matches) {
       startLenses();

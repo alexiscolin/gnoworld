@@ -1,9 +1,9 @@
-// What the worker precaches (ADR-0001 §12, nuanced by the 2026-10-18 decision, F175): the build's hashed scripts
+// What the worker precaches (ADR-0001 §12): the build's hashed scripts
 // and styles, of the fonts the latin faces, the text's and the code's, so that offline the page keeps its face
-// (text in other scripts falls back to the system's font, F292); and its shell, the pages, their data, the
+// (text in other scripts falls back to the system's font); and its shell, the pages, their data, the
 // manifest and the icon the pages link, so that the app opens with no network and a new tab opens the version
 // before the click. app/vite.config.ts computes it. A hash is Vite's eight characters, dashes among them:
-// "{8,}" took "-wght-normal" for one.
+// "{8,}" would take "-wght-normal" for one.
 import { integrity } from "./digest.ts";
 import type { Precached } from "./worker.ts";
 

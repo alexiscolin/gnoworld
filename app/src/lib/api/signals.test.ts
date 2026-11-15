@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Fetcher } from "./http.ts";
 import { signalsApi } from "./signals.ts";
 
-// Slice 9h: the browser's client of the first signals (server/src/signals/routes.ts, mounted at /api/signals), through
+// The browser's client of the first signals (server/src/signals/routes.ts, mounted at /api/signals), through
 // the one JSON call of lib/api/http.ts. Each answer must name the world asked.
 
 const server = (answer: { status: number; json?: unknown }) => {

@@ -272,7 +272,7 @@ test("once the page has gone (its signal aborted), no update shows a prompt, nor
   expect(updates).toEqual([]);
 });
 
-// F679: the message may be lost on the way (a worker stopped, a browser that drops it); the page cannot know.
+// The message may be lost on the way (a worker stopped, a browser that drops it); the page cannot know.
 test("a second click before the takeover sends SKIP_WAITING again, and the page reloads once", async () => {
   const waiting = worker();
   const { page, takeOver } = container({ waiting });
@@ -355,7 +355,7 @@ test("a lost message again: every time the page is shown after a click that took
   expect(waiting.sent).toHaveLength(2);
 });
 
-// A click goes to the worker waiting then, not to the one a click asked before (F380).
+// A click goes to the worker waiting then, not to the one a click asked before
 test("a newer worker waiting after a click is asked at the next click", async () => {
   const older = worker();
   const { page, registration, updateFound } = container({ waiting: older });
@@ -423,7 +423,7 @@ test("a page shown again asks the browser for a newer worker; hidden, it does no
 });
 
 // A check that cannot reach the host, offline or on a network with no way out, is expected of an
-// installed app: no bug is reported (F343, F351).
+// installed app: no bug is reported.
 test("a check that cannot reach the host is expected: nothing is reported, and the page goes on", async () => {
   const { page, registration } = container();
   const { started, document, report } = start(page, { reachable: false });
@@ -449,7 +449,7 @@ test("a check that fails while the host answers is reported, and the page goes o
 });
 
 // The worker's first fetch fails the same way: expected when the host cannot be reached, a bug when it
-// answers, which the page reports (F351).
+// answers, which the page reports.
 test("a worker that cannot register while the host cannot be reached is expected: nothing rejects", async () => {
   const { page } = container();
   page.register.mockRejectedValueOnce(new TypeError("Failed to fetch"));
@@ -463,7 +463,7 @@ test("a worker that cannot register while the host answers rejects, for the page
 });
 
 // Whether the host answers for the worker's script: any answer, an error status included, is one;
-// a fetch that fails is none (F351).
+// a fetch that fails is none.
 test("the host answers when its fetch gets a response, whatever its status, and not when it fails", async () => {
   const asked: [string, RequestInit | undefined][] = [];
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {

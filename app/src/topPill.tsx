@@ -1,6 +1,6 @@
-// The top centre's pill (DESIGN-SYSTEM.md, Layout: "one slot: the flight panel, the expedition pill, the flash"; frames 18, 23, 93): one
-// host in the shell that any part raises a message in, an arrival's "Stamped", 8b's expedition, so two pills never show at once and one
-// raised before a flight outlives the route it was raised on. A new message takes the place of the last.
+// The top centre's pill (DESIGN-SYSTEM.md, Layout: "one slot: the flight panel, the expedition pill, the flash"): one host in the shell
+// that any part raises a message in, an arrival's "Stamped", the expedition, so two pills never show at once and one raised before a
+// flight outlives the route it was raised on. A new message takes the place of the last.
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useSyncExternalStore } from "react";
 // The listeners' record the scene's host uses: one way to tell what a component reads.

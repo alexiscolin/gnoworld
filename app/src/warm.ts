@@ -1,4 +1,4 @@
-// What a plate is given ahead of the click (slice 13), in a chunk of its own: asked by plateWarm.ts once the page's space has drawn, or at a link's
+// What a plate is given ahead of the click, in a chunk of its own: asked by plateWarm.ts once the page's space has drawn, or at a link's
 // intent. Every read here is the page's own, kept (lib/query): the plate finds the answer asked, or the answer already come.
 import { hubWorldOf } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
@@ -62,7 +62,7 @@ export async function warmBatch(place: { kind: string; id: string }, signal: Abo
   await Promise.all(Array.from({ length: AT_ONCE }, work));
 }
 
-// The chain is shared and public: what an intent asks of it is capped, so a pointer swept over a list floods nothing (the plan's §3).
+// The chain is shared and public: what an intent asks of it is capped, so a pointer swept over a list floods nothing.
 const INTENTS_MOST = 12;
 const INTENTS_WINDOW_MS = 60_000;
 const intents: number[] = [];

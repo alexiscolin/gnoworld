@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { systemOfPage } from "./cosmosAt.ts";
 
-// The views' bar's System goes to the system round the place one is on (Alexis, 2026-11-07, D383): a realm's own namespace, a system's
+// The views' bar's System goes to the system round the place one is on: a realm's own namespace, a system's
 // own, and the Earth's anywhere else.
 describe("the system round a page", () => {
   it.each([

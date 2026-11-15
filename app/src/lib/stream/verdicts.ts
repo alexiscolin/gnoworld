@@ -1,9 +1,9 @@
 // The browser's client of the verdicts' stream (server/src/stream/stream.ts, mounted at /api/stream): the server's
-// "checked" or "hidden" for each line of the rooms it follows, which a link's player waits on (slice 4's 4g). The
+// "checked" or "hidden" for each line of the rooms it follows, which a link's player waits on. The
 // browser's EventSource reconnects by itself and sends the last id, so the server replays what was missed. An event
-// of a shape or state this page does not know is dropped, said once (F675, slice 4's plan §1). After its replay, the
-// stream says when it began following, on the server's clock (F890). An answer not 200 (a 429, a restart's 502)
-// ends it for good, which the page is told (F888).
+// of a shape or state this page does not know is dropped, said once. After its replay, the
+// stream says when it began following, on the server's clock. An answer not 200 (a 429, a restart's 502)
+// ends it for good, which the page is told.
 import { Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
 import type { Language } from "../language.ts";
 import { read } from "./read.ts";
@@ -27,11 +27,11 @@ export const BUSY_REST_MS = 60_000;
 export interface VerdictOptions {
   open: (url: string) => VerdictSource;
   log: (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => void;
-  /** A first signal of a world the rooms belong to (slice 9h). */
+  /** A first signal of a world the rooms belong to. */
   signal?: ((signal: Signal) => void) | undefined;
-  /** The data of a `chain` event (slice 9g), unread: its schema is the feed's (chainFeed.ts), which a page loads on the first. */
+  /** The data of a `chain` event, unread: its schema is the feed's (chainFeed.ts), which a page loads on the first. */
   chain?: ((data: unknown) => void) | undefined;
-  /** The data of a `card` event (link-previews L4), unread too: its schema is the cards' feed's, a chunk a page loads on the first. */
+  /** The data of a `card` event, unread too: its schema is the cards' feed's, a chunk a page loads on the first. */
   card?: ((data: unknown) => void) | undefined;
   /** The data of a `translation` event, unread too: its schema is the translations' feed's. */
   translation?: ((data: unknown) => void) | undefined;
@@ -69,7 +69,7 @@ export function followVerdicts(
       if (event !== undefined) signal(event);
       else once("signal_unknown");
     });
-  // The chain's events (9g) and the cards' (L4) go on unread: the feed that reads them is a chunk a page loads on the first.
+  // The chain's events and the cards' go on unread: the feed that reads them is a chunk a page loads on the first.
   for (const [type, on] of [
     ["chain", chain],
     ["card", card],

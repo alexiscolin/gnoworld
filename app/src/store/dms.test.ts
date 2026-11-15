@@ -12,7 +12,7 @@ const read = (line: string): IrcMessage => {
   return parsed.message;
 };
 
-// 4e: direct messages, kept by partner, an account's alone (docs/plans/slice-4.md §7).
+// Direct messages, kept by partner, an account's alone.
 describe("the store's chat slice: direct messages", () => {
   const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -67,7 +67,7 @@ describe("the store's chat slice: direct messages", () => {
   it("forgets every conversation at a new session, notifying no one when it held none", () => {
     const t = as(ACCOUNT);
     t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
-    // StrykerJS on 4e: a refusal held with a conversation, both forgotten; one with no device counted all the same.
+    // A refusal held with a conversation, both forgotten; one with no device counted all the same.
     t.store.getState().dmActions.refused(ALICE, "lost");
     expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 1, draft: "lost" } });
     t.store.getState().dmActions.begin();
@@ -81,7 +81,7 @@ describe("the store's chat slice: direct messages", () => {
     expect(heard).toBe(0);
   });
 
-  // 4e's UX review (U1): a line Ergo refused, its partner not connected, has its draft back in the composer.
+  // A line Ergo refused, its partner not connected, has its draft back in the composer.
   it("puts a refused line's draft back on the device, counting the partner's refusals until a new session", () => {
     const t = as(ACCOUNT);
     const written: [string, string][] = [];
@@ -104,7 +104,7 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({});
   });
 
-  // /code-review on 4e (CR7): a refusal put its draft back on the device over a draft typed since.
+  // A refusal put its draft back on the device over a draft typed since.
   it("puts a refused line's draft back on the device only where no draft waits", () => {
     const t = as(ACCOUNT);
     const kept = new Map([[ALICE, "typed since"]]);
@@ -124,7 +124,7 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 2, draft: "again" } });
   });
 
-  // /code-review on 4d's DM bar (CR2): a refused correction or reply lost its tags with the line, and came back plain.
+  // A refused correction or reply lost its tags with the line, and came back plain.
   it("keeps a refused line's tags with its draft where the draft went back on the device alone", () => {
     const t = as(ACCOUNT);
     const kept = new Map<string, string>();
@@ -147,8 +147,7 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 1, draft: "x" } });
   });
 
-  // 4e's complexity review (2-3), efficiency review (6) and test audit (T4): conversations were kept without end, a
-  // spammer with an account a message growing the store and the navigation.
+  // Conversations are bounded: a spammer with an account would otherwise grow the store and the navigation with each message.
   it(`keeps the ${String(DMS_KEPT)} conversations heard last, the oldest heard going first, each its newest ${String(LINES_KEPT)} lines`, () => {
     expect(DMS_KEPT).toBe(100);
     const t = as(ACCOUNT);
@@ -175,7 +174,7 @@ describe("the store's chat slice: direct messages", () => {
   });
 });
 
-// 4d-dm-bar: a direct message's lines get the message bar, so its reactions and deletes are kept as a room's are, by
+// A direct message's lines get the message bar, so its reactions and deletes are kept as a room's are, by
 // partner; Ergo names the target as the sender wrote it (its nick, mine on a line to me).
 describe("the store's chat slice: a direct message's reactions and deletes", () => {
   const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -252,7 +251,7 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
     expect(t.getState().dms[ALICE]).toEqual([]);
   });
 
-  // R1 (redpass-dmb): a DM has no moderators, so a REDACT takes a line or a reaction only from its own author.
+  // A DM has no moderators, so a REDACT takes a line or a reaction only from its own author.
   it("keeps my line, and my reaction, at a partner's REDACT naming them", () => {
     const t = store();
     const { heard } = t.getState().dmActions;
@@ -274,7 +273,7 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
     expect(t.getState().dms[ALICE]).toHaveLength(1);
   });
 
-  // R3: a partner's reaction flood grows with the universe, so each conversation's reactions are bound.
+  // A partner's reaction flood grows with the universe, so each conversation's reactions are bound.
   it("bounds a conversation's reactions, the oldest first, and an account's flood keeps another's one", () => {
     const t = store();
     const { heard } = t.getState().dmActions;
@@ -293,7 +292,7 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
     expect(kept.some(({ id }) => id === "mine")).toBe(true);
   });
 
-  // R6: a reaction's value is one emoji; markup or a long value leaves no chip.
+  // A reaction's value is one emoji; markup or a long value leaves no chip.
   it("keeps no reaction whose value is markup or too long to be an emoji", () => {
     const t = store();
     const { heard } = t.getState().dmActions;

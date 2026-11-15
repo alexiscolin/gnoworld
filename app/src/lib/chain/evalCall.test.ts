@@ -5,9 +5,9 @@ import { realmType } from "@gnoworld/core";
 import { isRealmPath } from "@gnoworld/schemas";
 import { evalCall, evalNameOf, isAddress, userCall } from "./evalCall.ts";
 
-// 5g-reads, tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
+// Tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
 // (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
-// two calls on a proved address (D283), or nothing.
+// two calls on a proved address, or nothing.
 
 // A port of gno's parseQueryEvalData (gno.land/pkg/sdk/vm/handler.go:289 at v1.5.0): the first dot AFTER the first slash cuts the
 // realm from the expression. A realm path with a dot past its first slash would change what is asked.
@@ -239,7 +239,7 @@ describe("evalCall, for any strings", () => {
   });
 });
 
-// Slice 13, B (docs/plans/slice-realm-plate.md §3): a read with arguments, its literals written by core's serializer (readArgs) and by
+// A read with arguments, its literals written by core's serializer (readArgs) and by
 // nothing else; the realm's grammar and the bare identifier still checked first. A first `realm` parameter is a write: qeval would inject
 // `cur` (gno v1.5.0, keeper.go:1924) and fake its success, so no call is built.
 describe("evalCall, a read with its typed arguments", () => {
@@ -295,7 +295,7 @@ describe("evalCall, a read with its typed arguments", () => {
     expect(call).toBeNull();
   });
 
-  // R5 of the red pass: the cap weighs the call as sent, its literals escaped, in UTF-8: the edge for each kind of character.
+  // The cap weighs the call as sent, its literals escaped, in UTF-8: the edge for each kind of character.
   it.each([
     ["quotes, each escaped to two bytes", '"', 128],
     ["backslashes, each escaped to two bytes", "\\", 128],
@@ -315,7 +315,7 @@ describe("evalCall, a read with its typed arguments", () => {
     expect(evalCall(WUGNOT, "Read", { params, texts: filled(pad + 1) })).toBeNull();
   });
 
-  // R6: a count of texts unlike the parameters' is a caller's bug: no call, never a throw that a read would not catch.
+  // A count of texts unlike the parameters' is a caller's bug: no call, never a throw that a read would not catch.
   it.each([
     ["a text missing", () => evalCall(WUGNOT, "Read", { params: [p("string")], texts: [] })],
     ["no texts given", () => evalCall(WUGNOT, "Read", { params: [p("string")] })],
@@ -355,8 +355,8 @@ describe("evalCall, a read with its typed arguments", () => {
   });
 });
 
-// 7c, tier 1 (the plan's §3, question 9): the one widening of the builder. The address alone is added, checked against a strict
-// g1 bech32 pattern and composed by code. The expression is the one a name read needs (chain-feasibility.md, item 9).
+// Tier 1: the one widening of the builder. The address alone is added, checked against a strict
+// g1 bech32 pattern and composed by code. The expression is the one a name read needs.
 describe("evalNameOf, the name registered for one address", () => {
   const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
 
@@ -434,7 +434,7 @@ describe("evalNameOf, the name registered for one address", () => {
   });
 });
 
-// D283, by Alexis: the name reader's two expressions are built here too, from an address the schema proved and nothing else.
+// The name reader's two expressions are built here too, from an address the schema proved and nothing else.
 describe("userCall, the two expressions on r/sys/users's record of an address", () => {
   const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 

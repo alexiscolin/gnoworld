@@ -1,4 +1,4 @@
-// The plate's sentence (D566): the first paragraph of the realm's own page, as plain words, cut to a line. A page that opens with
+// The plate's sentence: the first paragraph of the realm's own page, as plain words, cut to a line. A page that opens with
 // anything but a paragraph (a heading, a form) before one gives the first paragraph after; none, no sentence.
 import type { Inline, PageBlock } from "@gnoworld/core";
 

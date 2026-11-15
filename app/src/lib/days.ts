@@ -1,4 +1,4 @@
-// The one way a day and a time read in the app (D13015): "4 Nov 2026", "4 Nov" in the current year, "Today", "Yesterday", the weekday for the
+// The one way a day and a time read in the app: "4 Nov 2026", "4 Nov" in the current year, "Today", "Yesterday", the weekday for the
 // last week; times on 24 hours ("16:06"). A day is the zone's own (a reader's, unless a site says UTC), so a day of 23 or 25 hours is one day.
 interface Reader {
   timeZone?: string | undefined;

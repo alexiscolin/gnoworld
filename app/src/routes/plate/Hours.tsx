@@ -1,5 +1,5 @@
 // Chat messages per hour (the proposal's cardChat): the chat's last 24 hours of a place with no calls to count, as the day chart draws days, a
-// dot for an hour with no message: a flat chart of dots when nobody spoke, which is a count (D534 was: no block). With no read of the hours, nothing is drawn.
+// dot for an hour with no message: a flat chart of dots when nobody spoke, which is a count, not an absence. With no read of the hours, nothing is drawn.
 import { Card, DayChart, grouped, Stack, useAlone } from "@gnoworld/ui";
 import type { Hours as HoursRead } from "../../features/world/useHours.ts";
 import { hourCounts } from "./figures.ts";

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { placesOf } from "@gnoworld/core";
 import { prerenderPaths } from "./prerender.ts";
 
-// Slice 5's 5d: every place has its page, at its path and at its canonical address, and the list has one.
+// Every place has its page, at its path and at its canonical address, and the list has one.
 describe("prerenderPaths", () => {
   const places = () =>
     placesOf({

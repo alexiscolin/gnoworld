@@ -1,4 +1,4 @@
-// What it can do (D566): the capabilities its imports name, one chip each; a chip picked says the line that shows it. A reading aid, never a
+// What it can do: the capabilities its imports name, one chip each; a chip picked says the line that shows it. A reading aid, never a
 // verdict: what the code does is read on gnoweb, which the card links to.
 import { useState } from "react";
 import { Button, Card, Chip, Cluster, Stack } from "@gnoworld/ui";

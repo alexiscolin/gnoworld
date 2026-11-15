@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { keep } from "../lib/keep/keep.ts";
 import { createAppStore } from "./index.ts";
 
-// F2091 (AP2): one place ends a session's state, the store's own subscriber, whether or not a chat is open to follow
-// it; the link used to do it for the rooms, the keep and the pins, and only when it had known a session before.
+// One place ends a session's state, the store's own subscriber, whether or not a chat is open to follow
+// it.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const T = "2026-10-25T10:00:00.000Z";

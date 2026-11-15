@@ -1,4 +1,4 @@
-// Calls per day, with its last calls (the proposal's act card, D566): the rollup's days as bars on a log or a linear scale, over every day since the
+// Calls per day, with its last calls (the proposal's act card): the rollup's days as bars on a log or a linear scale, over every day since the
 // first call (a day with none a dot), the range (all or 14 days), then its last calls as a paged list of three that Expand opens to a hundred: who,
 // which function, when. Every text is the rollup's, checked by its schema; nothing here is made up.
 import { useState } from "react";

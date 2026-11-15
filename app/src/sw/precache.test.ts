@@ -19,7 +19,7 @@ const BUILD = [
   "_headers",
 ];
 
-// ADR-0001 §12 nuanced by Alexis's 2026-10-18 decision (F175): the shell is cached too, so a new tab opens
+// ADR-0001 §12: the shell is cached too, so a new tab opens
 // the version before the click, and the app opens with no network.
 test("the precache list holds the build's hashed files and its shell, as the site's paths, sorted", () => {
   expect(precacheList(BUILD)).toEqual([
@@ -94,7 +94,7 @@ test("a dashed name with no hash counts for nothing, its last words taken for no
   expect(precacheList(["assets/entry-client-chunk.js", "assets/route-world-main.css"])).toEqual([]);
 });
 
-// The fonts too, so that offline the page keeps Geist (docs/plans/slice-2cd.md); nothing else.
+// The fonts too, so that offline the page keeps Geist; nothing else.
 test("the precache list holds the build's hashed fonts as well, and no other kind of file", () => {
   expect(
     precacheList([
@@ -106,7 +106,7 @@ test("the precache list holds the build's hashed fonts as well, and no other kin
   ).toEqual(["/assets/geist-latin-wght-normal-BgDaEnEv.woff2"]);
 });
 
-// Offline, latin text keeps Geist; other scripts fall back to the system's font, 94 KB lighter (F292).
+// Offline, latin text keeps Geist; other scripts fall back to the system's font, 94 KB lighter.
 test("of the fonts, the latin faces only: the text's and the code's", () => {
   expect(
     precacheList([
@@ -133,7 +133,7 @@ test("a font counts only by its whole name: no nested path, no hash under eight 
 });
 
 // The build's list carries each file's digest as the worker checks it: the assets' are worker.test.ts's own,
-// computed apart with Python for the bytes `build <path>`; node's agrees (F342). A page's bytes are its file's.
+// computed apart with Python for the bytes `build <path>`; node's agrees. A page's bytes are its file's.
 test("lists each file with the digest the worker checks it by, a page's from its html file", async () => {
   const read = (name: string) => new TextEncoder().encode(`build /${name}`);
   const listed = await precached(["index.html", "w/bubble/index.html", ...BUILD.slice(0, 3)], read);

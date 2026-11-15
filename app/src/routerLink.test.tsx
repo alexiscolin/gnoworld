@@ -13,7 +13,7 @@ function read(html: string) {
   return { attributes, words: /<a[^>]*>(.*)<\/a>/.exec(html)?.[1] };
 }
 
-// What a link-button or a row hands the slot: the router draws the same anchor, going where it says (F328).
+// What a link-button or a row hands the slot: the router draws the same anchor, going where it says.
 test("draws the anchor the design system asks for: every attribute it was given, its href its path", () => {
   const props = { href: "/w/bubble", className: "look", "data-emphasis": "solid", "aria-current": "true" as const };
   const plain = renderToStaticMarkup(<a {...props}>Fly to Bubble</a>);
@@ -27,7 +27,7 @@ test("draws the anchor the design system asks for: every attribute it was given,
   expect(read(plain).attributes).toHaveLength(4);
 });
 
-// F326: a link to a file of the site (the sitemap) stays a plain anchor, where the catch-all route would say "No page here".
+// a link to a file of the site (the sitemap) stays a plain anchor, where the catch-all route would say "No page here".
 test.each([
   ["/sitemap.xml", false],
   ["/robots.txt", false],

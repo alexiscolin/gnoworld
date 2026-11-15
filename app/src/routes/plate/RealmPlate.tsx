@@ -1,4 +1,4 @@
-// A realm's plate (slice 13, D566): the adapter that fills the model from the realm's own sources, its page, the chain's indexer and
+// A realm's plate: the adapter that fills the model from the realm's own sources, its page, the chain's indexer and
 // the worlds' file, and the plate it draws. In a chunk of its own with the page's and the indexer's code (routes/realmPage.tsx). Its calls
 // and callers per day, and what it can do, come with the server's rollup and the typed reads: none stands here till they do.
 import { stampKey, worldIdOf } from "@gnoworld/core";
@@ -49,7 +49,7 @@ function rankOf(realm: string, worlds: Worlds["worlds"] | undefined, chain: stri
     : undefined;
 }
 
-// The indexer holds no time for a block (F2950): a deploy is its block, and how many blocks ago when the tip is known.
+// The indexer holds no time for a block: a deploy is its block, and how many blocks ago when the tip is known.
 function deployedWidget(first: number | undefined, tip: number | undefined): Widget | undefined {
   if (first === undefined) return undefined;
   if (first === 0) return { label: "Deployed", value: "Genesis", detail: "in the genesis block" };
@@ -193,7 +193,7 @@ export default function RealmPlate({
       status: statusOfRealm({ here, held, rollup, now, read: state.state === "read" }),
       rank: rankOf(realm, worlds, chain.name),
     },
-    // The one thing to do here follows the state (D530): a realm nobody called is for trying, one that lives is for reading.
+    // The one thing to do here follows the state: a realm nobody called is for trying, one that lives is for reading.
     actions: {
       place: { name, path: pathname },
       follow: stampKey(universe.id, worldIdOf(realm)),

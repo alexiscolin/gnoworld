@@ -20,7 +20,7 @@ const { parseSync } = loaded as { parseSync: (name: string, code: string, option
 const parse = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 const stripChunk = (code: string) => stripWith(code, parse);
 
-// The shaders' spaces stripped at build (Alexis, 2026-11-03, "avec ses tests"): the spaces a GLSL compiler skips, out of the chunks the
+// The shaders' spaces stripped at build: the spaces a GLSL compiler skips, out of the chunks the
 // browser downloads, three's and ours; every token kept, in order, and every line the preprocessor reads kept whole.
 
 // GLSL's tokens by maximal munch, as a compiler reads them: a preprocessor line whole, then names, numbers and operators, comments skipped.
@@ -88,7 +88,7 @@ describe("a shader's spaces, stripped", () => {
   });
 
   // Code joins a string to what stands beside it, a value set in or another string (three's `'#define ' + name`): its edge is kept as
-  // what it was, a line break as one, spaces as one space, none where there was none (7v's security review, F4450).
+  // what it was, a line break as one, spaces as one space, none where there was none.
   it("keeps a string's edges as they were, a line break as one and spaces as one space, none where there was none", () => {
     expect(stripGlsl("\n  float a = 1.0;\n  ")).toBe("\nfloat a=1.0;\n");
     expect(stripGlsl("  = vec4( 1.0 );")).toBe(" =vec4(1.0);");
@@ -99,8 +99,7 @@ describe("a shader's spaces, stripped", () => {
     expect(stripGlsl(" \n ")).toBe("\n");
   });
 
-  // Two signs a space keeps apart, for joined they would read as one operator or open or close a comment (7v's review: most of these
-  // could go from the code with no test failing).
+  // Two signs a space keeps apart, for joined they would read as one operator or open or close a comment.
   it.each([
     "++",
     "--",
@@ -257,8 +256,8 @@ describe("a built chunk's shaders, stripped", () => {
   });
 
   // Three builds a program's text from strings joined by `+` and `+=` (WebGLProgram.js:170, 319, 396, three 0.187): stripped apart, each
-  // lost the edge its neighbour needed, `#defineSTANDARD` and `usampler2DArray;#define HIGH_PRECISION`, and WebGL2 refused every
-  // material (7v's security review, F4450).
+  // loses the edge its neighbour needs, `#defineSTANDARD` and `usampler2DArray;#define HIGH_PRECISION`, and WebGL2 refuses every
+  // material.
   it("keeps the edges code joins strings by: a directive on its own line, a define's name a word apart", () => {
     const code = [
       "chunks.push('#define '+name+' '+value);",
@@ -271,7 +270,7 @@ describe("a built chunk's shaders, stripped", () => {
     expect(stripped).toContain(`const v="#version "+version+'\\n';const f=v+"#define varying in\\n"+body;`);
   });
 
-  // 7v's review (F4451): a template's part that ends inside a comment, stripped apart, would make the comment's rest code; a string's line
+  // A template's part that ends inside a comment, stripped apart, would make the comment's rest code; a string's line
   // continuation, stripped, would glue its two lines' words (`floaty`).
   it("leaves whole a template whose comment runs into a value set in, and a string the preprocessor continues", () => {
     const code = [
@@ -285,7 +284,7 @@ describe("a built chunk's shaders, stripped", () => {
     );
   });
 
-  // What 7v's review's hand-made mutants showed no test held: a value set in beside another, a shader string inside a shader template's
+  // What no other test holds: a value set in beside another, a shader string inside a shader template's
   // value (the outermost is taken, the inner left as it is), an escape in a template.
   it("keeps a space between two values set in, takes the outermost shader, and leaves a template with an escape whole", () => {
     expect(stripChunk("const s=`\nvoid main(){x=${a} ${b};}`;")).toBe("const s=`\nvoid main(){x=${a} ${b};}`;");

@@ -1,4 +1,4 @@
-// What a page shows a moment after its first screen (slice 8: the arrival's pill, the device's reader): its code is asked once the page
+// What a page shows a moment after its first screen: its code is asked once the page
 // has loaded and the browser rests, never with what the first paint needs.
 import { useEffect, useState } from "react";
 

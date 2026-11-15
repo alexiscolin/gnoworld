@@ -48,15 +48,15 @@
       --_top: var(--dock-top);
       /* raw: the window's foot, a step of space off, and 16 px over the frame's middle */
       --_middle: calc((var(--_top) + 100vb - var(--space-m)) / 2 - 16px);
-      /* raw: the ring keeps 28 px off the words and the dock; its height is held to 0.86 of the room under the outline (24 px kept), for the tilted ring and the Moon stand above the globe's top: on a 16:9 window they would reach the header and the outline (F3483) */
+      /* raw: the ring keeps 28 px off the words and the dock; its height is held to 0.86 of the room under the outline (24 px kept), for the tilted ring and the Moon stand above the globe's top: on a 16:9 window they would reach the header and the outline */
       --_reach: min(calc((var(--_end) - var(--_start)) / 2 - 28px), calc((var(--_middle) - var(--_top) - 24px) * 0.86));
-      /* raw: left of the room's middle by 8 % of it, toward the plate it stands over (Alexis, 2026-11-08: "la planète plus vers la gauche") */
+      /* raw: left of the room's middle by 8 % of it, toward the plate it stands over */
       --_x: calc((var(--_start) + var(--_end)) / 2 - (var(--_end) - var(--_start)) * 0.08);
       /* raw: the ring reaches 1.106 radii of the globe */
       --_radius: calc(var(--_reach) / 1.106);
     }
 
-    /* A world's circle is its busiest planet, frame 104's Bubble (Alexis, 2026-11-02): its ring, 1.143 radii, comes a small step short of
+    /* A world's circle is its busiest planet, frame 104's Bubble: its ring, 1.143 radii, comes a small step short of
        the plate's words and the dock, never under them, and the window's height caps it as the Earth's; a quieter world fills less (fit.ts). */
     .globe[data-world] {
       /* raw: the world's ring reaches 1.143 radii */
@@ -65,8 +65,8 @@
       );
     }
 
-    /* Close, larger than the window, lit at three quarters (D458): the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
-       height capping it past 16:10. Cropped by the window's edges, it stands over the plate's empty right margin as before, never under
+    /* Close, larger than the window, lit at three quarters: the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
+       height capping it past 16:10. Cropped by the window's edges, it stands over the plate's empty right margin, never under
        its words, and the dock stands over it as dark glass. */
     .globe[data-framing] {
       /* raw: the study's centre, across */
@@ -94,7 +94,7 @@
     }
   }
 
-  /* The arrival's aiming tag (D459, D540): a name pill of the world labels' family (labels.module.css), a step larger, at the Earth's lit
+  /* The arrival's aiming tag: a name pill of the world labels' family (labels.module.css), a step larger, at the Earth's lit
      limb (0.92 of a radius out, up and to the left at 45°) on a fine leader to a ring. It waits hidden: the page's arrival plays it once
      the flight has landed (arrival.ts). */
   .tag {
@@ -147,7 +147,7 @@
     font: var(--font-action);
   }
 
-  /* The way in: a solid small button, a word and its arrow as the hero's (D554), the design system's solid emphasis, at the pill's end. */
+  /* The way in: a solid small button, a word and its arrow as the hero's, the design system's solid emphasis, at the pill's end. */
   .go {
     block-size: var(--control-s);
     padding-inline: var(--space-s) var(--space-xs);
@@ -157,7 +157,7 @@
     font: var(--font-ui);
   }
 
-  /* The home's first screen (D459): the Earth close, lit at three quarters, cropped at the bottom right (86 % down, its radius the study's
+  /* The home's first screen: the Earth close, lit at three quarters, cropped at the bottom right (86 % down, its radius the study's
      42 % of the width or 67 % of the height), its glow a step clear of the hero's words, once space goes home, where the page frames it so. */
   .arrival {
     /* raw: a little right of the study's 80 %, so the hero's row keeps clear of it */

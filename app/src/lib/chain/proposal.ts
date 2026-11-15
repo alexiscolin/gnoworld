@@ -1,6 +1,6 @@
-// The GovDAO proposals a realm's home page lists, in the format RECORDED on gnoland-1 and onyx-1 (F2951, app/tests/chain/recorded/):
+// The GovDAO proposals a realm's home page lists, in the format RECORDED on gnoland-1 and onyx-1 (app/tests/chain/recorded/):
 // `### [Prop #N - Title](/r/gov/dao:N)` and `Status: WORD`, no tally and no threshold; the newest open one's own page gives its yes
-// and no (F4308), never a threshold. A proposer's words are text, bounded. Every pattern is linear, a page is read to a bound,
+// and no, never a threshold. A proposer's words are text, bounded. Every pattern is linear, a page is read to a bound,
 // nothing throws, the Zod schema has the last word.
 import { cutGraphemes } from "@gnoworld/core";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
@@ -84,7 +84,7 @@ const WHOLE = 100 + 1e-9;
 
 /** What a proposal's own page states of its votes: whether it is open, its yes and its no, 0 to 100, from its one block of stats; none
  * when a proposer's words hold a second block or a second line, a share is none, the two pass the whole, or the page is longer than what
- * is read: a proposer's long description would push the realm's own block past the bound and leave a forged one alone (security review). */
+ * is read: a proposer's long description would push the realm's own block past the bound and leave a forged one alone. */
 export function votesOf(text: string): { open: boolean; yes: number; no: number } | undefined {
   if (text.length > PAGE_READ) return undefined;
   const lines = linesOf(text);

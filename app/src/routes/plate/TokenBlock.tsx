@@ -1,4 +1,4 @@
-// A token realm's holders and supply (slice 13): what the server replayed from grc20's own events, drawn only when it holds something. Holders,
+// A token realm's holders and supply: what the server replayed from grc20's own events, drawn only when it holds something. Holders,
 // supply and today's transfers, the top holders by share, and a chart of transfers a day only when three days of the window hold one, else the
 // last transfer in words. A token whose events could not be trusted says its holders are unknown. Every text is the answer's, checked.
 import { utcDay } from "@gnoworld/core";

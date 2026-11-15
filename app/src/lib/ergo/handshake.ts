@@ -37,7 +37,7 @@ export type Step = "caps" | "sasl" | "auth" | "registering" | "connected";
  * draft/multiline is on; or the end of the handshake. */
 export type Move = { next: Step; send: readonly string[]; multiline?: boolean } | { end: "fail" | "connected" };
 // Who registers: an account, its nick its address, by SASL with its ticket; or a guest, its nick its own and
-// no ticket, which needs no sasl (Alexis, 2026-10-25: a visitor reads the public rooms as a guest).
+// no ticket, which needs no sasl: a visitor reads the public rooms as a guest.
 interface Login {
   nick: string;
   ticket: string | undefined;

@@ -14,14 +14,14 @@ test("an error no route catches shows an alert, never a blank page", async () =>
   expect(alertOf(html)).toMatch(BACK_HOME);
 });
 
-// The app may be what failed: the way home loads the document again, which the router cannot (F325).
+// The app may be what failed: the way home loads the document again, which the router cannot.
 test("an error no route catches offers a way home that loads the document again", async () => {
   const html = await render({ path: "/", loader: failing, ErrorBoundary }, "/", { slot: true });
   expect(alertOf(html)).toMatch(BACK_HOME);
   expect(alertOf(html)).not.toContain("data-routed");
 });
 
-// The app links layers.css first on every page (F3260); styles.css, which the stories load alone, says the same order.
+// The app links layers.css first on every page; styles.css, which the stories load alone, says the same order.
 test("layers.css and styles.css of the design system declare the same layers in the same order", () => {
   const statement = (file: string) => /@layer\s+[\w\s,]+;/.exec(readFileSync(`packages/ui/src/${file}`, "utf8"))?.[0];
   expect(statement("layers.css")).toBeDefined();

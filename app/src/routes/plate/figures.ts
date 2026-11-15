@@ -1,4 +1,4 @@
-// The plate's figures every kind shares (D530): who is here, as the standing's hero, and the counts a source gave, never a zero it did not.
+// The plate's figures every kind shares: who is here, as the standing's hero, and the counts a source gave, never a zero it did not.
 import { countryName } from "@gnoworld/core/bubbles";
 import { clock, HOUR_MS } from "../../lib/days.ts";
 import { PRESENCE_HOURS } from "@gnoworld/schemas/indexer";
@@ -7,7 +7,7 @@ import type { Widget } from "./model.ts";
 
 export const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-/** The people here now, the chat's first figure, as the proposal says it: "Here now", people in the world. */
+/** The people here now, the chat's first figure: "Here now", people in the world. */
 const hereFigure = (here: number): Figure => ({
   key: "here",
   label: "Here now",
@@ -37,7 +37,7 @@ export const hourCounts = (hours: { hours: readonly (number | null)[] } | undefi
       ? Array<number>(PRESENCE_HOURS).fill(0)
       : hours.hours.map(counted);
 
-/** The chat kinds' band (the proposal's section 9): who is here, from how many countries, the messages of this hour and of the last 24. A count
+/** The chat kinds' band: who is here, from how many countries, the messages of this hour and of the last 24. A count
  * no source gave (no read of the countries, none of the hours) is left out; a zero that was read is a value and shows. */
 export function chatFigures({
   here,
@@ -65,7 +65,7 @@ export function chatFigures({
   return made.filter((figure) => figure !== undefined);
 }
 
-/** The squares a chat's hours give a place: the messages of the day and its busiest hour (UTC, as the proposal's); a quiet day is a zero and shows.
+/** The squares a chat's hours give a place: the messages of the day and its busiest hour (UTC); a quiet day is a zero and shows.
  * None while no read has come. */
 export function hourWidgets(hours: { from: number; hours: readonly (number | null)[] } | undefined): Widget[] {
   const counts = hourCounts(hours);

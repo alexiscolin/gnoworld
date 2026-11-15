@@ -1,4 +1,4 @@
-// The page's connection to Ergo (slice 4's 4b): connectErgo on the browser's WebSocket at /ws on the page's own
+// The page's connection to Ergo: connectErgo on the browser's WebSocket at /ws on the page's own
 // host (nginx's location = /ws, deploy/web), on the page's clock and its randomness.
 import { connectErgo, type Ergo, type ErgoOptions, type Socket, type Who } from "./ergo.ts";
 

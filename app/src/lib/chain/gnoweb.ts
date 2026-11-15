@@ -1,4 +1,4 @@
-// A realm's address on its chain's gnoweb (5h). ADR-0002 §4 makes gnoweb the source of truth, and a realm's card and view each link to
+// A realm's address on its chain's gnoweb. ADR-0002 §4 makes gnoweb the source of truth, and a realm's card and view each link to
 // the realm there. Where a chain's gnoweb is comes from the data (`gnoweb` of a universe in app/data/universes.json, https and a bare
 // origin by the schema): this file holds no host.
 import { originOf } from "@gnoworld/core";

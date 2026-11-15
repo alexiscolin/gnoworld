@@ -1,9 +1,9 @@
-/* The tags at the hero's foot (D425): a rule, then plain words in one row; 66 px high whatever it holds, as the markets row it replaces
-   was, so the actions above never move. Everything that changes eases; nothing snaps. */
+/* The tags at the hero's foot: a rule, then plain words in one row; 66 px high whatever it holds,
+   so the actions above never move. Everything that changes eases; nothing snaps. */
 @layer components {
   .lenses {
     box-sizing: border-box;
-    /* raw: the markets row's 66 px, kept so the hero's actions above never move (frame 6) */
+    /* raw: 66 px, so the hero's actions above never move (frame 6) */
     block-size: 66px;
     /* the prototype's 16 px between the rule and the line */
     padding-block-start: var(--space-2xs);
@@ -39,7 +39,7 @@
     border: 0;
     background: transparent;
     color: var(--color-text-muted);
-    /* raw: 16 px, larger than the interface's 13 (Alexis, 2026-11-09: "plus gros") */
+    /* raw: 16 px, larger than the interface's 13 */
     font: 500 1rem/1 var(--family-sans);
     white-space: nowrap;
     transition: var(--transition-tint);
@@ -92,7 +92,6 @@
     opacity: 1;
   }
 
-  /* Someone is in a world now: amber, as people here are everywhere, pulsing once as it comes. */
   /* Live's mark: a dot the size of the other marks' ink, grey while nobody is in a world, amber once someone is, pulsing once as it comes. */
   .live {
     inline-size: var(--size-dot-l);

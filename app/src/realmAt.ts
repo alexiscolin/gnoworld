@@ -1,5 +1,5 @@
-// The realm a path names (5h): /r/<path> in the default universe, /net/<id>/r/<path> in another, read from that universe's
-// chain. A client route's address, with no page written ahead (docs/plans/slice-5-part-2.md §1): the path is the realm's, so
+// The realm a path names: /r/<path> in the default universe, /net/<id>/r/<path> in another, read from that universe's
+// chain. A client route's address, with no page written ahead: the path is the realm's, so
 // it passes gno's grammar for one (schemas' isRealmPath) or it names nothing.
 import { REALM_PREFIX } from "@gnoworld/core";
 import { isRealmPath } from "@gnoworld/schemas";

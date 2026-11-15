@@ -1,4 +1,4 @@
-// The pins' slice of the store (slice 4's 4d): each room's pins and whether the reader may pin there, as the server
+// The pins' slice of the store: each room's pins and whether the reader may pin there, as the server
 // answers (GET /api/pins). A slice of its own, beside the verdicts': they come from the server, not from Ergo's lines.
 import { trimOldest, type IrcMessage } from "@gnoworld/core";
 import { RoomId, type PinList } from "@gnoworld/schemas";

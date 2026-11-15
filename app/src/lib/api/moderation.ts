@@ -1,4 +1,4 @@
-// The browser's client of an owner's moderation (server/src/moderation/routes.ts, mounted at /api/moderation; owners' moderation, part 4b): hide a
+// The browser's client of an owner's moderation (server/src/moderation/routes.ts, mounted at /api/moderation): hide a
 // line of a room, mute an account in the room's world. The room, the line and the account are checked before any is sent.
 import { Address, PinId, RoomId } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";

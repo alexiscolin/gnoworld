@@ -1,4 +1,4 @@
-// A room read around a found message (slice 13, C): a window of history replaces the room's lines, live lines wait (chat.ts holds them
+// A room read around a found message a window of history replaces the room's lines, live lines wait (chat.ts holds them
 // back while `jump` is set), and `left` ends it.
 import { addLines, addReactions, lineOf, reactionOf, type IrcMessage } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";

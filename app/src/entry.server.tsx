@@ -13,7 +13,7 @@ export default async function handleRequest(request: Request, status: number, he
   const body = await renderToReadableStream(<ServerRouter context={context} url={request.url} />, {
     signal: AbortSignal.timeout(RENDER_MS),
     // Every part in its place, however long: React moves a part past its 12,800 characters out with an inline script of its own, which
-    // the policy refuses (csp.ts), as GovDAO's proposals grew to.
+    // the policy refuses (csp.ts), as a long list of proposals needs.
     progressiveChunkSize: Number.POSITIVE_INFINITY,
     onError(error: unknown) {
       failure ??= error;

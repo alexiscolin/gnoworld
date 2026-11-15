@@ -1,5 +1,5 @@
-// The rail's worlds (7i): the asks core orders, read from the worlds' file and what is known of them now, each with the
-// page it links to. The order changes at most once a minute, and never while the reader is on the rail (ADR-0002 §1's rail).
+// The rail's worlds: the asks core orders, read from the worlds' file and what is known of them now, each with the
+// page it links to. The order changes at most once a minute, and never while the reader is on the rail.
 import { chooseRail, daysSince, EARTH, type RailAsk, type RailWorld } from "@gnoworld/core";
 import { createStore } from "zustand/vanilla";
 import type { CosmosWorld } from "./space/cosmosWorld.ts";
@@ -19,7 +19,7 @@ export interface Known {
 const RAIL_MINUTE = 60_000;
 
 /** Where the rail's links go, the places the labels' doors lead to too; and the worlds the reader follows, by their ids, the last followed
- * first, which come after the Earth (slice 8). */
+ * first, which come after the Earth. */
 export type RailPlaces = WorldPlaces & { readonly followed?: readonly string[] | undefined };
 
 export interface RailEntry extends RailWorld {
@@ -54,7 +54,7 @@ function railOf({ worlds, signals }: Known, places: RailPlaces, shown: readonly 
   });
 }
 
-/** The rail of the worlds `kept` keeps alone, a tag's (D425) or a system's (D428): the liveliest first as the rail orders them, then the
+/** The rail of the worlds `kept` keeps alone, a tag's or a system's: the liveliest first as the rail orders them, then the
  * quiet ones its sections leave out: all of them its own. At once. */
 export function keptRail(known: Known, places: RailPlaces, kept: (id: string) => boolean): RailEntry[] {
   const worlds = known.worlds.filter(({ id }) => kept(id));

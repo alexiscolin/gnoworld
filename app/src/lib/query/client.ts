@@ -1,4 +1,4 @@
-// The app's one query client (slice 13, D13973): every read of the chain, the indexer and the site's files goes through it, so a place seen
+// The app's one query client: every read of the chain, the indexer and the site's files goes through it, so a place seen
 // comes back at once and is read again quietly. Fresh for fifteen seconds (the public RPC is shared: a visit costs one read, never a flood); an
 // answer nobody uses is let go after ten minutes, which bounds a tab's memory to the places it recently showed. The hooks pass this client to
 // `useQuery` themselves, so no provider sits over the first screen.

@@ -1,6 +1,6 @@
-// The files a search engine reads (slice 5's 5e): sitemap.xml names the mainnet's places, at their canonical addresses, and
-// robots.txt names the sitemap. A testnet's pages exist but are noindex and out of the sitemap (decisions, 2026-10-29).
-// Limits from sitemaps.org/protocol.html (read 2026-10-29): 50,000 URLs and 50 MB uncompressed a file. Values need entity escapes,
+// The files a search engine reads: sitemap.xml names the mainnet's places, at their canonical addresses, and robots.txt names the
+// sitemap. A testnet's pages exist but are noindex and out of the sitemap.
+// Limits from sitemaps.org/protocol.html: 50,000 URLs and 50 MB uncompressed a file. Values need entity escapes,
 // but a Slug is [a-z0-9-] (packages/schemas/src/data.ts) and the origin is constant: nothing here holds a character to escape.
 import { placesFrom } from "./dataPlaces.ts";
 import { ORIGIN } from "./meta.ts";

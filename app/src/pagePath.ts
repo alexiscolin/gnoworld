@@ -1,4 +1,4 @@
-// F326: which of the site's paths the router answers. The catch-all route says "No page here" to every path, so a path
+// which of the site's paths the router answers. The catch-all route says "No page here" to every path, so a path
 // that names a file (the sitemap, the manifest, a script) must reach the host as a plain anchor.
 const FILE = /\.[^/.]+$/;
 

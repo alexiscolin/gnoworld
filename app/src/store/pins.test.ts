@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createAppStore } from "./index.ts";
 import { PINS_ROOMS } from "./pins.ts";
 
-// The pins' slice (slice 4's 4d): each room's pins and whether the reader may pin there, as the server answers
+// The pins' slice: each room's pins and whether the reader may pin there, as the server answers
 // (GET /api/pins); a slice of its own, as the verdicts', since they come from the server and not from Ergo's lines.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const list = (room: string, ids: string[], may = false): PinList => ({
@@ -94,7 +94,7 @@ describe("the pins slice", () => {
   });
 
   // An answer asked before a line's REDACT and given after it must not bring its pin back for the minute until the next
-  // (4d's R19): the lines taken from rooms are remembered, as many as 500.
+  // one: the lines taken from rooms are remembered, as many as 500.
   it("keeps a line taken from its room out of a late answer that still holds it", () => {
     const store = createAppStore();
     const { set, redacted } = store.getState().pinsActions;
@@ -136,7 +136,7 @@ describe("the pins slice", () => {
     expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m3"]);
   });
 
-  // A message whose text is a pinned id is a message: only Ergo's REDACT command takes a line (G1).
+  // A message whose text is a pinned id is a message: only Ergo's REDACT command takes a line.
   it.each(["PRIVMSG", "NOTICE", "TAGMSG", "JOIN"])("keeps a pin whose id is the text of a %s", (command) => {
     const store = createAppStore();
     const { set, heard } = store.getState().pinsActions;

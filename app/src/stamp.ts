@@ -1,7 +1,7 @@
 import { clock, utcShortDay } from "./lib/days.ts";
 
 // When a read was made, in the words the home uses for the prices and the block. A clock time, not an age: the page ticks no
-// timer, so an age would be false after a minute in an open tab (F3066).
+// timer, so an age would be false after a minute in an open tab.
 const AHEAD_MS = 10 * 60_000;
 
 /** "06:00 UTC", with the day ("30 Oct 06:00 UTC") when it is not today's; "time unknown" for a time well ahead of our clock. */

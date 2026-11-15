@@ -1,4 +1,4 @@
-// Where a world leads on the page, which the rail's links (7i), the labels' doors and the home's ticker's trends (7t) share: its hub's page,
+// Where a world leads on the page, which the rail's links, the labels' doors and the home's ticker's trends share: its hub's page,
 // else its first realm's view; the Earth to its own. A hub's world is core's hubWorldOf.
 import { EARTH, hubWorldOf, realmRoute } from "@gnoworld/core";
 

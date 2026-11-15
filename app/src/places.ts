@@ -1,6 +1,6 @@
-// The places the app knows, from the data files (slice 5's 5c and 5d; the bundle holds a copy of app/data's lists, which
+// The places the app knows, from the data files (the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
-// request's path, exactly as written: the path's case is part of the address (F376), a trailing slash is not.
+// request's path, exactly as written: the path's case is part of the address, a trailing slash is not.
 import { placeAt, realmRoute, STATIONS_SHOWN, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
@@ -26,10 +26,10 @@ export interface Listed {
   canonical: string;
   /** The realms a world is about, on its universe's chain: the first is the one its page reads proposals from. */
   realms?: readonly string[];
-  /** What a world is and its genre's name, as its plate's crumb says them (8g): "dao", "Games". */
+  /** What a world is and its genre's name, as its plate's crumb says them: "dao", "Games". */
   kind?: string;
   genre?: string;
-  /** The calls its team pins (D271), as the data file holds them. */
+  /** The calls its team pins, as the data file holds them. */
   actions?: readonly PinnedRow[];
 }
 export type World = Listed;
@@ -40,9 +40,9 @@ export interface UniverseView {
   id: string;
   name: string;
   isDefault: boolean;
-  /** A testnet's pages are not indexed (ADR-0002 §2). */
+  /** A testnet's pages are not indexed. */
   testnet: boolean;
-  /** Its chain's gnoweb, the chat's link out (8d); none in data that names none. */
+  /** Its chain's gnoweb, the chat's link out; none in data that names none. */
   gnoweb?: string | undefined;
   home: { path: string; canonical: string };
   earth: { path: string; canonical: string };
@@ -78,8 +78,8 @@ export function pageOf(request: Request): Request {
   return new Request(url);
 }
 
-/** The site's places as the data files hold them. Built when first asked, never at a module's load (F2206: a build at
- * load is a static mutant, which StrykerJS leaves unjudged). */
+/** The site's places as the data files hold them. Built when first asked, never at a module's load: a build at
+ * load is a static mutant, which StrykerJS leaves unjudged. */
 export function siteOf(source: Source) {
   let built: ReturnType<typeof build> | undefined;
   const get = () => (built ??= build(source));
@@ -131,7 +131,7 @@ function viewAt(universe: UniverseView, pathname: string): View | undefined {
   const is = (at: { path: string; canonical: string }) =>
     [at.path, at.canonical].some((each) => trimmed(each) === here);
   if (is(universe.earth) || holdsChat(here)) return "world";
-  // The default universe's home is the Earth's first screen, no level of its own (D501); another universe's home is its system.
+  // The default universe's home is the Earth's first screen, no level of its own; another universe's home is its system.
   if (is(universe.home)) return universe.isDefault ? undefined : "system";
   // The cosmos's own addresses are the default universe's alone: the scene shows its cosmos only.
   if (universe.isDefault && cosmosAt(here) !== undefined) return cosmosAt(here)?.view;

@@ -37,9 +37,9 @@ const loads = (change: (f: Record<string, unknown>) => void) => {
   }
 };
 
-// 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
+// The origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
-// R-F3: and of their chains' public indexers, which the data names too (`indexer`).
+// And of their chains' public indexers, which the data names too (`indexer`).
 const INDEXER_ORIGINS = ["https://indexer.gno.land", "https://indexer.onyx.testnets.gno.land"];
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
@@ -58,7 +58,7 @@ function pagesOf(client: string): [string, string][] {
 
 /**
  * The policies a host holds for a page: _headers takes its address with and without its slash; nginx's table, also at its
- * file and at the $uri try_files leaves for its slashed address, the file joined without merging slashes (F2460).
+ * file and at the $uri try_files leaves for its slashed address, the file joined without merging slashes.
  */
 function lookups(
   address: string,
@@ -104,7 +104,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
   expect(longest[1], `the longest _headers line is ${longest[0]}`).toBeLessThan(cap);
 }
 
-// Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
+// The data files read and checked at build time.
 describe("loadData", () => {
   it("reads the twelve files into their schemas' shapes", () => {
     const dir = plant();
@@ -158,7 +158,7 @@ describe("loadData", () => {
     }
   });
 
-  // D122: the build names every fault of a file, one a line, where Jarvis's places name the first.
+  // The build names every fault of a file, one a line, where Jarvis's places name the first.
   it("names every fault of a file, one a line", () => {
     const dir = plant((files) => {
       const [hub] = files["hubs.json"] as Record<string, unknown>[];
@@ -215,14 +215,14 @@ describe("loadData", () => {
     }
   });
 
-  // What worlds.ts held, moved and nothing more (the brief: "nothing invented"): one world, and the two networks it needs.
+  // The files the repository ships: one world, and the two networks it needs.
   it("reads the files the repository ships: Bubble, GovDAO and the stations round the Earth (8l) in Onyx, the build's default", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.universes.map((u) => [u.id, u.default === true])).toEqual([
       ["onyx", true],
       ["gnoland", false],
     ]);
-    // Each station round the Earth is a world of its own kind, at its slug (8l).
+    // Each station round the Earth is a world of its own kind, at its slug.
     expect(data.hubs.slice(2).map(({ slug, kind }) => [slug, kind])).toEqual(
       data.earthOrbit.map(({ slug }) => [slug, "station"]),
     );
@@ -246,7 +246,7 @@ describe("loadData", () => {
         actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
       },
     ]);
-    // The crumbs' one genre (8g, frame 104: "GAMES › DAPP").
+    // The crumbs' one genre (frame 104: "GAMES › DAPP").
     expect(data.genres).toEqual([{ slug: "games", name: "Games" }]);
     // events and news hold the ticker's placeholders, listed below.
     for (const empty of ["ecosystems"] as const) expect(data[empty]).toEqual([]);
@@ -263,7 +263,7 @@ describe("loadData", () => {
   });
 });
 
-// 7v: what turns round the Earth, the projects the team adds by hand (Alexis, 2026-11-03), checked when the app builds.
+// What turns round the Earth, the projects the team adds by hand, checked when the app builds.
 describe("earthOrbit.json", () => {
   it("stops the build on a project's address that is not https, and names the file", () => {
     const dir = plant((f) => {
@@ -294,7 +294,7 @@ describe("earthOrbit.json", () => {
   });
 });
 
-// Slice 8: the expedition's stops, the quests' steps, what is on air and the events name worlds the site holds, each fault stopping the
+// The expedition's stops, the quests' steps, what is on air and the events name worlds the site holds, each fault stopping the
 // build with its file, its row and what it names; two stops of one world would make one visit reach both.
 describe("the discovery's files", () => {
   const stop = (over: Record<string, unknown>) => ({
@@ -398,7 +398,7 @@ describe("the discovery's files", () => {
   });
 });
 
-// 7f2: the places of the Earth's side rooms, one row a room, checked when the app builds.
+// The places of the Earth's side rooms, one row a room, checked when the app builds.
 describe("earthRooms.json", () => {
   it("stops the build on a place off the globe, and names the file", () => {
     const dir = plant((f) => {
@@ -417,7 +417,7 @@ describe("earthRooms.json", () => {
   });
 });
 
-// Slice 6's 6a: the bubbles' rules (ADR-0001 §7), one object in app/data/bubbles.json, checked when the app builds.
+// The bubbles' rules (ADR-0001 §7), one object in app/data/bubbles.json, checked when the app builds.
 describe("bubbles.json", () => {
   const planted = (change: (rules: Record<string, unknown>) => void) =>
     plant((f) => {
@@ -479,7 +479,7 @@ describe("bubbles.json", () => {
     expect(message(plant((f) => Reflect.set(f, "bubbles.json", "{")))).toMatch(/bubbles\.json/);
   });
 
-  // 6b: the centres come from a public-domain source read, named in the header (the plan's question 3).
+  // The centres come from a public-domain source, named in the header.
   it("names, in the header of the country table, a public-domain source and where it was read", () => {
     const table = new URL("../../packages/core/src/bubbles/countries.ts", import.meta.url).pathname;
     const header = readFileSync(table, "utf8").split("\n").slice(0, 6).join("\n");
@@ -488,7 +488,7 @@ describe("bubbles.json", () => {
     expect(header).toMatch(/source/i);
   });
 
-  // ADR-0001 §7's numbers live in the data file alone: the plan's "no number of §7 is written in code".
+  // ADR-0001 §7's numbers live in the data file alone: no number of §7 is written in code.
   it("leaves the rules' numbers out of the code of packages/core/src/bubbles", () => {
     const dir = new URL("../../packages/core/src/bubbles/", import.meta.url).pathname;
     const sources = readdirSync(dir, { recursive: true })
@@ -504,7 +504,7 @@ describe("bubbles.json", () => {
   });
 });
 
-// Slice 5's 5c: a fault planted in a data file stops `react-router build`, naming the file and the field; good data builds
+// A fault planted in a data file stops `react-router build`, naming the file and the field; good data builds
 // its pages. The build runs in a copy of the app in the temp directory (its generated files stay out of the app's folder),
 // node_modules linked; GNOWORLD_DATA points it at the planted data.
 const BIN = new URL("../node_modules/@react-router/dev/bin.cjs", import.meta.url).pathname;
@@ -614,7 +614,7 @@ describe("react-router build", () => {
   );
 
   // The positive control: the data drives the pages. A build that ignored GNOWORLD_DATA, or kept a list in the config,
-  // would write bubble alone; a config that failed on every build would write nothing. 5d: each place has its page, at its
+  // would write bubble alone; a config that failed on every build would write nothing. Each place has its page, at its
   // path and at its canonical address: a world of another universe, the Earth of each universe, an ecosystem, the list.
   it(
     "writes the page of each place, at its path and its canonical address, and the list",
@@ -634,7 +634,7 @@ describe("react-router build", () => {
         const client = join(copy, "build", "client");
         const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
         const pages: [string[], string, string][] = [
-          // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+          // The default universe's count is the cosmos's, which the browser reads from the worlds' file: none in the build, which keeps
           // the line's figure's room for it.
           [[], "Worlds in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
@@ -652,7 +652,7 @@ describe("react-router build", () => {
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
           const where = path.join("/") || "/";
-          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern, of its words whatever marks their parts.
+          // The cosmos' heading is the hero's line, so a heading is a pattern, of its words whatever marks their parts.
           expect(headingOf(html), where).toMatch(new RegExp(`^${heading}$`));
           expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
         }
@@ -661,11 +661,11 @@ describe("react-router build", () => {
         expect(page()).not.toContain(">Other</a>");
         expect(existsSync(join(client, "w", "other"))).toBe(false);
         expect(existsSync(join(client, "e", "other"))).toBe(false);
-        // 5f: each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
+        // Each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
         // nginx's table.
         await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
-        // F2458: buildEnd looked for sw.js before Vite's post hook wrote it, so a real build's _headers never held the worker's
-        // rule (decisions, 2026-10-30) and the worker shipped with the catch-all's policy on a _headers host. One rule, the bare
+        // The worker's rule is written once Vite's post hook has written sw.js: looked for earlier, a real build's _headers would never hold it
+        // and the worker would ship with the catch-all's policy on a _headers host. One rule, the bare
         // policy, with the catch-all detached.
         expect(existsSync(join(client, "sw.js"))).toBe(true);
         const headers = readFileSync(join(client, "_headers"), "utf8");
@@ -677,7 +677,7 @@ describe("react-router build", () => {
     },
   );
 
-  // Slice 5 part 2, 5g: connect-src is 'self' and the data's https RPC origins, in every policy a build writes, printed at
+  // Connect-src is 'self' and the data's https RPC origins, in every policy a build writes, printed at
   // build; a data file adding a host shows in the CSP, an http: one stops the build.
   it("writes connect-src as the data's RPC origins in every policy, and prints it", { timeout: 120_000 }, () => {
     const dir = plant((files) => {
@@ -707,7 +707,7 @@ describe("react-router build", () => {
       const rules = headerRules(readFileSync(join(client, "_headers"), "utf8"));
       const table = nginxTable(readFileSync(join(copy, "build", "csp.conf"), "utf8"));
       expect(rules.size).toBeGreaterThan(2);
-      // The worker's script and nginx's default answer no page: 'self' alone (docs/decisions.md, 2026-10-31).
+      // The worker's script and nginx's default answer no page: 'self' alone.
       const pages = [...rules, ...table].filter(([where]) => where !== "/sw.js" && where !== "default");
       expect(pages.length).toBeGreaterThan(2);
       for (const [where, csp] of pages)
@@ -745,7 +745,7 @@ describe("react-router build", () => {
     }
   });
 
-  // R-F3 (F2952): an indexer in the data is a source of connect-src like an RPC: http: stops the build at the schema, an odd host at csp.
+  // An indexer in the data is a source of connect-src like an RPC: http: stops the build at the schema, an odd host at csp.
   it.each([
     ["an http: indexer", "http://indexer.plain.example/graphql/query", /universes\.json/],
     ["a wildcard host", "https://*.indexer.example/graphql/query", /csp: .*indexer/],
@@ -803,7 +803,7 @@ describe("react-router build", () => {
     }
   });
 
-  // Slice 5's 5e: the build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
+  // The build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
   // naming it, and the pages' tags (a testnet's page noindex, a card and a JSON-LD on each).
   it("writes sitemap.xml and robots.txt, and tags each page", { timeout: 120_000 }, async () => {
     const dir = plant((files) => {
@@ -852,7 +852,7 @@ describe("react-router build", () => {
       rmSync(dir, { recursive: true });
     }
   });
-  // 5f, F2362: the hostile description of 5e's test, in the pages the policy is read from: the page holds the scripts React
+  // The hostile description of the search-engine test above, in the pages the policy is read from: the page holds the scripts React
   // Router wrote and no other, so the escape of its JSON (React Router's own, markup.js) is pinned by the build. Five
   // inline scripts a page and a JSON-LD: the module, the scroll restoration, the context, the loader data, its close.
   it(
@@ -891,12 +891,12 @@ describe("react-router build", () => {
     },
   );
 
-  // 5f: header size at the data's size and at 16 times it. Each page's policy holds its own scripts: a line of some 600
+  // Header size at the data's size and at 16 times it. Each page's policy holds its own scripts: a line of some 600
   // characters whatever the number of pages, where one policy for all of them passed 2,000 at about 7 worlds. The largest
   // page is named when a line is over the cap of a host that cuts a _headers line there (Cloudflare Pages).
   it.each([
     ["3 worlds", 3],
-    // F2452: the most a host's 100 header rules take (four a world, and the catch-all).
+    // The most a host's 100 header rules take (four a world, and the catch-all).
     ["21 worlds, the most a host's 100 header rules take", 21],
   ])("keeps every page's policy line under 2,000 characters at %s", { timeout: 300_000 }, async (_, worlds) => {
     const dir = plant((files) => {
@@ -919,7 +919,7 @@ describe("react-router build", () => {
     }
   });
 
-  // F2452: 16 times the data's size is past Cloudflare Pages' 100 header rules, which the build refuses rather than ship rules
+  // 16 times the data's size is past Cloudflare Pages' 100 header rules, which the build refuses rather than ship rules
   // the host may drop (a page without a rule has no policy there).
   it(
     "stops at 16 times as many worlds: 48 worlds make more _headers rules than a host takes",
@@ -940,7 +940,7 @@ describe("react-router build", () => {
     },
   );
 
-  // F475: a script planted in a page fails the build and writes no policy. The page is planted through the app's own root
+  // A script planted in a page fails the build and writes no policy. The page is planted through the app's own root
   // (a copy of it, as this describe's builds are), as a component of the app that wrote a script would.
   it("stops on a script planted in the pages: the build fails and writes neither policy", { timeout: 120_000 }, () => {
     const dir = plant();
@@ -964,7 +964,7 @@ describe("react-router build", () => {
   });
 });
 
-// The ticker's placeholders (Alexis, 2026-10-31), and the on-air line's (8i): named here, so none reaches a public deploy
+// The ticker's placeholders and the on-air line's: named here, so none reaches a public deploy
 // unnoticed; removing them is deleting these ids from their files and the lines below. No sample world, number or activity.
 const DIR = new URL("../data/", import.meta.url);
 const read = (file: string): unknown => JSON.parse(readFileSync(new URL(file, DIR), "utf8"));
@@ -983,7 +983,7 @@ const events = read("events.json") as Row[];
 /** The placeholders of the ticker, by id: three news and two events. Change this list only with the files. */
 const SAMPLE_NEWS = ["sample-news-bubble-onyx", "sample-news-demo", "sample-news-testnet"];
 const SAMPLE_EVENTS = ["sample-event-community-call", "sample-event-demo-session"];
-/** The on-air line's placeholder (8i), in a file of its own. */
+/** The on-air line's placeholder, in a file of its own. */
 const SAMPLE_OTHERS = ["sample-on-air"];
 const OTHERS = ["onAir.json"];
 
@@ -1072,7 +1072,7 @@ describe("the ticker's placeholders", () => {
 
   it("hold no date that was made up: an event waiting for its date starts at the one far-off sentinel, which the ticker never shows", () => {
     // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the gate off the calendar, and the
-    // ticker shows no event that starts there (7t). A real start replaces it with the content; this test then lists the event's id out.
+    // ticker shows no event that starts there. A real start replaces it with the content; this test then lists the event's id out.
     for (const row of events) {
       expect(row.title, row.id).toMatch(/date to be confirmed/i);
       expect(row.start ?? "", row.id).toMatch(/^2099-12-\d\dT00:00:00Z$/);
@@ -1086,7 +1086,7 @@ describe("the ticker's placeholders", () => {
   });
 });
 
-// 8g (frames 22 and 104): a world's kind and genre are its plate's crumb; a genre names one of genres.json.
+// A world's kind and genre are its plate's crumb (frames 22 and 104); a genre names one of genres.json.
 describe("hubs.json's kind and genre", () => {
   const hub = (extra: Record<string, unknown>) => [
     { slug: "bubble", name: "Bubble", description: "B".repeat(60), universe: "onyx", ...extra },
