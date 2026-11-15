@@ -1,4 +1,4 @@
-// The places of gnoworld's data (ADR-0002 §5, "the places and their URLs"; D101): universes, hubs, ecosystems and
+// The places of gnoworld's data (ADR-0002 §5, "the places and their URLs"): universes, hubs, ecosystems and
 // the Earth's orbit aside, read once at start from the folder JARVIS_DATA_DIR names, each through packages/schemas' own schema, as
 // the site's build reads them, then core's placesOf. find_place answers a place's path and canonical address from
 // them alone; a fault stops the start, naming its file and nothing it holds.

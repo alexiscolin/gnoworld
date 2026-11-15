@@ -78,7 +78,7 @@ function keepable(one: Case, kind: Kind, kept: Kept): boolean {
 }
 
 /** The request a case sends and the realms its node holds, alone, so a reworded rubric or expectation costs no run
- * (10j's review, V8), and a changed recorded source does. */
+ * and a changed recorded source does. */
 export function requestOf(one: Case) {
   const kind = kindOf(one);
   const body = "ask" in one ? one.ask : "translate" in one ? one.translate : one.digest;
@@ -180,7 +180,7 @@ export default class JarvisProvider {
 }
 
 // The spans leave jarvis every 5 s, its whole queue at once (BatchSpanProcessor's default, which no setting moves):
-// the first batch after the answers holds every span the case made; 7 s at most, a case with none (10j's review, V7).
+// the first batch after the answers holds every span the case made; 7 s at most, a case with none.
 async function nextBatch(fakes: Fakes, after: number): Promise<void> {
   for (let waited = 0; fakes.batches.length <= after && waited < 7_000; waited += 200)
     await new Promise((resolve) => setTimeout(resolve, 200));

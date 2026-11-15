@@ -6,7 +6,7 @@ import { capture } from "../testing/kit.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 
 // ADR-0002 section 5: gnoscope's tools behind its switch, "a transaction explained, a realm's decoded state, an address,
-// search over all code on chain", each with our own strict schema. Builders make each value inside the test (F2356).
+// search over all code on chain", each with our own strict schema. Builders make each value inside the test.
 // An address whose bech32 checksum holds (packages/schemas' Address takes it).
 const ADDRESS = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const HASH = "puQt1uwsMBxvUYhpdTvQ5KIF/zUlWxHuWrcuV1axdYw=";

@@ -1,8 +1,8 @@
 // jarvis's process (ADR-0002 §5, §7): its switch and settings, its file, the budget, and, switched on alone, its key,
 // its spans, its skills and places, gnomcp read-only, its cards, gnoscope behind its own switch, the loop, the translator
-// and the digests (10k); then its
-// HTTP face where its settings say. On SIGTERM it stops taking questions, lets those in flight end within its wait,
-// then closes gnomcp, gnoscope, the spans and its file, and exits by itself (D171, D178). Started as the image starts
+// and the digests; then its HTTP
+// face where its settings say. On SIGTERM it stops taking questions, lets those in flight end within its wait,
+// then closes gnomcp, gnoscope, the spans and its file, and exits by itself. Started as the image starts
 // it: node --disallow-code-generation-from-strings jarvis/src/main.ts
 import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
@@ -30,21 +30,21 @@ import { makeTranslator } from "./translate.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start jarvis with ${FLAG} (ADR-0002 §7)`);
-// A hold lives past the longest call, 600 s (D65), by a minute, so it never counts its worst before the call ends (D173).
+// A hold lives past the longest call, 600 s, by a minute, so it never counts its worst before the call ends.
 const HOLD_MS = 11 * 60_000;
 
 const served = loadServed(process.env);
-// jarvis logs no account (D42): the pepper of its HMAC is drawn at each start and kept by nobody (D179).
+// jarvis logs no account: the pepper of its HMAC is drawn at each start and kept by nobody.
 const log = logger(randomBytes(32).toString("hex"), (line) => process.stdout.write(line));
 const db = openDatabase(served.database, jarvisMigrations);
 const budget = makeBudget(db, { caps: served.budgets, holdMs: HOLD_MS, now: Date.now });
 // The file's caps are the first start's or an admin's: one its setting no longer names is said, so an operator who
-// lowered the setting knows it is not the cap (F5289).
+// lowered the setting knows it is not the cap.
 for (const kind of ["ask", "translate"] as const) {
   const kept = budget.caps()[kind];
   if (kept !== served.budgets[kind]) log("jarvis_budget_kept", { setting: kind, value: kept / DOLLAR });
 }
-// A start refused closes the file too, so nothing is left behind it (F5289).
+// A start refused closes the file too, so nothing is left behind it.
 const running = served.on
   ? await startModel(log, budget, db).catch((error: unknown) => {
       db.close();
@@ -70,7 +70,7 @@ const jarvis = await serve(jarvisRoutes(routes), {
 });
 
 // Switched on: what answers a question, each part checked at its start, and how it closes. What starts no child comes
-// first; past gnomcp's start, a part refused ends gnomcp before the start fails (F5289).
+// first; past gnomcp's start, a part refused ends gnomcp before the start fails.
 async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
   const config = loadJarvisConfig(process.env);
   // The model's one client refuses an environment that would add headers to its requests.

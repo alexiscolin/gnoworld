@@ -1,8 +1,8 @@
 // Jarvis's second defence (ADR-0002 §5, "Data stays data"): untrusted text, a tool's result or a room's lines, reaches
 // the model inside a block whose two markers carry a tag drawn per turn from 128 random bits. What hides in the text is
-// shown by its code point, the text cut to a byte limit on a code point boundary (D44: 16 KiB), saying where, and made
-// well-formed, since a request is JSON (D53); its copies of the tag are replaced, and a text that holds the tag in a
-// disguise is withheld (D56), so nothing inside can close its block.
+// shown by its code point, the text cut to a byte limit (16 KiB) on a code point boundary, saying where, and made
+// well-formed, since a request is JSON; its copies of the tag are replaced, and a text that holds the tag in a
+// disguise is withheld, so nothing inside can close its block.
 import { randomBytes } from "node:crypto";
 import { isName } from "./allowlist.ts";
 

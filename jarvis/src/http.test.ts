@@ -112,7 +112,7 @@ describe("jarvis's HTTP face: what it answers", () => {
     },
   );
 
-  // fetch would resolve these before it sends them: written raw, as any client may (F5287).
+  // fetch would resolve these before it sends them: written raw, as any client may.
   it.each(["//host/echo", "http://other.host/echo", "/x/../echo", "/./echo", "/%65cho", "//[", "*"])(
     "refuses the target %s, which is not the path /echo itself, as not_found",
     async (target) => {
@@ -128,7 +128,7 @@ describe("jarvis's HTTP face: what it answers", () => {
     },
   );
 
-  // A page of another site a browser was steered to (DNS rebinding) names its own host: refused (F5288).
+  // A page of another site a browser was steered to (DNS rebinding) names its own host: refused.
   it.each([
     "evil.example:8081",
     "evil.example",
@@ -555,7 +555,7 @@ describe("jarvis's HTTP face: a request that ends", () => {
   });
 });
 
-// 10u-g2: the door proves itself with a shared key in a header of every request, checked before anything else is read.
+// The door proves itself with a shared key in a header of every request, checked before anything else is read.
 describe("the door's key", () => {
   const KEY = `door-key-${"k".repeat(40)}`;
   const HEADER = JARVIS_KEY_HEADER;

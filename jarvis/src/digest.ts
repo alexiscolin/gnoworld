@@ -1,8 +1,8 @@
 // A realm's digest (ADR-0002 §4, "What a realm shows: a digest"): its page's raw Markdown (vm/qrender) and its functions
 // (vm/qfuncs), read on its universe's own node through the chain package, the node's chain checked and its height read
-// first; then the fast model, offered give_digest and propose_action alone (D170), whose cards pass 10d's grounding on
+// first; then the fast model, offered give_digest and propose_action alone, whose cards pass grounding on
 // those reads. Kept in jarvis's file per universe and realm with the height it was read at, one digest serving every
-// reader for 10 minutes; past them the realm is read again, and only a changed page or list pays for a new one (D193).
+// reader for 10 minutes; past them the realm is read again, and only a changed page or list pays for a new one.
 import type { DatabaseSync } from "node:sqlite";
 import { readFunctionList, readHeight, readRender } from "@gnoworld/chain/node";
 import type { ChainFetch } from "@gnoworld/chain/read";
@@ -80,10 +80,10 @@ export function makeDigests(parts: Parts) {
     renew: parts.db.prepare("UPDATE digests SET made = ?, height = ? WHERE universe = ? AND realm = ?"),
   };
   const bound = boundOf(parts.db, "digests", parts.keepBytes ?? CACHE_BYTES);
-  // The universes' nodes seen on their chain, an entry a universe (D126).
+  // The universes' nodes seen on their chain, an entry a universe.
   const seen = new Map<string, number>();
   const shared = together<Made>();
-  // A row its schemas refuse, such as one kept before a deploy tightened them, is none: it is made again (V2).
+  // A row its schemas refuse, such as one kept before a deploy tightened them, is none: it is made again.
   const cached = (asked: JarvisDigestRequest): Cached | undefined => {
     const row = Row.safeParse(sql.find.get(asked.universe, asked.realm));
     if (!row.success) return undefined;
@@ -115,14 +115,14 @@ export function makeDigests(parts: Parts) {
     const realm = await readOn({ ...parts, seen, log: parts.loop.log }, { universe, realm: asked.realm, signal });
     if (realm === undefined) return { digested: { kind: "none" }, made: false };
     const before = cached(asked);
-    // A digest whose reads are unchanged serves again at the new height; a none is made again (D193).
+    // A digest whose reads are unchanged serves again at the new height; a none is made again.
     if (before?.source !== sourceOf(realm) || before.card === null) return fresh(asked, realm, signal);
     sql.renew.run(parts.now(), realm.at.height, asked.universe, asked.realm);
     return { digested: answerOf({ ...before, height: realm.at.height }), made: false };
   };
   return {
     /** The realm's digest, from the file within 10 minutes, else read again and made once for its readers; `made` is
-     * called for each reader whose digest, or none, the model made (10k-1). */
+     * called for each reader whose digest, or none, the model made. */
     digest: async (asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void): Promise<Digested> => {
       const universe = parts.places.universes.get(asked.universe);
       if (universe === undefined || !parts.cards.chains.includes(asked.universe)) return { kind: "invalid" };
@@ -178,7 +178,7 @@ function digestOf(parts: Parts, realm: RealmRead, signal: AbortSignal): Promise<
   const tools = realmCards(parts.cards.definitions, realm);
   const loop = makeLoop({
     ...parts.loop,
-    // A digest of 50 blocks needs more than /ask's 4 turns and 1,000 tokens (D13985): its own caps, as before.
+    // A digest of 50 blocks needs more than /ask's 4 turns and 1,000 tokens: its own caps.
     caps: { ...parts.loop.caps, turns: 8, outputTokens: 4_096, toolResultBytes: BLOCK_BYTES },
     skills: { index: [], digest: "" },
     system: SYSTEM,
@@ -196,7 +196,7 @@ function digestOf(parts: Parts, realm: RealmRead, signal: AbortSignal): Promise<
   return loop.ask(question, signal);
 }
 
-// The model's own ends with no answer: kept as a none, so a page that steers it there costs one run in 10 minutes (S1).
+// The model's own ends with no answer: kept as a none, so a page that steers it there costs one run in 10 minutes.
 const ended = (result: Result): boolean =>
   result.kind === "turns" ||
   result.kind === "max_tokens" ||

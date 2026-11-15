@@ -16,7 +16,7 @@ const FOLDERS = [
   "packages/chain/src",
   "app/data",
 ];
-// The evals' own files that read a case's answers or run it: a fix of one reads every kept answer again (V8).
+// The evals' own files that read a case's answers or run it: a fix of one reads every kept answer again.
 const EVALS = ["provider.ts", "fakes.ts", "jarvis.ts", "spans.ts", "budget.ts", "cases.ts", "fingerprint.ts"];
 const kept = (path: string) => !/\.(test|bench)\.ts$/.test(path);
 

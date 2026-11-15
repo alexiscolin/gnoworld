@@ -39,7 +39,7 @@ async function resultOf(run: Run, use: Anthropic.ToolUseBlock): Promise<Anthropi
 }
 
 // holds() counts a shown code point as nothing, so the tag written as code points ([U+abab]...) is read with their
-// digits kept too. A heuristic: a tag written another way reaches a tool, and comes back replaced or withheld (D80).
+// digits kept too. A heuristic: a tag written another way reaches a tool, and comes back replaced or withheld.
 const holdsTag = (blocks: Untrusted, text: string) =>
   blocks.holds(text) || blocks.holds(text.replace(/\[U\+([0-9A-F]{4,6})\]/giu, "$1"));
 

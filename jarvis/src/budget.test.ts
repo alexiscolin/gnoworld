@@ -10,7 +10,7 @@ import { jarvisMigrations } from "./migrations.ts";
 
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
 const MIDNIGHT = Date.parse("2026-11-05T00:00:00.000Z");
-// The day's caps in nano-dollars, $45 and $5 (D47), and a hold's life.
+// The day's caps in nano-dollars, $45 and $5, and a hold's life.
 const CAP = 45_000_000_000;
 const PERCENT = CAP / 100;
 const TRANSLATE_CAP = 5_000_000_000;
@@ -67,7 +67,7 @@ describe("the budget", () => {
   });
 
   // node:sqlite answers at once and openDatabase holds the file alone, so calls at once are reservations one after
-  // another with no settle between; the cap's check and its add are one statement by construction (red pass F10).
+  // another with no settle between; the cap's check and its add are one statement by construction.
   it("lets through, from 99% of the cap, only the reservations that fit with every hold before them, in any order", () => {
     fc.assert(
       fc.property(fc.array(fc.integer({ min: 1, max: PERCENT / 2 }), { minLength: 1, maxLength: 24 }), (worsts) => {
@@ -341,7 +341,7 @@ describe("the budget", () => {
     first.db.close();
     const second = setup(path);
     expect(second.budget.state("ask")).toEqual({ spent: 70 * PERCENT, reserved: 25 * PERCENT, cap: CAP });
-    // 95% reached before the crash said 80 then: the restart says only what is new (red pass F4).
+    // 95% reached before the crash said 80 then: the restart says only what is new.
     expect(second.budget.reserve("ask", 6 * PERCENT)).toEqual({ ok: false, reason: "spent", alerts: [100] });
     second.clock.now = T0 + HOLD;
     expect(second.budget.state("ask")).toEqual({ spent: 95 * PERCENT, reserved: 0, cap: CAP });
@@ -361,8 +361,8 @@ describe("the budget", () => {
   });
 });
 
-// The caps live in jarvis's file (Alexis, "simplement modifiable par admin"): the settings give the first values, once,
-// as D95 seeds the door's quotas; an admin's change counts at once, against the day already spent.
+// The caps live in jarvis's file: the settings give the first values, once,
+// as the door's quotas are seeded; an admin's change counts at once, against the day already spent.
 describe("the budget's caps, kept in jarvis's file", () => {
   it("seeds each cap once, from the first start's values: a later start's are not read", () => {
     const path = join(dir, "seeded.db");

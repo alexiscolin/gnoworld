@@ -1,6 +1,6 @@
 // A translation's check (ADR-0002 §5, point 5): one that adds a link, an account or a number its original lacks, or names
 // the whole room where its original does not, is dropped and the original shows. Both are read by facts.ts, as grounding
-// reads a digest; a hidden character it adds, such as a reversal around a number, is dropped too (10k, S3).
+// reads a digest; a hidden character it adds, such as a reversal around a number, is dropped too.
 import { mentionsOf } from "@gnoworld/core";
 import { factsOf, groupsOf } from "./facts.ts";
 import { hiddenOf } from "./untrusted.ts";

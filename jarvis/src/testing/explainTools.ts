@@ -1,4 +1,4 @@
-// The tools of a function's explanation as the entry wires them (D13920), for the tests of the toolbox and the loops: two chain
+// The tools of a function's explanation as the entry wires them, for the tests of the toolbox and the loops: two chain
 // profiles, gnomcp's reads and gnoscope's a fake that says who ran, the places of a data folder of the test's own.
 import { fileURLToPath } from "node:url";
 import { vi } from "vitest";

@@ -7,7 +7,7 @@ import { fakeGnomcpTcp } from "./testing/fakeGnomcpTcp.ts";
 import { capture } from "./testing/kit.ts";
 import { SocketTransport } from "./socketTransport.ts";
 
-// gnomcp reached over TCP (10u-g2): the same MCP, the same start checks, timeouts, bound and restarts as over stdio,
+// gnomcp reached over TCP: the same MCP, the same start checks, timeouts, bound and restarts as over stdio,
 // tested against a fake on a local socket.
 const PROFILES = { read: ["onyx", "betanet"], indexed: ["onyx"] };
 const opened: Gnomcp[] = [];

@@ -19,8 +19,8 @@ import { gnoscopeTools } from "./gnoscopeTools.ts";
 import { keepCards, type Asked } from "./kept.ts";
 import { loadPlaces, placesTool } from "./places.ts";
 
-// Row 10 and ADR-0002 section 4: a card shows only what the chain's own reads hold. Each builder makes a fresh value inside
-// the test (F2356); characters above ASCII are built from their code points.
+// ADR-0002 section 4: a card shows only what the chain's own reads hold. Each builder makes a fresh value inside
+// the test; characters above ASCII are built from their code points.
 const { folderOf, remove } = placesData();
 afterAll(remove);
 const REALM = "gno.land/r/demo/poll";
@@ -35,7 +35,7 @@ const pollPage = () =>
   ["# The poll", "", "1,204 members, 37 proposals. Ask the [board](/r/demo/boards).", "", "Answer yes or no."].join(
     "\n",
   );
-// gnomcp 0.11.0's own wrapping of a page, as gno_render gave it live on 2026-11-04.
+// gnomcp 0.11.0's own wrapping of a page, as gno_render gave it live.
 const wrapped = (realm: string, page: string) =>
   `<untrusted_content kind="render" source="${realm}">\n${page}\n</untrusted_content>`;
 const status = (over: Record<string, unknown> = {}) =>
@@ -60,7 +60,7 @@ interface Setup {
   universes?: unknown;
 }
 const Profile = z.object({ profile: z.string() });
-// A universe's node (placesData: `https://rpc.<id>.example:443`, its chain `<id>-1`), as the chain package reads it (D119):
+// A universe's node (placesData: `https://rpc.<id>.example:443`, its chain `<id>-1`), as the chain package reads it:
 // its status names its chain, then `vm/qfuncs` lists a realm's functions, a realm it has none of refused as gno refuses it.
 const realmAsked = (url: string) => Buffer.from(/&data=0x([0-9a-f]*)$/.exec(url)?.[1] ?? "", "hex").toString("utf8");
 const nodeOf =
@@ -80,7 +80,7 @@ const nodeAsked = (node: { mock: { calls: Parameters<ChainFetch>[] } }) =>
     url.endsWith("/status") ? "status" : realmAsked(url),
   ]);
 const setup = ({ pages = { [REALM]: pollPage() }, lists = { [REALM]: pollFunctions() }, ...over }: Setup = {}) => {
-  // gnomcp's call refuses what 10b's schemas refuse, before anything is sent (gnomcp.ts, call).
+  // gnomcp's call refuses what the tools' schemas refuse, before anything is sent (gnomcp.ts, call).
   const reads = gnomcpTools({ chains: ["onyx", "gnoland"], indexed: [] });
   const read = vi.fn(async (name: string, args: unknown): Promise<Ran> => {
     if (reads.find((tool) => tool.name === name)?.args.safeParse(args).success !== true)
@@ -130,7 +130,7 @@ const button = (body: AnswerButton, profile: string | null = "onyx") => ({
   name: "give_button",
   args: profile === null ? { button: body } : { profile, button: body },
 });
-// Builders, so each test compares values of its own (F2356).
+// Builders, so each test compares values of its own.
 const none = () => ({ digests: [], proposals: [], buttons: [] });
 const readAt = (profile = "onyx") => ({ profile, height: 1204 });
 
@@ -895,7 +895,7 @@ describe("cardTools", () => {
       expect(description).toContain(
         "The server reads the realm itself and keeps it only when its page and functions hold",
       );
-    // The cards' own bodies are 10d's schemas of packages/schemas, which the tool's words describe.
+    // The cards' own bodies are the schemas of packages/schemas, which the tool's words describe.
     for (const field of [digestTool.args.shape.profile, digestTool.args.shape.realm, proposalTool.args.shape.profile])
       expect(field.description).toMatch(/\S/);
     expect(buttonTool.args.shape.profile.unwrap().description).toMatch(/\S/);

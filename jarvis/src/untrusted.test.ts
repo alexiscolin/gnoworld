@@ -117,7 +117,7 @@ describe("untrustedBlocks: nothing inside can close its block", () => {
 });
 
 describe("untrustedBlocks: the tag in a disguise", () => {
-  // An injection obeyed once can send the tag out in a call's arguments: 10e's loop refuses a call whose input holds it.
+  // An injection obeyed once can send the tag out in a call's arguments: jarvis's loop refuses a call whose input holds it.
   it.each([
     ["the tag", (tag: string) => tag],
     ["the tag in capitals, in a sentence", (tag: string) => `see ${tag.toUpperCase()} now`],

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { checkProposal } from "./proposed.ts";
 
 // `cur`'s type as `vm/qfuncs` writes it at gno's tag chain/onyx: `gno.BaseOf(param.Type).String()` (keeper.go:1795) of the
-// realm type (uverse.go:110), printed by running that code on a crossing function, not `realm` (D70).
+// realm type (uverse.go:110), printed by running that code on a crossing function, not `realm`.
 const REALM = [
   "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool;",
   "IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string;",

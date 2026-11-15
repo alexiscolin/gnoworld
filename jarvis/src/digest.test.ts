@@ -17,9 +17,9 @@ import { keepCards } from "./tools/kept.ts";
 import { realmCards } from "./tools/realmCards.ts";
 import { loadPlaces } from "./tools/places.ts";
 
-// 10k, ADR-0002 §4 ("What a realm shows: a digest"): a realm's page and functions read on its universe's own node with
+// ADR-0002 §4 ("What a realm shows: a digest"): a realm's page and functions read on its universe's own node with
 // its height, the digest the fast model gives through give_digest and propose_action alone, grounded before it is
-// kept, then served to every reader for 10 minutes. Each value is built inside its test (F2356).
+// kept, then served to every reader for 10 minutes. Each value is built inside its test.
 const { folderOf, remove } = placesData();
 afterAll(remove);
 const closing: (() => void)[] = [];
@@ -109,7 +109,7 @@ const setup = ({ steps = [], chain = {}, cap = 45 * DOLLAR, keepBytes, chains = 
   const cards = cardTools({ chains, places, read: () => Promise.reject(new Error("no gnomcp")), fetch: node });
   const caps = {
     questionChars: 2_000,
-    // /ask's caps (D13985): a digest keeps its own, 8 turns and 4,096 tokens.
+    // /ask's caps: a digest keeps its own, 8 turns and 4,096 tokens.
     turns: 4,
     outputTokens: 1_000,
     callTimeoutMs: 60_000,
@@ -156,7 +156,7 @@ describe("a realm's digest, read on its universe's node", () => {
     await ask();
     const urls = node.mock.calls.map(([url]) => url);
     expect(urls.every((url) => url.startsWith("https://rpc.onyx.example:443/"))).toBe(true);
-    // The height's status first, its chain checked; the page's read checks it again unless seen within a minute (D126).
+    // The height's status first, its chain checked; the page's read checks it again unless seen within a minute.
     expect(urls.map(asked)[0]).toBe("status");
     expect(urls.map(asked).filter((what) => what !== "status")).toEqual([
       "render gno.land/r/demo/poll:",

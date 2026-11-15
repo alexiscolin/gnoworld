@@ -1,7 +1,7 @@
-// jarvis's routes (D42, JARVIS_PATHS), each body through its schema first: POST /ask, a question to the loop, its result
-// as the door's wire reads it (D175), the room's lines as data (D176); GET and POST /budgets, the day's two caps in
-// whole dollars, changed at once and logged (D47). Off, /ask answers off before any work; /budgets serves on or off,
-// so an admin sets them before switching jarvis on (D171). Since 10k, POST /translate, a line's translation, and POST
+// jarvis's routes (JARVIS_PATHS), each body through its schema first: POST /ask, a question to the loop, its result
+// as the door's wire reads it, the room's lines as data; GET and POST /budgets, the day's two caps in
+// whole dollars, changed at once and logged. Off, /ask answers off before any work; /budgets serves on or off,
+// so an admin sets them before switching jarvis on. POST /translate, a line's translation, and POST
 // /digest, a realm's digest, each answering off while jarvis is, once its body passed its schema.
 import {
   DOOR_CAPS,
@@ -35,7 +35,7 @@ interface Parts {
   readonly ask: Ask | undefined;
   // The fast model's ask, for the fixed ask that catches a room up.
   readonly catchUp?: Ask | undefined;
-  // A function's explanation, on the loop that reads the code of one chain alone (D13920): none for a chain it has no profile for.
+  // A function's explanation, on the loop that reads the code of one chain alone: none for a chain it has no profile for.
   readonly explain?: ((chain: string | undefined) => Ask | undefined) | undefined;
   // A realm's explanation from its outline, on the fast model, or none while jarvis is off.
   readonly explainRealm?: ((asked: JarvisExplainRequest, signal: AbortSignal) => Promise<Explained>) | undefined;
@@ -121,11 +121,11 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
   };
 }
 
-// The fixed asks' words, Jarvis's own and constant (D13985): the page sets none of them. The place, and a function's
+// The fixed asks' words, Jarvis's own and constant: the page sets none of them. The place, and a function's
 // realm and name, go in as data blocks beside the room's lines.
 const HERE = "What can I do here, in this place? Say it briefly, with what the place's data tells.";
 const CATCH_UP = "Catch me up on this room: what was said, in a few short lines.";
-// An explanation is the same for every room, so it is written in English whatever the room says (D13920).
+// An explanation is the same for every room, so it is written in English whatever the room says.
 const EXPLAIN =
   "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly, in English.";
 
@@ -143,8 +143,8 @@ function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast
   };
 }
 
-// A room's line as data: who said it (the asker, or the others by their number, D91), when, and its words, so its line
-// breaks and quotes pass for no other line (D176).
+// A room's line as data: who said it (the asker, or the others by their number), when, and its words, so its line
+// breaks and quotes pass for no other line.
 const lineOf = ({ speaker, time, text }: { speaker: number; time?: string | undefined; text: string }): string =>
   JSON.stringify({ who: speaker === 0 ? "asker" : `#${String(speaker)}`, time, text });
 
@@ -168,7 +168,7 @@ function replyOf(result: Result, log: Log): Reply {
   if (result.kind === "declined") return answered({ status: "declined", cost: result.cost });
   if (result.kind === "spent")
     return answered(result.cost === undefined ? { status: "spent" } : { status: "spent", cost: result.cost });
-  // Every other end that spent answers failed with its cost, which the door adds to the person's share (D13985).
+  // Every other end that spent answers failed with its cost, which the door adds to the person's share.
   if ("cost" in result) return answered({ status: "failed", cost: result.cost });
   return failureOf(result.kind);
 }
@@ -176,7 +176,7 @@ function replyOf(result: Result, log: Log): Reply {
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none
 // or when its lines before it draw nothing.
 function cut(text: string, log: Log): string {
-  // ponytail: every answer read whole once, its length bounded by the model's output tokens (16,000 at most, D65).
+  // ponytail: every answer read whole once, its length bounded by the model's output tokens (16,000 at most).
   const points = Array.from(text);
   if (points.length <= DOOR_CAPS.answer) return text;
   log("jarvis_answer_cut");
@@ -185,7 +185,7 @@ function cut(text: string, log: Log): string {
   return isBlank(lines) ? kept : lines;
 }
 
-// A result with no answer on the wire, as the door reads it (D175), for each route: a request refused is refused, its
+// A result with no answer on the wire, as the door reads it, for each route: a request refused is refused, its
 // reader gone is not_ready, to nobody, any other internal.
 function failureOf(kind: string): Reply {
   if (kind === "invalid") return refusal("refused", 400);
@@ -220,7 +220,7 @@ function translationOf(result: Translated): Reply {
   return { status: 200, body };
 }
 
-// A digest on the wire, with whether the model made it for this request, which the door charges to its asker (10k-1).
+// A digest on the wire, with whether the model made it for this request, which the door charges to its asker.
 function digestOf(result: Digested, made: boolean): Reply {
   if (result.kind === "failed" || result.kind === "gone" || result.kind === "invalid") return failureOf(result.kind);
   const body: JarvisMadeDigest =

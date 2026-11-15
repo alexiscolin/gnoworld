@@ -1,7 +1,7 @@
 // Jarvis's traces (ADR-0002 §5, "Observability"): one trace per question, a span per model request and per tool call
 // under it, refusals and the budget's alerts as its events, counts and fixed words only, never a question's text, an
 // argument, a result or an account. Spans leave over OTLP/HTTP to the collector JARVIS_TRACES_URL names, nowhere by
-// default (D85). sdk-trace has no async context manager, so each span is handed its parent (Alexis, 2026-11-04).
+// default. sdk-trace has no async context manager, so each span is handed its parent.
 import type Anthropic from "@anthropic-ai/sdk";
 import { ROOT_CONTEXT, SpanStatusCode, trace, type Span, type Tracer } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -12,7 +12,7 @@ import { isName } from "./allowlist.ts";
 
 /** jarvis's tracer, its spans exported to JARVIS_TRACES_URL when set; throws naming the setting when it is no URL.
  * shutdown() tells whether the last spans left: a collector out of reach costs spans, never jarvis's stop. An export
- * waits 5 s at most, its retries included (F5112: a test hands a shorter one). */
+ * waits 5 s at most, its retries included (a test hands a shorter one). */
 export function startTracing(env: Record<string, string | undefined>, { exportTimeoutMs = 5_000 } = {}) {
   const Env = z.object({ JARVIS_TRACES_URL: z.url({ protocol: /^https?$/ }).optional() });
   const { JARVIS_TRACES_URL: url } = parseSettings(Env, env);
@@ -65,7 +65,7 @@ const ended = (span: Span, error?: string) => {
   span.end();
 };
 
-/** A question's trace: its span now, the others under it as the loop makes them. */
+/** A question's trace: its own span, the others under it as the loop makes them. */
 export function traceQuestion(tracer: Tracer, { model, version }: { model: string; version: string }): Trace {
   const named = { "gen_ai.request.model": model, "jarvis.prompt_version": version };
   const question = tracer.startSpan("jarvis.question", { attributes: named });

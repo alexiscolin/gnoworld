@@ -11,7 +11,7 @@ import { z } from "zod";
 interface Tool {
   name: string;
   inputSchema: { type: "object"; properties: Record<string, unknown> };
-  // A schema the MCP client would compile and check a result against, unless a call hands it a definition (F5111).
+  // A schema the MCP client would compile and check a result against, unless a call hands it a definition.
   outputSchema?: Record<string, unknown>;
 }
 interface Profile {
@@ -48,7 +48,7 @@ const tool = (name: string, ...names: string[]): Tool => ({
   inputSchema: { type: "object", properties: fields(...names) },
 });
 
-/** gnomcp 0.11.0's seven reads, each with its live schema's fields (ToolSearch, 2026-11-04), and two of its writes. */
+/** gnomcp 0.11.0's seven reads, each with its live schema's fields (ToolSearch), and two of its writes. */
 export const gnomcpListing = (): Tool[] => [
   tool("gno_packages", "limit", "path", "profile"),
   tool("gno_read", "file", "full", "path", "profile", "symbols"),

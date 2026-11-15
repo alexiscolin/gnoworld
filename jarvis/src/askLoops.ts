@@ -1,4 +1,4 @@
-// The two loops of /ask (D13985): a person's question, a room's `here` and a realm's `function` on the main model, and
+// The two loops of /ask: a person's question, a room's `here` and a realm's `function` on the main model, and
 // `catch-up`, which sums up the lines it is given, on the fast one with `decline` as its one tool; the same skills and caps.
 import { allowlist } from "./allowlist.ts";
 import type { Model } from "./prices.ts";
@@ -7,7 +7,7 @@ import { makeLoop } from "./loop.ts";
 type Parts = Parameters<typeof makeLoop>[0];
 type Tools = Parts["tools"];
 
-// The one job of the loop that explains a function (D13920): from the code alone, so one answer serves every room. Changed, it
+// The one job of the loop that explains a function: from the code alone, so one answer serves every room. Changed, it
 // bumps EXPLAIN_VERSION (askLoops.test.ts holds the pair).
 export const EXPLAIN_SYSTEM = [
   "You explain one function of a gno.land realm, from the realm's source code alone, in English. Read it with gno_read, asking for the function's own symbol; say only what the code shows, briefly: what it does and how to call it.",

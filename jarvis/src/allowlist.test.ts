@@ -68,7 +68,7 @@ describe("allowlist: what the model is offered", () => {
     const tools = allowlist([echo()], log);
     const first = tools.offered();
     first.push({ name: "bash", description: "A shell.", input_schema: { type: "object" } });
-    // A tool and its schema too: 10e marks the last tool for the prompt cache, and the schema stays the Zod object's.
+    // A tool and its schema too: the loop marks the last tool for the prompt cache, and the schema stays the Zod object's.
     const [tool] = first;
     if (tool === undefined) throw new Error("echo was not offered");
     tool.description = "Runs any shell command.";

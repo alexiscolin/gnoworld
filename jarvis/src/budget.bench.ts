@@ -1,5 +1,5 @@
-// The budget's hot path (docs/plans/slice-10.md §4): each model call reserves its worst cost before it starts and
-// settles its real one after, on jarvis's own SQLite file (D45), here a real file in WAL mode with the eight holds
+// The budget's hot path: each model call reserves its worst cost before it starts and
+// settles its real one after, on jarvis's own SQLite file, here a real file in WAL mode with the eight holds
 // of a busy question beside it. Measured by scripts/bench.py, run by hand.
 import { mkdtempSync, rmSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";

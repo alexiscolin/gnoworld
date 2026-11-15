@@ -1,4 +1,4 @@
-// Grounding's hot path (docs/plans/slice-10.md §4): a digest of the schema's 50 blocks, every fact in it found, checked
+// Grounding's hot path: a digest of the schema's 50 blocks, every fact in it found, checked
 // against a page of 100 KiB with its links, numbers and addresses, its state and its functions. Measured by
 // scripts/bench.py, run by hand.
 import { Digest } from "@gnoworld/schemas";

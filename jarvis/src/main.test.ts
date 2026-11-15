@@ -33,7 +33,7 @@ import { message, text, toolUse } from "./testing/fakeModel.ts";
 import { REALM_TYPE } from "./testing/realm.ts";
 import { loadPlaces } from "./tools/places.ts";
 
-// The door's key, as the test makes it up; every request of the test carries it, as the door's do (10u-g2).
+// The door's key, as the test makes it up; every request of the test carries it, as the door's do.
 const DOOR_KEY = `door-key-${"d".repeat(40)}`;
 const fetch = (url: string, init: RequestInit = {}) =>
   globalThis.fetch(url, {
@@ -58,7 +58,7 @@ const GNOSCOPE = "https://gnoscope.test";
 // Onyx's node, as app/data's universes name it (its port, 443, is no part of its origin).
 const ONYX_NODE = "https://rpc.onyx.testnets.gno.land";
 const REALM = "gno.land/r/demo/poll";
-// The poll's page as its node renders it (10k's digest reads it there).
+// The poll's page as its node renders it (the digest reads it there).
 const POLL_PAGE = "# The poll\n\n37 proposals are open.\n\nAnswer yes or no.";
 
 const started: Jarvis[] = [];
@@ -277,7 +277,7 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
     expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
   });
 
-  // An operator who lowers a budget's setting and starts jarvis again learns the file keeps its own (F5289, S3).
+  // An operator who lowers a budget's setting and starts jarvis again learns the file keeps its own.
   it("says at its start each cap its file keeps over its setting, and nothing of one they agree on", async () => {
     const { env, dir } = await setup();
     spentDay(join(dir, "jarvis.db"));
@@ -340,7 +340,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     expect(JarvisPaidAnswer.parse(await (await ask(url, body)).json())).toMatchObject({ status: "answered" });
     expect(run.model.seen[0]?.body).toMatchObject({ model });
     const all = [...READS, "load_skill", "find_place", "give_button", "decline"];
-    // A function's explanation reads the code alone: the four tools, no decline (D13920).
+    // A function's explanation reads the code alone: the four tools, no decline.
     const code = ["gno_read", "load_skill", "find_place", "give_button"];
     expect(namesOf(run.model.seen[0]?.body)).toEqual(
       name === "catch-up" ? ["decline"] : name === "function" ? code : all,
@@ -549,7 +549,7 @@ describe("jarvis's process: a start it refuses", { timeout: 60_000 }, () => {
     expect(jarvis.out.stderr).toMatch(fault);
     expect(lines(jarvis).some(({ event }) => event === "listening")).toBe(false);
     expect(model.seen).toEqual([]);
-    // A gnomcp it started is ended, its folder gone; its own file closed, its log removed (F5289).
+    // A gnomcp it started is ended, its folder gone; its own file closed, its log removed.
     const pids = gnomcp.starts().map(({ pid }) => pid);
     expect(pids.some(running)).toBe(false);
     expect(gnomcp.starts().map(({ cwd }) => existsSync(cwd))).toEqual(pids.map(() => false));
@@ -755,9 +755,9 @@ describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000
   });
 });
 
-// jarvis's image, of its own (Alexis, 2026-11-04, "Son propre paquet et image"; ADR-0002 §5, §7): the files its build
+// jarvis's image, of its own (ADR-0002 §5, §7): the files its build
 // takes from the repository, read as text from deploy/jarvis/Dockerfile and .dockerignore, as main.test.ts reads the
-// server's. Docker is refused in this sandbox: deploy/test.sh builds it. Each value is built inside its test (F2356).
+// server's. Docker is refused in this sandbox: deploy/test.sh builds it. Each value is built inside its test.
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 

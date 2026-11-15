@@ -8,7 +8,7 @@ import { startGnoscope } from "./gnoscope.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 
 // ADR-0002 section 5: gnoscope, a third party behind a switch, read-only by design; down or slow, Jarvis says so and
-// answers from gnomcp. Each test runs a fake gnoscope on the loopback; builders make each value inside the test (F2356).
+// answers from gnomcp. Each test runs a fake gnoscope on the loopback; builders make each value inside the test.
 const servers: { close: () => Promise<void> }[] = [];
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
@@ -18,7 +18,7 @@ const serve = async (scenario: Parameters<typeof fakeGnoscope>[0] = {}) => {
   servers.push(server);
   return server;
 };
-// A builder, so each test hands the product a list of its own (F2356).
+// A builder, so each test hands the product a list of its own.
 const networks = () => ["onyx", "mainnet"];
 const start = (url: string, over: { on?: boolean; timeoutMs?: number } = {}) => {
   const { log, events } = capture();
@@ -210,7 +210,7 @@ describe("startGnoscope: its tools listed at start, ours alone taken", () => {
 });
 
 describe("Gnoscope.call: one read, its time bounded, its answer through Zod", () => {
-  // The asker left: the call ends at once, never waiting gnoscope's answer nor its own time (F5290, V6).
+  // The asker left: the call ends at once, never waiting gnoscope's answer nor its own time.
   it("ends a call once its signal fires, before gnoscope answers", async () => {
     const arrived = Promise.withResolvers<undefined>();
     const server = await serve({
@@ -242,7 +242,7 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
   });
 
   it("never checks a result against an output schema gnoscope lists: a planted pattern cannot hold the process", async () => {
-    // A pattern that takes exponential time on "aaa...ab", which the MCP client would check synchronously (S1).
+    // A pattern that takes exponential time on "aaa...ab", which the MCP client would check synchronously.
     const outputSchema = { type: "object", properties: { x: { type: "string", pattern: "^(a|a)*$" } } };
     const tools = recordedTools().map((tool) =>
       Field.parse(tool).name === "get_realm_state" ? { ...tool, outputSchema } : tool,

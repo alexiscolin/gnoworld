@@ -1,5 +1,5 @@
-// jarvis's HTTP face (ADR-0002 §7, D42): on the network only it and the server share, the routes of its table and
-// nothing else, every refusal a typed code, never a stack or what the request sent (D174). A POST is JSON of strict
+// jarvis's HTTP face (ADR-0002 §7): on the network only it and the server share, the routes of its table and
+// nothing else, every refusal a typed code, never a stack or what the request sent. A POST is JSON of strict
 // UTF-8, read up to 256 KiB before it is parsed; a handler gets a signal its client's leaving aborts. While jarvis
 // stops, every request is not ready. Node's own server, with the server's timeouts (packages/service).
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -25,10 +25,10 @@ export type Routes = Readonly<Record<string, Readonly<Partial<Record<Method, Han
 interface Options {
   readonly host: string;
   readonly port: number;
-  // The names a request's Host may give, in lower case, without a port; any other is refused (F5288).
+  // The names a request's Host may give, in lower case, without a port; any other is refused.
   readonly names: readonly string[];
   readonly log: Log;
-  // The key every request must carry in a header, asked before anything else; none asked when unset (10u-g2).
+  // The key every request must carry in a header, asked before anything else; none asked when unset.
   readonly key?: Secret | undefined;
   // False once jarvis stops: every request is then not ready, its connection closed.
   readonly ready: () => boolean;
@@ -122,10 +122,10 @@ function holds(key: Secret | undefined, request: IncomingMessage): boolean {
 
 // The route and method a request asks, and how the log names them: a path or a method of the client's as one word,
 // as either could carry anything. The route is the target as written up to its query, never resolved: an authority,
-// a dot segment or an escape names no route (F5287).
+// a dot segment or an escape names no route.
 function askedOf({ routes, options }: { routes: Routes; options: Options }, request: IncomingMessage) {
   const [path = ""] = (request.url ?? "").split("?");
-  // A request whose Host is no name of jarvis's reaches no route (F5288).
+  // A request whose Host is no name of jarvis's reaches no route.
   const name = /^([a-z0-9.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i.exec(request.headers.host ?? "")?.[1]?.toLowerCase();
   const ours = options.names.some((known) => known === name);
   const route = ours && Object.hasOwn(routes, path) ? routes[path] : undefined;

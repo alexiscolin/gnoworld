@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { cost, MODELS, worstCost, type Model } from "./prices.ts";
 
-// The claude-api skill's table (models cached 2026-10-06) and shared/prompt-caching.md's "Economics", in dollars a
+// The claude-api skill's table and shared/prompt-caching.md's "Economics", in dollars a
 // million tokens: a token's price in nano-dollars is that figure times 1,000.
 const nano = (dollarsPerMillion: number): number => Math.round(dollarsPerMillion * 1000);
 const usage = (fields: Record<string, unknown>) => ({
@@ -26,7 +26,7 @@ describe("the models", () => {
 });
 
 describe("cost", () => {
-  // Its cache read is 0.05 of its input on Anthropic's pricing page (read 2026-11-04), not the skill's cached $0.20 (F5181).
+  // Its cache read is 0.05 of its input on Anthropic's pricing page, not the skill's cached $0.20.
   it("prices Sonnet 5.5: $2 in, $10 out, $0.10 a cache read, $2.50 a 5-minute write, $4 an hour's", () => {
     const model = "claude-sonnet-5-5";
     expect(cost(model, usage({ input_tokens: MILLION }))).toBe(MILLION * nano(2));
@@ -210,7 +210,7 @@ describe("cost", () => {
 
 describe("worstCost", () => {
   // The tool-use system prompt the API adds to a request with tools, in no byte jarvis sends (Anthropic's pricing
-  // page, "Tool use pricing", read 2026-11-04): 286 tokens on the three, 406 on Haiku 5.5 with a forced tool (F5182).
+  // page, "Tool use pricing"): 286 tokens on the three, 406 on Haiku 5.5 with a forced tool.
   const toolPrompt = (model: Model): number => (model === "claude-haiku-5-5" ? 406 : 286);
 
   it("prices every input byte and the tool prompt as an hour's cache write, and every allowed output token", () => {

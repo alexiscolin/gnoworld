@@ -214,7 +214,7 @@ describe("loadJarvisConfig", () => {
     ["JARVIS_DATABASE", ""],
     ["JARVIS_DATABASE", "d".repeat(1025)],
     ["JARVIS_DATABASE", `/${"d".repeat(1024)}`],
-    // In memory, a restart would open the day again at zero (D45, F5179).
+    // In memory, a restart would open the day again at zero.
     ["JARVIS_DATABASE", ":memory:"],
     ["JARVIS_DATABASE", "jarvis.db"],
     ["JARVIS_DATABASE", "./jarvis.db"],
@@ -343,8 +343,7 @@ describe("loadJarvisConfig", () => {
 });
 
 // What jarvis reads in any case, on or off: its switch, where it listens, its file, its budgets and how long a stop
-// waits for the questions in flight. Off, it reads nothing more: no key file, no gnomcp, no model (Alexis, "Coupé par
-// défaut").
+// waits for the questions in flight. Off, it reads nothing more: no key file, no gnomcp, no model.
 describe("loadServed", () => {
   const SERVED = { JARVIS_DATABASE: join(dir, "served.db") };
 
@@ -431,7 +430,7 @@ describe("loadServed", () => {
   });
 });
 
-// 10u-g2: the key the door proves itself with, and gnomcp reached over TCP.
+// The key the door proves itself with, and gnomcp reached over TCP.
 describe("the door's key", () => {
   const SERVED = { JARVIS_DATABASE: join(dir, "key.db") };
   const DOOR = `d${"0".repeat(31)}`;
@@ -560,7 +559,7 @@ describe("the Anthropic key", () => {
   });
 });
 
-// Jarvis apart from the server (decision-isolation.md, D110): its package lists nothing of the server's, and its compiler
+// Jarvis apart from the server (decision-isolation.md): its package lists nothing of the server's, and its compiler
 // reaches its own folder alone; the lint's walls hold each import (scripts/probe.py, walls).
 it("lists nothing of the server's in its package, and compiles its own folder alone", () => {
   const read = (name: string): unknown => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), "utf8"));
@@ -572,9 +571,9 @@ it("lists nothing of the server's in its package, and compiles its own folder al
   expect(tsconfig).not.toMatch(/\.\.\/server|"references"|"paths"/);
 });
 
-// jarvis in the stack (ADR-0002 §5, §7; 10i's report, "What 10j's deploy needs"): deploy/compose.yaml, the two ways
+// jarvis in the stack (ADR-0002 §5, §7): deploy/compose.yaml, the two ways
 // out's lists and the guard's rules, read as text. Docker is refused in this sandbox: deploy/test.sh starts the stack
-// and proves each of these by a request (test-jarvis.sh). Each value is built inside its test (F2356).
+// and proves each of these by a request (test-jarvis.sh). Each value is built inside its test.
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
 // A key's block of a YAML mapping at an indentation, up to the next key at that indentation or less; empty if none.
@@ -818,7 +817,7 @@ describe("the demo's ceiling", () => {
     expect(read("deploy/test.sh")).toContain("for id in $ts $guard $web $ergo $server $egress; do");
     expect(read("deploy/test.sh")).toContain(`[ "$cpus" -le 2000000000 ]`);
     expect(read("deploy/test.sh")).not.toMatch(/2\.4|2400000000/);
-    // A demo without jarvis is the demo (red pass, R1): its start needs the six alone.
+    // A demo without jarvis is the demo: its start needs the six alone.
     expect(read("deploy/test.sh")).toContain(
       `if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then\n\t\techo "test.sh: the demo is not running`,
     );
@@ -836,7 +835,7 @@ describe("the demo's ceiling", () => {
     expect(demo).toMatch(/^\t\t\thardened "\$reader" jarvis_reader$/m);
     expect(demo).toMatch(/^\t\t\thardened "\$egress_reader" egress_reader network$/m);
     expect(demo).toContain("for id in $jarvis $egress_jarvis $reader $egress_reader; do");
-    // 656 MiB and 0.7 core, the four files' caps (D184, 10u-g2), apart from the demo's 2 cores.
+    // 656 MiB and 0.7 core, the four files' caps, apart from the demo's 2 cores.
     expect(demo).toContain(`[ "$jarvis_memory" -le ${String(656 * 2 ** 20)} ] && [ "$jarvis_cpus" -le 700000000 ]`);
   });
 
@@ -854,20 +853,20 @@ describe("the demo's ceiling", () => {
     expect(runbook).not.toMatch(/2\.4 cores|1,952 MB/);
     expect(runbook).toContain("`egress_jarvis` (profile `jarvis`)");
     expect(runbook).toContain("`jarvis` (profile `jarvis`)");
-    // Started with Jarvis switched on, and taken by every stop, so no jarvis outlives the demo (red pass, R2).
+    // Started with Jarvis switched on, and taken by every stop, so no jarvis outlives the demo.
     for (const command of ["up -d --build", "down", "down -v"])
       expect(runbook, command).toContain(
         `docker compose -f deploy/compose.yaml --profile demo --profile jarvis ${command}\``,
       );
     const env = read("deploy/.env.example");
     expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("--profile jarvis");
-    // Ops, without the demo's profile, start jarvis by its name, which switches its profile on (F5157).
+    // Ops, without the demo's profile, start jarvis by its name, which switches its profile on.
     expect(runbook).toContain("`docker compose up -d jarvis`");
     expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("up -d jarvis");
-    // No stop or restart of the demo's alone, which leaves a running jarvis up (F5158).
+    // No stop or restart of the demo's alone, which leaves a running jarvis up.
     expect(runbook).not.toMatch(/--profile demo\s+(down|restart)/);
     expect(runbook).not.toContain("then `down -v` and `up`");
-    // What the door answers without jarvis (question 10l-1): off when switched off, not ready when on without it.
+    // What the door answers without jarvis: off when switched off, not ready when on without it.
     expect(runbook).not.toMatch(/door answering internal/);
     expect(runbook).toContain("the door answers `not_ready` (503)");
   });
@@ -1018,7 +1017,7 @@ describe("jarvis's way out", () => {
   it("shares no host with the server's list but a node both read", () => {
     const server = new Set(allowedBy(read("deploy/egress/acl.yaml")));
     const shared = allowedBy(read("deploy/egress/jarvis-acl.yaml")).filter((host) => server.has(host));
-    // A chain's node and its indexer: both read each (the server's worlds job reads the indexers, 7c).
+    // A chain's node and its indexer: both read each (the server's worlds job reads the indexers).
     const nodes = universes().flatMap((universe) => [
       new URL(universe.rpc).hostname,
       new URL(universe.indexer).hostname,
@@ -1067,7 +1066,7 @@ describe("the guard's rules", () => {
   const rules = () => read("deploy/guard/guard.sh");
   const at = (line: string) => rules().indexOf(line);
   it("find jarvis's network by the guard's own address there, never by a name, refusing any other interface", () => {
-    // A name could resolve to another network's address, or to a LAN host through the search domain (V2, S4).
+    // A name could resolve to another network's address, or to a LAN host through the search domain.
     expect(rules()).toContain(`jarvis_out=$(ip -4 -o addr show to "$JARVIS_OUT_ADDRESS/32" | awk '{ print $2 }')`);
     expect(rules()).not.toMatch(/getent hosts jarvis/);
     expect(rules()).toContain(
@@ -1103,7 +1102,7 @@ describe("the guard's rules", () => {
   });
 });
 
-// What only Docker proves, read as text so a check or a fault planted for it is not lost (deploy/test.sh, F2763).
+// What only Docker proves, read as text so a check or a fault planted for it is not lost (deploy/test.sh).
 describe("deploy/test.sh", () => {
   const script = () => read("deploy/test.sh");
   const jarvis = () => read("deploy/test-jarvis.sh");
@@ -1121,20 +1120,20 @@ describe("deploy/test.sh", () => {
       "the server finds no jarvis in the demo",
     ])
       expect(script(), check).toContain(check);
-    // A search of containers the start never names proves nothing (F5301).
+    // A search of containers the start never names proves nothing.
     expect(script()).not.toContain("the demo starts no");
     expect(script()).toContain(
       `config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0`,
     );
     expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
-    // Its stop takes jarvis's and links's profiles too, which a down of the demo's alone leaves up (F13130).
+    // Its stop takes jarvis's and links's profiles too, which a down of the demo's alone leaves up.
     expect(script()).toContain(
       `docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 ||\n\t\t\techo "test.sh: the project`,
     );
     expect(script()).toContain(
       `docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 || true #`,
     );
-    // The proofs of its absence, by commands no profile switches on, before jarvis's own start (red pass, R4).
+    // The proofs of its absence, by commands no profile switches on, before jarvis's own start.
     const at = (text: string) => script().indexOf(text);
     const sourced = script().lastIndexOf(`\t. "$here/test-jarvis.sh"\n`);
     for (const command of [
@@ -1144,20 +1143,20 @@ describe("deploy/test.sh", () => {
       expect(at(command), command).toBeGreaterThan(-1);
       expect(at(command), command).toBeLessThan(sourced);
     }
-    // Sourced twice: among the mutants, once their helpers exist, and at the plain run's end (red pass, R3).
+    // Sourced twice: among the mutants, once their helpers exist, and at the plain run's end.
     const mutants = at(`\t. "$here/test-jarvis.sh"\n`);
     expect(mutants).toBeGreaterThan(at("\tover() {"));
     expect(mutants).toBeGreaterThan(at("\tmutant() {"));
     expect(mutants).toBeLessThan(at(`elif [ "\${1:-}" != --demo ]; then`));
     expect(sourced).toBeGreaterThan(at("go test ./..."));
     expect(sourced).toBeLessThan(at("\t# The running demo."));
-    // Its start fails as the demo's does, once, with exit 3 (red pass, R6).
+    // Its start fails as the demo's does, once, with exit 3.
     expect(jarvis()).toContain(
       `if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis jarvis_reader egress_reader; then`,
     );
     expect(jarvis()).toMatch(/test-jarvis\.sh: jarvis did not start: [^\n]*\n\texit 3\nfi$/m);
     expect(jarvis()).toMatch(/^hardened "\$jarvis" jarvis$/m);
-    // In --mutants it plants its faults and returns, starting nothing (F5300).
+    // In --mutants it plants its faults and returns, starting nothing.
     expect(jarvis()).toMatch(/\n\tmutant "jarvis back in the demo" [^\n]*\n/);
     expect(jarvis()).toMatch(/\n\tmutant [^\n]*\n\treturn 0\nfi\n/);
     expect(jarvis()).toMatch(/^hardened "\$egress_jarvis" egress_jarvis network$/m);

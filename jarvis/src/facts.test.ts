@@ -3,7 +3,7 @@ import type { Digest } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { digestFacts, factsOf, groupsOf, sourceFactsOf } from "./facts.ts";
 
-// 10d's one extractor: what grounding and the translation's check read in a text. Characters above ASCII are built from
+// The one extractor: what grounding and the translation's check read in a text. Characters above ASCII are built from
 // their code points.
 const char = (...points: number[]) => String.fromCodePoint(...points);
 const ADDRESS = "g1qpzry9x8gf2tvdw0s3jn54khce6mua7lqpzry9";

@@ -1,4 +1,4 @@
-// gnoscope's reads as the allowlist offers them (ADR-0002 §5; D104): four of the seven it lists, "a transaction explained,
+// gnoscope's reads as the allowlist offers them (ADR-0002 §5): four of the seven it lists, "a transaction explained,
 // a realm's decoded state, an address, search over all code on chain", each with our own strict schema and `network`
 // required, one of the networks Jarvis names in gnoscope's own words, so no call searches every chain it indexes. Not
 // get_realm_state's wider read, which a public node nobody funds pays for. A field or a tool gnoscope gains is none.
@@ -6,7 +6,7 @@ import { ADDRESS_BODY } from "@gnoworld/core";
 import { Address, isRealmPath } from "@gnoworld/schemas";
 import { z } from "zod";
 
-// gnoscope explains; the chain's own reads state (Alexis, 2026-11-04: "gnoscope pour expliquer").
+// gnoscope explains; the chain's own reads state.
 const RULE =
   " gnoscope, a third party, explains: a figure it gives is stated only once a gnomcp read agrees. If gnoscope is down or slow, say so and answer from gnomcp's reads.";
 

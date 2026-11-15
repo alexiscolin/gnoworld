@@ -938,8 +938,8 @@ describe("the loop: a question whose asker left", () => {
     run.close();
   });
 
-  // The SDK never resolves a request after its signal fired (the verifier, 4,000 runs): this pins a guard for a send
-  // that does, as a fake can (the reviewer's V5).
+  // The SDK never resolves a request after its signal fired: this pins a guard for a send
+  // that does, as a fake can.
   it("stops a run at once when the asker left as the model's answer came, never waiting the tool's time", async () => {
     const left = new AbortController();
     const signals: AbortSignal[] = [];
@@ -1191,7 +1191,7 @@ describe("the loop: what a question hands back", () => {
   });
 });
 
-// 10u-g, G-jarvis points 2 and 3: a question off Jarvis's ground ends on `decline`; every end that spent carries its cost.
+// A question off Jarvis's ground ends on `decline`; every end that spent carries its cost.
 const declining = (id = "toolu_d") => asking(toolUse(id, "decline", {}));
 const hasDecline = (request: Request | undefined) =>
   request?.tools?.some((tool) => "name" in tool && tool.name === "decline");

@@ -1,6 +1,5 @@
-// A jarvis file whose day is spent (row 10: "at 100% of the budget Jarvis stops"): its budgets of $1 each reserved and
-// settled at $1 by jarvis's own budget, so the jarvis started on it answers spent to everything that day, as it would
-// at the cap, and its route's own words, not ours, are what the case reads.
+// A jarvis file whose day is spent: its budgets of $1 each reserved and settled at $1 by jarvis's own budget, so the
+// jarvis started on it answers spent to everything that day, as it would at the cap, in its route's own words, not ours.
 import { openDatabase } from "../packages/service/src/db.ts";
 import { makeBudget } from "../jarvis/src/budget.ts";
 import { jarvisMigrations } from "../jarvis/src/migrations.ts";

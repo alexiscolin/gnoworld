@@ -1,7 +1,7 @@
-// Jarvis's one door to Anthropic's API (ADR-0002 §5): the SDK's client is made here alone, with the key and D44's
-// timeout, retrying nothing itself, so each attempt is reserved and settled on its own (D69); every request goes to
-// the global inference at the standard tier, the only place and tier `cost` prices (F5177, D82). callModel makes one
-// model request of the loop's: its attempts, two retries at most of what the SDK itself would retry (D83).
+// Jarvis's one door to Anthropic's API (ADR-0002 §5): the SDK's client is made here alone, with the key and its
+// timeout, retrying nothing itself, so each attempt is reserved and settled on its own; every request goes to
+// the global inference at the standard tier, the only place and tier `cost` prices. callModel makes one
+// model request of the loop's: its attempts, two retries at most of what the SDK itself would retry.
 import { setTimeout as sleep } from "node:timers/promises";
 import Anthropic, {
   AnthropicError,
@@ -53,7 +53,7 @@ interface Attempts {
   readonly log: Log;
   readonly trace: Trace;
   readonly wait?: Wait | undefined;
-  // The question's: once its asker left, nothing more is sent, waited for or retried (D177).
+  // The question's: once its asker left, nothing more is sent, waited for or retried.
   readonly signal?: AbortSignal | undefined;
   // The question's running total of what its attempts were charged, in nano-dollars, added to as each settles.
   readonly paid?: { nano: number } | undefined;
@@ -115,8 +115,8 @@ async function tryOnce(
   }
 }
 
-// An attempt with no answer: one answered 429 or 529 ran nothing and costs nothing (V2, Alexis); any other is charged its
-// worst (undefined), for it may have been billed (D69).
+// An attempt with no answer: one answered 429 or 529 ran nothing and costs nothing; any other is charged its
+// worst (undefined), for it may have been billed.
 function failedCost(error: unknown): 0 | undefined {
   const status = error instanceof AnthropicError ? answeredOf(error)?.status : undefined;
   return status === 429 || status === 529 ? 0 : undefined;

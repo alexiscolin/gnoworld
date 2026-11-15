@@ -1,4 +1,4 @@
-// The loop with the tools a test gives, for the tools' own tests: a fake model taking its steps in turn, a $45 day, 10e's
+// The loop with the tools a test gives, for the tools' own tests: a fake model taking its steps in turn, a $45 day, its
 // caps, the tag of 16 bytes of 0xab, and the tools' table as the allowlist offers it.
 import { allowlist, type Definition } from "../allowlist.ts";
 import type { Ran } from "../gnomcp.ts";

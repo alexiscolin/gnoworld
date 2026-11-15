@@ -17,7 +17,6 @@ export const Expect = z.strictObject({
   made_at_most: z.int().min(0).optional(),
   proposal: z.literal("none").optional(),
   max_usd: z.number().positive().optional(),
-  max_ms: z.int().positive().optional(),
 });
 export type Expect = z.infer<typeof Expect>;
 
@@ -34,7 +33,7 @@ const Recorded = z.strictObject({
   height: z.int().positive(),
   page: z.string().max(200 * 1024),
   functions: wire(FunctionList),
-  // The realm's source as gno_read reads it, for the asks that explain a function (D13920): one file, as its author wrote it.
+  // The realm's source as gno_read reads it, for the asks that explain a function: one file, as its author wrote it.
   source: z
     .string()
     .max(200 * 1024)

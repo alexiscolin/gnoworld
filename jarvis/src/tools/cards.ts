@@ -1,7 +1,7 @@
-// Jarvis's cards (ADR-0002 §4, §5 point 4; D102): the model hands a realm's digest, a proposed action or an answer's
-// button through these tools, and the server keeps it only once 10d's checks pass on what it read itself, that call:
+// Jarvis's cards (ADR-0002 §4, §5 point 4): the model hands a realm's digest, a proposed action or an answer's
+// button through these tools, and the server keeps it only once its checks pass on what it read itself, that call:
 // the realm's height and page through gnomcp, its `vm/qfuncs` on its universe's node, and the asker's words for a
-// proposal's or a button's arguments alone (D107). A refused card goes back to the model naming what is missing.
+// proposal's or a button's arguments alone. A refused card goes back to the model naming what is missing.
 import { readFunctionList } from "@gnoworld/chain/node";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { jsonOf, placeAt } from "@gnoworld/core";
@@ -17,14 +17,14 @@ interface Setup {
   readonly places: Places;
   /** gnomcp's call, for `gno_status` and `gno_render`. */
   readonly read: (name: string, args: unknown) => Promise<Ran>;
-  /** The way to a universe's node for its `vm/qfuncs` (D119): the chain package's own, unless a test gives a fake node. */
+  /** The way to a universe's node for its `vm/qfuncs`: the chain package's own, unless a test gives a fake node. */
   readonly fetch?: ChainFetch;
 }
 
-// The cards' setup and their memory of the universes' nodes seen on their chain, an entry a universe (10h's review, V7).
+// The cards' setup and their memory of the universes' nodes seen on their chain, an entry a universe.
 type Ready = Setup & { readonly seen: Map<string, number> };
 
-// A page is read only as far as 64 KiB, cut on its last line's end so no number is read cut (D102).
+// A page is read only as far as 64 KiB, cut on its last line's end so no number is read cut.
 const PAGE_BYTES = 64 * 1024;
 /** A card refused, said to the model with what is missing. */
 export const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
@@ -65,13 +65,13 @@ function heightOf(status: Ran, universe: Universe): number | undefined {
   return declared === universe.chainId && node === universe.chainId ? height : undefined;
 }
 
-// The page inside gnomcp 0.11.0's wrapping (read live, 2026-11-04), cut to its last whole line within 64 KiB.
+// The page inside gnomcp 0.11.0's wrapping (read live), cut to its last whole line within 64 KiB.
 function pageOf(text: string, realm: string): string {
   const [open, close] = [`<untrusted_content kind="render" source="${realm}">\n`, "\n</untrusted_content>"];
   return cutPage(text.startsWith(open) && text.endsWith(close) ? text.slice(open.length, -close.length) : text);
 }
 
-/** A realm's page cut to its last whole line within 64 KiB, so no number is read cut (D102). */
+/** A realm's page cut to its last whole line within 64 KiB, so no number is read cut. */
 export function cutPage(page: string): string {
   // encodeInto reads no more of the page than its 64 KiB hold, whatever the page's size.
   const { read } = new TextEncoder().encodeInto(page, new Uint8Array(PAGE_BYTES));
@@ -95,7 +95,7 @@ const LATE = { ok: false, why: "its call's time is up." } as const;
 // Read through a call, as a signal's state changes across an await, which TypeScript's narrowing does not see.
 const over = (signal: AbortSignal): boolean => signal.aborted;
 
-// A realm's functions on its universe's own node, checked to be its chain (D118), the call's signal ending the read.
+// A realm's functions on its universe's own node, checked to be its chain, the call's signal ending the read.
 function functionsOn(setup: Ready, universe: Universe, at: Realm) {
   const node = { chainId: universe.chainId, signal: at.signal, seen: setup.seen };
   return readFunctionList(universe.rpc, at.realm, setup.fetch === undefined ? node : { ...node, fetch: setup.fetch });

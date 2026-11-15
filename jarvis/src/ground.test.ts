@@ -3,8 +3,8 @@ import type { FunctionList } from "@gnoworld/schemas/functions";
 import { describe, expect, it } from "vitest";
 import { grounded, groundedButton, sourcesOf, type Read } from "./ground.ts";
 
-// Row 10: "every number, link and function in a digest traces to its source". Each builder makes a fresh value inside
-// the test (F2356); characters above ASCII are built from their code points.
+// Every number, link and function in a digest traces to its source. Each builder makes a fresh value inside
+// the test; characters above ASCII are built from their code points.
 const REALM_TYPE = [
   "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool;",
   "IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string;",

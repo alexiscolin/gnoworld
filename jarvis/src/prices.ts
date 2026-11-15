@@ -1,7 +1,6 @@
-// What a model call costs (ADR-0002 §5, D41): the three models' prices from the claude-api skill (models cached
-// 2026-10-06; shared/prompt-caching.md, "Economics") and Anthropic's pricing page, read on 2026-11-04, where the
-// skill's Sonnet 5.5 cache read was stale (F5181), in nano-dollars a token so that every price is whole; the cost of
-// an answer from its usage, and the most a call can cost, which it reserves before it starts (budget.ts).
+// What a model call costs (ADR-0002 §5): the three models' prices from the claude-api skill (shared/prompt-caching.md,
+// "Economics") and Anthropic's pricing page, which wins where they differ, in nano-dollars a token so that every
+// price is whole; the cost of an answer from its usage, and the most a call can cost, which it reserves before it starts (budget.ts).
 import { z } from "zod";
 
 export const MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"] as const;
@@ -17,7 +16,7 @@ interface Rates {
   hour: number;
 }
 
-// A model's rates for a prompt of that many tokens; Haiku 5.5 alone has a second card, past 100,000 (D61).
+// A model's rates for a prompt of that many tokens; Haiku 5.5 alone has a second card, past 100,000.
 function ratesOf(model: Model, prompt: number): Rates {
   switch (model) {
     case "claude-sonnet-5-5":
@@ -69,12 +68,12 @@ export function cost(model: string, usage: unknown): number | undefined {
   return input * rates.input + output * rates.output + read * rates.read + written;
 }
 
-/** The most one attempt of a call can cost, in nano-dollars: a RangeError on a bound that is not a count (D69). */
+/** The most one attempt of a call can cost, in nano-dollars: a RangeError on a bound that is not a count. */
 export function worstCost(model: Model, { inputBytes, maxTokens }: { inputBytes: number; maxTokens: number }): number {
   if (!Number.isSafeInteger(inputBytes) || inputBytes < 0) throw new RangeError("inputBytes: a count of bytes");
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) throw new RangeError("maxTokens: a count of tokens, from 1");
   // No prompt has more tokens than its UTF-8 bytes and the tool-use system prompt the API adds (the pricing page:
-  // 286 tokens, 406 on Haiku 5.5 with a forced tool; F5182): each is the dearest input token of the card they reach.
+  // 286 tokens, 406 on Haiku 5.5 with a forced tool): each is the dearest input token of the card they reach.
   const prompt = inputBytes + (model === "claude-haiku-5-5" ? 406 : 286);
   const rates = ratesOf(model, prompt);
   const dearest = Math.max(rates.input, rates.read, rates.fiveMinutes, rates.hour);
