@@ -44,10 +44,26 @@ text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png
 # did), so the private rules skip those files; the secret rules read every file (F139).
 binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
+# An annotated tag is pushed as its own object, whose message git log never shows: the text of each tag a revision names, and of each
+# tag that tag points at, is read as text too, by the object's type, whatever ref it is pushed to.
+tag_text() {
+	for rev in $revs; do
+		case $rev in \^*) continue ;; esac
+		rev=${rev##*..}
+		[ "$rev" != HEAD ] || continue
+		while [ "$(git cat-file -t "$rev" 2>/dev/null)" = tag ]; do
+			git cat-file tag "$rev"
+			rev=$(git cat-file tag "$rev" | sed -n 's/^object //p')
+		done
+	done
+}
+tags=""
+[ "$mode" != range ] || tags=$(tag_text)
 found=0 # both rule sets run, so a secret does not hide a private name beside it (F120)
 for config in gitleaks.toml gitleaks-private.toml; do
 	paths="" # every file, but for the private rules
 	[ "$config" = gitleaks.toml ] || paths="-- . $binaries"
+	[ -z "$tags" ] || printf '%s\n' "$tags" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1
 	if [ "$mode" = staged ]; then
 		# set -f: the pathspecs reach git as written; a failure stops the scan rather than scan nothing.
 		staged=$(set -f && git diff --cached -U0 $text $paths)

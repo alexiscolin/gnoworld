@@ -1209,6 +1209,15 @@ def mutants():
         ('[ "$mode" = all ] || opts=', ': || opts=', "scans the range alone"),
     ):
         yield from each("scripts/scan_secrets.sh", find, replace, "hooks", f"scan_secrets --range {label}")
+    # An annotated tag's message is scanned, whatever ref carries the tag, through a tag of a tag, by both rule sets.
+    yield from each("scripts/scan_secrets.sh", 'rev=${rev##*..}', 'rev=$rev', "hooks", 'scan_secrets --range reads the tag that ends A..B')
+    yield from each("scripts/scan_secrets.sh", '= tag ]; do', '= never ]; do', "hooks", 'scan_secrets --range reads the message of a tag')
+    yield from each("scripts/scan_secrets.sh", 'rev=$(git cat-file tag "$rev" | sed -n \'s/^object //p\')', 'break', "hooks", 'scan_secrets --range reads the tag a tag points at')
+    yield from each("scripts/scan_secrets.sh", '[ "$mode" != range ] || tags=$(tag_text)', 'tags=', "hooks", 'scan_secrets --range scans the tags it names')
+    yield from each("scripts/scan_secrets.sh", '[ -z "$tags" ] || printf', '[ -z "$tags" ] || [ "$config" = gitleaks.toml ] || printf', "hooks", "scan_secrets reads a tag's message for secrets")
+    yield from each("scripts/scan_secrets.sh", '[ -z "$tags" ] || printf', '[ -z "$tags" ] || [ "$config" = gitleaks-private.toml ] || printf', "hooks", "scan_secrets reads a tag's message for private names")
+    yield from each("scripts/scan_secrets.sh", '--ignore-gitleaks-allow || found=1\n\tif [ "$mode" = staged ]', '--ignore-gitleaks-allow || :\n\tif [ "$mode" = staged ]', "hooks", "scan_secrets fails on what a tag's message holds")
+    yield from each("scripts/scan_secrets.sh", '[ -z "$tags" ] || printf \'%s\\n\' "$tags" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1', '[ -z "$tags" ] || printf \'%s\\n\' "$tags" | gitleaks stdin --no-banner --redact --config "$here/$config" || found=1', "hooks", "scan_secrets ignores gitleaks:allow in a tag's message")
     # git's stderr makes gitleaks read no history, and pass: the scan hides none, and refuses what it cannot hide.
     yield from each("scripts/scan_secrets.sh", 'unset "$var"; done', 'true; done', "hooks", 'scan_secrets gives git no trace to write to stderr')
     yield from each("scripts/scan_secrets.sh", "sed -n 's/^\\(GIT_TRACE", "sed -n 's/^\\(NOT_TRACE", "hooks", 'scan_secrets looks for every GIT_TRACE variable')

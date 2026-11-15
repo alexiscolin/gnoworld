@@ -4843,6 +4843,31 @@ printf '%s\n' "$out" | grep -q "scan_secrets: gitleaks scanned no commit" || fai
 git -C "$pr" commit -q --allow-empty -m empty && es=$(git -C "$pr" rev-parse HEAD)
 stubbed 'INF 0 commits scanned.' --range "$es" "^$tk" || fail "scan_secrets --range refused a range of an empty commit"
 git -C "$pr" reset -q --hard "$tk"
+# An annotated tag's message is text git log never shows, and a tag is pushed as the tag object itself: its message is scanned
+# too, whether the tag points at a commit the push sends, one the remote holds, or another tag, and whatever ref it is pushed to.
+tagged() { printf 'refs/tags/%s %s refs/tags/%s %s\n' "$1" "$(git -C "$pr" rev-parse "$1")" "$1" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1); }
+git -C "$pr" tag -a tclean -m 'a release' trunk
+tagged tclean || fail "pre-push refused an annotated tag with a clean message"
+git -C "$pr" tag -a tkey -m "aws = \"$key\"" trunk
+tagged tkey && fail "pre-push let through a key in an annotated tag's message"
+git -C "$pr" tag -a theld -m "aws = \"$key\"" "$held"
+tagged theld && fail "pre-push let through a key in the message of a tag on a commit the remote holds"
+git -C "$pr" tag -a tnest -m 'a release of a tag' tkey
+[ "$(git -C "$pr" cat-file tag tnest | sed -n 1p)" = "object $(git -C "$pr" rev-parse tkey)" ] || fail "the test's nested tag is not a tag of a tag"
+tagged tnest && fail "pre-push let through a key in the message of a tag a tag points at"
+git -C "$pr" tag -a tpriv -m 'host = "N''8N"' trunk # split, so this file holds no name
+tagged tpriv && fail "pre-push let through a private name in an annotated tag's message"
+git -C "$pr" tag -d tpriv >/dev/null
+git -C "$pr" tag -a tallow -m "aws = \"$key\" # gitleaks:allow" trunk
+tagged tallow && fail "pre-push obeyed a gitleaks:allow in an annotated tag's message"
+git -C "$pr" tag -d tallow >/dev/null
+sr "$(git -C "$pr" rev-parse tkey)" "^$held" && fail "scan_secrets --range missed a key in a tag's message"
+sr "$(git -C "$pr" rev-parse tclean)" "^$held" || fail "scan_secrets --range refused a tag with a clean message"
+tagbranch() { printf 'refs/heads/x %s refs/heads/x %s\n' "$(git -C "$pr" rev-parse "$1")" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1); }
+tagbranch tkey && fail "pre-push let through a key in a tag's message, the tag pushed to a branch name"
+tagbranch tclean || fail "pre-push refused a tag with a clean message pushed to a branch name"
+sr "$held..$(git -C "$pr" rev-parse tkey)" && fail "scan_secrets --range missed a key in the message of the tag that ends A..B"
+git -C "$pr" tag -d tclean tkey theld tnest >/dev/null
 out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --stagd 2>&1) && fail "scan_secrets took an unknown option for a whole-history scan"
 printf '%s\n' "$out" | grep -q "usage: scan_secrets.sh" || fail "scan_secrets refused an unknown option without its usage: $out"
 fi
