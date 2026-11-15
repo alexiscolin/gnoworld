@@ -162,15 +162,15 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 60065, // 2026-11-13, after the review's fixes: 59,809 B measured, 256 B ahead (D13948, D13135)
-  HubPlate: 56518, // 2026-11-13, after the review's fixes: 56,262 B measured, 256 B ahead (D13948, D13135)
+  EarthPlate: 60664, // 2026-11-15, the typed reads sharing core's args chunk: 60,408 B measured, 256 B ahead (D13304)
+  HubPlate: 56992, // 2026-11-15, the typed reads sharing core's args chunk: 56,736 B measured, 256 B ahead (D13304)
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
   hours: 618,
   Bars: 3336,
   ChartedBy: 608,
-  realms: 8307, // D13948: two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,051 B of realm code; hardening splits them
+  realms: 8604, // two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,348 B of realm code (D13304); hardening splits them
   worlds: 1126,
   // A bubble's words with the plain text they are cut from, asked once a bubble shows: 535 B on 2026-11-13, 256 B ahead.
   BubbleWords: 791,

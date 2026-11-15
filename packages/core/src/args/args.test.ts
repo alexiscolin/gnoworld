@@ -1,7 +1,17 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import * as core from "../index.ts";
-import { callArgs, callFields, HIDDEN, isCarried, realmType, textProblem } from "./args.ts";
+import {
+  callArgs,
+  callFields,
+  HIDDEN,
+  isCarried,
+  READ_STRING_MAX_BYTES,
+  readArgs,
+  readFields,
+  realmType,
+  textProblem,
+} from "./args.ts";
 
 // A call's arguments follow its parameters' types (ADR-0002 §4). The rules are gno's own `convert.go`
 // (gnolang/gno 07e44776c261, tag v1.5.1, the version onyx-1 and gnoland-1 run), read as `vm/qfuncs` writes the types
@@ -714,5 +724,269 @@ describe("the index", () => {
     expect(core.isCarried).toBe(isCarried);
     expect(core.textProblem).toBe(textProblem);
     expect(core.HIDDEN).toBe(HIDDEN);
+  });
+});
+
+// Slice 13, B (plan §3): a read's arguments enter a `vm/qeval` expression the chain runs whatever it says, so they are written as Go
+// literals alone. A first `realm` parameter is a write: qeval injects `cur` (gno v1.5.0 keeper.go:1924) and runs it on a store thrown
+// away. onyx-1, gnomcp, 2026-11-10, in r/gnoland/wugnot: `len("a\tb\n\"\\é")` is `(8 int)`; see the integers for the rest.
+
+const READ_PROPERTY = { seed: 20261110, numRuns: 400 };
+const literal = (type: string, text: string) => {
+  const done = readArgs([param(type)], [text]);
+  return done.ok ? done.literals[0] : done;
+};
+const problem = (type: string, text: string) => {
+  const done = readArgs([param(type)], [text]);
+  return !done.ok && done.why === "fields" ? done.problems[0] : "none";
+};
+
+// Go's interpreted string literal (the spec's string_lit) with only the escapes the serializer writes: one token, no raw newline, every
+// quote and backslash escaped. The decoder is Go's strconv.Unquote for those four escapes, written out so no JSON stands in for it.
+const GO_STRING = /^"(?:[^"\\\n]|\\[\\"nt])*"$/u;
+const ESCAPES: Record<string, string> = { "\\": "\\", '"': '"', n: "\n", t: "\t" };
+const unquote = (lit: string): string =>
+  lit.slice(1, -1).replace(/\\(.)/gu, (_all, char: string) => {
+    const decoded = ESCAPES[char];
+    if (decoded === undefined) throw new Error(`no such escape: ${char}`);
+    return decoded;
+  });
+// The UTF-8 bytes of a well-formed text (core has no TextEncoder: no DOM, no Node).
+function utf8(text: string): number {
+  let bytes = 0;
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+describe("readFields: what a read asks for", () => {
+  it.each([null, undefined, []])("takes a function with no parameter (%j), and draws no field", (params) => {
+    expect(readFields(params)).toEqual({ ok: true, fields: [] });
+  });
+
+  it("draws a field for each string, bool and integer parameter, in order", () => {
+    const params = [param("string", "who"), param("bool", "all"), param("int", "page"), param("uint8", "small")];
+    expect(readFields(params)).toEqual({
+      ok: true,
+      fields: [
+        { name: "who", type: "string", kind: "string", freeText: true },
+        { name: "all", type: "bool", kind: "bool", freeText: false },
+        { name: "page", type: "int", kind: "integer", freeText: false },
+        { name: "small", type: "uint8", kind: "integer", freeText: false },
+      ],
+    });
+  });
+
+  it.each([
+    ["alone", () => [cur()]],
+    ["before a string", () => [cur(), param("string")]],
+    ["before a bool and an int", () => [cur(), param("bool"), param("int")]],
+  ])("refuses a function whose first parameter is the realm (%s): a write, which qeval would fake", (_name, params) => {
+    expect(readFields(params())).toEqual({ ok: false, why: "write" });
+    expect(
+      readArgs(
+        params(),
+        params()
+          .slice(1)
+          .map(() => "1"),
+      ),
+    ).toEqual({ ok: false, why: "write" });
+  });
+
+  it.each(["float32", "float64", "[]uint8", "[32]uint8", "[]string", "address", "map[string]string", "*string", ""])(
+    "refuses a read with a %j parameter: only string, bool and integers are written here",
+    (type) => {
+      expect(readFields([param("string"), param(type)])).toEqual({ ok: false, why: "gnoweb" });
+      expect(readArgs([param("string"), param(type)], ["a", "1"])).toEqual({ ok: false, why: "gnoweb" });
+    },
+  );
+
+  it("refuses the realm type after the first parameter as a type it does not carry, not as a write", () => {
+    expect(readFields([param("string"), cur()])).toEqual({ ok: false, why: "gnoweb" });
+  });
+
+  it("calls a first realm parameter a write before it looks at the others", () => {
+    expect(readFields([cur(), param("float64")])).toEqual({ ok: false, why: "write" });
+    expect(readFields([param("float64"), cur()])).toEqual({ ok: false, why: "gnoweb" });
+  });
+
+  it.each(["realm", ".uverse.realm", "address", ".uverse.address", realmType().toUpperCase(), `${realmType()} `])(
+    "refuses a first parameter of type %j: nothing it does not carry is ever written",
+    (type) => {
+      expect(readFields([param(type)]).ok).toBe(false);
+      expect(readArgs([param(type)], ["a"]).ok).toBe(false);
+    },
+  );
+
+  it("throws for another count of texts than fields: a caller's bug, never a call", () => {
+    expect(() => readArgs([param("string")], [])).toThrow(RangeError);
+    expect(() => readArgs([], ["a"])).toThrow(RangeError);
+  });
+});
+
+describe("readArgs: strings, quoted and escaped", () => {
+  it.each([
+    ["", '""'],
+    ["plain", '"plain"'],
+    ['a"b', '"a\\"b"'],
+    ["a\\b", '"a\\\\b"'],
+    ["a\nb", '"a\\nb"'],
+    ["a\tb", '"a\\tb"'],
+    ["a)b", '"a)b"'],
+    ['"); os.Exit(1); ("', '"\\"); os.Exit(1); (\\""'],
+    ['\\"', '"\\\\\\""'],
+    ["日本語 😀 é", '"日本語 😀 é"'],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", '"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"'],
+  ])("writes %j as the Go literal %s", (text, expected) => {
+    expect(literal("string", text)).toBe(expected);
+  });
+
+  it.each([
+    ["a right-to-left override", "a\u202eb"],
+    ["a zero-width space", "a\u200bb"],
+    ["a carriage return", "a\rb"],
+    ["a NUL", "a\u0000b"],
+    ["DEL", "a\u007fb"],
+    ["a byte order mark", "\ufeffa"],
+    ["a lone surrogate", `a${String.fromCharCode(0xd800)}`],
+  ])("refuses %s as malformed: it would draw unlike what is sent, or Go would not read it", (_name, text) => {
+    expect(problem("string", text)).toBe("malformed");
+  });
+
+  it("takes a string of 256 UTF-8 bytes and refuses one of 257, in bytes, not characters", () => {
+    expect(READ_STRING_MAX_BYTES).toBe(256);
+    expect(literal("string", "a".repeat(256))).toBe(`"${"a".repeat(256)}"`);
+    expect(problem("string", "a".repeat(257))).toBe("long");
+    expect(literal("string", "é".repeat(128))).toBe(`"${"é".repeat(128)}"`);
+    expect(problem("string", "é".repeat(129))).toBe("long");
+    expect(literal("string", "日".repeat(85))).toBe(`"${"日".repeat(85)}"`);
+    expect(problem("string", "日".repeat(86))).toBe("long");
+    expect(literal("string", "😀".repeat(64))).toBe(`"${"😀".repeat(64)}"`);
+    expect(problem("string", "😀".repeat(65))).toBe("long");
+    expect(problem("string", "a".repeat(100_000))).toBe("long");
+  });
+
+  it("calls a string with a hidden character malformed before long", () => {
+    expect(problem("string", `\u202e${"a".repeat(300)}`)).toBe("malformed");
+  });
+
+  it("property: any well-formed text up to the cap is one Go string token that reads back as that text", () => {
+    const visible = fc.string({ unit: "grapheme", maxLength: 60 });
+    const tricky = fc
+      .array(fc.constantFrom('"', "\\", "\n", "\t", ")", "(", ";", "`", "'", "a", "é", "😀", "\u2028"), {
+        maxLength: 60,
+      })
+      .map((chars) => chars.join(""));
+    fc.assert(
+      fc.property(fc.oneof(visible, tricky), (text) => {
+        const done = readArgs([param("string")], [text]);
+        if (!done.ok) {
+          expect(done.why === "fields" && ["malformed", "long"].includes(done.problems[0] ?? "")).toBe(true);
+          return;
+        }
+        const [lit = ""] = done.literals;
+        expect(lit).toMatch(GO_STRING);
+        expect(unquote(lit)).toBe(text);
+      }),
+      READ_PROPERTY,
+    );
+  });
+
+  it("property: whatever the text, either a field's problem or one Go string token, never anything else", () => {
+    fc.assert(
+      fc.property(fc.string({ unit: "binary", maxLength: 300 }), (text) => {
+        const done = readArgs([param("string")], [text]);
+        if (done.ok) {
+          expect(done.literals[0]).toMatch(GO_STRING);
+          expect(utf8(text)).toBeLessThanOrEqual(256);
+        } else expect(done).toEqual({ ok: false, why: "fields", problems: [expect.any(String)] });
+      }),
+      READ_PROPERTY,
+    );
+  });
+});
+
+describe("readArgs: bool and integers, their canonical text alone", () => {
+  it.each(["true", "false"])("writes the bool %j as itself", (text) => {
+    expect(literal("bool", text)).toBe(text);
+  });
+
+  it.each(["True", "1", "", " true", "true)", "!false"])("refuses the bool %j", (text) => {
+    expect(problem("bool", text)).toBe("format");
+  });
+
+  it.each([
+    ["int", "0"],
+    ["int", "-42"],
+    ["int", "9223372036854775807"],
+    ["int", "-9223372036854775808"],
+    ["int8", "-128"],
+    ["uint8", "255"],
+    ["uint64", "18446744073709551615"],
+  ])("writes the %s %j as itself", (type, text) => {
+    expect(literal(type, text)).toBe(text);
+  });
+
+  it.each([
+    ["int", "-0", "format"],
+    ["int", "01", "format"],
+    ["int", "1e3", "format"],
+    ["int", "0x10", "format"],
+    ["int", "+1", "format"],
+    ["int", " 1", "format"],
+    ["int", "1)", "format"],
+    ["int", "1, 2", "format"],
+    ["int", "", "format"],
+    ["int8", "128", "range"],
+    ["uint8", "-1", "range"],
+    ["int", "9223372036854775808", "range"],
+    ["uint64", "18446744073709551616", "range"],
+  ])("refuses the %s %j (%s)", (type, text, why) => {
+    expect(problem(type, text)).toBe(why);
+  });
+
+  // onyx-1, gnomcp, 2026-11-10, r/gnoland/wugnot: `int64(-9223372036854775808)` and `uint64(18446744073709551615)` read as written;
+  // `BalanceOf("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5")` is `(0 int64)`, a quoted string into an `address` (qfuncs writes `string`).
+  it("property: an integer in its width's range is written as its decimal text, one out of it is refused", () => {
+    const widths: [string, bigint, bigint][] = [
+      ["int8", -128n, 127n],
+      ["uint16", 0n, 65535n],
+      ["int64", -(2n ** 63n), 2n ** 63n - 1n],
+      ["uint64", 0n, 2n ** 64n - 1n],
+    ];
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...widths),
+        fc.bigInt({ min: -(2n ** 65n), max: 2n ** 65n }),
+        ([type, min, max], n) => {
+          const text = n.toString();
+          if (n >= min && n <= max) expect(literal(type, text)).toBe(text);
+          else expect(problem(type, text)).toBe("range");
+        },
+      ),
+      READ_PROPERTY,
+    );
+  });
+});
+
+describe("readArgs: a whole call", () => {
+  it("writes each field's literal in order, and says each field's problem in order", () => {
+    const params = [param("string", "who"), param("bool", "all"), param("int", "page")];
+    expect(readArgs(params, ['a "b"', "true", "-3"])).toEqual({ ok: true, literals: ['"a \\"b\\""', "true", "-3"] });
+    expect(readArgs(params, ["ok", "yes", "1.5"])).toEqual({
+      ok: false,
+      why: "fields",
+      problems: [undefined, "format", "format"],
+    });
+  });
+});
+
+describe("the index, for a read", () => {
+  it("exports readFields, readArgs and the string cap for the app", () => {
+    expect(core.readFields).toBe(readFields);
+    expect(core.readArgs).toBe(readArgs);
+    expect(core.READ_STRING_MAX_BYTES).toBe(READ_STRING_MAX_BYTES);
   });
 });

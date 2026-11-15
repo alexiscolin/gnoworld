@@ -102,6 +102,7 @@ export { realmRoom } from "./cosmos/realmRoom.ts";
 export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
 export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
+export { isExportedName } from "./chain/exportedName.ts";
 export { realmRoute, worldRoute } from "./places/route.ts";
 export { GOLDEN } from "./space/golden.ts";
 export { NATURES } from "./planet/choice.ts";
@@ -158,6 +159,7 @@ export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
 export { originOf } from "./markdown/address.ts";
+export { withActions } from "./markdown/actions.ts";
 export {
   MAX_LIST_DEPTH,
   MAX_TABLE_COLUMNS,
@@ -193,3 +195,4 @@ export { utf8Bytes } from "./text/utf8.ts";
 export { asciiBytes, hexOf } from "./text/bytes.ts";
 export { damp } from "./smooth.ts";
 export { trimOldest } from "./trim.ts";
+export { helpCall, MAX_HELP_ARGS, prefill, type HelpArg, type HelpCall } from "./args/help.ts";

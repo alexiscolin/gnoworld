@@ -2,13 +2,16 @@
 // a plain https one, never inside another link; a mention's (4d) an account's, never inside a link either; no text
 // is empty, and no two sit side by side.
 
-/** What a line holds: text, its marks (the chat's underline among them, 8k), code, links (a page's image is one, flagged `image`), mentions, and the breaks
- * between a paragraph's lines. */
+import type { HelpArg } from "../args/help.ts";
+
+/** What a line holds: text, its marks (the chat's underline among them, 8k), code, links (a page's image is one, flagged `image`), a
+ * page's `$help` link to its own realm as an action (a call by name, never an address, D13300), mentions, and a paragraph's breaks. */
 export type Inline =
   | { type: "text"; text: string }
   | { type: "strong" | "em" | "strike" | "underline"; children: Inline[] }
   | { type: "code"; text: string }
   | { type: "link"; href: string; children: Inline[]; image?: true }
+  | { type: "action"; func: string; args: HelpArg[]; children: Inline[] }
   | { type: "mention"; address: string }
   | { type: "break" };
 

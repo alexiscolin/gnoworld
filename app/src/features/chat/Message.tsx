@@ -9,7 +9,8 @@ import { createElement, type ReactNode } from "react";
 import { NEW_TAB } from "../../lib/newTab.ts";
 import { isAccount, shortAddress } from "./names.ts";
 
-const MARKS = { strong: "strong", em: "em", strike: "s", underline: "u" } as const;
+// A realm page's `$help` link to its own function (D13300) is its words alone, never an address; the realm's view makes it a call card.
+const MARKS = { strong: "strong", em: "em", strike: "s", underline: "u", action: "span" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
 export const LINK = { dir: "ltr", ...NEW_TAB } as const;
 
@@ -58,6 +59,8 @@ function linkOf(node: Extract<Inline, { type: "link" }>, reader: Reader): ReactN
 }
 
 function inline(node: Inline, reader: Reader): ReactNode {
+  if ("children" in node && node.type !== "link")
+    return createElement(MARKS[node.type], null, ...drawInlines(node.children, reader));
   switch (node.type) {
     case "text":
       return node.text;
@@ -69,11 +72,6 @@ function inline(node: Inline, reader: Reader): ReactNode {
       return linkOf(node, reader);
     case "mention":
       return mentionOf(node.address, reader);
-    case "strong":
-    case "em":
-    case "strike":
-    case "underline":
-      return createElement(MARKS[node.type], null, ...drawInlines(node.children, reader));
   }
 }
 
