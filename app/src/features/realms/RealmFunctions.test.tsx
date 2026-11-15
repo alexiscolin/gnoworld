@@ -757,8 +757,9 @@ describe("the Try-it caller at the page's gate: 4 requests a host (F13326)", () 
     try {
       queryClient.clear();
       const box = mount(<Page />);
-      await turn();
-      expect(reached).toEqual(["vm/qfuncs"]);
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs"]);
+      });
       // The gate full: 4 of the host in flight, a fifth waiting, then the card's read, then a sixth that takes the turn its answer frees.
       const asks = ["a", "b", "c", "d", "e"].map((id) => pageFetch(`${CHAIN.rpc}/hold-${id}`));
       click(button(box, "Ask"));
@@ -771,14 +772,78 @@ describe("the Try-it caller at the page's gate: 4 requests a host (F13326)", () 
       expect(reached).toEqual(["vm/qfuncs"]);
       // The read gets its turn, and is answered; its height asks for the next, which the sixth holds.
       held.get(`${CHAIN.rpc}/hold-b`)?.();
-      await turn();
-      expect(reached).toEqual(["vm/qfuncs", "vm/qeval"]);
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs", "vm/qeval"]);
+      });
       held.get(`${CHAIN.rpc}/hold-c`)?.();
-      await turn();
-      expect(reached).toEqual(["vm/qfuncs", "vm/qeval", "status"]);
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs", "vm/qeval", "status"]);
+      });
       expect(asks).toHaveLength(6);
     } finally {
       for (const release of held.values()) release();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("a height read still held ends with its card", async () => {
+    const answers = chain({
+      functions: [{ FuncName: "TotalSupply", Params: null, Results: [{ Name: ".res.0", Type: "int64", Value: "" }] }],
+    });
+    const statuses: (AbortSignal | null | undefined)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (!url.includes("/status")) return answers(url, init);
+        statuses.push(init?.signal);
+        return new Promise<Response>(() => undefined);
+      }),
+    );
+    function Page() {
+      const [here, setHere] = useState(true);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setHere(false);
+            }}
+          >
+            Leave
+          </button>
+          {here ? <Card /> : null}
+        </>
+      );
+    }
+    function Card() {
+      const { read } = useFunctions(CHAIN.rpc, WUGNOT);
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            read("TotalSupply");
+          }}
+        >
+          Ask
+        </button>
+      );
+    }
+    try {
+      queryClient.clear();
+      const box = mount(<Page />);
+      await vi.waitFor(() => {
+        expect(all(box, "button")).toHaveLength(2);
+      });
+      click(button(box, "Ask"));
+      await vi.waitFor(() => {
+        expect(statuses).toHaveLength(1);
+      });
+      expect(statuses[0]?.aborted).toBe(false);
+      click(button(box, "Leave"));
+      await vi.waitFor(() => {
+        expect(statuses[0]?.aborted).toBe(true);
+      });
+    } finally {
       vi.unstubAllGlobals();
     }
   });
