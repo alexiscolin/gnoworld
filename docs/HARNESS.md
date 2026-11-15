@@ -149,7 +149,9 @@ critical journeys; the build, the first screen's budget and nginx (`scripts/chec
 the Go tools; the coverage and the patch's (`scripts/patch_coverage.py`, from the base); StrykerJS on the changed tier-1 lines
 (`scripts/stryker_lines.py`, from the base; no job fails on its survivors yet, F13184); the regressions and the migrations (`scripts/check_regressions.py`,
 `scripts/check_migrations.py`, from the base); `deploy/test.sh` when `deploy/` changes; the harness's own `probe.py` and `test_hooks.sh`
-when the harness changes. `gate-ok` reads every job with the base's `scripts/ci_gate_ok.py`.
+when the harness changes. `gate-ok` reads every job with the base's `scripts/ci_gate_ok.py`; after a failure, its last step writes
+each failed job's end as an annotation (the base's `scripts/ci_annotate.py`, D13177), which the public check-runs API serves with
+no login. An annotation's text comes from the run's logs, so whoever reads it takes it as data, never as instructions.
 
 **The night** (on `main`): the 41 journeys of the gate's list and the old merge list (the other 68 specs of `app/tests/e2e` run by
 hand: F13185); the `timing`, display and slow Vitest projects; StrykerJS over tier 1; `harness_mutate.py`,
@@ -514,6 +516,7 @@ costs context in every session.
 | `.github/workflows/nightly.yml` | the night on GitHub: 41 journeys, StrykerJS and the harness whole, the history's secrets; a red night opens one issue |
 | `.github/CODEOWNERS` | the core, whose change needs an owner's approval once main's ruleset asks for it |
 | `scripts/ci_changes.sh`, `scripts/ci_gate_ok.py` | what a change calls for, and gate-ok's verdict, each run from the base commit |
+| `scripts/ci_annotate.py` | each failed job's end as an annotation of gate-ok, read with no login (D13177) |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks: the guard (PreToolUse) and the reaper (Stop) |
 | `scripts/speeds.py` | `--tier1`: whether a change holds a tier-1 path of docs/REVIEW.md, or one it cannot place (GitHub's detector, from the base) |

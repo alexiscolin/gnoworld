@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { migrations } from "./migrations.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
-import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
+import { fakeErgo, message, PASSWORD, welcome, type Peer } from "./testing/fakeErgo.ts";
 import { loadRoles } from "./roles/roles.ts";
 import { cliFile, cliKey } from "./testing/cliSigner.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
@@ -96,6 +96,35 @@ const exited = (server: Server): Promise<number | null> =>
       resolve(code);
     }),
   );
+
+// A wait with a bound: past it, the test fails saying what it waited for, whether the server still runs, what it printed and
+// what Ergo heard (F13188: on GitHub's coverage run one wait hung two minutes and said nothing).
+const bounded = async <T>(
+  what: string,
+  wait: Promise<T>,
+  at: { server: Server; peer?: Peer; ms: number },
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const { child, out } = at.server;
+      const ended = child.exitCode ?? child.signalCode;
+      const state = ended === null ? "still runs" : `ended (${String(ended)})`;
+      const heard = (at.peer?.lines ?? []).slice(-30).join(" | ");
+      reject(
+        new Error(
+          `waited ${String(at.ms)} ms for ${what}; the server ${state}; its stderr: ${out.stderr.slice(-2000)}; ` +
+            `its stdout: ${out.stdout.slice(-2000)}; Ergo heard: ${heard}`,
+        ),
+      );
+    }, at.ms);
+  });
+  try {
+    return await Promise.race([wait, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 const listening = (server: Server): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -312,7 +341,8 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await left;
   });
 
-  // Two minutes: under the coverage's instrumentation on GitHub's four cores it ran past one, twice (gate run 43599405799).
+  // Two minutes: under the coverage's instrumentation on GitHub's four cores it ran past one, twice (gate run 43599405799),
+  // then past two (F13188); each wait now has its own bound, their sum under the test's, so a hang names itself.
   it(
     "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
     { timeout: 120_000 },
@@ -330,20 +360,25 @@ describe("the server's process", { timeout: 30_000 }, () => {
         JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
       );
       const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
-      await listening(server);
-      const peer = await ergo.peer(0);
-      await welcome(peer);
+      await bounded("the server's listening line", listening(server), { server, ms: 15_000 });
+      const peer = await bounded("the server's connection to Ergo", ergo.peer(0), { server, ms: 15_000 });
+      await bounded("the server's registration, OPER and JOIN", welcome(peer), { server, peer, ms: 15_000 });
       for (let n = 0; n < 5; n += 1) {
         peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
         peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
       }
       // The mute's own line: the room's flags go out first, with the JOINs (3m).
-      expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
+      const muted = await bounded("the mute's SAMODE", peer.next(/^SAMODE #bubble [+-]b /), {
+        server,
+        peer,
+        ms: 30_000,
+      });
+      expect(muted).toBe(`SAMODE #bubble +b m:${other}`);
       peer.say("PING :settled");
-      await peer.next(/^PONG settled$/);
+      await bounded("the PONG after the mute", peer.next(/^PONG settled$/), { server, peer, ms: 15_000 });
       expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
       server.child.kill("SIGTERM");
-      expect(await exited(server)).toBe(0);
+      expect(await bounded("the exit on SIGTERM", exited(server), { server, peer, ms: 15_000 })).toBe(0);
       const db = new DatabaseSync(env["DATABASE"] ?? "");
       const index = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
