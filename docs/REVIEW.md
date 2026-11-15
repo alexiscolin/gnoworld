@@ -75,7 +75,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
    with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
    runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
    `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
-   missing fail the step). One review per slice, at its last merge (the speed plan, 2026-11-06). Each finding names its
+   missing fail the step). One review a pull request, before Alexis's merge (D13181). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).
@@ -109,9 +109,9 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
 8. **Keep it cheap.** Each branch runs in a new session of its own, in its own worktree, two at
    most at once; the chief session plans, integrates and reads GitHub's gate. Agents are fresh,
    briefed from files, four at most at once, each asked for a short report: its findings, one row
-   each with its evidence. A workspace is reviewed whole once per slice, at its true last merge.
-   A commit's gate runs the unit tests related to a tier-1 change, the whole suite at a part's end
-   (`sh scripts/check.sh` on the committed tree) and on every pull request (`docs/HARNESS.md`, "The gate"). A fix of about 20
+   each with its evidence. Before asking for a push, the session runs once every job GitHub will run on the change,
+   `sh scripts/check.sh` whole among them (D13178, D13186); GitHub's gate runs them again on the pull request
+   (`docs/HARNESS.md`, "The gate"). A fix of about 20
    product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
@@ -126,9 +126,8 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
 |---|---|---|
 | Retouch | a look tried live in the workshop (ping-pong) | at the batch's end: the gate, the pictures of the screens it touches, one `reviewer` |
 | Small fix | about 20 product lines, no tier-1 or harness file | its test seen failing, the gate, the journeys that watch it, one `reviewer` |
-| Feature | product code with no tier-1 or harness file | tests first and the red pass, one combined review (the design apart only for how space looks), two lots at most |
+| Feature | product code with no tier-1 or harness file | new logic a small test, one combined review a pull request (D13181; the design apart only for how space looks), two lots at most |
 | Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
-| Radical (until the hardening slice) | a part that touches no tier-1 file and no harness file | no test written and no agent review while it builds; the types, the lint, the build, the secrets' scan, the copies' check and the first screen's cap hold; the hardening slice writes its tests and reviews it before `main` |
 
 The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
 A way to game a display's ranking or count (a ticker, a trend) is a low, kept for after the demo, never a round of its own.

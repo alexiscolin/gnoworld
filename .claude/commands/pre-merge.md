@@ -10,11 +10,11 @@ A branch's Workflow `branch` (`.claude/workflows/branch.js`) runs steps 1, 3, 4 
 lines that loosen the net and its tokens; the branch session then runs steps 2 and 6 to 9. The chief session runs them all
 on the slice's last merge.
 
-0. **The speed plan (2026-11-06).** One review per slice, at its last merge, not per branch; the `security-reviewer` and `gno-auditor` only on a
+0. **The speed plan (2026-11-06).** One review a pull request (D13181); the `security-reviewer` and `gno-auditor` only on a
    tier-1 or harness change (docs/REVIEW.md); no `finding-verifier`; StrykerJS by hand (`pnpm run mutate`; GitHub's gate runs it on the changed
    tier-1 lines alone, failing on no survivor yet: F13184). Since D13168 GitHub's gate judges the pull request; check.sh is the commit gate.
-1. **No tokens first.** Run `sh scripts/check.sh` on the committed tree (Prettier, ESLint, the types, gno and the node, ui and compiled projects' tests
-   but the `timing` ones; knip, jscpd, the journeys and the rest are GitHub's), and read
+1. **No tokens first.** The committed tree passed `sh scripts/check.sh` before each commit (Prettier, ESLint, the types, gno and the node, ui and
+   compiled projects' tests but the `timing` ones; knip, jscpd, the journeys and the rest are GitHub's, CLAUDE.md); read
    GitHub's gate on the pull request once it is pushed (`gate-ok`). If one fails, run the failing lane or job's command alone, fix,
    and run it again; stop and report if it still fails. Write the diff to `.claude/tmp/diff.patch` and pass
    agents its path, never its content. Past the size `docs/REVIEW.md` allows (about 400 lines of
@@ -44,17 +44,16 @@ on the slice's last merge.
    finding fixed in a tier-1 file, and only its lens, on the diff since the first; the
    `design-reviewer` runs again only on the screens of a high finding of its own that a fix changed.
    A fourth round does not run: stop and reconsider with Alexis.
-6. **The operator's tests.** Every branch asks Alexis once, after every fix is committed, for
-   `deploy/test.sh` on the host (and its `--mutants` for a branch that changes `deploy/`), run in the
-   background while the review goes on; never in between. He runs it from a checked copy of the commit
-   he reviewed, never from the worktree: hand him `docs/OPERATIONS.md`'s "Run test.sh from the commit
-   you reviewed" with that commit's full sha (F4927). An app change alone broke the web image
-   in slice 4, found days later at the slice's end (F2133-F2136).
-7. **Report** to Alexis, in French: the review card of `CLAUDE.md` (in the first slices, its
-   items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");
+6. **The operator's tests.** `deploy/test.sh` is GitHub's deploy-stack job on a pull request that touches `deploy/`
+   (D13180). Alexis runs it by hand only to debug, from a checked copy of the commit he reviewed, never from the
+   worktree (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed", F4927). Until F13163 is fixed deploy-stack is red on
+   Linux: read it check by check, any red but F13163's two a finding, and on a pull request that touches `deploy/` Alexis runs
+   `deploy/test.sh` and its `--mutants` (narrowed by `ONLY_MUTANTS`) from the reviewed commit, named in the pull request (D13191).
+7. **Report** to Alexis, in French: the review card of `CLAUDE.md`, the findings held back until he has reviewed ("Blind first");
    the findings, most severe first, each with its scenario and its tag (important, nit, or
    pre-existing: in the code before the branch); the low list; what was dropped, one line each.
-8. **Check the final code.** On the final committed code, run `sh scripts/check.sh`.
+8. **Before the push.** After the last fix, run once every job GitHub will run on the change, `sh scripts/check.sh`
+   whole among them (D13186); step 1's run counts when no commit followed it.
 9. **Log.** Append to `docs/review-log.md`: the date, the branch, its rounds, each finding with its
    agent and outcome, the tokens and hours the branch took, and what Alexis caught that the agents
    missed, and commit it. `main` takes the branch through its pull request, merged by Alexis on GitHub (D13165).

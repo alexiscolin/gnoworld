@@ -1,5 +1,5 @@
 ---
-description: The dream, at a slice's end or at night — the read-only dreamer agent over the slice's evidence proposes rule and memory changes, each with its evidence; Alexis accepts each, reading every memory's full text first.
+description: The dream, at a slice's end (D13182) — the read-only dreamer agent over the slice's evidence proposes rule and memory changes, each with its evidence; Alexis accepts each, reading every memory's full text first.
 argument-hint: "<slice number> [the slice's shared folder, if not .claude/tmp/slice-<n>]"
 ---
 

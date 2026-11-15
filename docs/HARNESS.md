@@ -29,7 +29,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 
 From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 - **Alexis** approves each slice's plan, reviews blind first, runs what the
-  sandbox refuses (Docker's `deploy/test.sh`, the merge into `main`, the push), and accepts or
+  sandbox refuses (the push, the merge into `main` on GitHub, `deploy/test.sh` by hand while F13163 lasts), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its range of F numbers
@@ -101,7 +101,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), each finding reproduced, high and medium fixed,
    low ones listed for Alexis.
-8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch, from a copy of the commit he reviewed
+8. **Alexis reviews,** blind first, and merges on GitHub. `deploy/test.sh` is the gate's deploy-stack job on a change to `deploy/` (D13180); run by
+   hand to debug, it runs from a copy of the commit he reviewed
    whose commit and files hash to its name (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed"), never from a worktree. It takes a lock per Docker project
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
@@ -369,7 +370,7 @@ costs context in every session.
   the section of the probe or hook tests that belongs to it (`ONLY=<section>`): a guard whose
   removal no test notices is a guard nobody checks, and the run prints the test to add.
 - **A removal or a narrowing lands with no test of its own** (Alexis, 2026-11-04): three read-only passes read it (a `reviewer`, the
-  `security-reviewer`, a second `reviewer` over the gate as a whole), and the whole suite runs at a part's end and before main; a case
+  `security-reviewer`, a second `reviewer` over the gate as a whole), and every job GitHub runs runs once before the push (D13186); a case
   that tested what is removed goes with it, on a `Removed-test:` line.
 - **A new guard lands with its planted fault and its mutant.** Each `/pre-merge` writes to the
   review log how many verified findings it found in the harness itself; if that number does not
@@ -446,8 +447,8 @@ costs context in every session.
   that runs code in a child process other than the server's (`app/src/dataFiles.test.ts` builds the app) runs for a change
   of code only when the graph holds it, and a read through a place built from another's (`join(APP, "..", "deploy")`) is seen
   as its base; a path built at run time from no literal the grep knows is not seen. Markdown is prose outside the sources only,
-  for the gate (a recorded chain page under them is a fixture). A part's end
-  (`sh scripts/check.sh` on the committed tree) and GitHub's gate run every test of the fast projects, the night the rest.
+  for the gate (a recorded chain page under them is a fixture). The run before a push
+  (`sh scripts/check.sh` on the committed tree, D13186) and GitHub's gate run every test of the fast projects, the night the rest.
 - **A commit runs no gate** (D13173): a session that commits without `sh scripts/check.sh` first meets its types, lint and tests at
   GitHub's gate, on the pull request; pre-commit's Prettier and check_docs read the disk, so a staged file must be as it is there.
 - **Core's tests alone run on both engines,** Node's V8 and Chromium's (F816, F817).

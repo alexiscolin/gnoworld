@@ -241,8 +241,9 @@ development or test-GPU build only; a production build holds no trace of it.
   of the system's temporary directory (never in the repository), and a missing or failing `openssl` fails the test with its message, it
   never skips. `memory.test.ts` runs the real codecs at their cap in a child with the image's flags and reads the peak resident memory,
   which must stay under the container's 256 MiB. What needs Docker (the reader's isolation, its way out, its guard rules) is
-  `deploy/test-links.sh`, which `deploy/test.sh` sources: run `deploy/test.sh` from the commit you reviewed (docs/OPERATIONS.md) after any
-  change to `deploy/`, the reader or what it fetches; it needs the network for its controls (`example.com`).
+  `deploy/test-links.sh`, which `deploy/test.sh` sources: GitHub's deploy-stack job runs `deploy/test.sh` on a change to `deploy/`
+  (D13180), not yet on one to the reader or what it fetches (F13210), after which it is run by hand, from the commit you reviewed
+  (docs/OPERATIONS.md); it needs the network for its controls (`example.com`).
 
 ## Jarvis's evals
 

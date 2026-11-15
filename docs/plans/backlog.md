@@ -222,8 +222,9 @@ What the ping-pong decided or found and left for parts of their own (`.claude/tm
 
 ## Slice 13's days, 2026-11-10 to 11-12
 
-Built on `pingpong`, not yet in `main`: `main` takes it after the hardening slice (tests and journeys for every behaviour, the pictures, no
-regression, a security review of the whole, `deploy/test.sh` green). The demo is the evening of 2026-11-12, run from the Docker stack on
+Built on `pingpong`, now in `main` without its tests (the radical mode, withdrawn by D13183): the hardening slice still owes them
+(tests and journeys for every behaviour, the pictures, no regression, a security review of the whole, D13929's eight-angle deep
+review, `deploy/test.sh` green; D13918). The demo is the evening of 2026-11-12, run from the Docker stack on
 Alexis's Mac behind Tailscale Funnel (D13944, D13030): no new big part waits for it beyond the rows below.
 
 | What | State | Plan |
