@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { onEarth, raw, record, type Frame } from "./earthStage.ts";
 
-// The dive (D429, the flights) is untouched by the bubbles' spin and lean (D13916): lines of yours arrive while the camera flies down to
+// The dive (the flights) is untouched by the bubbles' spin and lean: lines of yours arrive while the camera flies down to
 // /earth and while it flies out, and the same dive with no line is the control. Each frame records the camera, the ground's spin and lean.
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 

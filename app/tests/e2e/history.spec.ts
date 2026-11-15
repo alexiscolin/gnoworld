@@ -3,8 +3,8 @@ import { expect, test } from "./fixtures.ts";
 import { opened } from "./scripted.ts";
 import { GUEST, OTHER, T, tagmsg } from "./talk.ts";
 
-// R1: a page of 200 history items that are all reactions holds no line; the page reads on, before its oldest, and shows
-// the lines there (docs/decisions.md, 2026-10-26). A scripted Ergo (scripted.ts).
+// A page of 200 history items that are all reactions holds no line; the page reads on, before its oldest, and shows
+// the lines there. A scripted Ergo (scripted.ts).
 test("shows the lines before a page of 200 reactions, never a room with no message", async ({ page }) => {
   test.slow();
   const reactions = Array.from({ length: 200 }, (_, n) =>

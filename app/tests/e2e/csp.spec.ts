@@ -3,7 +3,7 @@ import { controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures
 import { headerRules, nginxTable } from "./cspFiles.mjs";
 import { BUILD, GUARDED, SITE } from "./sites.ts";
 
-// The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
+// The policy's shape: the unit test pins its words, this the page's every answer.
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')*; style-src 'self'; img-src 'self' data:; " +
     "font-src 'self'; connect-src 'self'( https://[a-z0-9.:-]+)*; worker-src 'self'; manifest-src 'self'; " +
@@ -15,9 +15,9 @@ const HASH = /'sha256-[^']+'/g;
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
 
 test.describe("the content security policy", () => {
-  // 5f: one policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at
+  // One policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at
   // 2,000 characters (Cloudflare Pages) takes any number of worlds by line length; its 100 rules take about 20 (the build
-  // stops past them, F2452).
+  // stops past them).
   test("is a policy of the right shape on every answer: each page, the fallback, files, a 400, a 401 and a 500", async ({
     request,
   }) => {
@@ -37,7 +37,7 @@ test.describe("the content security policy", () => {
     for (const answer of answers) expect(answer.headers()["content-security-policy"]).toMatch(SHAPE);
   });
 
-  // F2451: a _headers host matches the request path, and a path no page names is served a document that runs the app.
+  // A _headers host matches the request path, and a path no page names is served a document that runs the app.
   test("gives a path the build never made the catch-all's policy, not none", async ({ request }) => {
     const headers = readFileSync(new URL("client/_headers", BUILD), "utf8");
     const catchAll = headerRules(headers).get("/*");
@@ -106,7 +106,7 @@ test.describe("the content security policy", () => {
         );
       }, html);
       const named = served.match(HASH) ?? [];
-      // A path the build never made falls to the catch-all, which names the home's scripts as well (F2451).
+      // A path the build never made falls to the catch-all, which names the home's scripts as well.
       if (path === "/nowhere") for (const hash of found) expect(named, path).toContain(hash);
       else expect(found.toSorted(), path).toEqual(named.toSorted());
     }
@@ -179,7 +179,7 @@ test.describe("a planted violation", () => {
     expect(page.url()).toBe(`${SITE}/`);
   });
 
-  // F883: a service's own site is no player: a frame of youtube.com, not youtube-nocookie.com, is refused.
+  // A service's own site is no player: a frame of youtube.com, not youtube-nocookie.com, is refused.
   test("refuses a frame of a host the players' list does not name", async ({ page, violations }) => {
     await page.goto("/");
     await hydrated(page);
@@ -190,7 +190,7 @@ test.describe("a planted violation", () => {
     await expect.poll(() => violations).toEqual(["frame-src"]);
   });
 
-  // F885: frame-src names each service's player by its path, so its host's other pages are refused; any such page
+  // frame-src names each service's player by its path, so its host's other pages are refused; any such page
   // let through is answered here, the test reaching no one.
   test("refuses a frame of an accepted host outside its player's path", async ({ page, violations }) => {
     await page.route(/^https:\/\/(?:www\.youtube-nocookie\.com|player\.vimeo\.com|giphy\.com)\//, (route) =>
@@ -208,8 +208,8 @@ test.describe("a planted violation", () => {
     await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
   });
 
-  // 5g: connect-src names the data's RPC origins, so a fetch to one is let through (answered here, the test reaching no
-  // one) and the same fetch to any other https host is refused: what the browser enforces, not a header compared with itself (F461).
+  // connect-src names the data's RPC origins, so a fetch to one is let through (answered here, the test reaching no
+  // one) and the same fetch to any other https host is refused: what the browser enforces, not a header compared with itself.
   test("lets a fetch through to a listed RPC origin and refuses one to an unlisted https host, once", async ({
     page,
     violations,
@@ -247,7 +247,7 @@ test.describe("a planted violation", () => {
     await expect.poll(() => violations).toEqual(["script-src"]);
   });
 
-  // F468: the worker has a global scope of its own, where the page's listener never runs.
+  // The worker has a global scope of its own, where the page's listener never runs.
   test("is reported from inside the service worker too: a fetch the worker makes to another site", async ({
     page,
     violations,

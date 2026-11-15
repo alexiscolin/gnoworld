@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { running } from "./sceneStage.ts";
 
-// Space's two views (7v; Alexis, 2026-11-03, the mock-ups he approved and the GUI board's option B) on a phone, on the gate's software GPU,
+// Space's two views on a phone, on the gate's software GPU,
 // from Onyx's recorded file.
 const HOME = "/?test-gpu";
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
@@ -12,7 +12,7 @@ test.describe.configure({ timeout: 180_000 });
 
 const views = (page: Page) => page.getByRole("group", { name: "Views of space" });
 
-// F4691: on a phone the views bar broke its names under the two icons ("EART H", "COSMO S", "LIS T", in 283a3b45's approved picture). Each
+// On a phone the views bar must not break its names under the two icons ("EART H", "COSMO S", "LIS T"). Each
 // view's name stands on one line, at 390 and 320 px; the icons only once a scene runs, after View in space, in a pill of their own over the
 // scene, off the bar and inside the screen.
 const linesOfNames = (page: Page) =>

@@ -2,7 +2,7 @@ import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 
-// The Earth's New room button (D394) is in the rooms list of an account's chat, in the full chat's rail and in the dock's menu (slice 13).
+// The Earth's New room button is in the rooms list of an account's chat, in the full chat's rail and in the dock's menu.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
 test.describe("the Earth's New room button", () => {

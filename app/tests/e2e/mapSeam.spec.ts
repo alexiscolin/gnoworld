@@ -3,7 +3,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 
 // Where a map's two ends meet, a lookup that takes the wrong longitude, or another's derivatives, reads a far mip or a far place: a line
 // down every world. This runs the shader's own lookup in WebGL2 over a probe map, at both longitudes where one of the two values jumps.
-// Its limit: a software GPU rounds alike in every pixel of a quad, so the shimmer of a real GPU cannot show here (b373ac20); this holds the choice.
+// Its limit: a software GPU rounds alike in every pixel of a quad, so the shimmer of a real GPU cannot show here; this holds the choice.
 const WIDTH = 256;
 const HEIGHT = 128;
 

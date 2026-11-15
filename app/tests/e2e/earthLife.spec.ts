@@ -9,7 +9,7 @@ import type { WebSocketRoute } from "@playwright/test";
 import { axeOf } from "./axe.ts";
 
 // The Earth's life (frames 43 to 55, 85): what people say, where they say it from, over the globe, on a scripted Ergo so every run shows the
-// same words. Each line declares its country as 7j's will: a tag on the wire. The hour is fixed: at 21:30 UTC, Europe is in the night.
+// same words. Each line declares its country as a real line will: a tag on the wire. The hour is fixed: at 21:30 UTC, Europe is in the night.
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
 const LATER = "2026-11-02T21:30:01.000Z";

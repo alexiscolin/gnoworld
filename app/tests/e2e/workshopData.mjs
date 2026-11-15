@@ -5,7 +5,7 @@ import { readFile } from "node:fs";
 import { join } from "node:path";
 
 const FILES = ["worlds.json", "worlds-count.json", "markets.json"];
-// Each realm's rollup (13a), as nginx serves it: that one name, under /rollups/, from the folder of the same name beside the worlds' file.
+// Each realm's rollup, as nginx serves it: that one name, under /rollups/, from the folder of the same name beside the worlds' file.
 const ROLLUP = /^\/rollups\/([0-9a-f]{32}\.json)$/;
 
 // The middleware: a GET or HEAD of exactly `/<name>` (no query, no encoding, no suffix) is answered from `dir`; any other request goes on.

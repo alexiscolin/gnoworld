@@ -1,5 +1,5 @@
 // The journeys' relay (api.mjs) stands for nginx: a page gone ends its request upstream, or each stream it held keeps one
-// of the server's 1,000 slots for good, and late journeys meet a 429 (F5763: typing.spec.ts, once 9g's pages opened more).
+// of the server's 1,000 slots for good, and late journeys meet a 429.
 import { createServer, get, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
 import { relay } from "./api.mjs";

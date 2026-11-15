@@ -2,9 +2,9 @@ import { inGames, lineOf, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { chipOf, inThread, panel, threadField, threadOf } from "./thread.ts";
 
-// 4d's threads through the real Ergo: a reply is a PRIVMSG tagged +reply with the root's msgid, which Ergo relays to the
+// Threads through the real Ergo: a reply is a PRIVMSG tagged +reply with the root's msgid, which Ergo relays to the
 // room, stores and replays from its history (server/src/testing/ergo.test.ts), so a thread must come back after a
-// reload. Another account's reply reaching the open panel is the scripted journey's, and ergo.test.ts's (R18).
+// reload. Another account's reply reaching the open panel is the scripted journey's, and ergo.test.ts's.
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 
 // A line said in the room's composer, shown once Ergo echoed it.

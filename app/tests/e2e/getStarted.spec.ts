@@ -1,7 +1,7 @@
 import { expect, hydrated, test } from "./fixtures.ts";
 import { connectButton } from "./account.ts";
 
-// D13017: a Connect with no Adena opens the steps; Adena's coming, seen without a reload, shows Connect; a guest closes it.
+// A Connect with no Adena opens the steps; Adena's coming, seen without a reload, shows Connect; a guest closes it.
 const SHOTS = process.env["GET_STARTED_SHOTS"];
 const sizes = { computer: { width: 1280, height: 900 }, phone: { width: 390, height: 800 } };
 

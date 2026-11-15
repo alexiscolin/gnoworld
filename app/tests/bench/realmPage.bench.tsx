@@ -1,4 +1,4 @@
-// The realm page reader's budget (docs/plans/slice-5-part-2.md §4), measured by scripts/bench.py, run by hand: linear in
+// The realm page reader's budget, measured by scripts/bench.py, run by hand: linear in
 // bytes, under 50 ms at the 256 KB cap, timed at 16, 64 and 256 KB so a quadratic step shows as a ratio, not a lucky page.
 import { page, PAGE_MAX_BYTES } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -39,7 +39,7 @@ const OPENERS = "<gno-form>\n<gno-columns>\n> [!NOTE]\n```\n"
   .repeat(Math.ceil(PAGE_MAX_BYTES / 38))
   .slice(0, PAGE_MAX_BYTES);
 
-// A fence's line of blanks and a mark, the shape a regex with two runs of blanks pays half a minute for (R-F1).
+// A fence's line of blanks and a mark, the shape a regex with two runs of blanks pays half a minute for.
 const BLANKS = ("```" + " ".repeat(PAGE_MAX_BYTES - 8) + "!").slice(0, PAGE_MAX_BYTES);
 
 /** One read timed; a page the reader calls too big, or any answer but a page, throws: the bench then has no sample. */

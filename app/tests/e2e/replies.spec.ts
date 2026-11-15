@@ -4,7 +4,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { opened } from "./scripted.ts";
 import { asAccount, barOf, field, GUEST, HISTORY, OTHER, ROOM, T, tagged } from "./talk.ts";
 
-// 4d's replies (docs/decisions.md, 2026-10-26): Reply on a line's bar; the composer says which line the next answers,
+// Replies: Reply on a line's bar; the composer says which line the next answers,
 // sends it tagged +reply, and the reply quotes its line; the target is the room's, gone with a room switch, with its
 // line deleted, or once the line went out. A scripted Ergo (scripted.ts).
 const form = (page: Page) => page.getByRole("form", { name: "Write in #games" });
@@ -42,7 +42,7 @@ test.describe("replies", () => {
     expect(said()).toEqual([`PRIVMSG ${ROOM} :plain`]);
   });
 
-  // F1175 (the UX review's U3): Escape in the field cancels the reply, as the Cancel button does, and keeps the draft.
+  // Escape in the field cancels the reply, as the Cancel button does, and keeps the draft.
   test("cancel a reply with Escape in the field, the draft and the focus kept", async ({ page }) => {
     const { said } = await asAccount(page);
     await replyTo(page, 1);
@@ -57,7 +57,7 @@ test.describe("replies", () => {
     expect(said()).toEqual([`PRIVMSG ${ROOM} :half a thought`]);
   });
 
-  // F1178 (the UX review's U6): a quote stays one line, cut by an ellipsis, wherever it is: over the field the cancel
+  // A quote stays one line, cut by an ellipsis, wherever it is: over the field the cancel
   // stands on its row, and on a phone's width too.
   test("keep a reply's quote and the reply bar to one line on a phone's screen, the cancel on the bar's row", async ({
     page,
@@ -109,13 +109,13 @@ test.describe("replies", () => {
     expect(said()).toEqual([`@+reply=m2 PRIVMSG ${ROOM} :this one`]);
   });
 
-  // The green pass (G8): each Reply puts the focus in the field, the same line's again included.
+  // Each Reply puts the focus in the field, the same line's again included.
   test("put the focus in the field at each Reply, the same line's a second time too", async ({ page }) => {
     await asAccount(page);
     await replyTo(page, 0);
     await expect(field(page)).toBeFocused();
     await lines(page).nth(1).focus();
-    // The focus moved: its line's bar shows until the pointer moves again (U11); it leaves, then comes back.
+    // The focus moved: its line's bar shows until the pointer moves again; it leaves, then comes back.
     await page.mouse.move(0, 0);
     await replyTo(page, 0);
     await expect(field(page)).toBeFocused();
@@ -124,7 +124,7 @@ test.describe("replies", () => {
     await expect(field(page)).toBeFocused();
   });
 
-  // The code review (CR2): an edit of the line being answered changes the words the composer quotes, never the focus.
+  // An edit of the line being answered changes the words the composer quotes, never the focus.
   test("leave the focus where the reader put it when the line being answered is edited", async ({ page }) => {
     const { ergo } = await asAccount(page);
     await replyTo(page, 1);
@@ -136,7 +136,7 @@ test.describe("replies", () => {
     await expect(rooms).toBeFocused();
   });
 
-  // The code review (CR4): the reply cancelled, the focus goes to the field, never to the page.
+  // The reply cancelled, the focus goes to the field, never to the page.
   test("give the field the focus once the reply is cancelled", async ({ page }) => {
     await asAccount(page);
     await replyTo(page, 1);
@@ -146,7 +146,7 @@ test.describe("replies", () => {
     await expect(field(page)).toBeFocused();
   });
 
-  // The green pass (G7): the composer quotes a line as the room shows it, its author's edit folded in.
+  // The composer quotes a line as the room shows it, its author's edit folded in.
   test("quote an edited line by its edited words", async ({ page }) => {
     await asAccount(page, () => ({
       replayed: [tagged("e1", "the first line, fixed", { at: 2, tags: "+gnoworld/edit=m1" })],
@@ -156,7 +156,7 @@ test.describe("replies", () => {
     await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line, fixed");
   });
 
-  // R4: the line being answered is the room's: another room's line goes out answering none, and the reply is gone on
+  // The line being answered is the room's: another room's line goes out answering none, and the reply is gone on
   // coming back.
   test("leave the reply behind on a room switch: the other room's line answers none", async ({ page }) => {
     const { said } = await asAccount(page);

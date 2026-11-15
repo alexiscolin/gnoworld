@@ -2,8 +2,8 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { accountPill } from "./account.ts";
 import { logIn, phoneOf } from "./namesChain.ts";
 
-// The name dialog as it looks (9f; frames 9 to 15), on a computer and on a phone, which only reads. The pictures are made and
-// approved on the Mac Studio (decision 4238523f). The face is drawn from the test wallet's address, drawn anew at each server's
+// The name dialog as it looks (frames 9 to 15), on a computer and on a phone, which only reads. The pictures are made and
+// approved on the Mac Studio. The face is drawn from the test wallet's address, drawn anew at each server's
 // start: it is masked, and its look is the Avatar's own pictures' and NameDialog.test.tsx's.
 test.describe("the name dialog, as it looks", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });

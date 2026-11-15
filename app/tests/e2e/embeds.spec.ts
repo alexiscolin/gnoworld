@@ -5,7 +5,7 @@ import { MEMBER, scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { SITE } from "./sites.ts";
 import { axeOf } from "./axe.ts";
 
-// 4g (docs/decisions.md, 2026-10-26; slice 4's plan §1, §3): a link's player loads on a click, once "checked"; no
+// A link's player loads on a click, once "checked"; no
 // third party is reached before. The verdicts' stream answered here, each (re)connection reading `verdicts()`; every
 // request to another host recorded and answered here, so the test reaches no one. #games on a scripted Ergo.
 const GUEST = "guest-zzzzzz";
@@ -20,7 +20,7 @@ const event = (msgid: string, state: "checked" | "hidden") =>
 interface Room {
   away: string[];
   asked: string[];
-  /** A line said in #games now, as Ergo sends it live; at `time` if given. */
+  /** A line said in #games, as Ergo sends it live; at `time` if given. */
   say: (id: string, text: string, time?: string) => void;
 }
 
@@ -29,7 +29,7 @@ async function room(page: Page, verdicts: () => string, status = 200): Promise<R
   const away: string[] = [];
   const asked: string[] = [];
   const site = new URL(SITE).host;
-  // When the stream began following, as the server tells after its replay (F890): the test's start, on its own clock.
+  // When the stream began following, as the server tells after its replay: the test's start, on its own clock.
   const since = `event: since\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`;
   await page.route(
     (url) => url.host !== site && url.hostname !== "flush.invalid",
@@ -61,7 +61,7 @@ async function room(page: Page, verdicts: () => string, status = 200): Promise<R
   };
   return { away, asked, say };
 }
-// A line said once the stream follows the room has its verdict from it, the server asked of none (F884); one dated
+// A line said once the stream follows the room has its verdict from it, the server asked of none; one dated
 // before, said after it, marks when a request for the first would have gone.
 async function asksNothingSaidSince(page: Page) {
   const asked: string[] = [];
@@ -107,7 +107,7 @@ test.describe("a link's player", () => {
     expect(away).toEqual([]);
   });
 
-  // F871: a hide that comes once the player plays takes the player away, the third party's frame with it.
+  // A hide that comes once the player plays takes the player away, the third party's frame with it.
   test("takes a playing player away when the moderation hides its line later", async ({ page }) => {
     let said = event("v1", "checked");
     await room(page, () => said);
@@ -116,13 +116,13 @@ test.describe("a link's player", () => {
     await expect(player).toBeVisible();
     said = event("v1", "hidden");
     await expect(player).toHaveCount(0);
-    // The player's own buttons: the line holds the focus the player had, so its message bar (4c) shows.
+    // The player's own buttons: the line holds the focus the player had, so its message bar shows.
     await expect(
       lineOf(page, "watch").getByRole("button", { name: /^(Play the YouTube video|Close the player)$/ }),
     ).toHaveCount(0);
   });
 
-  // Alexis, 2026-10-26: a line older than the stream's replay gets its verdict from GET /api/verdicts, asked for the
+  // A line older than the stream's replay gets its verdict from GET /api/verdicts, asked for the
   // lines in view with a player and no verdict, and answered for a room the reader may read.
   test("asks the server the verdict of a line the stream never told, and plays it once checked", async ({ page }) => {
     const asked: string[] = [];
@@ -137,12 +137,12 @@ test.describe("a link's player", () => {
     expect(away).toEqual([]);
   });
 
-  // F884: asking the server too made every reader ask for every new link at once.
+  // The server is not asked as well: every reader would ask for every new link at once.
   test("asks the server nothing of a line said after the page began following the room", async ({ page }) => {
     await asksNothingSaidSince(page);
   });
 
-  // F890: the page dated the stream's opening by its own clock; five minutes ahead, it asked of a line said since.
+  // A page clock five minutes ahead must not make it ask of a line said since the stream's opening.
   test("asks the server nothing of a line said after the stream began, the page's clock five minutes ahead", async ({
     page,
   }) => {
@@ -150,8 +150,8 @@ test.describe("a link's player", () => {
     await asksNothingSaidSince(page);
   });
 
-  // U1, U10 (F895, F899): Play swapped the card for the frame, the focus fell to the page, and the frame of a line near
-  // the list's end opened below the list's view.
+  // Play swaps the card for the frame: the focus must not fall to the page, and the frame of a line near
+  // the list's end must open inside the list's view.
   test("gives the player the focus and its whole frame in the list's view on Play", async ({ page }) => {
     let said = "";
     const { say } = await room(page, () => said);
@@ -171,7 +171,7 @@ test.describe("a link's player", () => {
     }).toPass();
   });
 
-  // U7 (F1053): an animation looped for good, a video played on, and nothing on the page stopped them.
+  // An animation looping for good and a video playing on must be stoppable from the page.
   test("stops a player on its reader's word, the frame gone and the focus back on Play", async ({ page }) => {
     const { away } = await room(page, () => event("v1", "checked"));
     await play(page).click();
@@ -182,7 +182,7 @@ test.describe("a link's player", () => {
     expect(away).toEqual([PLAYER]);
   });
 
-  // U5 (F896): a hide that took away the player holding the focus left it on the page, where the reader lost it.
+  // A hide that takes away the player holding the focus must not leave it on the page, where the reader would lose it.
   test("gives the focus back to its line when a hide takes away the player holding it", async ({ page }) => {
     let said = event("v1", "checked");
     await room(page, () => said);
@@ -193,7 +193,7 @@ test.describe("a link's player", () => {
     await expect(lineOf(page, "watch")).toBeFocused();
   });
 
-  // F888: the stream given up (a 429: a fifth tab, a shared address), a line said since waited for good.
+  // The stream given up (a 429: a fifth tab, a shared address): a line said since must not wait for good.
   test("asks the server of a line said after the stream began once the browser gave the stream up", async ({
     page,
   }) => {
@@ -211,7 +211,7 @@ test.describe("a link's player", () => {
     expect(asked.some((url) => url.endsWith("ids=v3"))).toBe(true);
   });
 
-  // F889: no verdict from the stream or the server, the card waited for good; now it says it could not check.
+  // With no verdict from the stream or the server, the card says it could not check and never waits for good.
   test("says it could not check a link whose verdict never comes", async ({ page }) => {
     await page.clock.install();
     await page.route("**/api/verdicts?**", (route) => route.fulfill({ json: { room: "#bubble/games", verdicts: [] } }));
@@ -221,7 +221,7 @@ test.describe("a link's player", () => {
     await expect(lineOf(page, "watch")).toContainText("Couldn't check this link");
   });
 
-  // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).
+  // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked.
   test("shows none to a reader who saves data, and asks no verdict", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(Navigator.prototype, "connection", { configurable: true, get: () => ({ saveData: true }) });
@@ -241,8 +241,8 @@ test.describe("a link's player", () => {
     expect(told).toEqual([]);
   });
 
-  // F893 (CR6): Data saver was read once by the asker, at every render by the lines: switched off after the page
-  // opened, a new line offered a card that waited for good on a stream never opened.
+  // Data saver is read at every render by the lines and by the asker alike: switched off after the page
+  // opened, a new line must not offer a card that waits for good on a stream never opened.
   test("offers no player while the page runs once it opened saving data, whatever the browser says later", async ({
     page,
   }) => {
@@ -269,7 +269,7 @@ test.describe("a link's player", () => {
     await expect(lineOf(page, "watch").locator("iframe")).toBeVisible();
     // The frame's own document is the service's (here a stand-in): axe reads the page around it.
     expect((await axeOf(page).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
-    // F881: on a phone's screen too, the frame whole inside its line, at a video's 16/9.
+    // On a phone's screen too, the frame whole inside its line, at a video's 16/9.
     await page.setViewportSize({ width: 390, height: 800 });
     expect((await axeOf(page).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
     const frame = await lineOf(page, "watch").locator("iframe").boundingBox();

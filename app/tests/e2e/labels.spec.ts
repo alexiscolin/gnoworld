@@ -3,7 +3,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { goInPage, labelsOf, landed, running, shownLabels } from "./sceneStage.ts";
 import { axeOf } from "./axe.ts";
 
-// The universe's names (D401, the demo's pills), read off the engine's own layer (`options.labels`): text, never an address; a door where
+// The universe's names (the demo's pills), read off the engine's own layer (`options.labels`): text, never an address; a door where
 // one shows and no pointer where none does; none over a page that frames its planet. On the software GPU, with the recorded worlds' file.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
@@ -42,7 +42,7 @@ test("names what the view at rest draws, never by an address", async ({ page }) 
   }
 });
 
-// ADR-0003, 2e: a shown label is a door to its world; a hidden one takes no pointer, so every other click goes through to the cosmos.
+// ADR-0003: a shown label is a door to its world; a hidden one takes no pointer, so every other click goes through to the cosmos.
 test("lets every click through to the cosmos but where a shown label stands: a hidden label takes no pointer", async ({
   page,
 }) => {

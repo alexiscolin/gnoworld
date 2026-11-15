@@ -4,10 +4,10 @@ import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, T, tabsTo, tagmsg } from "./talk.ts";
 
-// The lines sent, each label as a star: what a label says is the link's own (F1170).
+// The lines sent, each label as a star: what a label says is the link's own.
 const unlabelled = (sent: readonly string[]) => sent.map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
 
-// 4d's reactions (docs/decisions.md, 2026-10-26): three quick reactions on a line's bar, a line's reactions under it as
+// Reactions: three quick reactions on a line's bar, a line's reactions under it as
 // chips, counted once an account, an account's own pressed, sent and shown only through Ergo, whose echo says it took
 // one. A scripted Ergo (scripted.ts).
 test.describe("reactions", () => {
@@ -73,8 +73,8 @@ test.describe("reactions", () => {
     ]);
   });
 
-  // The green pass (G1): mine stays pressed, on the chip and on the bar, when another account reacts after me.
-  // The code review (CR4): taking back the last of an emoji from its chip, which goes, hands the focus to its line.
+  // Mine stays pressed, on the chip and on the bar, when another account reacts after me.
+  // Taking back the last of an emoji from its chip, which goes, hands the focus to its line.
   test("hand the focus to the line when its chip goes with the reaction taken back", async ({ page }) => {
     await asAccount(page, (address) => ({
       replayed: [tagmsg("r1", "+draft/react=🎉;+reply=m1", { at: 2, who: address })],
@@ -86,7 +86,7 @@ test.describe("reactions", () => {
     await expect(lines(page).nth(0)).toBeFocused();
   });
 
-  // The code review (CR3): a reaction that grows the newest line, read at the end, keeps the list at its end.
+  // A reaction that grows the newest line, read at the end, keeps the list at its end.
   test("keep the list at its end as a reaction grows the newest line", async ({ page }) => {
     const history = Array.from({ length: 40 }, (_, n): HistoryLine => [`h${String(n)}`, T(n), `line ${String(n)}`]);
     const { ergo } = await asAccount(page, () => ({ history }), 40);
@@ -113,7 +113,7 @@ test.describe("reactions", () => {
     await expect(barOf(page, 0).getByRole("button", { name: "React with 👍" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  // The green pass (G4): a reaction that cannot go out, the chat away, is said at once and sends nothing. Ergo
+  // A reaction that cannot go out, the chat away, is said at once and sends nothing. Ergo
   // scripted: its first socket answers, then closes; the next ones never answer.
   test("say a reaction could not go while the chat is away, and send nothing", async ({ page }) => {
     const address = await logIn(page, word("talk"));
@@ -133,7 +133,7 @@ test.describe("reactions", () => {
     expect(sent.filter((line) => line.includes(" TAGMSG "))).toEqual([]);
   });
 
-  // R3: a chip the keyboard reaches by Tab acts on Enter and on Space, as a button does.
+  // A chip the keyboard reaches by Tab acts on Enter and on Space, as a button does.
   test("reach a line's chip by Tab from the line, and press it with Enter, then with Space", async ({ page }) => {
     const { said } = await asAccount(page, () => ({
       replayed: [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })],
@@ -152,8 +152,8 @@ test.describe("reactions", () => {
     ]);
   });
 
-  // F1171 (the UX review's U2): the bar stands before the chips in the Tab order, so Reply is 5 presses from the line
-  // whatever the line holds (three quick reactions and Add reaction come first, D376), and the chips follow More.
+  // The bar stands before the chips in the Tab order, so Reply is 5 presses from the line
+  // whatever the line holds (three quick reactions and Add reaction come first), and the chips follow More.
   test("reach a line's bar by Tab before its 20 chips, then the chips", async ({ page }) => {
     const emoji = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂")].map(
       ({ segment }) => segment,
@@ -170,7 +170,7 @@ test.describe("reactions", () => {
     expect(await tabsTo(page, line.getByRole("button", { name: "😀, 1" }), 6)).toBeLessThanOrEqual(5);
   });
 
-  // F1172 (U9): the chips are a group named for what they are.
+  // The chips are a group named for what they are.
   test("name a line's chips as a group, Reactions, to a guest and to an account", async ({ page }) => {
     const replayed = [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })];
     await opened(page, GUEST, { history: HISTORY, replayed });
@@ -207,7 +207,7 @@ test.describe("reactions", () => {
   });
 });
 
-// R10: Ergo refuses a reaction where the account may not speak; the page shows none it did not echo, and says so.
+// Ergo refuses a reaction where the account may not speak; the page shows none it did not echo, and says so.
 test.describe("a reaction Ergo refused", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 

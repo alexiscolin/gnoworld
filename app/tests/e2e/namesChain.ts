@@ -4,8 +4,8 @@ import { adena } from "./adena.ts";
 import { callWallet, connect, phoneOf as touchPhone, type Wallet } from "./callCard.ts";
 import { hydrated, type Page } from "./fixtures.ts";
 
-// The name journeys' world (9f): both chains' RPC stood in as a browser gets them, and a login made on a computer then read at the
-// size under test. NOT recorded: the shapes of vm/qeval and tx as the 9d journeys write them.
+// The name journeys' world: both chains' RPC stood in as a browser gets them, and a login made on a computer then read at the
+// size under test. NOT recorded: the shapes of vm/qeval and tx as the journeys write them.
 const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
 const BASE64_HASH = "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=";
 export const NAME = "nym-alexis042";

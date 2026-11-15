@@ -111,7 +111,7 @@ async function policyOfRelease(file) {
 }
 
 // The policy of an answer: a page's, as a host that reads _headers picks it, by the request path (the rule that names it, else
-// the catch-all `/*`, whatever file is served there: F2451); a release's from the bytes it is sent with; any other file the
+// the catch-all `/*`, whatever file is served there); a release's from the bytes it is sent with; any other file the
 // bare one, as nginx's map sends its default.
 async function policyOf(file, pathname, deployed) {
   if (!file.endsWith(".html")) return BARE;
@@ -147,7 +147,7 @@ function host({ bumping = false, password = false }) {
       relay(backend.ws, request, response);
       return;
     }
-    // A network gone for every page's chat at once (4b's reconnect journey).
+    // A network gone for every page's chat at once (the reconnect journey).
     if (request.method === "POST" && pathname === "/__drop") {
       dropSockets(new URL(request.url ?? "/", "http://host").searchParams.get("tag") ?? "");
       response.writeHead(204).end();

@@ -3,7 +3,7 @@ import { logIn } from "./irc.ts";
 import { lines } from "./chat.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 
-// How the room's pins and what an account keeps look (slice 4's 4d), on a computer's screen and a phone's: the page's
+// How the room's pins and what an account keeps look, on a computer's screen and a phone's: the page's
 // socket answered by a scripted Ergo (scripted.ts) and the pins' answer fixed, so each picture is the same each run. The
 // account's saved lines are on its device before the page loads; the header, which names the wallet, is masked.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

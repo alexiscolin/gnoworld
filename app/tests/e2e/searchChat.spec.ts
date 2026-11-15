@@ -3,7 +3,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { answerSearchFrom } from "./searchServer.mjs";
 
-// The chat's search (search.md part C): ⌘⇧F opens it, the words find a line through the real server's index, a result opens its room at the
+// The chat's search: ⌘⇧F opens it, the words find a line through the real server's index, a result opens its room at the
 // message with "Back to the latest" over it, and the way back leaves it. CROPS, when set, is a folder the states are photographed to.
 const CROPS = process.env["SEARCH_CROPS"];
 const field = (page: Page) => page.getByRole("searchbox", { name: /^Search messages in/ });

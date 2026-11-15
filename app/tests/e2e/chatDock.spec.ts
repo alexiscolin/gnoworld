@@ -5,7 +5,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { pixelHash } from "./pixels.ts";
 
-// 5q fix pass, review 1: a world's page is the video's (frames 20 to 35): the plate at the left, the chat a dock at the right
+// A world's page is the video's (frames 20 to 35): the plate at the left, the chat a dock at the right
 // inside the one outline, and expanded (frames 56 to 77) the same chat full bleed over the page. The state is in the address.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const near = (value: number, wanted: number, slack = 2) => {
@@ -146,7 +146,7 @@ test.describe("a world's page: the dock and the full chat", () => {
   });
 });
 
-// Review 2 (F1763): a chunk of the chat that cannot be fetched leaves its own place alone, never the page.
+// A chunk of the chat that cannot be fetched leaves its own place alone, never the page.
 test.describe("a chunk of the chat that cannot be fetched", () => {
   // The worker would serve the chunk from its cache, which a route does not see.
   test.use({ serviceWorkers: "block" });

@@ -1,4 +1,4 @@
-// What the chat's journeys share (slice 4): a word of a test's own, the room's lines and people, and an account of
+// What the chat's journeys share: a word of a test's own, the room's lines and people, and an account of
 // the test's own in #games.
 import type { Locator } from "@playwright/test";
 import { expect, hydrated, type Page } from "./fixtures.ts";
@@ -7,10 +7,10 @@ import { logIn } from "./irc.ts";
 /** A word of its own for each test, so none reads another's lines, or its own retry's. */
 export const word = (what: string): string => `${what}-${crypto.randomUUID().slice(0, 8)}`;
 const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
-/** A room's lines: the Messages list's own items, never those of a line that is a list (F814), nor the day dividers between days. */
+/** A room's lines: the Messages list's own items, never those of a line that is a list, nor the day dividers between days. */
 export const lines = (page: Page) => messages(page).locator(":scope > li:not([role='separator'])");
 export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
-/** A line's buttons but its author's name, which opens the person's card (5a1e8335): the chips, the bar, the players. */
+/** A line's buttons but its author's name, which opens the person's card: the chips, the bar, the players. */
 export const buttonsOf = (line: Locator) => line.locator("button:not([data-author] > button)");
 export const whoIsHere = (page: Page) => page.getByRole("region", { name: "Who's here" });
 /** Presses the header's Who's here: its own button, or where the header's width leaves it under "More" (a phone's), that menu's item. */

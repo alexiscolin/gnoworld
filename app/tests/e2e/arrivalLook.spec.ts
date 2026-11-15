@@ -3,9 +3,9 @@ import { accountPill, connectButton } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 
-// How the arrival banners look (slice 9h, frames 90 to 97), on a phone and a computer. No journey reaches first words (the
+// How the arrival banners look (frames 90 to 97), on a phone and a computer. No journey reaches first words (the
 // journeys' moderation has no key), so the page is handed the answers a server would give; the pictures are approved on the
-// Mac Studio (decision 4238523f), never here.
+// Mac Studio, never here.
 const SIZES = [
   ["phone", 390, 844],
   ["computer", 1728, 1080],
@@ -54,8 +54,8 @@ test.describe("the arrival banners, as they look", () => {
   }
 });
 
-// The review's F5627: from 1400 px the banner floats over the scene and the page makes no room for it, but another flash
-// that stays (the update notice) still pushes the page down while a banner shows (F2165), and a narrower page makes room for
+// From 1400 px the banner floats over the scene and the page makes no room for it, but another flash
+// that stays (the update notice) still pushes the page down while a banner shows, and a narrower page makes room for
 // the banner as for any flash.
 test.describe("the banner beside the page", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });

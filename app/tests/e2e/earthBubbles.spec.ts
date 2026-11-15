@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { onEarth, raw, record, type Frame, type Said } from "./earthStage.ts";
 
-// The Earth's bubbles in a real browser (D13998): a line whose country is in view moves nothing and shows over its country; one that is not
+// The Earth's bubbles in a real browser: a line whose country is in view moves nothing and shows over its country; one that is not
 // turns the Earth once, one way, eased, then it keeps its own spin. Every frame is recorded: the ground's lead, what faces the eye, each bubble.
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const DEGREE = Math.PI / 180;

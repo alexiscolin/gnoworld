@@ -3,7 +3,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { another, logIn } from "./irc.ts";
 import { MEMBER, opened, type Scripted } from "./scripted.ts";
 
-// 4d-dm-bar (docs/decisions.md, 2026-10-27): a direct message's lines get the message bar, as a room's: react, reply,
+// A direct message's lines get the message bar, as a room's: react, reply,
 // edit and delete one's own. Still no player (the server sees no direct message, so has no verdict), no link to copy.
 // Most journeys run on a scripted Ergo, so the bytes the page sends are read; the last runs two accounts on the real one.
 const PARTNER = MEMBER;
@@ -146,7 +146,7 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  // R2 and R7(a) (redpass-dmb): what is typed in the edit box never reaches the reader's kept draft, and the focus stays in
+  // What is typed in the edit box never reaches the reader's kept draft, and the focus stays in
   // the field when the edit goes.
   test("leaves an edit unsent on Escape or Cancel, the draft the reader had kept, the focus in the field", async ({
     page,
@@ -185,7 +185,7 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  // R5: the second edit of a line names the line, not the first edit, and starts from the edited words.
+  // The second edit of a line names the line, not the first edit, and starts from the edited words.
   test("edits a line twice: each correction names the original line, the box starting from the last words", async ({
     page,
   }) => {
@@ -208,7 +208,7 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  // R7(b), decided by Claude: an emptied box sends nothing and stays in edit mode; unchanged words close the edit, sending nothing.
+  // An emptied box sends nothing and stays in edit mode; unchanged words close the edit, sending nothing.
   test("sends nothing for an edit emptied, which stays open, nor for one left as it was, which closes", async ({
     page,
   }) => {
@@ -227,7 +227,7 @@ test.describe("a direct message's bar", () => {
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :as written`]);
   });
 
-  // R7(c), decided by Claude: Edit drops a pending Reply, so the next plain message answers nothing.
+  // Edit drops a pending Reply, so the next plain message answers nothing.
   test("drops a pending reply when Edit is chosen: the correction and the next line carry no +reply", async ({
     page,
   }) => {
@@ -252,7 +252,7 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  // R8, F1562 answered by Claude (keep), then CR2 (F1871): a refused edit's words come back in the box with the edit open
+  // A refused edit's words come back in the box with the edit open
   // again, and why is said; Save sends the correction tagged as before, not a new message beside the line.
   test("puts a refused edit's words back in the box, saying its partner is not online, the line unchanged", async ({
     page,
@@ -309,7 +309,7 @@ test.describe("a direct message's bar", () => {
     await dialog.getByRole("button", { name: "Delete message" }).click();
     await expect(lines(page)).toHaveCount(1);
     await expect(flash(page, "Message deleted.")).toBeVisible();
-    // The correction's REDACT first, the line's last (F2001).
+    // The correction's REDACT first, the line's last.
     expect(dm.says().filter((line) => line.startsWith("REDACT"))).toEqual([
       `REDACT ${PARTNER} echo2`,
       `REDACT ${PARTNER} echo1`,
@@ -370,7 +370,7 @@ test.describe("a direct message's bar", () => {
     expect((await bar.boundingBox())?.height ?? Infinity).toBeLessThan(56);
   });
 
-  // R10: the edit bar, its buttons and a long line fit a phone's width.
+  // The edit bar, its buttons and a long line fit a phone's width.
   test("fits a phone's screen while a line is edited: the bar, the field and both buttons in view, no sideways scroll", async ({
     page,
   }) => {
@@ -406,7 +406,7 @@ test.describe("a direct message's bar", () => {
 });
 
 // Two accounts on the real Ergo, each in its conversation with the other: what one does with a line the other sees. Each
-// journey is its own, so its name says which act failed (R9).
+// journey is its own, so its name says which act failed.
 test.describe("a direct message's bar, between two accounts", () => {
   const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
   // Bob's page first, connected to Ergo, which delivers a line to an account that is; then mine, and one line of mine.

@@ -1,4 +1,4 @@
-// The workshop's backend (scripts/workshop.sh; Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"): the journeys' real server and real
+// The workshop's backend (scripts/workshop.sh): the journeys' real server and real
 // Ergo (api.mjs), on the ports the workshop gave its app's dev server to proxy (vite.config.ts's workshopBackend), allowing the origins it
 // serves the app from. It lives until a signal, which stops both and removes their folders (startBackend).
 // Usage: node workshopBackend.mjs <the server's port> <Ergo's port> <Ergo's WebSocket port> <origin>...

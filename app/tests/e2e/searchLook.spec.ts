@@ -1,6 +1,6 @@
 import { expect, hydrated, test } from "./fixtures.ts";
 
-// How slice 5's 5n palette looks, on a phone and on a computer: with its results, and with none. The dialog alone is drawn.
+// How the palette looks, on a phone and on a computer: with its results, and with none. The dialog alone is drawn.
 const WIDTHS = [390, 1280] as const;
 
 for (const width of WIDTHS) {

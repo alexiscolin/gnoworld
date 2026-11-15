@@ -1,9 +1,9 @@
-// The account in the header, as the journeys reach it (8p, frames 6 and 17): its one pill once logged in, the way out in its menu, and a
+// The account in the header, as the journeys reach it (frames 6 and 17): its one pill once logged in, the way out in its menu, and a
 // phone given a computer's session, since a phone cannot log in.
 import type { Locator, Page, PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 
-/** The account's pill in the header once logged in (8p, frame 17): its face and short address, opening the menu that holds the way out. */
+/** The account's pill in the header once logged in (frame 17): its face and short address, opening the menu that holds the way out. */
 export const accountPill = (page: Page) => page.getByRole("button", { name: /Your account/ });
 
 /** The header's Connect button for a reader logged out (the welcome card holds another named alike, so it is read in the banner). */

@@ -63,7 +63,7 @@ export const ANSWERS = {
   },
 } as const satisfies Record<string, Answer>;
 
-export interface FakeAdena {
+interface FakeAdena {
   /** Every method asked, in order, with its first argument. */
   asked: { call: string; arg?: unknown }[];
   adena: Record<string, (...args: unknown[]) => unknown>;

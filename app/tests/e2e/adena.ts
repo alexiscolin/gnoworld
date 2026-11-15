@@ -1,8 +1,8 @@
 import type { Page } from "./fixtures.ts";
 
-// A stand-in for Adena, for the journeys that log in (slice 4's 4a). It answers as Adena's SDK types it and
+// A stand-in for Adena, for the journeys that log in. It answers as Adena's SDK types it and
 // signs through the host's test wallet of that name (serve.mjs, /__sign?as=), as signer.ts does for the server's
-// tests; it keeps what it was asked to sign.
+// tests; it lists what it was asked to sign (`__asked`).
 type Mode = "signs" | "declines" | "locked";
 export async function adena(page: Page, mode: Mode = "signs", as = ""): Promise<void> {
   await page.addInitScript(
@@ -12,7 +12,7 @@ export async function adena(page: Page, mode: Mode = "signs", as = ""): Promise<
       const wallet = async (): Promise<{ address: string }> =>
         (await fetch(`/__wallet${as}`)).json() as Promise<{ address: string }>;
       const asked: unknown[] = [];
-      // Adena's events: the listeners kept as the SDK keeps them, for a journey to emit (adena.emit below).
+      // Adena's events: the listeners, held as the SDK holds them, for a journey to emit (adena.emit below).
       const listeners: Record<string, ((value: unknown) => void)[]> = {};
       Object.assign(window, {
         __asked: asked,

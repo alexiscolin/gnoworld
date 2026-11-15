@@ -8,7 +8,7 @@ import { asAccount, barOf, field, GUEST, OTHER, ROOM, T, tabsTo, tagged, tagmsg 
 import { chipOf, closeButton, inThread, panel, threadField, threadOf } from "./thread.ts";
 import { axeOf } from "./axe.ts";
 
-// 4d's threads (docs/plans/chat-features.md, M3): a reply chain found in the room's own lines; a chip under its root, or
+// Threads: a reply chain found in the room's own lines; a chip under its root, or
 // a line's More menu, opens it beside the room; every reply from it is tagged +reply with the root's msgid (scripted.ts).
 // A root, a line that is none, a reply to the root and a reply to that reply: the root has two replies.
 const BASE: readonly HistoryLine[] = [
@@ -77,7 +77,7 @@ test.describe("threads", () => {
     await expect(chipOf(lines(page).first())).toHaveText(/^3 replies\b/);
     await expect(lines(page)).toHaveCount(5);
     await expect(threadField(page)).toHaveText("");
-    // After a send the focus stays in the field, for the next line (R14).
+    // After a send the focus stays in the field, for the next line.
     await expect(threadField(page)).toBeFocused();
     // The room's own composer says its line plain: the panel's tag is the panel's.
     await field(page).fill("in the room");
@@ -87,7 +87,7 @@ test.describe("threads", () => {
     await expect(inThread(page)).toHaveCount(4);
   });
 
-  // R3: a Reply asked in the room is the room composer's alone: the panel's line goes to its root, and sends nothing
+  // A Reply asked in the room is the room composer's alone: the panel's line goes to its root, and sends nothing
   // to the room's pending target, nor clears it.
   test("sends from the panel to the root, the room's pending Reply to its own line, neither taking the other's", async ({
     page,
@@ -110,7 +110,7 @@ test.describe("threads", () => {
     expect(said().at(-1)).toBe(`@+reply=m2 PRIVMSG ${ROOM} :to the unrelated line`);
   });
 
-  // R2: the room's unsent draft is the room's: the panel's field opens empty, and what it holds is kept on no device.
+  // The room's unsent draft is the room's: the panel's field opens empty, and what it holds is kept on no device.
   test("keeps the room's draft apart from the panel's field, which opens empty and keeps no draft", async ({
     page,
   }) => {
@@ -140,7 +140,7 @@ test.describe("threads", () => {
     await expect(field(page)).toHaveText("keep me");
   });
 
-  // R4: a thread opened over another is a new panel: nothing typed for the first goes to the second.
+  // A thread opened over another is a new panel: nothing typed for the first goes to the second.
   test("switches from one thread to another with the panel open: its own lines, an empty field, its own root's tag", async ({
     page,
   }) => {
@@ -173,7 +173,7 @@ test.describe("threads", () => {
     await expect(lines(page)).toHaveCount(6);
   });
 
-  // R1: an author's edit of a reply is folded out of the room's list; the panel agrees with the chip.
+  // An author's edit of a reply is folded out of the room's list; the panel agrees with the chip.
   test("reads an author's edit of a reply as the reply's words, not as a reply, in the chip and the panel", async ({
     page,
   }) => {
@@ -186,7 +186,7 @@ test.describe("threads", () => {
     await expect(lines(page)).toHaveCount(4);
   });
 
-  // R8: the root hidden while the panel is open: its words leave the title and the first row, the replies stay, and the
+  // The root hidden while the panel is open: its words leave the title and the first row, the replies stay, and the
   // composer keeps tagging the id of the line that was (a reply to an earlier message, as the window's own).
   test("takes a hidden root's words out of the open panel, its replies kept, the composer still on its msgid", async ({
     page,
@@ -205,7 +205,7 @@ test.describe("threads", () => {
     expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :still here`]);
   });
 
-  // The stated limit (decisions, 2026-10-27): a deleted reply takes the replies it had out of the thread, they answer a
+  // The stated limit: a deleted reply takes the replies it had out of the thread, they answer a
   // message that is gone; the lines stay in the room.
   test("takes the replies of a deleted middle reply out of the thread, the count falling with them", async ({
     page,
@@ -236,7 +236,7 @@ test.describe("threads", () => {
     await expect(root).toBeFocused();
   });
 
-  // R14: a thread opened from a reply's menu gives the focus back to that reply.
+  // A thread opened from a reply's menu gives the focus back to that reply.
   test("gives the focus back to the reply whose menu opened the thread", async ({ page }) => {
     await open(page);
     await threadOf(lineOf(page, "a reply to the reply"));
@@ -244,7 +244,7 @@ test.describe("threads", () => {
     await expect(lineOf(page, "a reply to the reply")).toBeFocused();
   });
 
-  // R14: no line to give the focus to: the room's own stop, never the page.
+  // No line to give the focus to: the room's own stop, never the page.
   test("gives the focus to a line of the room, never the page, when the line that opened the thread is gone", async ({
     page,
   }) => {
@@ -261,11 +261,11 @@ test.describe("threads", () => {
     await expect(lines(page).last()).toHaveAttribute("tabindex", "0");
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
-    // The focus moves a frame after the panel goes: the stop, not any line of the list (G4).
+    // The focus moves a frame after the panel goes: the stop, not any line of the list.
     await expect(lines(page).last()).toBeFocused();
   });
 
-  // R14: Escape belongs to what has the focus: the room's composer keeps it, the panel stays.
+  // Escape belongs to what has the focus: the room's composer keeps it, the panel stays.
   test("leaves the panel open when Escape is pressed in the room's own composer", async ({ page }) => {
     await open(page);
     await chipOf(lines(page).first()).click();
@@ -324,7 +324,7 @@ test.describe("threads", () => {
     await expect(buttonsOf(inThread(page))).toHaveCount(0);
   });
 
-  // G2: the panel's rows are no stop of the room's list, so a link in one is a Tab stop of its own, after Close.
+  // The panel's rows are no stop of the room's list, so a link in one is a Tab stop of its own, after Close.
   test("keeps a link of the panel in the Tab order: one Tab from Close reaches it", async ({ page }) => {
     const text = "see [the docs](https://example.com/fine)";
     await open(page, { replayed: [tagged("m3", text, { at: 2, tags: "+reply=m1", who: OTHER })] }, 3);
@@ -347,14 +347,14 @@ test.describe("threads", () => {
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
     await expect(lines(page).first()).toBeFocused();
-    // G6: a guest has no field, so a thread opened over another gives Close the focus again.
+    // A guest has no field, so a thread opened over another gives Close the focus again.
     await chipOf(lines(page).first()).click();
     await threadOf(lineOf(page, "an unrelated line"));
     await expect(inThread(page)).toHaveText([/an unrelated line/]);
     await expect(closeButton(page)).toBeFocused();
   });
 
-  // R9: a guest's keyboard: the chip on the line the focus is on, and the More menu's item, which every line holds.
+  // A guest's keyboard: the chip on the line the focus is on, and the More menu's item, which every line holds.
   test("lets a guest reach a thread by keyboard, by its chip and by a line's More menu", async ({ page }) => {
     await opened(page, GUEST, { history: BASE, replayed: REPLIES });
     await expect(lines(page)).toHaveCount(4);
@@ -417,7 +417,7 @@ test.describe("threads", () => {
     expect(sockets).toHaveLength(2);
   });
 
-  // The words of the root and of a reply are a sender's (R5): text nodes, never markup they build, and no script runs.
+  // The words of the root and of a reply are a sender's: text nodes, never markup they build, and no script runs.
   test("shows a root's and a reply's markup, a script and unsafe links as text, and runs none", async ({ page }) => {
     const text = '<img src=x onerror="window.pwned=1"> <script>window.pwned=1</script> [x](javascript:window.pwned=1)';
     const links = "[d](data:text/html,<script>window.pwned=1</script>) [e](//evil.example/x) @g1notanaddress";
@@ -438,7 +438,7 @@ test.describe("threads", () => {
     expect(await page.evaluate(() => String(Reflect.get(window, "pwned")))).toBe("undefined");
   });
 
-  // R6: the room's list waits on the moderation's verdict before a player; the panel draws none, so a link to an
+  // The room's list waits on the moderation's verdict before a player; the panel draws none, so a link to an
   // accepted service in a thread reaches no third party, opened or not.
   test("reaches no embed host when a thread with links to accepted services opens", async ({ page }) => {
     const hosts = /youtube|vimeo|giphy/;
@@ -457,7 +457,7 @@ test.describe("threads", () => {
     expect(asked).toEqual([]);
   });
 
-  // 4f's reading place is the room's (R15): opening a thread, scrolling its lines, moves no place.
+  // The reading place is the room's: opening a thread, scrolling its lines, moves no place.
   test("moves no reading place by opening and reading a thread", async ({ page }) => {
     const address = await logIn(page, word("thread"));
     const heard: string[] = [];
@@ -474,7 +474,7 @@ test.describe("threads", () => {
     expect(marks(heard)).toEqual(before);
   });
 
-  // ADR-0001 §12: the panel's code is no part of the first screen: asked at the first thread opened, never before.
+  // The panel's code is no part of the first screen: asked at the first thread opened, never before.
   test.describe("code", () => {
     test.use({ serviceWorkers: "block" });
     test("loads the panel's code when a thread is first opened, never before", async ({ page }) => {

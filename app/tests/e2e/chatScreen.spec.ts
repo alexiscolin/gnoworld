@@ -5,7 +5,7 @@ import { open, PIN } from "./chatScreenOpen.ts";
 import { scriptedErgo } from "./scripted.ts";
 import { axeOf } from "./axe.ts";
 
-// 5q: the chat as the video shows it (frames 23.58.01 and 23.57.54 of .claude/tmp/slice-5/video-frames): worlds, rooms,
+// The chat as the video shows it (frames 23.58.01 and 23.57.54): worlds, rooms,
 // conversation and info panel at a computer's width, the conversation first at a phone's. Scripted Ergo, so each run draws
 // the same lines; the measured boxes are chatGeometry.spec.ts's.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

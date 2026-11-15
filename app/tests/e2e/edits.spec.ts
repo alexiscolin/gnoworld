@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures.ts";
 import { opened } from "./scripted.ts";
 import { GUEST, HISTORY, OTHER, tagged } from "./talk.ts";
 
-// 4d's edits shown (F664; docs/decisions.md, 2026-10-21): a correction by the line's own account shown in its place,
+// Edits shown: a correction by the line's own account shown in its place,
 // marked edited; another account's a line of its own, as a plain IRC client shows it. A scripted Ergo (scripted.ts).
 test.describe("edits", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });

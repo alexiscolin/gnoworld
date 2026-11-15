@@ -15,7 +15,7 @@ const SLOW = { timeout: 90_000 };
 // A software GPU decodes and uploads four maps, and draws a frame, in tens of seconds at the worst.
 test.describe.configure({ timeout: 180_000 });
 
-// The Earth's maps the page asks for, as it asks for them, from now on.
+// The Earth's maps the page asks for, as it asks for them.
 function mapsAsked(page: Page): string[] {
   const asked: string[] = [];
   page.on("request", (request) => {

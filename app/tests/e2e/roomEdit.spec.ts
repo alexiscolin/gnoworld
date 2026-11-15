@@ -3,7 +3,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { opened, type HistoryLine, type Scripted } from "./scripted.ts";
 import { asAccount, barOf, field, GUEST, HISTORY, ROOM, T, tagged, twoInGames } from "./talk.ts";
 
-// slice-4-room-edit (docs/decisions.md, 2026-10-28, F1560): a room's own lines get Edit as a direct message's do (dmBar.spec.ts):
+// A room's own lines get Edit as a direct message's do (dmBar.spec.ts):
 // its words in the composer, sent tagged +gnoworld/edit with the line's msgid, shown in the line's place marked edited.
 // Most journeys run on a scripted Ergo, so the bytes the page sends are read; the last runs two accounts on the real one.
 const menu = (page: Page) => page.getByRole("menu", { name: "Message actions" }).getByRole("menuitem");
@@ -139,8 +139,8 @@ test.describe("a room's lines: Edit", () => {
     expect(said()).toEqual([`@+gnoworld/edit=m1 PRIVMSG ${ROOM} :my first words, fixed`]);
   });
 
-  // R7 (redpass-red): the device keeps the reader's draft, never the words of an edit, and a reload mid-edit gives the
-  // draft back; the room is told the account types while an edit is typed (F1924, the decision: kept).
+  // The device keeps the reader's draft, never the words of an edit, and a reload mid-edit gives the
+  // draft back; the room is told the account types while an edit is typed.
   test("keeps the reader's draft on the device through an edit, none of the edit's words in it, a reload giving it back", async ({
     page,
   }) => {
@@ -224,8 +224,8 @@ test.describe("a room's lines: Edit", () => {
     ]);
   });
 
-  // The room has no outbox: Ergo's refusal of a correction (here a numeric, unlabelled) is heard by no one, as a plain line's is
-  // (F1920), so the line stays as it was and no phantom correction shows.
+  // The room has no outbox: Ergo's refusal of a correction (here a numeric, unlabelled) is heard by no one, as a plain line's is,
+  // so the line stays as it was and no phantom correction shows.
   test("leaves the line as it was when Ergo refuses the correction, and shows no correction", async ({ page }) => {
     const { said } = await asMember(page, () => ({ refuseTagged: true }));
     await startEdit(page, 0);
@@ -264,7 +264,7 @@ test.describe("a room's lines: Edit", () => {
     await expect(lines(page)).toHaveCount(1);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveText("a draft in progress");
-    // The box says so (F2004) until the draft changes, across the remount of the writer (R4 of the second red pass).
+    // The box says so until the draft changes, across the remount of the writer.
     await expect(page.getByText("That message is gone.", { exact: true })).toBeVisible();
     await field(page).press("End");
     await field(page).pressSequentially("!");
@@ -346,7 +346,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     await field(page).press("Enter");
     await expect(lineOf(bob.page, text)).toHaveCount(1);
     // The line holds the focus, not the pointer: on #games, shared by the journeys running at once, a line arriving moves
-    // the list under a pointer, and the bar goes with it to the line then under it (F2066).
+    // the list under a pointer, and the bar goes with it to the line then under it.
     await lineOf(page, text).focus();
     await lineOf(page, text).getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Edit" }).click();

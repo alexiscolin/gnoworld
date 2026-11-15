@@ -1,9 +1,9 @@
 import { openSettings } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// Slice 8's discovery on the device (docs/plans/slice-8.md §1 and §6), walked in the built site: a stamp survives a reload; every setting
+// Discovery on the device, walked in the built site: a stamp survives a reload; every setting
 // takes effect with no reload and survives one, the safety notices showing with every setting; the menu by keyboard; the device's views by
-// address and the browser's back; a phone's menu; "Go explore" to today's stop with its pill. Pictures wait for Alexis's ping-pong.
+// address and the browser's back; a phone's menu; "Go explore" to today's stop with its pill.
 const PHONE = { width: 390, height: 844 };
 const COMPUTER = { width: 1728, height: 1000 };
 

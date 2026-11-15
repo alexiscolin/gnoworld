@@ -7,12 +7,10 @@ import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, reactMark,
 import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
-// ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: 265,038 B on 2026-11-12; 278,607 B measured after the review's fixes of 2026-11-13, a world's,
-// 256 B ahead (D13948, D13135, provisional till the hardening; its history D386 on).
+// ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
+// The Earth's or a world's page, exact: its measured size, 256 B ahead.
 const FIRST_SCREEN_JS = 278_863;
-// A page with no plate (the home), exact: 262,551 B on 2026-11-12; 275,999 B measured after the review's fixes of 2026-11-13, 256 B ahead
-// (D13948, D13135, provisional till the hardening; its history D386 on).
+// A page with no plate (the home), exact: its measured size, 256 B ahead.
 const PLAIN_FIRST_SCREEN_JS = 276_255;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
@@ -63,7 +61,7 @@ test(
 
 // A page of its own, planted where the site is served: what its entry imports, statically, as it runs and after a fetch, is its first
 // screen; what a timer, a frame or an idle callback asks is not. Then frames and short timers run, while an idle callback or a timer of
-// a second or more waits until the test lets it go, whatever the load (F5410).
+// a second or more waits until the test lets it go, whatever the load.
 test(
   "the first screen counts what a page imports as it runs, never what its timers ask",
   { tag: "@gate" },
@@ -124,7 +122,7 @@ test(
     await letTimersGo(page);
     const later = [...short, ...putOff].sort();
     await expect.poll(() => asked(later)).toEqual(later);
-    // A held call cleared before it ran never runs once the rest goes (R5).
+    // A held call cleared before it ran never runs once the rest goes.
     expect([...seen.scripts].map(name)).not.toContain("cleared.js");
     // The guard of every page's run names them: asked, and under no cap.
     expect(
@@ -137,67 +135,60 @@ test(
 );
 
 // A world's chat comes after hydration (Chat.tsx's boundary), its lines' view only once a room holds a line
-// (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
+// (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view.
 const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // A page that holds the chat and space (the Earth's, a world's): its chat waits for space's first frame, or 2.5 s once the page is on screen
-// (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's, which
-// the old door's chunk (mountUniverse, D401) replaced.
+// (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09; 45,824 B
-// with the realm plate's moved bytes (slice 13); 46,464 B on 2026-11-11, 46,208 B measured with the chat's move on Web Animations
-// (D13980), 256 B ahead; 50,032 B on 2026-11-12 (49,776 B measured, 256 B ahead; D13948); 54,797 B on 2026-11-13 (54,541 B measured).
+// What leaves the first screen keeps a cap of its own, with what it asks once open: 54,541 B measured, 256 B ahead.
 const LATE_CHAT_JS = 54_797;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
-// A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
-// the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
-// where the bytes come from: hardening).
+// A world with a realm reads its proposals from the chain once hydrated (world.tsx): their chunk, asked after the first screen, and
+// the scripts only it needs, under a cap of their own.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 const PROPOSALS_JS = 35_631;
-// A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
+// A world's pinned actions on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
-// A plate's late chunks, each capped at its size and 256 B (8g, D386); EarthPlate 46,535 B and HubPlate 45,647 B with the card opened
-// alone's Room (D13979), the worlds file's reader and schema realms 694 B and worlds 870 B (D13973); the others as measured on the plate's
-// commit (Plate weighed once, in the plate's chunk); no RealmPlate cap, no journey reaches it.
+// A plate's late chunks, each capped at its size and 256 B (Plate is weighed once, in the plate's chunk); no RealmPlate cap, no journey
+// reaches it.
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 60664, // 2026-11-15, the typed reads sharing core's args chunk: 60,408 B measured, 256 B ahead (D13304)
-  HubPlate: 56992, // 2026-11-15, the typed reads sharing core's args chunk: 56,736 B measured, 256 B ahead (D13304)
+  EarthPlate: 60664, // 60,408 B measured, 256 B ahead
+  HubPlate: 56992, // 56,736 B measured, 256 B ahead
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
   hours: 618,
   Bars: 3336,
   ChartedBy: 608,
-  realms: 8604, // two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,348 B of realm code (D13304); hardening splits them
+  realms: 8604, // two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,348 B of realm code
   worlds: 1126,
-  // A bubble's words with the plain text they are cut from, asked once a bubble shows: 535 B on 2026-11-13, 256 B ahead.
+  // A bubble's words with the plain text they are cut from, asked once a bubble shows: 535 B measured, 256 B ahead.
   BubbleWords: 791,
   plain: 682,
 };
-// So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
+// Its page's capture, on the plate of a world with a realm: a chunk of its own, asked after the first screen, capped at its size and 256 B.
 // It is weighed beyond the proposals' code, which the same page loads.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
-// 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B; 5,212 B in the timer-held
-// measure on slice-7's merge into slice-8, the realm page's drawing (RealmBlocks) and the chat's (Message) counted here, the capture
-// asking for both (Alexis, 2026-11-05); 8,685 B with D382's tables and alerts, 256 B ahead (D386); 10,095 B on the ping-pong of 2026-11-09 (9,839 B measured), 256 B ahead (+1,410 B).
+// The realm page's drawing (RealmBlocks) and the chat's (Message) are counted here, the capture asking for both: 10,181 B measured, 256 B ahead.
 const PREVIEW_JS = 10_437;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
-// And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.
+// And the realm page's drawing (RealmBlocks), a chunk of its own through its slot: the capture's three parts.
 const PAGE_DRAWING = /\/assets\/RealmBlocks-[\w-]+\.js$/;
 const CAPTURE_PARTS = [PREVIEW, DRAWING, PAGE_DRAWING];
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames. Three itself sits in the `earth` chunk
-// the scene imports (D401, D13952): the scene's and its three's, both hashed to eight characters.
+// the scene imports the scene's and its three's, both hashed to eight characters.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 const SCENE_CHUNKS = /\/assets\/(?:scene|earth)-[\w-]{8}\.js$/;
 const THREE_MARK = "isWebGLRenderer";
-// The rail (7i): a chunk of its own, on the home's first screen since the rebuild, outside the scene's cap.
+// The rail: a chunk of its own, on the home's first screen, outside the scene's cap.
 const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
 const RECORDED_WORLDS = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
-// Every world but the Earth (7b5): its program and its recipe, a chunk of its own the scene imports with its worlds' maps, so neither
+// Every world but the Earth: its program and its recipe, a chunk of its own the scene imports with its worlds' maps, so neither
 // the scene's own file nor three's pays for it. The mark is a uniform of its program that no minifier renames.
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
 const GENERATED_MARK = "minorShare";
@@ -206,7 +197,7 @@ const GENERATED_MARK = "minorShare";
 const NAMED_SCRIPT = /["'](\/[\w./-]+\.js)["']/;
 
 // The scripts the page's HTML names (at its address) and, at any depth, what they import statically or by a dynamic import the page asked (`asked`), read
-// from the built files; never a chunk of `late`, nor what only one opens, though it came before the page settled (F5410: the chat's
+// from the built files; never a chunk of `late`, nor what only one opens, though it came before the page settled (the chat's
 // RoomsDrawer, at a load of 100, counted in the first screen as a root of its own).
 async function reached(page: Page, asked: readonly string[], late: readonly string[]) {
   const html = await (await page.request.get(page.url())).text();
@@ -345,7 +336,7 @@ async function settled(page: Page, seen: Seen): Promise<void> {
   }
 }
 
-// The first screen: what a page asks before any of its timers, frames or idle callbacks runs (the chief, 2026-11-04: a timer's chunk was
+// The first screen: what a page asks before any of its timers, frames or idle callbacks runs (a timer's chunk was
 // counted at a load of 50 to 80, not quiet), once settled. What it imports as it runs or mounts counts. Then what the page puts off on
 // purpose stays held until the caller lets it go.
 async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
@@ -366,7 +357,7 @@ const letTimersGo = (page: Page) =>
     (Reflect.get(window, "__letTimersGo") as () => void)();
   });
 
-// The built files the pages are served from (serve.mjs), which chunks.ts weighs with no page (item 7: a page drawing the scene on a
+// The built files the pages are served from (serve.mjs), which chunks.ts weighs with no page (a page drawing the scene on a
 // software GPU timed these journeys out at a load of 60).
 const ASSETS = fileURLToPath(new URL("client/assets/", BUILD));
 const fileOfUrl = (url: string) => new URL(url).pathname.split("/").pop() ?? "";
@@ -375,7 +366,7 @@ const fileOfUrl = (url: string) => new URL(url).pathname.split("/").pop() ?? "";
 const closureOf = (url: string) => filesOf(ASSETS, fileOfUrl(url)).map((file) => new URL(file, url).href);
 
 // What a late chunk brings: it and every chunk it imports statically that was not there already. A chunk weighed alone would let a split
-// carry its code out of every cap (7e's review, B2-1).
+// carry its code out of every cap .
 const ownOf = (late: string, there: readonly string[]) => closureOf(late).filter((each) => !there.includes(each));
 
 // The scripts a page asked that none of its caps' files holds, by name.
@@ -388,7 +379,7 @@ const uncounted = (asked: Iterable<string>, ...caps: readonly (readonly string[]
 };
 
 // What a late chunk brings once it runs: its own, and each chunk its files name in a dynamic import that the page asked, with that one's
-// own, at any depth (the chief, 2026-11-04: the chat's RoomsDrawer, asked once its box is narrow, fell between two cuts).
+// own, at any depth (the chat's RoomsDrawer, asked once its box is narrow, fell between two cuts).
 function openedOf(late: string, there: readonly string[], asked: ReadonlySet<string>): string[] {
   const own = ownOf(late, there);
   // The loop reaches the files pushed as it goes: an array's iterator reads its length at each step.
@@ -413,7 +404,7 @@ function weighed(url: string, chunk: string) {
 
 // The chat of a page that holds space, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load
 // (space's wait, 2.5 s, ended); open, its rooms read and its screen drawn, and settled, so what it asks once open, as a narrow chat's rooms, has come
-// (F5410: RoomsDrawer asked as the guard read, at a load of 10 to 40).
+// (RoomsDrawer asked as the guard read, at a load of 10 to 40).
 async function lateChat(page: Page, path: string, seen: Seen) {
   const { scripts } = seen;
   if (!holdsDoor(path) || (await page.locator("#chat").count()) === 0) return undefined;
@@ -457,7 +448,7 @@ async function plateWithin(page: Page, late: readonly string[], firstScreen: rea
   return brought;
 }
 
-// A world's page's capture (8f): its code and the chat's drawing it asks for, both late, on a world with a realm alone (GovDAO, of the default
+// A world's page's capture: its code and the chat's drawing it asks for, both late, on a world with a realm alone (GovDAO, of the default
 // universe, whose pages the job captures); none elsewhere.
 async function lateCapture(path: string, scripts: ReadonlySet<string>): Promise<string[]> {
   const asks = () => [...scripts].some((url) => PREVIEW.test(url));
@@ -480,8 +471,8 @@ async function captureWithin(page: Page, capture: readonly string[], there: read
   return own;
 }
 
-// A world someone charted (slice 9h, D210): its plate names who, from the stream, so a guest's first screen also asks for the
-// plate's line; the stream is handed the signal here, as no journey charts Bubble (D218).
+// A world someone charted: its plate names who, from the stream, so a guest's first screen also asks for the
+// plate's line; the stream is handed the signal here, as no journey charts Bubble.
 const CHARTED = "/w/bubble";
 const signalFrame = () =>
   `event: signal\ndata: ${JSON.stringify({
@@ -512,7 +503,7 @@ const expectPinned = (scripts: ReadonlySet<string>, path: string) => {
   );
 };
 
-// /list is the home with the palette open (D355): its scripts are the home's, weighed at /.
+// /list is the home with the palette open: its scripts are the home's, weighed at /.
 const WEIGHED = PAGES.filter((each) => each !== "/list");
 for (const [path, charted] of [...WEIGHED.map((each) => [each, false] as const), [CHARTED, true] as const]) {
   test(`${path}${charted ? ", charted," : ""} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
@@ -557,8 +548,8 @@ for (const [path, charted] of [...WEIGHED.map((each) => [each, false] as const),
       );
     const plates = await plateWithin(page, plateLate, firstScreen);
     const captured = await captureWithin(page, capture, [...firstScreen, ...chatOpened, ...proposals]);
-    // Every script the page asked is under one of its caps: a chunk between two cuts fails here (the chief, 2026-11-04). What the page
-    // puts off is still held, so what it asks (the bell's watch, the arrival pill) is never the chat's, whatever the load (F5410).
+    // Every script the page asked is under one of its caps: a chunk between two cuts fails here . What the page
+    // puts off is still held, so what it asks (the bell's watch, the arrival pill) is never the chat's, whatever the load.
     expect(
       uncounted(scripts, firstScreen, chatOpened, proposals, plates, captured),
       "every chunk the page asks is under a cap",
@@ -586,9 +577,8 @@ for (const [path, charted] of [...WEIGHED.map((each) => [each, false] as const),
   });
 }
 
-// A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
-// brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
-// 8,122 B with slice 9; 9,458 B on the ping-pong, 256 B ahead (D386); 11,024 B on 2026-11-09 (10,768 B measured), 256 B ahead (+1,566 B).
+// A page's capture under a chat line, on a world with no realm, whose page loaded none of the realm view's code: what the capture
+// brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap.
 const LINE_PREVIEW_JS = 11_024;
 test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
   const scripts = new Set<string>();
@@ -654,7 +644,7 @@ test("the rail's chunk comes with the home, within its own cap, apart from what 
   weighed((await rail).url(), "Rail");
 });
 
-// The shaders' spaces stripped at build (Alexis, 2026-11-03): three's own, which the scene's chunk ships, read as a compiler reads them, in the
+// The shaders' spaces stripped at build: three's own, which the scene's chunk ships, read as a compiler reads them, in the
 // site's build.
 test("ships the scene's shaders stripped of their spaces, in the site's build", async ({ page }) => {
   const texts: string[] = [];
@@ -676,7 +666,7 @@ test("ships the scene's shaders stripped of their spaces, in the site's build", 
 });
 
 // The scene weighs its chunk and every chunk it imports statically that the page's first screen did not bring already: three, in a chunk of
-// its own since D401's rebuild (`earth`), is still the scene's (7e: two lazy parts made rolldown split the scene's shared modules out of it).
+// its own (`earth`), is still the scene's (two lazy parts made rolldown split the scene's shared modules out of it).
 test("the scene's chunk brings three, and stays within its cap", async ({ page }) => {
   const url = await homeScene(page);
   const holding = await Promise.all(

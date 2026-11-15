@@ -5,7 +5,7 @@ import { field, hiddenTab, HISTORY, live, OTHER, room, tab, T } from "./scripted
 import { MEMBER, type HistoryLine } from "./scripted.ts";
 import { axeOf } from "./axe.ts";
 
-// 4f-n (docs/decisions.md, 2026-10-26: "Notifications wait for a merge of their own"; docs/plans/slice-4.md §1): what the
+// Notices: what the
 // account is told, on a scripted Ergo: a badge on each room's row and conversation's, the count in the tab's title, a
 // list of what was addressed to it, a mode for each room. #games is in view; #bubble and #news are followed.
 const BASE = "Bubble · gno.world";
@@ -64,7 +64,7 @@ test.describe("notifications", () => {
     await expect(rowOf(page, "games")).not.toContainText("unread");
   });
 
-  // R12: a barrier line after the one under test is read first, so a notice added a frame late would have shown.
+  // A barrier line after the one under test is read first, so a notice added a frame late would have shown.
   test("counts nothing for a line in the room in view as it arrives, the tab shown and the reader at the end", async ({
     page,
   }) => {
@@ -130,7 +130,7 @@ test.describe("notifications", () => {
     await expect(rowOf(page, OTHER_SHORT)).not.toContainText("unread");
   });
 
-  // 4d's replies: a reply to a line of the account's is a notice, said by who and what.
+  // Replies: a reply to a line of the account's is a notice, said by who and what.
   test("counts a reply to the account's line as a notice, and sees it as the tab shows", async ({ page }) => {
     await hiddenTab(page, true);
     const address = await logIn(page, word("reply"));
@@ -200,7 +200,7 @@ test.describe("notifications", () => {
     await expect(rowOf(page, "news")).not.toContainText("unread");
   });
 
-  // No Notification API, no sound, no focus taken: what arrives is read, never forced (decisions row of 4f-n).
+  // No Notification API, no sound, no focus taken: what arrives is read, never forced.
   test("tells a screen reader what came in a polite status, for a room not in view, and moves no focus", async ({
     page,
   }) => {
@@ -212,7 +212,7 @@ test.describe("notifications", () => {
     expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
-  // R19: the button goes as the list empties, and so does the link followed from it: focus must land on a stable element,
+  // The button goes as the list empties, and so does the link followed from it: focus must land on a stable element,
   // the rooms' navigation, not on the page's body.
   test("keeps the keyboard's place in the navigation as Clear empties the list", async ({ page }) => {
     const { address, ergo } = await account(page);
@@ -234,7 +234,7 @@ test.describe("notifications", () => {
     await expect(roomsNav(page)).toBeFocused();
   });
 
-  // N1: what arrives is read, never forced: no browser notification, no sound.
+  // What arrives is read, never forced: no browser notification, no sound.
   test("asks for no browser notification and plays no sound", async ({ page }) => {
     await page.addInitScript(() => {
       const calls: string[] = [];

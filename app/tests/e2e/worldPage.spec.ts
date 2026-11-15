@@ -100,7 +100,7 @@ test.describe("a world's page at the video's size", () => {
   });
 });
 
-// F2864, with the dock: the chat stands beside the plate from 1280 px, so "Say hi in the chat" needs no scroll; it puts the reader's
+// With the dock: the chat stands beside the plate from 1280 px, so "Say hi in the chat" needs no scroll; it puts the reader's
 // cursor in the chat's composer. Under 1280 px the chat is a block under the plate.
 test.describe("Say hi in the chat", () => {
   for (const width of [1280, 1728] as const) {
@@ -193,7 +193,7 @@ test.describe("who is here while nobody is counted", () => {
 test.describe("Share", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
-  // 8c: Share opens a sheet (the link, a picture, Copy link); the copy and its answer are the sheet's.
+  // Share opens a sheet (the link, a picture, Copy link); the copy and its answer are the sheet's.
   test("copies the world's canonical address and says it did", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
@@ -221,7 +221,7 @@ test.describe("Share where the browser cannot copy", () => {
 });
 
 // From 1280 px the chat is a dock at the plate's right, inside one outline; under it the chat is a block under the plate.
-// The plate comes first in the reading and tab order at every width (F2865).
+// The plate comes first in the reading and tab order at every width.
 test.describe("the page's order", () => {
   for (const width of [390, 1279] as const) {
     test(`at ${String(width)} px the chat is a block under the plate, between the page's gutters`, async ({ page }) => {

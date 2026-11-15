@@ -4,9 +4,9 @@ import { done, violations } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { DOWN, logIn, NAME, phoneOf } from "./namesChain.ts";
 
-// 9f's journeys: the account control's name from both chains, "Pick a name", the dialog of frames 9 to 15 (keyboard, axe on a phone,
+// The journeys: the account control's name from both chains, "Pick a name", the dialog of frames 9 to 15 (keyboard, axe on a phone,
 // which only reads, and a computer) and Register through Adena's stand-in. The chains are stood in (namesChain.ts, NOT recorded).
-// "Pick a name" is an item of the account's menu (8p, 9f), offered while the universe's chain says the account has none: the menu opens first.
+// "Pick a name" is an item of the account's menu, offered while the universe's chain says the account has none: the menu opens first.
 const pickItem = (page: Page) => page.getByRole("menuitem", { name: "Pick a name" });
 const openPick = async (page: Page) => {
   await accountPill(page).click();

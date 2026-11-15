@@ -136,9 +136,9 @@ const COUNTRIES = [
 // (429 "too many"), leaving the room empty. Test keys of the workshop's own, never a real one.
 const KEYS = join(tmpdir(), "gnoworld-crowd-wallets.json");
 const walletOf = (n) => {
-  const kept = existsSync(KEYS) ? JSON.parse(readFileSync(KEYS, "utf8")) : {};
-  const made = wallet(kept[n]);
-  if (kept[n] === undefined) writeFileSync(KEYS, JSON.stringify({ ...kept, [n]: made.pem }));
+  const fromFile = existsSync(KEYS) ? JSON.parse(readFileSync(KEYS, "utf8")) : {};
+  const made = wallet(fromFile[n]);
+  if (fromFile[n] === undefined) writeFileSync(KEYS, JSON.stringify({ ...fromFile, [n]: made.pem }));
   return made;
 };
 // The script's rooms, each with the language its first writer speaks and that speaker's country, and every plain line said in it
@@ -175,8 +175,8 @@ const SESSIONS = join(tmpdir(), "gnoworld-crowd-sessions");
 const sessionOf = (n) => join(SESSIONS, `${String(n)}.json`);
 
 async function arrive(browser, base, { n, writes, guest, bare }, rooms) {
-  const kept = writes && !guest && existsSync(sessionOf(n)) ? { storageState: sessionOf(n) } : {};
-  const context = await (await browser.open()).newContext({ baseURL: base, ...kept });
+  const resumed = writes && !guest && existsSync(sessionOf(n)) ? { storageState: sessionOf(n) } : {};
+  const context = await (await browser.open()).newContext({ baseURL: base, ...resumed });
   const page = await context.newPage();
   const place = placeOf(n, rooms);
   if (writes && !guest) {

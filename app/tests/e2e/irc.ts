@@ -1,4 +1,4 @@
-// The journeys' talk with Ergo over a page's own WebSocket (slice 4's 4b): lines sent as the lines received
+// The journeys' talk with Ergo over a page's own WebSocket: lines sent as the lines received
 // say, and an account of the host's test wallet logged in to Ergo with a ticket the server minted.
 import { Address, Ticket } from "@gnoworld/schemas";
 import { z } from "zod";

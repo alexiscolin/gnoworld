@@ -5,9 +5,9 @@ import { chain, RPC } from "../chain/rpcRoute.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { violations } from "./axe.ts";
 
-// 5h's journey (plan §1): a realm page holding a script, an image with onerror, a javascript: link and a hidden form field
+// A realm page holding a script, an image with onerror, a javascript: link and a hidden form field
 // shows them as text, every field visible. The view is a client route read once; the RPC is answered here as a browser would
-// get it (the recorded answers of tests/chain), and whether a real RPC answers a browser at all is F2841.
+// get it (the recorded answers of tests/chain), and whether a real RPC answers a browser at all is not known.
 const HOSTILE = [
   "# Welcome",
   "<script>window.hacked = 1</script>",

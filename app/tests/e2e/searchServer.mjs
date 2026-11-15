@@ -1,4 +1,4 @@
-// The server's own search route over an index of its own (slice 13, C): the journeys' stack has no moderation provider, so no line ever passes
+// The server's own search route over an index of its own: the journeys' stack has no moderation provider, so no line ever passes
 // the bot into the real index. This runs the real route and index code (server/src/search) in the test, seeded with the lines the page shows,
 // and answers the page's /api/search from it: the answers are the server's, only the seeding is the test's.
 import { logger } from "../../../packages/service/src/log.ts";

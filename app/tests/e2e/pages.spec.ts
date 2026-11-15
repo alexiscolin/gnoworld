@@ -3,9 +3,9 @@ import { violations } from "./axe.ts";
 import { goBySearch } from "./palette.ts";
 import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
-// The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
+// The pre-rendered pages (ADR-0002 §2), with the address each names as its own.
 const pages = [
-  // The default universe's count is the cosmos's, from the worlds' file, which this server does not serve (7d6).
+  // The default universe's count is the cosmos's, from the worlds' file, which this server does not serve.
   { path: "/", title: "gno.world", heading: "Worlds in Onyx", canonical: "https://gno.world/net/onyx/" },
   {
     path: "/w/bubble",
@@ -93,7 +93,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:description"]')).toBe(description);
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
-      // Every page here is Onyx's, a testnet: not indexed (5e).
+      // Every page here is Onyx's, a testnet: not indexed.
       expect.soft(await tag(page, 'meta[name="robots"]')).toBe("noindex");
       expect.soft(await tag(page, 'meta[name="twitter:card"]')).toBe("summary");
       await expect.soft(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
@@ -142,7 +142,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
 });
 
 test.describe("once the client takes over", () => {
-  // Every request the page makes is watched: the home's count comes as a deployment serves it once the job ran (7t, red since 7n2).
+  // Every request the page makes is watched: the home's count comes as a deployment serves it once the job ran.
   test.use({ counted: true });
 
   for (const { path, title } of pages) {
@@ -183,7 +183,7 @@ test.describe("once the client takes over", () => {
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   });
 
-  // The way home is the design system's link-button: the router's link fills it (F259).
+  // The way home is the design system's link-button: the router's link fills it.
   test("the way home from a page not found changes the page without a reload", async ({ page }) => {
     const home = page.getByRole("alert").getByRole("link", { name: "Galaxy" });
     await followInPlace(page, home, { from: "/nowhere", url: "/", title: "gno.world" });
@@ -233,7 +233,7 @@ test.describe("once the client takes over", () => {
     });
   }
 
-  // No page prints the name it was asked for yet (F119): this guards the day one does.
+  // No page prints the name it was asked for yet: this guards the day one does.
   test("a world name made of markup stays text", async ({ page }) => {
     const dialogs: string[] = [];
     page.on("dialog", async (dialog) => {
@@ -297,7 +297,7 @@ test("the React Compiler compiled the routes, not only React's own runtime", asy
 
 // Layers rank by their first mention: the page meets the design system's six in their order, the
 // app importing the sheet itself (root.tsx), the one import that brings it once ui's JavaScript is
-// free of side effects (F363, F370).
+// free of side effects.
 test("a page meets the design system's six layers in their order", async ({ page }) => {
   await page.goto("/");
   const met = await page.evaluate(() => {
@@ -315,7 +315,7 @@ test("a page meets the design system's six layers in their order", async ({ page
   expect(met).toEqual(["reset", "tokens", "base", "compositions", "components", "utilities"]);
 });
 
-// F3260: layers rank by their first mention, and the order must not hang on which chunk the bundler meets first (a chunk of
+// Layers rank by their first mention, and the order must not hang on which chunk the bundler meets first (a chunk of
 // components' CSS ahead of the statement made `a { color: inherit }` beat the components). The first sheet of every page is
 // the one statement, so no chunking can change the order.
 test.describe("the layers' order is the first sheet of every page", () => {
@@ -333,9 +333,8 @@ test.describe("the layers' order is the first sheet of every page", () => {
   }
 });
 
-// Slice 5p: no world has a capture yet (the capture job is slice 7), so a world's page shows no preview of it, whether
-// read before any script runs or once it runs, and its tags name no social image. A preview added later comes with its
-// capture, and with this test changed in its own commit.
+// No world has a capture yet, so a world's page shows no preview of it, whether
+// read before any script runs or once it runs, and its tags name no social image.
 test.describe("a world with no capture shows no preview", () => {
   for (const path of ["/w/bubble", "/net/onyx/w/bubble"]) {
     test(`${path} holds no picture, frame or preview, and no og:image`, async ({ page }) => {

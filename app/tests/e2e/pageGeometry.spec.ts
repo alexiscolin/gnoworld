@@ -6,7 +6,7 @@ import { calmed, pinFigures } from "./figures.ts";
 import { box, brightness, near, style } from "./geometry.ts";
 import { axeOf } from "./axe.ts";
 
-// Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
+// Header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
 // held to 2 px of the frame's, for anti-aliasing and compression; the pictures' own numbers are read off the frames' pixels.
 
@@ -69,7 +69,7 @@ test.describe("at the video's size", () => {
     const search = await box(page, "header nav[aria-label='Views'] button[aria-label='Search']");
     expect(search.x).toBeGreaterThan(list.x + list.width);
     expect(search.x + search.width).toBeLessThanOrEqual(pill.x + pill.width);
-    // A control's own size, 44 px (F5967), centred in the 34 px between the pill's padding, its overflow shared by both sides.
+    // A control's own size, 44 px, centred in the 34 px between the pill's padding, its overflow shared by both sides.
     expect(search.width).toBeGreaterThanOrEqual(34);
     near(search.height, 44, "the search's height");
     near(search.y + search.height / 2, 56, "the search's middle");
@@ -126,8 +126,8 @@ test.describe("at the video's size", () => {
     expect(await style(page, "[data-look='plate']", "border-right-width")).toBe("0px");
   });
 
-  // The picture of a plate is compared with a colour threshold that let amber-brown pass as navy (dock-1728 kept the old plate after
-  // 647ffb79): the plate's computed fill is read here, and must be the frames' navy, #182033 (frame 37), within 4 a channel.
+  // The picture of a plate is compared with a colour threshold that let amber-brown pass as navy:
+  // the plate's computed fill is read here, and must be the frames' navy, #182033 (frame 37), within 4 a channel.
   test("a world's plate is the frames' navy, not amber: its computed fill, read as pixels (frame 37)", async ({
     page,
   }) => {
@@ -247,7 +247,7 @@ test.describe("at the video's size", () => {
     const rows = await brightness(
       page,
       picture,
-      // 8g: the Earth's plate holds its latest post on X at y 600, so the rows are read lower, in a plain stretch under its links.
+      // The Earth's plate holds its latest post on X at y 600, so the rows are read lower, in a plain stretch under its links.
       Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 900 + dy, 340, 901 + dy]),
     );
     const peak = (values: number[]) => values.indexOf(Math.max(...values));
@@ -301,7 +301,7 @@ test.describe("at the video's size", () => {
     near(second.x - (first.x + first.width), 10, "the gap between the actions");
     expect(await style(page, "[data-hero='actions'] a", "font-size")).toBe("15px");
     // The line is the row's first cell, 28 px before the actions, on their middle line (frame 6): the page's heading and what a world is
-    // after it (ADR-0003, 2a), in the line's own size.
+    // after it (ADR-0003), in the line's own size.
     const line = await box(page, "[data-hero='line']");
     near(first.x - (line.x + line.width), 28, "the gap between the line and the actions");
     near(line.y + line.height / 2, first.y + first.height / 2, "the line's middle against the actions'");
@@ -312,7 +312,7 @@ test.describe("at the video's size", () => {
     near(hero.y - (label.y + label.height), 22, "the kicker's gap above the number");
     near(first.y - (hero.y + hero.height), 22, "the number's gap above the row");
     await expect(page.locator("main p.label [data-tone='warm']")).toBeVisible();
-    // The hero stands 64 px from the bottom (prototype 514): the gap under the whole hero. Since 5m the live line (markets and
+    // The hero stands 64 px from the bottom (prototype 514): the gap under the whole hero. The live line (markets and
     // block, here a state for want of a file) ends it, and the actions stand above it, 22 px (frame 6).
     await expect(page.locator("[data-hero='markets']")).toBeVisible();
     const live = await box(page, "[data-hero='markets']");
@@ -443,7 +443,7 @@ for (const width of [390, 1280, 1728] as const) {
   });
 }
 
-// F4642: at 320 px "Join the chat" ran past the window's right edge (7v's pictures): the hero's calls wrap to a second row before they leave
+// At 320 px "Join the chat" must not run past the window's right edge: the hero's calls wrap to a second row before they leave
 // the page's 16 px gutter, and at 390 px they share a row, as the approved hero-390 draws them.
 for (const width of [320, 390] as const)
   test(`the hero's calls stand inside the page's 16 px gutter at ${String(width)} px, wrapping before they overflow`, async ({
@@ -468,7 +468,7 @@ for (const width of [320, 390] as const)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
-// F3274: the bar of the three views stands over the foot of a phone's page; the page leaves it the room, so at the page's end
+// The bar of the three views stands over the foot of a phone's page; the page leaves it the room, so at the page's end
 // nothing of it lies under the bar (the prototype reserves it: lines 770 to 774).
 test.describe("the views' bar on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -498,8 +498,8 @@ test.describe("the views' bar on a phone", () => {
   }
 });
 
-// The bug: the fixed plate pushed the chat's slot to 612 px at 1280, so opening a thread hid the room (F3258: and at 1366 the
-// message list fell to 242 px wide). 5q's fix pass (review 1): the chat is the plate's dock at the right from 1280 px, 320 px
+// The fixed plate must not push the chat's slot to 612 px at 1280, so that opening a thread hides the room, nor at 1366 the
+// message list to 242 px wide: the chat is the plate's dock at the right from 1280 px, 320 px
 // wide under 1400 and 360 from it, its lines 300 px wide or more; under 1280 px the plate is a block and the chat the page.
 test.describe("the chat's dock beside the plate", () => {
   for (const width of [900, 1279, 1280, 1366, 1399, 1400, 1728, 1900] as const) {

@@ -4,7 +4,7 @@ import { countShifts, keepsItsRoom, opened, shifted } from "./sceneStage.ts";
 import { axeOf } from "./axe.ts";
 
 // A world's page in space (frames 20 to 35, 90 to 107, 115 to 125) on the gate's software GPU, under the page's real CSP: the world's
-// planet in the circle the page keeps beside the plate, its rooms as moons clear of the plate, and the chat, which now comes after the load
+// planet in the circle the page keeps beside the plate, its rooms as moons clear of the plate, and the chat, which comes after the load
 // and the door, arriving and working. The canvas is not pixel-compared (the plan, section 6).
 const COMPUTER = { width: 1728, height: 1080 };
 const SLOW = { timeout: 90_000 };
@@ -87,7 +87,7 @@ test.describe("a computer", () => {
   });
 });
 
-// A world's planet takes the frames' sizes (Alexis, 2026-11-02, F4307): its circle is its busiest, frame 104's Bubble, 336 px of radius at
+// A world's planet takes the frames' sizes: its circle is its busiest, frame 104's Bubble, 336 px of radius at
 // 1728 by 1080, whose ring at 1.143 radii reaches the plate's words and the dock and never passes under them; a world at rest, as these are,
 // is frame 22's quieter GovDAO, 172 px. The Earth's circle stays its own (earth.spec.ts).
 const RING = 1.143;
@@ -121,8 +121,7 @@ for (const viewport of [
     });
   });
 
-// A window this wide lays the planet's room out from the first paint, or the plate jumps under the reader as the world comes (7e's review,
-// B2-2; the Earth's own journey holds the same for its globe).
+// A window this wide lays the planet's room out from the first paint, or the plate jumps under the reader as the world comes (the Earth's own journey holds the same for its globe).
 for (const width of [1100, 1728])
   test.describe(`a world's room from the first paint, at ${String(width)} px`, () => {
     test.use({ viewport: { width, height: 1000 } });
@@ -137,7 +136,7 @@ for (const width of [1100, 1728])
 
 // A narrow chat's header (a dock's, a phone's) holds the rooms' control and the place on one row, the room's name and the close control on
 // the next: rows that let the header's items fall where they fit change as its title's font or the control's chunk comes, and the chat moves
-// under the reader (the 390 px journey below caught it, CLS 0.15, 2026-11-02).
+// under the reader (the 390 px journey below catches it, CLS 0.15).
 test.describe("the chat's header at 390 px", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -161,7 +160,7 @@ test.describe("the chat's header at 390 px", () => {
 });
 
 // A world whose chat counts nobody, its socket answering nothing: the plate's "here, right now" keeps its place, empty, and nothing moves
-// (the chief, 2026-11-02: Bubble, GovDAO and a world with nobody, each under 0.05 at 390 px).
+// (Bubble, GovDAO and a world with nobody, each under 0.05 at 390 px).
 test.describe("a world with nobody counted, at 390 px", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -177,7 +176,7 @@ test.describe("a world with nobody counted, at 390 px", () => {
 });
 
 // The chat waits for the load and the door, never for ever: a door whose chunk never answers leaves the chat to come 2.5 s after the page is on
-// screen (F4306, the chief's call: a hung chunk, a refused WebGL or a slow network leaves no world without its chat).
+// screen (a hung chunk, a refused WebGL or a slow network leaves no world without its chat).
 test.describe("the chat with the door held back", () => {
   test("comes on bubble's page though the door's chunk never answers", async ({ page }) => {
     await page.route(/\/assets\/mountUniverse-[\w-]+\.js$/, () => undefined);
@@ -188,8 +187,8 @@ test.describe("the chat with the door held back", () => {
   });
 });
 
-// The chat waits for the load and the door now (budgets.spec.ts, "a page that holds the door"): it must still come, work, and hold its
-// place while it comes, so nothing moves under the reader (the chief's conditions, 2026-11-02).
+// The chat waits for the load and the door (budgets.spec.ts, "a page that holds the door"): it must still come, work, and hold its
+// place while it comes, so nothing moves under the reader.
 for (const viewport of [COMPUTER, { width: 390, height: 844 }])
   test.describe(`the chat after the door, at ${String(viewport.width)} px`, () => {
     test.use({ viewport });

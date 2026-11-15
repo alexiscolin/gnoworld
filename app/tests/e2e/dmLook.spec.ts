@@ -5,7 +5,7 @@ import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 import { axeOf } from "./axe.ts";
 
-// How a direct message looks (slice 4's 4e; its UX review, U20), on a computer's screen and a phone's: the page's
+// How a direct message looks, on a computer's screen and a phone's: the page's
 // socket answered by a scripted Ergo (scripted.ts), the conversation's lines sent by the test, the same each run.
 // The nick Ergo gives the page's account, whatever the test wallet is; the header, which names the wallet, is masked.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -41,8 +41,8 @@ const dm = (id: string, { from, to, minute, text }: { from: string; to: string; 
   `@msgid=${id};time=2026-10-25T10:0${String(minute)}:00.000Z;account=${from} :${from}!u@h PRIVMSG ${to} :${text}`;
 const axe = async (page: Page) => (await axeOf(page).analyze()).violations;
 
-// A phone's chat header keeps two fixed rows (81bfec1c); a direct message's mark takes a third of its own, said at once, so the partner's
-// name keeps the room it needs beside the close control (F4309: the mark on the name's row cut the name to its first letter).
+// A phone's chat header keeps two fixed rows; a direct message's mark takes a third of its own, said at once, so the partner's
+// name keeps the room it needs beside the close control (a mark on the name's row would cut the name to its first letter).
 test("names the partner whole in a phone's header, its mark on a row of its own", async ({ page }) => {
   await conversation(page, 390, MEMBER);
   const name = page.getByRole("heading", { name: /^Direct message with/ });
@@ -73,7 +73,7 @@ test.describe("a direct message, as it looks", () => {
       await expect(page).toHaveScreenshot(`dm-${screen}.png`, { mask: [page.getByRole("banner")] });
     });
 
-    // 4d's DM bar: a reaction's chip under the partner's line, and the bar on the reader's own, focused.
+    // The DM bar: a reaction's chip under the partner's line, and the bar on the reader's own, focused.
     test(`with a reaction and a line's bar, on a ${screen}'s screen`, async ({ page }) => {
       const ergo = await conversation(page, width, MEMBER);
       ergo.send(dm("d1", { from: MEMBER, to: ACCOUNT, minute: 0, text: "Up for a round of **gnogolf** tonight?" }));

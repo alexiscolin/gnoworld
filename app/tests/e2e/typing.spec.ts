@@ -5,7 +5,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, live, OTHER, room, ROOM, T, tags, typingOf, typist } from "./scriptedRoom.ts";
 
-// 4f (docs/decisions.md, 2026-10-21): who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing), shown under
+// Who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing), shown under
 // a room's lines and told by the account's composer, on a scripted Ergo.
 test.describe("who is typing", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
@@ -39,7 +39,7 @@ test.describe("who is typing", () => {
     await expect(typist(page)).toHaveCount(0);
   });
 
-  // The red pass (R9, R14): the page's clock paused, each step run by the test.
+  // The page's clock paused, each step run by the test.
   test("keeps a renewed typist 6 s from its last active, and the second of two alone once the first's are past", async ({
     page,
   }) => {
@@ -68,7 +68,7 @@ test.describe("who is typing", () => {
     expect(errors).toEqual([]);
   });
 
-  // The code review (CR4) and /simplify (A1): a typist whose time passed while the room was out of view is not drawn
+  // A typist whose time passed while the room was out of view is not drawn
   // as the room comes back, not for one commit (the clock paused: no timer would correct it).
   test("draws no typist whose time passed while the room was out of view", async ({ page }) => {
     const ergo = await paused(page);
@@ -81,7 +81,7 @@ test.describe("who is typing", () => {
     await expect(typist(page)).toHaveCount(0);
   });
 
-  // The green pass (G2): the second typist's end is told too, the first's time past, the room left open.
+  // The second typist's end is told too, the first's time past, the room left open.
   test("shows no one typing once the second of two typists' times is past as well", async ({ page }) => {
     await twoTypists(page, await paused(page));
     await page.clock.runFor(4_000);
@@ -97,7 +97,7 @@ test.describe("who is typing", () => {
   });
 });
 
-// The UX review (U2, U8, U10): the line's place is always drawn, so the composer never moves as typists come and go,
+// The line's place is always drawn, so the composer never moves as typists come and go,
 // whatever their names' length, on a computer's screen and a phone's.
 for (const [screen, size] of [
   ["a computer's", { width: 1280, height: 900 }],
@@ -147,8 +147,8 @@ test.describe("telling the room the account is typing", () => {
     ]);
   });
 
-  // D418 (Alexis, 2026-11-08): the field no longer tells of the typing in its help: it says nothing while there is nothing to say, and what
-  // Tab takes is the list of suggestions (C3 of the review), not a line of help.
+  // The field tells nothing of the typing in its help: it says nothing while there is nothing to say, and what
+  // Tab takes is the list of suggestions, not a line of help.
   test("says nothing of the typing in the field's help, and lists the commands for a slash", async ({ page }) => {
     const address = await logIn(page, word("typing"));
     await room(page, { me: address });
@@ -157,7 +157,7 @@ test.describe("telling the room the account is typing", () => {
     await expect(page.getByRole("listbox", { name: "Suggestions" }).getByRole("option")).toHaveText([/\/me/, /\/poll/]);
   });
 
-  // The red pass (R3): a draft the device kept is no typing; opening a room, or coming back to it, tells nothing.
+  // A draft the device kept is no typing; opening a room, or coming back to it, tells nothing.
   test("tells nothing as a room opens on a kept draft, or is come back to, and tells the next edit", async ({
     page,
   }) => {

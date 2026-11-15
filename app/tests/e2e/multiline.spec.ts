@@ -4,7 +4,7 @@ import { logIn } from "./irc.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { axeOf } from "./axe.ts";
 
-// A message of several lines (docs/decisions.md row 255, by Alexis: draft/multiline, Shift+Enter adds a line): the
+// A message of several lines (draft/multiline, Shift+Enter adds a line): the
 // composer's box holds lines and Enter sends them as one batch; a message of several lines shows as one line, its
 // Markdown's blocks drawn. On a scripted Ergo that answers as Ergo 2.19.1 does, then on the real Ergo.
 const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -77,11 +77,11 @@ test.describe("a message of several lines", () => {
     await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
     await field(page).press("Enter");
     expect(sent.filter((line) => line.startsWith("BATCH ") || line.includes(" PRIVMSG "))).toEqual([]);
-    // Enter says nothing more: the reason stays the cap's, not a "Not sent" of the link's (G9).
+    // Enter says nothing more: the reason stays the cap's, not a "Not sent" of the link's.
     await expect(field(page)).toHaveAccessibleDescription("1 line too many: 40 at most.");
   });
 
-  // A phone cannot log in (backlog row 4: a coarse pointer gets no login button), so the page is logged in on a
+  // A phone cannot log in (a coarse pointer gets no login button), so the page is logged in on a
   // computer, then switched to touch emulation; the composer follows the pointer media query as it changes.
   test("on a touch screen, Enter adds a line and Send sends the draft whole (F1714)", async ({ page }) => {
     const sent = await opened(page);
@@ -118,7 +118,7 @@ test.describe("a message of several lines", () => {
     expect(sent.filter((line) => /PRIVMSG #bubble\/games :line \d+$/.test(line))).toHaveLength(20);
   });
 
-  // The red pass's open question: a draft of 30 lines restored before Ergo's welcome. While the connection has no nick
+  // A draft of 30 lines restored before Ergo's welcome. While the connection has no nick
   // it is not known whether draft/multiline was granted, which blocks nothing (no refusal, Send on); once Ergo
   // welcomes the page, it is.
   test("does not refuse a restored draft of 30 lines once a late welcome shows draft/multiline", async ({ page }) => {
@@ -142,7 +142,7 @@ test.describe("a message of several lines", () => {
     await hydrated(page);
     const tooMany = page.getByText(/too many: 20 at most/);
     await expect(field(page).locator("p")).toHaveCount(30);
-    // F1915: before the welcome nothing is known of draft/multiline, so nothing is refused and Send stays on.
+    // Before the welcome nothing is known of draft/multiline, so nothing is refused and Send stays on.
     await expect(tooMany).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
     welcome();
@@ -154,7 +154,7 @@ test.describe("a message of several lines", () => {
     expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
   });
 
-  // F1722 (CR10): a box of two rows showed two lines of a 30-line paste, and a sideways drag could push Send off a
+  // A box of two rows would show two lines of a 30-line paste, and a sideways drag could push Send off a
   // 320 px screen. It grows with its draft up to ten lines, then scrolls, and no drag makes it wider than its place.
   test("grows with its draft up to ten lines, and keeps Send in view on a 320 px screen", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 700 });
@@ -168,7 +168,7 @@ test.describe("a message of several lines", () => {
     expect(await height()).toBeGreaterThan(six);
     expect(await height()).toBeLessThan(350);
     expect(await field(page).evaluate((box) => box.scrollHeight > box.clientHeight)).toBe(true);
-    // F1729: CSS sizes the box, so a long line counts as the lines it wraps to; ten lines is the cap, and the
+    // CSS sizes the box, so a long line counts as the lines it wraps to; ten lines is the cap, and the
     // handle moves the height alone.
     await field(page).fill("word ".repeat(80));
     expect(await height()).toBeGreaterThan(empty + 40);
@@ -179,7 +179,7 @@ test.describe("a message of several lines", () => {
     expect(twelve).toBeGreaterThan(nine);
     await field(page).fill(draft(60));
     expect(await height()).toBe(twelve);
-    // The composer's box takes the handle off its field (review 11 of 5q): it grows to ten lines on its own.
+    // The composer's box takes the handle off its field: it grows to ten lines on its own.
     expect(await field(page).evaluate((box) => getComputedStyle(box).resize)).toBe("none");
     // What a drag of the handle sets on the box: a width far past its place.
     await field(page).evaluate((box) => {

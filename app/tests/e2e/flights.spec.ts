@@ -3,9 +3,9 @@ import type { Space } from "../../src/space/scene.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { countFlights, flightOf, goInPage, gpuOf, heapOf, landed, running, shownLabels } from "./sceneStage.ts";
 
-// Flights (7g; ADR-0001 §7; ADR-0002 §1; frames 18, 19, 36, 88, 89, 101, 128, 129, 142), read off the engine (`__gnoworldSpace`): the flight
+// Flights (ADR-0001 §7; ADR-0002 §1; frames 18, 19, 36, 88, 89, 101, 128, 129, 142), read off the engine (`__gnoworldSpace`): the flight
 // to a system aimed at, Escape going up a level, the names hidden on the way, a page's flight, one under reduced motion, and what twenty
-// leave behind (row 7's test, slice 7 §1). Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
+// leave behind. Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
 const HOME = "/?test-gpu";
 const FRAME = { width: 1728, height: 1080 };
 // Small enough for twenty flights on the gate's software GPU, wide enough for a computer's layout.
@@ -30,7 +30,7 @@ const withWorlds = (page: Page) =>
   page.route("**/worlds.json", (route) => route.fulfill({ body: RECORDED, contentType: "application/json" }));
 
 // A system other than the home's, on screen, nearest the screen's middle: where a reader aims, and its id. The page's frames are held from the
-// read to the click: the view sways, and under load the frames between them took the sun past a click's reach (7g2's report, F5400).
+// read to the click: the view sways, and under load the frames between them took the sun past a click's reach.
 async function aimAtASystem(page: Page) {
   const aimed = await page.evaluate(
     () =>
@@ -111,7 +111,7 @@ test("flies to the system aimed at, lands, and goes back up to the universe on E
   await flown(page);
 });
 
-// No name while a flight runs (D13128; move.ts): they fade as it starts and come back as it lands. Read in the page on every frame of the
+// No name while a flight runs (move.ts): they fade as it starts and come back as it lands. Read in the page on every frame of the
 // flight past 0.3 of the way, when a name told to go has faded long since.
 test("hides the names through a flight, and gives them back once it lands", async ({ page }) => {
   await withWorlds(page);
@@ -204,9 +204,9 @@ test("flies from the cosmos to a world's page, and lands as the world comes into
   expect((await flightOf(page)).neared).toBe(true);
 });
 
-// Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP; slice 7 §9, Q17).
-// Every kind of place, half pages' flights, driven through the router; a world page's own warming is no flight's (heap snapshots, 2026-11-03).
-// The baseline once a round adds nothing: three counts a geometry from its first draw, which a loaded first round can miss (F5404).
+// The bar, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP).
+// Every kind of place, half pages' flights, driven through the router; a world page's own warming is no flight's.
+// The baseline once a round adds nothing: three counts a geometry from its first draw, which a loaded first round can miss.
 test("leaves the GPU's resources at their baseline and the heap within a tenth after twenty flights there and back", async ({
   page,
 }) => {

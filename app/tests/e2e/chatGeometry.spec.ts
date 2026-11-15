@@ -5,9 +5,9 @@ import { logIn } from "./irc.ts";
 import { MEMBER } from "./scripted.ts";
 import { threadOf } from "./thread.ts";
 
-// 5q, pixel perfect to the video: the chat at its frames' size (1728 by 1080, scale 1), each region's box measured against
-// the frame (`.claude/tmp/slice-5/video-frames`, f0060) and the prototype's CSS (docs/prototype/source/index.html:133-700).
-// Offsets are read from the chat's own box, the page's header staying over it until the dock (slice 7).
+// Pixel perfect to the video: the chat at its frames' size (1728 by 1080, scale 1), each region's box measured against
+// the frame (f0060) and the prototype's CSS (docs/prototype/source/index.html:133-700).
+// Offsets are read from the chat's own box, the page's header staying over it until the dock.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const near = (value: number, wanted: number, slack = 1) => {
   expect(
@@ -85,7 +85,7 @@ test.describe("the chat at the video's size", () => {
     expect(radius).toBe("16px");
   });
 
-  // Review 15 of 5q: fourteen CSS mutants passed every assertion above; these read the frame (f0066, 1728 by 1080).
+  // Read from the frame (f0066, 1728 by 1080), tighter than the assertions above.
   test("sets the rooms' pills, the pin, the lines' time and the panel as frame 66 does", async ({ page }) => {
     await logIn(page, "geometry-frame");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
@@ -145,7 +145,7 @@ test.describe("the chat at the video's size", () => {
     ).toBe("32px");
     const [row1, row2] = await Promise.all([people.nth(0).boundingBox(), people.nth(1).boundingBox()]);
     if (row1 === null || row2 === null) throw new Error("no people");
-    // 61, not the frame's 41: each row holds 8c's Follow button, a control 44 px high since the 9m tokens (--control-m, F5967).
+    // 61, not the frame's 41: each row holds the Follow button, a control 44 px high (--control-m).
     near(row2.y - row1.y, 61);
     // Send is round, 32 px; the format bar's icons 16 px in the muted grey; the field has no handle or ring of its own.
     const send = await page.getByRole("button", { name: "Send" }).evaluate((element) => {
@@ -176,7 +176,7 @@ test.describe("the chat at the video's size", () => {
   }) => {
     await logIn(page, "geometry-pills");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    // Quick actions are not a row any more: the box's Add button holds them, inside the box.
+    // Quick actions are not a row: the box's Add button holds them, inside the box.
     await expect(page.locator('[role="toolbar"][aria-label="Quick actions"]')).toHaveCount(0);
     const [add, message] = await Promise.all([
       page.getByRole("group", { name: "Message box" }).getByRole("button", { name: "Add" }).boundingBox(),
@@ -193,7 +193,7 @@ test.describe("the chat at the video's size", () => {
     near(tool.width, 32);
   });
 
-  // 5q2, the differences 5q left (frames f0060, f0066, f0080 and the prototype's CSS): each held by what the frame shows.
+  // Differences from the frames (f0060, f0066, f0080) and the prototype's CSS: each held by what the frame shows.
   test("draws the worlds' planets at 44 px, the format bar's two rules, the thread at 13.5 px", async ({ page }) => {
     await logIn(page, "geometry-last");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });

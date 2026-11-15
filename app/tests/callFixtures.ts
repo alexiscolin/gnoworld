@@ -1,4 +1,4 @@
-// What the tests of the 9e call surfaces share (a page's form, a proposed action): the chain they draw on, a vm/qfuncs answer in its
+// What the tests of the call surfaces share (a page's form, a proposed action): the chain they draw on, a vm/qfuncs answer in its
 // shape, and how a test waits for a drawing without a sleep. NOT recorded: qfuncs' shape.
 import { realmType } from "@gnoworld/core";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
@@ -84,7 +84,7 @@ function prefilled(card: HTMLElement, values: readonly string[], call: { realm: 
   expect(card.textContent).toContain(call.func);
 }
 
-/** What a GovDAO vote's card says before Adena opens (Alexis, D272): r/gov/dao refuses a vote from anyone but its members. */
+/** What a GovDAO vote's card says before Adena opens: r/gov/dao refuses a vote from anyone but its members. */
 export const MEMBERS_ONLY =
   "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost.";
 
@@ -97,7 +97,7 @@ export function warnsMembers(card: HTMLElement): void {
   expect(lines[0] !== undefined && sign !== undefined && follows(lines[0], sign)).toBe(true);
 }
 
-/** That `card` is GovDAO's pinned Vote's (D271, D272): titled Vote, prefilled with `values`, naming the realm and the function, and
+/** That `card` is GovDAO's pinned Vote's: titled Vote, prefilled with `values`, naming the realm and the function, and
  * saying before Sign in Adena that only members can vote. */
 export function pinnedVote(card: HTMLElement, values: readonly string[]): void {
   expect(card.querySelector("h1, h2, h3, h4")?.textContent).toBe("Vote");

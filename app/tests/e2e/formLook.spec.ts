@@ -2,9 +2,9 @@ import { adena } from "./adena.ts";
 import { calls, callWallet, connect, openRealm, openRow, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
-// A page's form with a Call, and a write row that sends to gnoweb, as they look on a computer's screen (9e; frames 31 to 33): the
+// A page's form with a Call, and a write row that sends to gnoweb, as they look on a computer's screen (frames 31 to 33): the
 // form's frame, its Call at the end of the line, its card after the frame with the hidden field as a field, and the row with no Call.
-// The pictures are made and approved on the Mac Studio (decision 4238523f): the header, which names the test wallet, is masked.
+// The pictures are made and approved on the Mac Studio: the header, which names the test wallet, is masked.
 test.describe("a page's form and a gnoweb row, as they look", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 

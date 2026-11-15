@@ -45,7 +45,7 @@ async function flush(page: Page): Promise<void> {
 
 // A worker's violation reaches the test as a message to the pages (src/sw/report.ts), after the worker's own
 // task: a fetch the policy refuses, planted last in the worker, says every earlier violation of the worker came.
-// A navigation under way may lose the message with the old document: each try plants the fetch again (F2066).
+// A navigation under way may lose the message with the old document: each try plants the fetch again.
 async function flushWorker(page: Page, worker: Worker): Promise<void> {
   await expect(async () => {
     const done = page.waitForEvent("console", {
@@ -68,7 +68,7 @@ async function flushWorker(page: Page, worker: Worker): Promise<void> {
   }).toPass();
 }
 
-// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f). The directives a page's documents
+// Every journey runs under the site's CSP: a violation no test planted fails it. The directives a page's documents
 // reported, written to its console, which outlives a navigation.
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
   planted: boolean;
@@ -85,7 +85,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
   planted: [false, { option: true }],
   refusing: [false, { option: true }],
   // A shader the scene refused fails every journey that plants none (`refusing`): the scene reports each as a page error (scene.ts's
-  // onShaderError), three logs any other. No journey heard the scene's own report before 7v, when the build broke them all.
+  // onShaderError), three logs any other.
   refusals: [
     async ({ context, refusing }, use) => {
       const seen: string[] = [];
@@ -140,7 +140,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
           }),
         }),
       );
-      // No count of people online and no prices' history (8i), as a server whose relay and timer have said nothing yet: the hero counts the
+      // No count of people online and no prices' history, as a server whose relay and timer have said nothing yet: the hero counts the
       // worlds and the live line draws no sparkline. A journey that watches them routes its own on its page, which goes first.
       for (const pattern of ["**/api/presence/people", "**/api/markets/history"])
         await context.route(pattern, (route) =>
@@ -238,7 +238,7 @@ export const cacheContents = (page: Page) =>
     return { names, paths: paths.sort() };
   });
 
-/** Every script `page` asks from now on, by its address, as it asks it: a list that grows. */
+/** Every script `page` asks, by its address, as it asks it: a list that grows. */
 export function scriptsAsked(page: Page): string[] {
   const scripts: string[] = [];
   page.on("request", (request) => (request.resourceType() === "script" ? scripts.push(request.url()) : undefined));

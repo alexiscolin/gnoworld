@@ -6,8 +6,7 @@ import { asAccount, barOf, crossedByBar, OTHER, tagged } from "./talk.ts";
 import { chipOf, panel } from "./thread.ts";
 import type { HistoryLine } from "./scripted.ts";
 
-// The slice 4 UX review's majors that ship before slice 5: U1 (the bar over a line's words) and U4 (a first
-// notification moving the page).
+// The bar over a line's words, and a first notification moving the page.
 const LONG =
   "Rules and the whole scoring table are a lot to read at once, so this line says the same thing again and again until it " +
   "fills the column and wraps onto a third row, which is where the bar of a long line used to lie on its words, again";
@@ -15,7 +14,7 @@ const LONG =
 test.describe("the slice 4 UX review's fixes", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
-  // U1: the bar's five controls are about 200 px wide and the line kept room for one control, so on a line that fills the
+  // The bar's five controls are about 200 px wide and the line kept room for one control, so on a line that fills the
   // column the bar lay over its first row's last words.
   for (const width of [1280, 1000]) {
     test(`a line's bar covers none of its words, nor any other line's, on a ${String(width)} px screen`, async ({
@@ -32,7 +31,7 @@ test.describe("the slice 4 UX review's fixes", () => {
     });
   }
 
-  // U4: the Notifications block above the rooms widened the rail from 190 to 245 px and dropped the room list.
+  // The Notifications block above the rooms widened the rail from 190 to 245 px and dropped the room list.
   test("a first notification moves neither the message column nor a room's row", async ({ page }) => {
     const address = await logIn(page, word("steady"));
     const { ergo } = await room(page, { me: address, read: T(2) });
@@ -52,7 +51,7 @@ test.describe("the slice 4 UX review's fixes", () => {
     expect(await place()).toEqual(before);
   });
 
-  // The focus brings a line's bar into the list's view (G8): a click on a chip of a line the list's top cuts moved the list
+  // The focus brings a line's bar into the list's view: a click on a chip of a line the list's top cuts moved the list
   // under the pointer between the press and the release, so the click was lost and no thread opened.
   test("a click on a chip in a line the list's top cuts opens its thread, the list not moving under the pointer", async ({
     page,

@@ -6,7 +6,7 @@ import type { HistoryLine } from "./scripted.ts";
 import { marks, room, ROOM, T } from "./scriptedRoom.ts";
 import { axeOf } from "./axe.ts";
 
-// 4d's mark unread and saved messages (docs/plans/slice-4.md §7; ADR-0002: "Mark unread: 0, on the device", "Saved
+// Mark unread and saved messages (ADR-0002: "Mark unread: 0, on the device", "Saved
 // messages: Device"), on a scripted Ergo. Both are the device's: Ergo's MARKREAD only moves forward (irc/getters.go:552,
 // v2.19.1), so a place asked to go back to is told to nobody, and no other device of the account sees a saved line.
 const SIXTY = Array.from({ length: 60 }, (_, n): HistoryLine => [`h${String(n)}`, T(n), `Line ${String(n)}`]);
@@ -21,7 +21,7 @@ async function choose(page: Page, at: number, item: string) {
   await page.getByRole("menuitem", { name: item }).click();
 }
 // The menu opened from the keyboard on the `at`th line: the line, Tab through its bar (the quick reactions and Reply
-// come before More, 4d), Enter on More.
+// come before More), Enter on More.
 async function openByKeys(page: Page, at: number) {
   await lines(page).nth(at).focus();
   const more = moreOf(page, at);

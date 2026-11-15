@@ -2,7 +2,7 @@ import { expect, hydrated, test } from "./fixtures.ts";
 import { loggedIn, login, talk, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
 
-// The page's WebSocket to Ergo through the host's /ws (slice 4's 4b), under the site's CSP, as nginx hands it on
+// The page's WebSocket to Ergo through the host's /ws, under the site's CSP, as nginx hands it on
 // in the stack. Only the browser's WebSocket speaks here: the chat client is the app's, tested apart.
 
 // A guest's registration (the welcome, 001, ends it), and Ergo's account of it (WHOIS, which ends at 318).

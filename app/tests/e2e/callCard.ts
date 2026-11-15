@@ -134,7 +134,7 @@ export async function writeChain(
   await indexer(page);
   await page.route(INDEXER, (route) => {
     const asked = decodeURIComponent(route.request().url());
-    // The fee read asks the tip first, then the calls above a window under it (F5724).
+    // The fee read asks the tip first, then the calls above a window under it .
     if (fees === "rows" && asked.includes("latestBlockHeight") && !asked.includes("getTransactions"))
       return route.fulfill({ headers: CORS, body: JSON.stringify({ data: { latestBlockHeight: 110 } }) });
     if (!asked.includes("getTransactions")) return route.fallback();
@@ -202,7 +202,7 @@ export async function callAndSign(page: Page): Promise<void> {
   await calls(page).getByRole("article").getByRole("button", { name: "Sign in Adena" }).click();
 }
 
-// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
+// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once, so the
 // transitions and finite animations (a panel's fade-in) running end first (a cancelled one too); the spinner's endless one is left.
 export async function violations(page: Page) {
   await page.evaluate(async () => {

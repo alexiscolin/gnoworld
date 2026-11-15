@@ -91,7 +91,7 @@ test.describe("a computer", () => {
     expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
-  // D333: the canvas is not seen while its first frame is not whole; it opens as an iris once the dive started and leaves no clip behind.
+  // The canvas is not seen while its first frame is not whole; it opens as an iris once the dive started and leaves no clip behind.
   test("the canvas stays unseen till the dive starts, then opens whole and leaves no clip behind", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
@@ -130,7 +130,7 @@ test.describe("a computer", () => {
   });
 });
 
-// Every route, by its first visit: the cosmos of each universe, the Earth and a world's page (its planet, since 7e) show space, and no
+// Every route, by its first visit: the cosmos of each universe, the Earth and a world's page (its planet) show space, and no
 // other page asks for its code.
 test.describe("which pages show space", () => {
   test.use({ viewport: COMPUTER });

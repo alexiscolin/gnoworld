@@ -1,4 +1,4 @@
-// The app's query client in a test (slice 13): a test's reads are its own, so the held answers go before each, and a failed read is not asked again
+// The app's query client in a test: a test's reads are its own, so the held answers go before each, and a failed read is not asked again
 // (the retries' backoff is not a test's wait). Imported by the helpers that mount or render a page.
 import { beforeEach } from "vitest";
 import { queryClient } from "../src/lib/query/client.ts";

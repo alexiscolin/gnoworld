@@ -135,7 +135,7 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
         const focused = document.activeElement;
         const all = [...document.querySelectorAll("#storybook-root *")];
         const where = focused === null ? -1 : all.indexOf(focused);
-        // A prefixed field's ring is its frame's, around the prefix too (F5963): the bare input inside draws none (F6040).
+        // A prefixed field's ring is its frame's, around the prefix too: the bare input inside draws none.
         const own = getComputedStyle(focused ?? document.body);
         const frame = focused?.parentElement;
         const style =
@@ -298,7 +298,7 @@ for (const touch of [false, true]) {
   const how = touch ? "by touch" : "with a pointer";
   test.describe(how, () => {
     // Playwright's own options: a device's (Desktop Chrome's) override contextOptions, so a touch set
-    // there measured a mouse everywhere but in the sandbox (F339).
+    // there measured a mouse everywhere but in the sandbox.
     test.use({ hasTouch: touch, isMobile: touch });
 
     test("the page's pointer is coarse by touch, fine with a pointer", async ({ page }) => {
@@ -306,7 +306,7 @@ for (const touch of [false, true]) {
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(touch);
     });
 
-    // F5967 (answer 9k-3): the video's default control is 44 px with a pointer too.
+    // The video's default control is 44 px with a pointer too.
     test("controls are as tall as their size's control, the default 44 px", async ({ page }) => {
       const m = 44;
       expect((await sizes(page, "button--sizes")).heights).toEqual({ s: 32, m, l: 56 });
@@ -317,7 +317,7 @@ for (const touch of [false, true]) {
     });
 
     // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a popover's trigger at
-    // the default one, and a field's box at the default one, its edges inside it, 44 px (Alexis, 2026-11-08, Field.module.css; was 46).
+    // the default one, and a field's box at the default one, its edges inside it, 44 px (Field.module.css).
     test("chips, tabs and triggers are as tall as their size's control, a field the default one's too", async ({
       page,
     }) => {
@@ -338,7 +338,7 @@ for (const touch of [false, true]) {
       expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([44]);
     });
 
-    // iOS Safari zooms into a field whose text is under 16 px when it takes the focus (F371).
+    // iOS Safari zooms into a field whose text is under 16 px when it takes the focus.
     test("a field's text is 16 px by touch, 14 px with a pointer, whatever its kind", async ({ page }) => {
       for (const id of ["field--text", "field--search", "field--date-and-time"]) {
         await open(page, id);
@@ -351,7 +351,7 @@ for (const touch of [false, true]) {
   });
 }
 
-// F5968 (answer 9k-3): a field rests on the strong line, frame 10's edge, and keeps it under the pointer; an invalid one is coral.
+// A field rests on the strong line, frame 10's edge, and keeps it under the pointer; an invalid one is coral.
 test("a field's edge is the strong line at rest and under the pointer, the danger line when invalid", async ({
   page,
 }) => {
@@ -452,7 +452,7 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
 });
 
 // Every button's hover shows: the cream fill and the coral one take a veil of the ink, where the text's
-// veil left them 1.001:1 and 1.068:1 (F369). The floor is the outline button's own 1.22:1, rounded down.
+// veil left them 1.001:1 and 1.068:1. The floor is the outline button's own 1.22:1, rounded down.
 test("every button's fill under the pointer is 1.2:1 from its fill at rest", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const id of ["button--matrix", "button--as-link", "button-iconbutton--pressed", "button-iconbutton--plain"]) {
@@ -499,7 +499,7 @@ test("a link-button wears its button's look, with no underline", async ({ page }
 });
 
 // The flash's region is in the page's flow, where a screen reader finds it: empty, it takes no room and
-// paints nothing; full, its flash is in the top layer (F331), and the region still takes no room.
+// paints nothing; full, its flash is in the top layer, and the region still takes no room.
 test("the flash's region sits in the flow, taking no room; its flash is in the top layer", async ({ page }) => {
   await open(page, "flash--empty");
   const empty = await page.getByRole("status").evaluate((region) => {
@@ -521,10 +521,10 @@ test("the flash's region sits in the flow, taking no room; its flash is in the t
   expect(full).toEqual({ height: 0, position: "static", raised: true });
 });
 
-// Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).
+// Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through.
 test("a flash's panel is the surface's night, opaque", async ({ page }) => {
   await open(page, "flash--timed");
-  // Its fade in (D13969) is played first: an opacity read half way is the fade's, not the panel's.
+  // Its fade in is played first: an opacity read half way is the fade's, not the panel's.
   await settle(page);
   await page
     .getByRole("status")
@@ -572,7 +572,7 @@ test("the base styles text with the tokens, and the label keeps its case where c
       .first()
       .evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), property);
   expect(await style("h1", "font-size")).toBe("36px");
-  // F5969 (answer 9k-3): the panel and dialog title is frame 10's 26 px.
+  // The panel and dialog title is frame 10's 26 px.
   expect(await style("h2", "font-size")).toBe("26px");
   expect(await style("h3", "font-size")).toBe("20px");
   expect(await style("small", "font-size")).toBe("12px");

@@ -3,8 +3,8 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { running, shownLabels } from "./sceneStage.ts";
 import { axeOf } from "./axe.ts";
 
-// The rail (frame 4 and 16, 7i): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
-// 25 at most, ending on the last (8p); one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
+// The rail (frames 4 and 16): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
+// 25 at most, ending on the last; one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
 // motion; each planet its own portrait. Frame 4's rail: x 1,585 to 1,703 at 1,728 px, y 98 to 1,024 at most, its planets 64 px, 98 apart.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
@@ -28,7 +28,7 @@ const PRESENT = [
   { world: "govdao", here: 12, perHour: 9, rise: null },
   { world: "bubble", here: 9, perHour: 2, rise: 1.4 },
 ];
-// The recorded file (2026-11-01) counts no caller: three of its worlds are given callers here, as the live job's histories bring them.
+// The recorded file counts no caller: three of its worlds are given callers here, as the live job's histories bring them.
 const CALLED: Record<string, number> = {
   "demo/defi": 30,
   "demo/profile": 20,
@@ -64,7 +64,7 @@ async function arrived(page: Page, motion: "reduce" | "no-preference" = "reduce"
   await page.goto(HOME);
   await hydrated(page);
   await running(page);
-  // The loader covers the page, taking every pointer, till the dive starts (D333).
+  // The loader covers the page, taking every pointer, till the dive starts.
   await expect(page.getByRole("status", { name: "Loading space" })).toHaveCount(0, SLOW);
   await expect(railLinks(page).first()).toBeVisible(SLOW);
 }
@@ -96,11 +96,11 @@ test("stands where frame 4's rail stands, as tall as its worlds, its planets the
   expect(Math.abs(x - FRAME.left)).toBeLessThanOrEqual(2);
   expect(Math.abs(x + width - FRAME.right)).toBeLessThanOrEqual(2);
   expect(Math.abs(y - FRAME.top)).toBeLessThanOrEqual(6);
-  // Eight worlds: the panel ends a step under its last planet's name (8p: no link ends it), above frame 4's foot, and nothing fades at it.
+  // Eight worlds: the panel ends a step under its last planet's name (no link ends it), above frame 4's foot, and nothing fades at it.
   const last = await railLinks(page).last().boundingBox();
   const under = y + height - (last?.y ?? 0) - (last?.height ?? 0);
   expect(under).toBeGreaterThan(0);
-  // Under the last planet are its air and See all's 52 px (D355).
+  // Under the last planet are its air and See all's 52 px.
   expect(under).toBeLessThanOrEqual(40 + 52);
   expect(y + height).toBeLessThanOrEqual(FRAME.bottom);
   expect(await fadesOf(page)).toBe(1);
@@ -180,7 +180,7 @@ test("grows the planet under the pointer like a dock, its neighbours less, and l
     expect(near).toBeGreaterThan(FRAME.planet);
     expect(near).toBeLessThan(under);
   }
-  // The pointer stays on the planet it pointed at (the same share of its link, D359), and once all stand still the dock writes nothing more.
+  // The pointer stays on the planet it pointed at (the same share of its link), and once all stand still the dock writes nothing more.
   const pointed = target.y + target.height / 2;
   const [top, bottom] = await planets.nth(2).evaluate((thumb) => {
     const box = thumb.getBoundingClientRect();

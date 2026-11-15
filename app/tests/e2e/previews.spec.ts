@@ -6,7 +6,7 @@ import { scriptedErgo } from "./scripted.ts";
 import { SITE } from "./sites.ts";
 import { axeOf } from "./axe.ts";
 
-// A page's preview (8f, slice 7's 7l): the capture the server's job wrote of a realm's home, on its world's plate (frame 26) and under a
+// A page's preview: the capture the server's job wrote of a realm's home, on its world's plate (frame 26) and under a
 // chat line that links that page (frames 104, 107), once the line is checked. The page asks the site's own previews.json and nothing the
 // line names. GovDAO's capture is its page as RECORDED on onyx-1 (tests/chain/recorded), the first line the recording's own comment.
 const HOME = readFileSync(new URL("../chain/recorded/onyx-1-gov-dao-home.md", import.meta.url), "utf8")

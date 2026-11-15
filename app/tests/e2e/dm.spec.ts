@@ -3,13 +3,13 @@ import { inGames, lines, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 
-// 4e (docs/plans/slice-4.md §1, §7): direct messages between accounts, through the real Ergo. The page's account
+// Direct messages between accounts, through the real Ergo. The page's account
 // reads and writes them; another account, logged in by a page of a context of its own (a session of its own),
 // writes over a raw socket: its login, then its message.
 const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
 const dmsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 // A conversation's row, by its link's own name, the address alone: the Notifications list above it links to the same page, its
-// link named by who did what (4f-n).
+// link named by who did what .
 const rowOf = (page: Page, address: string) => dmsNav(page).getByRole("link", { name: short(address), exact: true });
 
 // A direct message from that account, over its own socket with a ticket of its own (one a connection), once it is
@@ -50,7 +50,7 @@ test.describe("direct messages", () => {
     await dmFrom(bob, me, text);
     const link = rowOf(page, bob.address);
     await expect(link).toBeVisible();
-    // U6, 5q: the list's note says they are not encrypted; U7: the page says it is a direct message, the address whole in its title.
+    // The list's note says they are not encrypted; the page says it is a direct message, the address whole in its title.
     await expect(link).toHaveAccessibleName(short(bob.address));
     await expect(dmsNav(page).getByText(NOT_ENCRYPTED)).toBeVisible();
     await link.click();
@@ -67,7 +67,7 @@ test.describe("direct messages", () => {
     await bob.close();
   });
 
-  // 4d's threads (G1): a reply in a direct message is no thread, so a root there shows no chip and opens no panel.
+  // Threads: a reply in a direct message is no thread, so a root there shows no chip and opens no panel.
   test("show a root that has a reply as a line like another: no thread chip, no panel", async ({
     page,
     playwright,
@@ -108,17 +108,17 @@ test.describe("direct messages", () => {
       .click();
     await expect(page.locator('[data-region="header"]').getByText("Not encrypted", { exact: true })).toBeVisible();
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
-    // U12: the button goes with who is here; the field takes the focus, not the page.
+    // The button goes with who is here; the field takes the focus, not the page.
     await expect(field).toBeFocused();
     const text = word("reply");
     await field.fill(text);
     await field.press("Enter");
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`dm=${bob.address}`));
-    // Mine, and delivered: Bob's page lists the conversation with me (T10: the journey compared two setup values).
+    // Mine, and delivered: Bob's page lists the conversation with me.
     await expect(lines(page).filter({ hasText: text }).getByTitle(me)).toBeVisible();
     await expect(rowOf(bob.page, me)).toBeVisible();
-    // /code-review (CR6): the focus asked once, not each time the conversation comes back in view.
+    // The focus asked once, not each time the conversation comes back in view.
     await dmsNav(page).getByRole("link", { name: "games" }).click();
     await expect(page.getByRole("heading", { name: "#games" })).toBeVisible();
     const row = rowOf(page, bob.address);
@@ -129,7 +129,7 @@ test.describe("direct messages", () => {
     await bob.close();
   });
 
-  // 4e's UX review (U1): Ergo refuses a line to an account not connected (401); the page emptied the box all the same.
+  // Ergo refuses a line to an account not connected (401); the page emptied the box all the same.
   test("keep the draft of a message to an account not connected, and say it was not sent", async ({
     page,
     playwright,
@@ -152,7 +152,7 @@ test.describe("direct messages", () => {
     await bob.close();
   });
 
-  // 4e's UX review (U15): Alt+Down in a conversation went to the room after the one hidden behind it.
+  // Alt+Down in a conversation went to the room after the one hidden behind it.
   test("stay in a conversation on Alt+Up and Alt+Down, which move between rooms", async ({ page }) => {
     await inGames(page);
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -174,7 +174,7 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("heading", { name: short(partner) })).toBeVisible();
   });
 
-  // 4e's UX review (U9): ?dm= a page cannot show said nothing, the main room in its place.
+  // ?dm= a page cannot show said nothing, the main room in its place.
   test("say why a ?dm= shows no conversation: a guest's, or an address that is none", async ({ page }) => {
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
     await page.goto(`/w/bubble?dm=${partner}&chat=full`);
@@ -187,7 +187,7 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("heading", { name: "#bubble" })).toHaveCount(0);
   });
 
-  // 4e's UX review (U10): a direct message waited on the rooms' list, and showed only its failure.
+  // A direct message waited on the rooms' list, and showed only its failure.
   test("show a conversation though the rooms could not load", async ({ page }) => {
     await inGames(page);
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -195,7 +195,7 @@ test.describe("direct messages", () => {
     await page.goto(`/w/bubble?dm=${partner}&chat=full`);
     await hydrated(page);
     await expect(dmsNav(page).getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
-    // /code-review (CR8): the failure stands in the rooms' place, never beside "No room here yet.".
+    // The failure stands in the rooms' place, never beside "No room here yet.".
     await expect(page.getByText("No room here yet.")).toHaveCount(0);
     await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toHaveCount(1);
     await expect(page.getByRole("heading", { name: `Direct message with ${short(partner)}` })).toBeVisible();

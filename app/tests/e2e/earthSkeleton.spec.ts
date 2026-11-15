@@ -5,7 +5,7 @@ import { onEarth, raw, spaceReady as sceneOn } from "./earthStage.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { bonesTurns, recordBones, stopBones } from "./smoothBones.ts";
 
-// The skeletons' lines and state (2026-11-11), flow by flow: the Earth's page to the full chat (a skeleton left over a planet that stands), and
+// The skeletons' lines and state, flow by flow: the Earth's page to the full chat (a skeleton left over a planet that stands), and
 // the arrival at the Earth from the universe and from its system (the lines turn only as the planet does). One JSON line a flow to `SKEL_OUT`.
 declare const process: { env: Record<string, string | undefined> };
 const OUT = process.env["SKEL_OUT"] ?? join(tmpdir(), "earthSkeleton.jsonl");
@@ -85,7 +85,7 @@ test("a reload of the Earth's page, from its first frame", async ({ page }) => {
       }
     }, SLOW)
     .toBe(true);
-  // Lines from far countries, so the page's planet has signs to turn to (the lean toward the eye, D13916).
+  // Lines from far countries, so the page's planet has signs to turn to (the lean toward the eye).
   for (const [id, country] of [
     ["s1", "JP"],
     ["s2", "BR"],

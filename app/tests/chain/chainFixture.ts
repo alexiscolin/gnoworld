@@ -1,5 +1,5 @@
-// Answers of onyx-1 and gnoland-1, for lib/chain's contract tests and 5h's card. Each body is RECORDED through gnomcp between
-// 2026-10-30T23:43Z and 23:52Z (gno_status, gno_render, gno_eval): the text gnomcp gave, its wrapper off, one last newline aside.
+// Answers of onyx-1 and gnoland-1, for lib/chain's contract tests and the call card. Each body is RECORDED through gnomcp
+// (gno_status, gno_render, gno_eval): the text gnomcp gave, its wrapper off, one last newline aside.
 // FUNCTIONS and the envelope builders (@gnoworld/chain/testing/envelopes) are NOT recordings: gnomcp returns decoded text and has no qfuncs tool, so they
 // are written from gno's source at v1.5.0 (file:line beside each). The chains run newer code, gnoland-1 v1.7.0 and onyx-1
 // v1.7.0-rc.1 (PAGES' upgrade post, onyx's UPGRADES.md); the same places at tag v1.7.0 were compared through excerpts, not line
