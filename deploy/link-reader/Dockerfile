@@ -1,4 +1,4 @@
-# The link reader's own image (Alexis, 2026-11-11, D13919; docs/plans/link-previews.md): its workspace and the three packages it imports,
+# The link reader's own image: its workspace and the three packages it imports,
 # with their production dependencies from the lockfile (htmlparser2 and the @jsquash WebAssembly codecs), then Node 24 alone in a
 # distroless image, as 65530, a user no other service runs as. No secret, no volume, no server code, no test (.dockerignore).
 # It reads public pages and pictures from strangers through its own way out (egress_links), so it holds nothing worth taking.
@@ -20,6 +20,6 @@ FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:78f07ef1b5ea71ad7c055df1
 WORKDIR /app
 COPY --from=build /repo /app
 USER 65530:65530
-# The JS heap at 90 MiB; the WebAssembly codecs' memory is outside it: the container's 256 MiB holds the measured peak of 210 MiB (2 Mpx cap) (F13951,
-# link-reader/src/memory.test.ts).
+# The JS heap at 90 MiB; the WebAssembly codecs' memory is outside it: the container's 256 MiB holds the measured peak of 210 MiB (2 Mpx cap)
+# (link-reader/src/memory.test.ts).
 CMD ["--disallow-code-generation-from-strings", "--max-old-space-size=90", "link-reader/src/main.ts"]

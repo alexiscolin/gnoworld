@@ -1,7 +1,7 @@
-# The demo stack (docs/plans/slice-1c.md, ADR-0002 §7). Run it, from the repository's root:
+# The demo stack (ADR-0002 §7). Run it, from the repository's root:
 #   docker compose -f deploy/compose.yaml --profile demo up -d --build
-# with the link cards on (LINK_CARDS=1), --profile links too (slice 13), and with Jarvis switched on (JARVIS=on), its profile too:
-# --profile demo --profile jarvis (10j-4), once the door's key is made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
+# with the link cards on (LINK_CARDS=1), --profile links too, and with Jarvis switched on (JARVIS=on), its profile too:
+# --profile demo --profile jarvis, once the door's key is made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
 # Ops runs the same file with its own settings (.env) and secrets. deploy/test.sh proves it.
 name: gnoworld-demo
 
@@ -16,7 +16,7 @@ x-locked: &locked
     options: { max-size: 10m, max-file: "3" }
   restart: unless-stopped
 
-# The socket the server makes and Ergo dials for each login (3d), in their shared volume.
+# The socket the server makes and Ergo dials for each login, in their shared volume.
 x-auth-socket: &auth-socket /run/gnoworld/auth.sock
 
 # web's fixed address on the internal network, the one Ergo and the server believe (deploy/.env.example).
@@ -31,18 +31,18 @@ services:
       context: ..
       dockerfile: deploy/web/Dockerfile
     user: "101:101"
-    # A fixed address: Ergo and the server believe the visitor's address from web's alone (3e).
+    # A fixed address: Ergo and the server believe the visitor's address from web's alone.
     networks:
       inside:
         ipv4_address: *web-address
     secrets: [demo_htpasswd]
-    # markets.json, which the server writes (5l) and this serves at /markets.json (5m): read-only here.
+    # markets.json, which the server writes and this serves at /markets.json: read-only here.
     volumes:
       - markets:/markets:ro
     cpus: 0.5
     mem_limit: 128m
     pids_limit: 64
-    # Two files for each of nginx's 4,096 connections, set here: nginx, no root, cannot raise a hard limit (F645).
+    # Two files for each of nginx's 4,096 connections, set here: nginx, no root, cannot raise a hard limit.
     ulimits:
       nofile: { soft: 8192, hard: 8192 }
     healthcheck:
@@ -53,12 +53,12 @@ services:
       start_period: 10s
       start_interval: 1s
     # Its upstreams' names are read once, at its start: one Compose restarts restarts it, not one Docker
-    # restarts after a crash (OPERATIONS.md, F622).
+    # restarts after a crash (OPERATIONS.md).
     depends_on:
       ergo: { condition: service_healthy, restart: true }
       server: { condition: service_healthy, restart: true }
 
-  # The chat (slice 3's plan, 3e): Ergo's settings rendered at its start from these and its secret.
+  # The chat: Ergo's settings rendered at its start from these and its secret.
   ergo:
     <<: *locked
     build:
@@ -78,7 +78,7 @@ services:
       - auth:/run/gnoworld
     cpus: 0.4
     # 2,000 guests joining one room took Ergo to 344 MiB, and Go past 128 threads, which a pids_limit counts:
-    # "failed to create new OS thread (have 129 already)", Ergo dead (3n's load runs). It starts no process of its own.
+    # "failed to create new OS thread (have 129 already)", Ergo dead. It starts no process of its own.
     mem_limit: 512m
     pids_limit: 1024
     healthcheck:
@@ -89,7 +89,7 @@ services:
       start_period: 20s
       start_interval: 1s
 
-  # The server (slice 3): the login, the rooms, the bot; OpenAI through the way out, as Node's proxy.
+  # The server: the login, the rooms, the bot; OpenAI through the way out, as Node's proxy.
   server:
     <<: *locked
     build:
@@ -97,13 +97,13 @@ services:
       dockerfile: deploy/server/Dockerfile
     user: "65532:65532"
     networks:
-      # A fixed address, which its API binds alone (HOST): jarvis's network reaches no port of the server's (10j's V12).
+      # A fixed address, which its API binds alone (HOST): jarvis's network reaches no port of the server's.
       inside:
         ipv4_address: ${SERVER_ADDRESS:-172.30.89.11}
       jarvis: {}
-      # The link reader's network (slice 13), the reader and the server alone: the server asks it for a page's card.
+      # The link reader's network, the reader and the server alone: the server asks it for a page's card.
       links: {}
-      # The admin API's listener (10g), on an address of a network nobody else joins: a console joins it to reach it.
+      # The admin API's listener, on an address of a network nobody else joins: a console joins it to reach it.
       admin:
         ipv4_address: ${ADMIN_ADDRESS:-172.30.92.10}
     environment:
@@ -118,39 +118,39 @@ services:
       ERGO_PORT: "6667"
       ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
       OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
-      # Ergo's volume, read-only, measured against its cap at each retention tick (3n-b).
+      # Ergo's volume, read-only, measured against its cap at each retention tick.
       ERGO_DATA: /ergo
       ERGO_DATA_MB: ${ERGO_DATA_MB:-1024}
       # The demo's way out; ops names its own proxy.
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
       NO_PROXY: ergo,jarvis,link_reader,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
-      # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
+      # The prices timer's file: CoinGecko's prices every 5 minutes, in a volume of their own.
       MARKETS_FILE: /markets/markets.json
-      # The worlds job's file (7c): the default universe's realms grouped into worlds, in the same volume, served at /worlds.json; its
-      # count beside it (7n2), worlds-count.json, served at /worlds-count.json.
+      # The worlds job's file: the default universe's realms grouped into worlds, in the same volume, served at /worlds.json; its
+      # count beside it, worlds-count.json, served at /worlds-count.json.
       WORLDS_FILE: /markets/worlds.json
-      # The preview job's file (8f): the hubs' realms' home pages, each read by the moderation check before it is written, in the same volume,
+      # The preview job's file: the hubs' realms' home pages, each read by the moderation check before it is written, in the same volume,
       # served at /previews.json; through the same RPC as the worlds job, so the way out lets no host out for it.
       PREVIEWS_FILE: /markets/previews.json
       # The same read takes the default universe's block height from its RPC (the host the way out lets out besides CoinGecko's and OpenAI's).
       UNIVERSES_FILE: /app/app/data/universes.json
-      # The door to jarvis (10g), on the network only the two share; off unless JARVIS=on, the setting jarvis reads.
+      # The door to jarvis, on the network only the two share; off unless JARVIS=on, the setting jarvis reads.
       JARVIS: ${JARVIS:-off}
       JARVIS_URL: http://jarvis:8081
-      # The key the door sends jarvis in a header and jarvis asks of every request (10u-g2): one secret, the server's and jarvis's alone.
+      # The key the door sends jarvis in a header and jarvis asks of every request: one secret, the server's and jarvis's alone.
       JARVIS_DOOR_KEY_FILE: /run/secrets/jarvis_door_key
-      # Link previews (slice 13, D13919): off unless LINK_CARDS=1, the kill switch; the reader is in the links profile, so on needs it up
+      # Link previews: off unless LINK_CARDS=1, the kill switch; the reader is in the links profile, so on needs it up
       # (--profile links). The reader's name on the network the two share.
       LINK_CARDS: ${LINK_CARDS:-0}
       LINK_READER_URL: http://link_reader:8084
-      # The guest chat (D430): on unless GUEST_CHAT=off, its undo; its limits, the server's own defaults (config.ts), an hour's names
-      # for one visitor and for all, and the guests alive at once (F13950: none of them reached the server).
+      # The guest chat: on unless GUEST_CHAT=off, its undo; its limits, the server's own defaults (config.ts), an hour's names
+      # for one visitor and for all, and the guests alive at once.
       GUEST_CHAT: ${GUEST_CHAT:-on}
       GUEST_NAMES_PER_VISITOR_HOUR: ${GUEST_NAMES_PER_VISITOR_HOUR:-10}
       GUEST_NAMES_PER_HOUR: ${GUEST_NAMES_PER_HOUR:-600}
       GUEST_LIVING: ${GUEST_LIVING:-5000}
-      # The admin API (10g, ADR-0002 §6): its sites are the console's, never a public one (ORIGINS).
+      # The admin API (ADR-0002 §6): its sites are the console's, never a public one (ORIGINS).
       ADMIN_HOST: ${ADMIN_ADDRESS:-172.30.92.10}
       ADMIN_PORT: "8082"
       ADMIN_ORIGINS: ${ADMIN_ORIGINS:-}
@@ -177,11 +177,11 @@ services:
       start_period: 20s
       start_interval: 1s
 
-  # Jarvis (slice 10; ADR-0002 §5, §7): its own image and user, off unless JARVIS=on (then it reads its key and reaches
+  # Jarvis (ADR-0002 §5, §7): its own image and user, off unless JARVIS=on (then it reads its key and reaches
   # gnomcp, which runs in jarvis_reader, a container of its own with no secret). It listens on its address of the network it
   # shares with the server alone, and goes out through a proxy of its own (egress_jarvis). /ask and /budgets ask no session:
-  # the network walls them, and the door's key (jarvis_door_key) is asked of every request besides (10u-g2).
-  # Its profile alone, out of the demo's cap (10j-4): without it the door answers off, or not_ready when on (10l-1).
+  # the network walls them, and the door's key (jarvis_door_key) is asked of every request besides.
+  # Its profile alone, out of the demo's cap: without it the door answers off, or not_ready when on.
   jarvis:
     <<: *locked
     profiles: [jarvis]
@@ -190,7 +190,7 @@ services:
       dockerfile: deploy/jarvis/Dockerfile
     user: "65533:65533"
     init: true
-    # Its drain (JARVIS_DRAIN_S), then gnomcp's close (4 s at most) and the spans' (5 s), with room (D178).
+    # Its drain (JARVIS_DRAIN_S), then gnomcp's close (4 s at most) and the spans' (5 s), with room.
     stop_grace_period: 35s
     networks:
       jarvis:
@@ -202,16 +202,16 @@ services:
       JARVIS: ${JARVIS:-off}
       JARVIS_HOST: ${JARVIS_ADDRESS:-172.30.91.10}
       JARVIS_PORT: "8081"
-      # The name the server's JARVIS_URL gives, which a request's Host must name (F5288).
+      # The name the server's JARVIS_URL gives, which a request's Host must name.
       JARVIS_HOSTNAMES: jarvis
       JARVIS_DATABASE: /data/jarvis.db
-      # The demo's budgets, a day (D47): the file keeps them from the first start, an admin changes them (D173).
+      # The demo's budgets, a day: the file keeps them from the first start, an admin changes them.
       JARVIS_BUDGET_USD: ${JARVIS_BUDGET_USD:-3}
       JARVIS_TRANSLATION_BUDGET_USD: ${JARVIS_TRANSLATION_BUDGET_USD:-1}
       JARVIS_DRAIN_S: "20"
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
       JARVIS_DOOR_KEY_FILE: /run/secrets/jarvis_door_key
-      # gnomcp is not here: one connection to the reader's bridge, the reader's address and port 8083 (10u-g2).
+      # gnomcp is not here: one connection to the reader's bridge, the reader's address and port 8083.
       JARVIS_GNOMCP_ADDRESS: ${READER_ADDRESS:-172.30.97.10}:8083
       # Named after app/data/universes.json's universes, as gnomcp.toml's profiles are.
       JARVIS_PROFILES: onyx,gnoland
@@ -226,10 +226,10 @@ services:
     volumes:
       - jarvis:/data
     cpus: 0.3
-    # Node alone now, gnomcp being the reader's; the heap is 70% of it (deploy/jarvis/Dockerfile).
+    # Node alone, gnomcp being the reader's; the heap is 70% of it (deploy/jarvis/Dockerfile).
     mem_limit: 384m
     pids_limit: 128
-    # Its budgets, which it serves on or off, asked by the name it takes and with the door's key (no /health route: 10i).
+    # Its budgets, which it serves on or off, asked by the name it takes and with the door's key (no /health route).
     healthcheck:
       test:
         [
@@ -247,11 +247,11 @@ services:
     depends_on:
       jarvis_reader: { condition: service_healthy, restart: true }
 
-  # gnomcp, alone (10u-g2, D13987): its release image, a bridge that gives it a TCP port, one gnomcp a connection (two at
+  # gnomcp, alone: its release image, a bridge that gives it a TCP port, one gnomcp a connection (two at
   # most: jarvis keeps one, a restart overlaps by one), and a relay that gives it a way out (deploy/jarvis-reader/main.go).
   # gnomcp ignores HTTPS_PROXY, so each chain host is named in /etc/hosts to one loopback address, where the relay reads the
   # TLS hello's server name, refuses one off READER_HOSTS and opens a CONNECT tunnel to it through egress_reader; the TLS
-  # stays between gnomcp and the host. Its caps are a ceiling not measured on a running stack (D-row of 10u-g2). No secret, no volume but a tmpfs, a user of its own, and a network shared with jarvis alone.
+  # stays between gnomcp and the host. Its caps are a ceiling not measured on a running stack. No secret, no volume but a tmpfs, a user of its own, and a network shared with jarvis alone.
   # Its ports below 1024 are open to its user in its own network namespace (sysctl), where a capability would be added back.
   jarvis_reader:
     <<: *locked
@@ -294,12 +294,12 @@ services:
     depends_on:
       egress_reader: { condition: service_healthy, restart: true }
 
-  # The link reader (slice 13, D13919; docs/plans/link-previews.md): reads a public page's head and its picture for a chat line's card, in
+  # The link reader: reads a public page's head and its picture for a chat line's card, in
   # Node, its own image and user (65530), no secret, no volume, nothing of the stack's: it fetches what strangers link, so it is walled
   # in. It listens on its address of the network it shares with the server alone, and goes out through egress_links (4754) on a network
-  # of its own, to any public https host, never a private one. Its profile alone, out of the demo's cap, as Jarvis (D184): LINK_CARDS=1 and
-  # --profile links turn the cards on. Its memory is 256 MiB, measured (F13951, D13943): the codecs at the 2 Mpx cap peak at 210 MiB resident with a 90 MiB JS heap, one picture at a time
-  # (link-reader/src/memory.test.ts); the plan's 64 MiB, and 128 MiB, could not hold them.
+  # of its own, to any public https host, never a private one. Its profile alone, out of the demo's cap, as Jarvis: LINK_CARDS=1 and
+  # --profile links turn the cards on. Its memory is 256 MiB, measured: the codecs at the 2 Mpx cap peak at 210 MiB resident with a 90 MiB JS heap, one picture at a time
+  # (link-reader/src/memory.test.ts); 64 MiB and 128 MiB could not hold them.
   link_reader:
     <<: *locked
     profiles: [links]
@@ -336,7 +336,7 @@ services:
       egress_links: { condition: service_healthy, restart: true }
 
   # The demo's only way out: it holds the network Tailscale shares, refuses every private address
-  # (the host, its LAN, any tailnet), then sleeps. It alone has NET_ADMIN (docs/decisions.md).
+  # (the host, its LAN, any tailnet), then sleeps. It alone has NET_ADMIN.
   guard:
     <<: *locked
     profiles: [demo]
@@ -347,11 +347,11 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       XTABLES_LOCKFILE: /tmp/xtables.lock
-      # Its own address on jarvis's way out's network, by which guard.sh finds that network (10j's review, V2).
+      # Its own address on jarvis's way out's network, by which guard.sh finds that network.
       JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
-      # And its address on the reader's way out's network (10u-g2).
+      # And its address on the reader's way out's network.
       READER_OUT_ADDRESS: ${GUARD_READER_ADDRESS:-172.30.99.2}
-      # And on the link reader's way out's network (slice 13).
+      # And on the link reader's way out's network.
       LINKS_OUT_ADDRESS: ${GUARD_LINKS_ADDRESS:-172.30.103.2}
     volumes:
       - ./guard:/guard:ro
@@ -377,7 +377,7 @@ services:
     depends_on:
       web: { condition: service_healthy }
 
-  # The demo's way out (decision 151): the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
+  # The demo's way out: the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
   egress:
     <<: *locked
     profiles: [demo]
@@ -400,7 +400,7 @@ services:
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
-  # jarvis's way out (10j): the hosts of deploy/egress/jarvis-acl.yaml alone, on 4751 in the guard's network, whose rules
+  # jarvis's way out: the hosts of deploy/egress/jarvis-acl.yaml alone, on 4751 in the guard's network, whose rules
   # take 4751 from jarvis's network alone (guard.sh): the server's list and jarvis's never mix.
   egress_jarvis:
     <<: *locked
@@ -433,7 +433,7 @@ services:
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
-  # The reader's way out (10u-g2): the hosts of deploy/egress/reader-acl.yaml alone, on 4753 in the guard's network, whose rules
+  # The reader's way out: the hosts of deploy/egress/reader-acl.yaml alone, on 4753 in the guard's network, whose rules
   # take 4753 from the reader's network alone (guard.sh): neither jarvis's list nor the server's reaches it, nor it theirs.
   egress_reader:
     <<: *locked
@@ -466,10 +466,10 @@ services:
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
-  # The link reader's way out (slice 13): any public https host (deploy/egress/links-acl.yaml, `action: open`), on 4754 in the guard's
+  # The link reader's way out: any public https host (deploy/egress/links-acl.yaml, `action: open`), on 4754 in the guard's
   # network, whose rules take 4754 from the link reader's network alone (guard.sh) and refuse every private range on each packet.
   # smokescreen resolves each name and refuses a private answer itself. 8 tunnels at once, the reader serving 2 pages (LINKS_MAX), a
-  # picture's fetch each: the file's 32 tunnels hold (F13952: no flag of v0.1.0 read for a lower one, so none is set).
+  # picture's fetch each: the file's 32 tunnels hold (no flag of v0.1.0 reads for a lower one, so none is set).
   egress_links:
     <<: *locked
     profiles: [links]
@@ -565,7 +565,7 @@ networks:
     ipam:
       config:
         - subnet: ${JARVIS_OUT_SUBNET:-172.30.95.0/24}
-  # jarvis and its reader alone, the reader's address fixed (JARVIS_GNOMCP_ADDRESS): the way jarvis reaches gnomcp (10u-g2).
+  # jarvis and its reader alone, the reader's address fixed (JARVIS_GNOMCP_ADDRESS): the way jarvis reaches gnomcp.
   reader:
     internal: true
     driver_opts:
@@ -584,7 +584,7 @@ networks:
     ipam:
       config:
         - subnet: ${READER_OUT_SUBNET:-172.30.99.0/24}
-  # The link reader and the server alone, the reader's address fixed (LINKS_LISTEN): as sealed as the internal network (slice 13).
+  # The link reader and the server alone, the reader's address fixed (LINKS_LISTEN): as sealed as the internal network.
   links:
     internal: true
     driver_opts:
@@ -603,7 +603,7 @@ networks:
     ipam:
       config:
         - subnet: ${LINKS_OUT_SUBNET:-172.30.103.0/24}
-  # The admin API's listener alone: the console joins it (slice 12).
+  # The admin API's listener alone: the console joins it.
   admin:
     internal: true
     driver_opts:
@@ -618,9 +618,9 @@ volumes:
   tailscale: {}
   ergo: {}
   server: {}
-  # jarvis's file (D45): its budgets and its caches, which it alone mounts.
+  # jarvis's file: its budgets and its caches, which it alone mounts.
   jarvis: {}
-  # markets.json, which the server writes and the home page reads (5l, 5m).
+  # markets.json, which the server writes and the home page reads.
   markets: {}
   # The auth socket's folder, which the server makes the socket in and Ergo dials.
   auth: {}
@@ -639,7 +639,7 @@ secrets:
   # Read by jarvis alone, and only when on; a file must be there even off (any text): Compose wants it.
   anthropic_api_key:
     file: ${ANTHROPIC_API_KEY_FILE:-./secrets/anthropic_api_key}
-  # The door's key (10u-g2): the server sends it, jarvis asks it of every request; both read it when on, and jarvis's health
+  # The door's key: the server sends it, jarvis asks it of every request; both read it when on, and jarvis's health
   # check reads it. A file must be there even off. docs/OPERATIONS.md makes it.
   jarvis_door_key:
     file: ${JARVIS_DOOR_KEY_FILE:-./secrets/jarvis_door_key}

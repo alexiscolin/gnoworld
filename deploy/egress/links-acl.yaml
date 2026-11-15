@@ -1,4 +1,4 @@
-# The link reader's way out (D13919, docs/plans/link-previews.md §4): any public https host, on 4754, from the reader's network alone
+# The link reader's way out: any public https host, on 4754, from the reader's network alone
 # (deploy/guard/guard.sh). `open` lets every name out and nothing else changes: smokescreen resolves the name, then refuses an address
 # that is not global unicast, private, carrier-grade or an IPv6 embedding of one (unsafe_allow_private_ranges: false, config.yaml), and the
 # guard's rules refuse every private range again on each packet. Port 443 is the reader's URL rule and its redirect rule; the guard lets

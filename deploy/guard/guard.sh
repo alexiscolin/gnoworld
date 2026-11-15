@@ -1,13 +1,13 @@
 #!/bin/sh
-# The demo's only way out (docs/decisions.md, 2026-10-18). This container holds the network that
+# The demo's only way out. This container holds the network that
 # Tailscale shares, and loads its rules before anything else runs there: web's port, on web alone; the
-# way out's replies to the internal network, to connections it accepted (slice 3: smokescreen listens
+# way out's replies to the internal network, to connections it accepted (smokescreen listens
 # here on 4750, and only that network may reach it); the DNS servers Docker forwards to from this
 # network; then every private, local, carrier and reserved address refused, so the host, its LAN and
 # any tailnet stay out of reach; then public TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is
 # closed. jarvis's way out listens here too, on 4751, reached from jarvis's own network alone, which gets nothing
-# else in and nothing out but its replies (10j), and its reader's, on 4753, the same for the reader's network
-# (10u-g2), and the link reader's, on 4754, the same for the link reader's network (slice 13). deploy/test.sh proves each line.
+# else in and nothing out but its replies, and its reader's, on 4753, the same for the reader's network,
+# and the link reader's, on 4754, the same for the link reader's network. deploy/test.sh proves each line.
 set -eu
 
 web=$(getent hosts web | awk '{ print $1 }')

@@ -1,4 +1,4 @@
-# The server in the stack (slice 3's plan, 3e): its workspace and the packages it imports, with their production
+# The server in the stack: its workspace and the packages it imports, with their production
 # dependencies from the lockfile, then Node 24 alone in a distroless image, as 65532, the user Ergo shares for
 # the auth socket. Node strips the types itself: server/src/main.ts runs as it is, as the tests run it.
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
@@ -19,7 +19,7 @@ COPY server/src server/src
 COPY server/roles.json server/
 # The universes the app is built from: the default one's RPC is where the prices timer reads the block height (UNIVERSES_FILE).
 COPY app/data/universes.json app/data/
-# The hubs beside them: the trends read a hub's rooms and its realms as one world (7t3).
+# The hubs beside them: the trends read a hub's rooms and its realms as one world.
 COPY app/data/hubs.json app/data/
 RUN mkdir -p /data /markets /run/gnoworld && chown 65532:65532 /data /markets /run/gnoworld
 

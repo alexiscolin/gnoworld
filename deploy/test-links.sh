@@ -1,4 +1,4 @@
-# deploy/test-links.sh: the link reader's proofs (slice 13, L1; D13919; docs/plans/link-previews.md §4), sourced by deploy/test.sh with its
+# deploy/test-links.sh: the link reader's proofs, sourced by deploy/test.sh with its
 # helpers, as test-jarvis.sh is: in --mutants, its faults; else, once the demo is proven, it starts the reader and its way out under
 # the `links` profile and proves them. Not run where Docker is unreachable (the build sandbox): link-reader/src/deploy.test.ts reads the
 # same files as text; this proves them on Docker. Needs the network for its controls (example.com).
@@ -37,7 +37,7 @@ if [ "${1:-}" = --mutants ]; then
 	return 0
 fi
 
-# The demo profile holds neither the reader nor its way out: they are outside its ceiling, as Jarvis (D184).
+# The demo profile holds neither the reader nor its way out: they are outside its ceiling, as Jarvis.
 expect "the demo profile holds no link reader, nor its way out" \
 	"$(docker compose -p "$project" $files config --services | grep -c -E '^(link_reader|egress_links)$' || true)" 0
 

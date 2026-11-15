@@ -1,5 +1,5 @@
 #!/bin/sh
-# deploy/k6/run.sh: slice 3's first load runs (docs/plans/slice-3.md, 3n), on the operator's host with Docker,
+# deploy/k6/run.sh: the load runs, on the operator's host with Docker,
 # which Claude Code's sandbox refuses. A stack of its own in a throwaway project, never the demo (ADR-0002: load
 # tests never run on it), driven from inside its internal network: k6 for the logins, Ergo's crowd and the
 # messages, Node for the streams (k6 reads a response whole, and a stream never ends). It prints k6's summaries,
@@ -7,7 +7,7 @@
 #   sh deploy/k6/run.sh             every scenario, at its default size
 #   sh deploy/k6/run.sh messages    one: logins, crowd, streams or messages
 # Sizes: ACCOUNTS (200), CROWD (2000), STREAMS (1000), HOLD (60 s), RATE (a message an account every 5 s).
-# OPENAI_API_KEY_FILE names a real key for the messages' checks; without one the messages are not run (F644).
+# OPENAI_API_KEY_FILE names a real key for the messages' checks; without one the messages are not run.
 # Exit: 0 it ran, 1 k6 found a threshold missed, 2 a tool or a fact is missing, 3 the stack did not start.
 set -eu
 umask 022 # what the run writes, the containers' users read
@@ -26,14 +26,14 @@ for size in ACCOUNTS CROWD STREAMS HOLD RATE; do
 	eval "value=\$$size"
 	case $value in "" | *[!0-9]* | 0*) missing "$size: a whole number from 1, not [$value]" ;; esac
 done
-# Each visitor's address is one of 250 x 250 (setup.ts, load.js), a stream's four to one (F650).
+# Each visitor's address is one of 250 x 250 (setup.ts, load.js), a stream's four to one.
 [ "$ACCOUNTS" -le 62500 ] && [ "$CROWD" -le 62500 ] && [ "$STREAMS" -le 250000 ] ||
 	missing "ACCOUNTS and CROWD 62,500 at most, STREAMS 250,000: the visitors' addresses"
-# Without OpenAI's key every line is unchecked and the breaker stops calling: the messages measure nothing (F644).
+# Without OpenAI's key every line is unchecked and the breaker stops calling: the messages measure nothing.
 key=${OPENAI_API_KEY_FILE:-}
 [ "$only" != messages ] || [ -n "$key" ] || missing "messages: set OPENAI_API_KEY_FILE, OpenAI's key, which checks each line"
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
-# Never on the demo's host (ADR-0002): none of its containers, running or stopped, may be here (F643).
+# Never on the demo's host (ADR-0002): none of its containers, running or stopped, may be here.
 [ -z "$(docker ps -aq --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
 	missing "the demo's containers are on this host: run the load on another (ADR-0002: never on the demo's host)"
 
@@ -46,7 +46,7 @@ cleanup() {
 	rm -r "$tmp"
 }
 trap cleanup EXIT
-# dash runs no EXIT trap when a signal ends it: a signal ends the run through exit, so cleanup runs (F642).
+# dash runs no EXIT trap when a signal ends it: a signal ends the run through exit, so cleanup runs.
 trap 'exit 130' INT
 trap 'exit 143' TERM
 # The stack's own secrets; OpenAI's key the operator's, if given.
@@ -144,7 +144,7 @@ export const options = {
       exec: SCENARIO,
     },
   },
-  // First budgets, to be set from this run's numbers (the plan's 3n): nearly every login and line goes through.
+  // A loose budget: nearly every login and line goes through.
   thresholds: { checks: ["rate>0.99"] },
 };
 // This virtual user's share: EACH connections, by their numbers.
@@ -155,7 +155,7 @@ const mine = () => {
 
 // One IRC connection through Ergo's WebSocket, as the visitor at `ip`: `on.line` sees each line Ergo sends, and
 // `on.close` whether the connection had reached its goal. One still open a minute past the hold is closed, so
-// every connection is counted, a stuck one as missed (F635).
+// every connection is counted, a stuck one as missed.
 const irc = (ip, first, on) => {
   const ws = new WebSocket(ERGO, null, { headers: { Origin: ORIGIN, "X-Forwarded-For": ip } });
   const deadline = setTimeout(() => ws.close(), (HOLD + 60) * 1000);
@@ -265,7 +265,7 @@ let held = 0;
 const read = async (i) => {
   const visitor = Math.floor(i / 4);
   const ip = `198.20.${String(Math.floor(visitor / 250))}.${String((visitor % 250) + 1)}`;
-  // A heartbeat is a line that starts with ":", wherever the chunks part it (F648).
+  // A heartbeat is a line that starts with ":", wherever the chunks part it.
   let beat = false;
   let last = "\n";
   try {
@@ -283,7 +283,7 @@ const read = async (i) => {
   }
   if (beat) held += 1;
 };
-// As k6's checks: 99% of them, or the run says a threshold was missed (F635).
+// As k6's checks: 99% of them, or the run says a threshold was missed.
 Promise.all(Array.from({ length: count }, (_, i) => read(i))).then(() => {
   console.log(`streams that answered and beat: ${String(held)} of ${String(count)}`);
   process.exit(held >= count * 0.99 ? 0 : 1);
@@ -294,7 +294,7 @@ k6() {
 		-e HOLD="$HOLD" -e RATE="$RATE" -e CROWD="$CROWD" "$K6" run --quiet /k6/load.js
 }
 # A scenario, the containers sampled all through it; its own exit code.
-# A file each: a docker stats under way when its sampler stops still writes, into its own scenario's file (F647).
+# A file each: a docker stats under way when its sampler stops still writes, into its own scenario's file.
 during() {
 	runs=$((${runs:-0} + 1))
 	since=$(date +%s)
