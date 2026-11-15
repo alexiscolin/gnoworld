@@ -3,14 +3,14 @@
 // hide one and no message can send one. Its caps bound what the card draws and Adena signs.
 import { z } from "./zod.ts";
 import { Address } from "./address.ts";
-import { utf8Bytes } from "@gnoworld/core";
+import { isExportedName, utf8Bytes } from "@gnoworld/core";
 import { hasHidden } from "./hidden.ts";
 import { ChainId, RealmPath } from "./realmPath.ts";
 
-const CALL_REQUEST_CAPS = { func: 128, args: 32, argBytes: 8192 } as const;
+const CALL_REQUEST_CAPS = { args: 32, argBytes: 8192 } as const;
 
 // An exported function: it starts with a capital, as gno exports it.
-const Func = z.string().check(z.maxLength(CALL_REQUEST_CAPS.func), z.regex(/^[A-Z][A-Za-z0-9_]*$/));
+const Func = z.string().check(z.refine(isExportedName, { message: "an exported name" }));
 // Control and format characters (bidi overrides, zero-width, escapes) but newline and tab are refused: the card would draw text
 // unlike the signed bytes.
 const Argument = z

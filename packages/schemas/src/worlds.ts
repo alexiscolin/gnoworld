@@ -1,7 +1,7 @@
 // The file the server's worlds job writes and every client reads: the chain's realms grouped into worlds, each realm
 // with what was read of its package and its history. All of it came from a chain or an indexer, so every text is capped and
 // checked, every count is a whole number, and a null is a fact not read, never a zero.
-import { isAddress } from "@gnoworld/core";
+import { isAddress, isExportedName } from "@gnoworld/core";
 import { ChainCount, RealmPath, WorldId } from "./realmPath.ts";
 import { Moment, Slug, WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";
@@ -13,7 +13,7 @@ export { WORLDS_CAPS } from "./worldsHead.ts";
 export const WORLDS_MAX_BYTES = 4 * 1024 * 1024;
 
 /** An exported Go identifier, at most 128 characters. */
-export const ExportedName = z.string().check(z.regex(/^[A-Z][A-Za-z0-9_]{0,127}$/));
+export const ExportedName = z.string().check(z.refine(isExportedName, { message: "an exported name" }));
 
 /** A package or realm a realm imports, by its path on gno.land. */
 export const ImportPath = z.string().check(
