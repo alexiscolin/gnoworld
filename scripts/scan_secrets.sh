@@ -44,6 +44,16 @@ text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png
 # did), so the private rules skip those files; the secret rules read every file (F139).
 binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
+# What a merge adds in its resolution is a diff against neither parent, shown by no plain git log: --remerge-diff shows it, against the
+# merge git would make again (the other parent's side is no addition, as against the first parent alone). It skips an octopus merge,
+# saying so on stderr, so a scan that holds one is refused.
+merges="--remerge-diff"
+if [ "$mode" != staged ]; then
+	scope=--all
+	[ "$mode" = all ] || scope=$revs
+	octopus=$(set -f && git rev-list --min-parents=3 --full-history $scope | head -n 1)
+	[ -z "$octopus" ] || { echo "scan_secrets: an octopus merge ($octopus) in what is scanned: --remerge-diff skips it, so nothing would read what it adds; merge two branches at a time" >&2; exit 1; }
+fi
 # An annotated tag is pushed as its own object, whose message git log never shows: the text of each tag a revision names, and of each
 # tag that tag points at, is read as text too, by the object's type, whatever ref it is pushed to.
 tag_text() {
@@ -70,8 +80,8 @@ for config in gitleaks.toml gitleaks-private.toml; do
 		printf '%s\n' "$staged" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1
 	else
 		# --log-opts replaces gitleaks's own log options, so they are given again before the text ones.
-		opts="--full-history --all --diff-filter=tuxdb $text${paths:+ $paths}"
-		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $text${paths:+ $paths}"
+		opts="--full-history --all --diff-filter=tuxdb $merges $text${paths:+ $paths}"
+		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $merges $text${paths:+ $paths}"
 		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first (F140).
 		err=$(set -f && git log -1 $opts 2>&1 >/dev/null) || { echo "scan_secrets: git cannot read the history with $opts" >&2; exit 1; }
 		# gitleaks reads git's stderr as a failure of git, logs it, and scans nothing: with its own exit code 0.

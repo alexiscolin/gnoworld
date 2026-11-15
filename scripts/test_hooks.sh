@@ -4868,6 +4868,57 @@ tagbranch tkey && fail "pre-push let through a key in a tag's message, the tag p
 tagbranch tclean || fail "pre-push refused a tag with a clean message pushed to a branch name"
 sr "$held..$(git -C "$pr" rev-parse tkey)" && fail "scan_secrets --range missed a key in the message of the tag that ends A..B"
 git -C "$pr" tag -d tclean tkey theld tnest >/dev/null
+# What a merge commit adds in its resolution (a conflict resolved with a line neither side had, or a file added in the merge) is a diff
+# against neither parent: git log shows a merge no diff. Both scans read it, by range and over the whole history, and through the hook.
+mkmerge() { # $1: the repository, $2: how the merge differs from its parents: conflict, file or none
+	git init -q "$1" && git -C "$1" checkout -q -b trunk
+	printf 'c = 0\n' >"$1/c.txt" && git -C "$1" add c.txt && git -C "$1" commit -qm base
+	git -C "$1" checkout -q -b side && printf 'c = 1\n' >"$1/c.txt" && git -C "$1" commit -qam side
+	git -C "$1" checkout -q trunk && printf 'c = 2\n' >"$1/c.txt" && git -C "$1" commit -qam main
+	git -C "$1" merge -q --no-commit --no-ff side >/dev/null 2>&1 || :
+	case $2 in
+	conflict) printf 'c = "%s"\n' "$key" >"$1/c.txt" ;;
+	file) printf 'c = 2\n' >"$1/c.txt" && printf 'aws = "%s"\n' "$key" >"$1/new.txt" ;;
+	*) printf 'c = 2\n' >"$1/c.txt" ;;
+	esac
+	git -C "$1" add -A && git -C "$1" commit -qm merged
+	# a merge that did not start would be a commit of one parent, and read as a pass
+	[ "$(git -C "$1" rev-list --parents -n 1 trunk | wc -w | tr -d ' ')" = 3 ] || fail "the test's $2 merge has not two parents"
+}
+mpushed() { printf 'refs/heads/trunk %s refs/heads/trunk %s\n' "$(git -C "$1" rev-parse trunk)" "$zero" | (cd "$1" && sh "$rh/pre-push" origin "$t/no-such-remote.git" >/dev/null 2>&1); }
+for kind in conflict file; do
+	mr="$t/pushrange-merge-$kind" && mkmerge "$mr" "$kind"
+	mtop=$(git -C "$mr" rev-parse trunk)
+	(cd "$mr" && sh "$rh/scan_secrets.sh" --range "$mtop" "^$(git -C "$mr" rev-parse "$mtop^1")" >/dev/null 2>&1) && fail "scan_secrets --range missed a key a merge's $kind resolution adds"
+	(cd "$mr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) && fail "scan_secrets missed, over the whole history, a key a merge's $kind resolution adds"
+	mpushed "$mr" && fail "pre-push let through a key a merge's $kind resolution adds"
+done
+mr="$t/pushrange-merge-none" && mkmerge "$mr" none && mtop=$(git -C "$mr" rev-parse trunk)
+(cd "$mr" && sh "$rh/scan_secrets.sh" --range "$mtop" "^$(git -C "$mr" rev-parse "$mtop^1")" >/dev/null 2>&1) || fail "scan_secrets --range refused a merge that adds nothing"
+(cd "$mr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) || fail "scan_secrets refused, over the whole history, a merge that adds nothing"
+mpushed "$mr" || fail "pre-push refused a merge that adds nothing"
+# The usual merge, trunk into a feature branch, shows the other parent's whole side as added when read against the first parent:
+# a key the remote already holds, in what trunk brought, is no key of this push (the lint job reads $base..HEAD).
+git -C "$pr" checkout -q -b feat "$held^" && commit f.txt 'f = 1' && git -C "$pr" merge -q --no-ff -m merged "$tk" && git -C "$pr" checkout -q trunk
+[ "$(git -C "$pr" rev-list --parents -n 1 feat | wc -w | tr -d ' ')" = 3 ] || fail "the test's feature merge has not two parents"
+fs=$(git -C "$pr" rev-parse feat)
+sr "$held..$fs" || fail "scan_secrets --range took a key the remote holds, brought in by a merge of trunk, for the push's own (A..B)"
+sr "$fs" "^$held" || fail "scan_secrets --range took a key the remote holds, brought in by a merge of trunk, for the push's own"
+pushed feat || fail "pre-push took a key the remote holds, brought in by a merge of trunk, for the push's own"
+# An octopus merge is skipped by --remerge-diff, which says so and shows nothing: a range or a history holding one is refused.
+mo="$t/pushrange-octopus" && git init -q "$mo" && git -C "$mo" checkout -q -b trunk
+printf 'x = 0\n' >"$mo/x.txt" && git -C "$mo" add x.txt && git -C "$mo" commit -qm base
+for b in one two; do git -C "$mo" checkout -q -b "$b" trunk && printf '%s = 1\n' "$b" >"$mo/$b.txt" && git -C "$mo" add "$b.txt" && git -C "$mo" commit -qm "$b"; done
+git -C "$mo" checkout -q trunk && git -C "$mo" merge -q --no-ff --no-commit one two >/dev/null 2>&1
+printf 'aws = "%s"\n' "$key" >"$mo/o.txt" && git -C "$mo" add o.txt && git -C "$mo" commit -qm octopus
+[ "$(git -C "$mo" rev-list --parents -n 1 trunk | wc -w | tr -d ' ')" = 4 ] || fail "the test's octopus merge has not three parents"
+ot=$(git -C "$mo" rev-parse trunk) && ob=$(git -C "$mo" rev-parse trunk~1)
+out=$(cd "$mo" && sh "$rh/scan_secrets.sh" --range "$ot" "^$ob" 2>&1) && fail "scan_secrets --range let an octopus merge through"
+printf '%s\n' "$out" | grep -q "scan_secrets: an octopus merge" || fail "scan_secrets --range refused an octopus merge without saying why: $out"
+out=$(cd "$mo" && sh "$rh/scan_secrets.sh" 2>&1) && fail "scan_secrets let an octopus merge through, over the whole history"
+printf '%s\n' "$out" | grep -q "scan_secrets: an octopus merge" || fail "scan_secrets refused an octopus merge, over the whole history, without saying why: $out"
+mpushed "$mo" && fail "pre-push let an octopus merge through"
+(cd "$mo" && sh "$rh/scan_secrets.sh" --range "$ob" >/dev/null 2>&1) || fail "scan_secrets --range refused a history before the octopus merge"
 out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --stagd 2>&1) && fail "scan_secrets took an unknown option for a whole-history scan"
 printf '%s\n' "$out" | grep -q "usage: scan_secrets.sh" || fail "scan_secrets refused an unknown option without its usage: $out"
 fi

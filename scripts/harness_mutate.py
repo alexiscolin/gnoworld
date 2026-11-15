@@ -1209,6 +1209,13 @@ def mutants():
         ('[ "$mode" = all ] || opts=', ': || opts=', "scans the range alone"),
     ):
         yield from each("scripts/scan_secrets.sh", find, replace, "hooks", f"scan_secrets --range {label}")
+    # A merge's resolution is read against the merge git would make again, an octopus merge, which that cannot, is refused.
+    yield from each("scripts/scan_secrets.sh", '--diff-filter=tuxdb $merges $text', '--diff-filter=tuxdb $text', "hooks", 'scan_secrets reads what a merge adds in its resolution')
+    yield from each("scripts/scan_secrets.sh", 'merges="--remerge-diff"', 'merges="--diff-merges=first-parent"', "hooks", 'scan_secrets reads a merge against the merge git would make again, not the first parent')
+    yield from each("scripts/scan_secrets.sh", '--min-parents=3', '--min-parents=4', "hooks", 'scan_secrets refuses an octopus merge')
+    yield from each("scripts/scan_secrets.sh", '[ -z "$octopus" ] ||', 'true ||', "hooks", 'scan_secrets stops at an octopus merge')
+    yield from each("scripts/scan_secrets.sh", '[ "$mode" = all ] || scope=$revs', 'scope=--all', "hooks", 'scan_secrets refuses an octopus merge of what it scans alone')
+    yield from each("scripts/scan_secrets.sh", '\tscope=--all\n', '\tscope=\n', "hooks", 'scan_secrets refuses an octopus merge in the whole history')
     # An annotated tag's message is scanned, whatever ref carries the tag, through a tag of a tag, by both rule sets.
     yield from each("scripts/scan_secrets.sh", 'rev=${rev##*..}', 'rev=$rev', "hooks", 'scan_secrets --range reads the tag that ends A..B')
     yield from each("scripts/scan_secrets.sh", '= tag ]; do', '= never ]; do', "hooks", 'scan_secrets --range reads the message of a tag')
