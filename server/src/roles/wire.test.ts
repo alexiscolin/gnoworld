@@ -106,6 +106,7 @@ function setup({
         check: () => Promise.resolve(),
       },
       rooms: { maker: (room) => (room === ROOM ? MAKER : undefined) },
+      line: (room, msgid) => Promise.resolve({ room, msgid, time: "t", account: "bob", text: "hi" }),
       hide: (room, msgid) => sent.push(`hide ${room} ${msgid}`) > 0,
       muteKeeping: (account) => {
         sent.push(`mute ${account}`);

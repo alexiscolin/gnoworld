@@ -10,7 +10,7 @@ import type { RecentLines } from "./door/lines.ts";
 import type { Answers } from "./door/said.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
-import type { Said } from "./irc/link.ts";
+import type { Fetched, Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Log } from "@gnoworld/service/log";
 import type { CardFlow } from "./cards/flow.ts";
@@ -55,6 +55,7 @@ export interface Chat extends ReturnType<typeof guestFor> {
   // Whether an account is staff of a room: its world's moderators and the team.
   staff: (room: string, who: string) => boolean;
   // An owner's moderation (D13936): a line hidden by the link's REDACT, a mute that ends none, a world's rooms.
+  line: (room: string, msgid: string) => Promise<Fetched>;
   hide: (room: string, msgid: string) => boolean;
   muteKeeping: (account: string, world: string) => "muted" | "already" | "full";
   roomsOf: (world: string) => readonly string[];
@@ -195,7 +196,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     recent: recent.recent,
     last: recent.last,
     said: answers,
-    ...ownerActs(db, send, mutes),
+    ...ownerActs(db, { send, link: () => link }, mutes),
     stop: stopper({
       timers: [lifts, passes],
       sweep: stopSweeping,

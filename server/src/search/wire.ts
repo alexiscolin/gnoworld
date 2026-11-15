@@ -1,6 +1,6 @@
 import type { Log } from "@gnoworld/service/log";
 import type { RecentLines } from "../door/lines.ts";
-import type { Fetched, Link, Said } from "../irc/link.ts";
+import { lineOf, type Link, type Said } from "../irc/link.ts";
 import { guarded } from "./guard.ts";
 import type { Search } from "./index.ts";
 
@@ -23,8 +23,7 @@ export function indexing(search: Search | undefined, log: Log, { recent, link }:
         undefined,
       );
   };
-  const fetch = (room: string, msgid: string): Promise<Fetched> =>
-    link()?.line(room, msgid) ?? Promise.resolve("unanswered");
+  const fetch = lineOf(link);
   // The joins' reconciles one after the other: each asks the link a question a line, and the link holds 1,000 at once (F13702).
   let asking = Promise.resolve();
   return {
