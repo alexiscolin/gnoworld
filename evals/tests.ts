@@ -20,7 +20,7 @@ const verdict = (pass: boolean, reason: string): Verdict => ({ pass, score: pass
 const listed = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
-// The checks of what ran: an answer traced, no tool of `never` run, one of `some`, none passing blind.
+// The checks of what ran: an answer traced, no tool of `never` run, one of `some` (10j's review, S2: none blind).
 function toolChecks(expect: Expect, check: (value: Check) => void): void {
   if (expect.status.includes("answered"))
     check((_, { metadata }) => verdict(Number(metadata?.["made"]) >= 1, "no question span came back"));
@@ -74,6 +74,7 @@ export function assertionsOf(expect: Expect, planted = false): Assertion[] {
   madeChecks(expect, check);
   if (expect.rubric !== undefined) checks.push({ type: "llm-rubric", value: expect.rubric });
   if (expect.max_usd !== undefined) checks.push({ type: "cost", threshold: expect.max_usd });
+  if (expect.max_ms !== undefined) checks.push({ type: "latency", threshold: expect.max_ms });
   return checks;
 }
 
