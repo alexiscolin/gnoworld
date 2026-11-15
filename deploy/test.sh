@@ -1,13 +1,10 @@
 #!/bin/sh
-# deploy/test.sh: the demo's proofs (docs/plans/slice-1c.md §3), on the demo's host, macOS or
-# Linux, with Docker Engine 28 or later. It needs Docker's socket, which Claude Code's sandbox
-# refuses, so the operator runs it:
+# deploy/test.sh: the stack's proofs, on a host with Docker Engine 28 or later, macOS or Linux. It needs Docker's socket,
+# which Claude Code's sandbox refuses, so the operator runs it:
 #   sh deploy/test.sh            builds the static server, starts it with the guard in a throwaway
 #                                project and a password of its own, checks both, then removes it;
 #   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail, and its run ends at the check that
-#                                must catch it (STOP_AT), not after every check of the stack;
-#   sh deploy/test.sh --demo     checks the running demo: Tailscale, its tailnet, the public URL;
-#                                it asks for the demo's password, which no command line shows.
+#                                must catch it (STOP_AT), not after every check of the stack.
 # Its output names the host's own addresses and ports: never commit it, nor paste it in public.
 # Exit: 0 every check passed, 1 a check failed, 2 a tool or a fact of the host is missing, 3 the
 # stack did not start.
@@ -24,27 +21,25 @@ missing() {
 	echo "test.sh: $1" >&2
 	exit 2
 }
-case ${1:-} in "" | --mutants | --demo) ;; *) missing "no such mode [$1]: none, --mutants or --demo" ;; esac
+case ${1:-} in "" | --mutants) ;; *) missing "no such mode [$1]: none or --mutants" ;; esac
 case $os in
 Darwin) host_tools="netstat route ifconfig arp" ;;
 Linux) host_tools="ss ip" ;;
 *) missing "it runs on macOS or Linux, not $os" ;;
 esac
-[ "${1:-}" != --demo ] || host_tools="$host_tools dig" # only --demo resolves the public name
 for tool in docker curl python3 openssl htpasswd git $host_tools; do
-	command -v "$tool" >/dev/null || missing "$tool is missing (htpasswd: apache2-utils or httpd-tools on Linux; dig: dnsutils)"
+	command -v "$tool" >/dev/null || missing "$tool is missing (htpasswd: apache2-utils or httpd-tools on Linux)"
 done
 engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
 [ "${engine%%.*}" -ge 28 ] 2>/dev/null || missing "Docker Engine 28 or later is needed (an isolated network's gateway), not [$engine]"
 
-# --- One run at a time per project (2026-10-30: two runs shared gnoworld-demo-test, and each one's start removed the other's
-# containers: `No such container`). The lock is a folder in the user's own cache, not in TMPDIR, which a sandbox and a terminal
-# do not share; it holds its run's pid, so a run killed hard leaves a lock the next one finds dead and takes over. --demo starts
-# and removes nothing of the test's, and takes none.
+# --- One run at a time per project: two runs sharing a project each remove the other's containers (`No such container`).
+# The lock is a folder in the user's own cache, not in TMPDIR, which a sandbox and a terminal do not share; it holds its
+# run's pid, so a run killed hard leaves a lock the next one finds dead and takes over.
 lock_dir=$HOME/.cache/gnoworld-tools
 lock=$lock_dir/deploy-test-$project.lock
 locked=
-# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616).
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM).
 pid_alive() {
 	python3 -Ic 'import os, sys
 try:
@@ -55,38 +50,34 @@ except PermissionError:
     pass' "$1"
 }
 release() { if [ -n "$locked" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "${lock:?}"; fi; }
-if [ "${1:-}" != --demo ]; then
-	mkdir -p "$lock_dir"
-	if ! mkdir "$lock" 2>/dev/null; then
-		holder=$(cat "$lock/pid" 2>/dev/null || true)
-		if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
-		if [ -n "$holder" ] && pid_alive "$holder"; then
-			missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
-		fi
-		rm -rf "${lock:?}"
-		mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"
+mkdir -p "$lock_dir"
+if ! mkdir "$lock" 2>/dev/null; then
+	holder=$(cat "$lock/pid" 2>/dev/null || true)
+	if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
+	if [ -n "$holder" ] && pid_alive "$holder"; then
+		missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
 	fi
-	echo "$$" >"$lock/pid"
-	locked=yes
+	rm -rf "${lock:?}"
+	mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"
 fi
+echo "$$" >"$lock/pid"
+locked=yes
 # Stopped by a signal, a run still removes what it made: exit runs the EXIT trap, which a shell otherwise skips while a command runs.
 trap 'release' EXIT
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
-# A run a Ctrl+C left up (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named, not run beside.
-if [ "${1:-}" != --demo ]; then
-	leftover=$({
-		docker compose ls --all --format json 2>/dev/null | python3 -I -c 'import json, sys
+# A run a Ctrl+C left up (a gnoworld-demo-mutant-<pid> project, whose network holds the test's 172.30.90.0/24) is named, not run beside.
+leftover=$({
+	docker compose ls --all --format json 2>/dev/null | python3 -I -c 'import json, sys
 try:
     for p in json.load(sys.stdin):
         print(p.get("Name", ""))
 except ValueError:
     pass' || true
-		docker network ls --format '{{.Name}}' 2>/dev/null | sed -n 's/^\(gnoworld-demo-mutant-[0-9]*\)_.*/\1/p' || true
-	} | grep -E '^gnoworld-demo-mutant-[0-9]+$' | grep -vx "$project" | sort -u | head -1 || true)
-	if [ -n "$leftover" ]; then
-		missing "the project $leftover is up (a run still going, or one a Ctrl+C left); it holds the test's network: docker compose -p $leftover down -v"
-	fi
+	docker network ls --format '{{.Name}}' 2>/dev/null | sed -n 's/^\(gnoworld-demo-mutant-[0-9]*\)_.*/\1/p' || true
+} | grep -E '^gnoworld-demo-mutant-[0-9]+$' | grep -vx "$project" | sort -u | head -1 || true)
+if [ -n "$leftover" ]; then
+	missing "the project $leftover is up (a run still going, or one a Ctrl+C left); it holds the test's network: docker compose -p $leftover down -v"
 fi
 
 pass() { printf 'ok    %s\n' "$1"; }
@@ -99,7 +90,6 @@ fail() {
 }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1: wanted [$3], got [$2]"; fi; }
 at_least() { if [ "$2" -ge "$3" ]; then pass "$1 ($2)"; else fail "$1: $2, under $3"; fi; }
-is_public() { python3 -c "import ipaddress, sys; a = ipaddress.ip_address(sys.argv[1]); print(a.is_global and a not in ipaddress.ip_network('100.64.0.0/10'))" "$1" 2>/dev/null || echo False; }
 
 # --- What the host offers: its services, its addresses, its router, its LAN, Docker's gateways. --
 
@@ -114,7 +104,7 @@ host_ports() {
 		printf '%s\n' 22 88 445 548 631 2049 3283 5900
 	} | grep -E '^[0-9]+$' | sort -un
 }
-host_addresses() { # every IPv4 address of the host, its tailnet's and its VPNs' included
+host_addresses() { # every IPv4 address of the host, its VPNs' included
 	case $os in
 	Darwin) ifconfig 2>/dev/null | awk '/inet / { print $2 }' ;;
 	Linux) ip -4 -o addr show 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }' ;;
@@ -158,15 +148,15 @@ mkdir "$tmp/canary"
 canary=$((20000 + $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 10000))
 python3 -m http.server --bind 0.0.0.0 --directory "$tmp/canary" "$canary" >/dev/null 2>&1 &
 canary_pid=$!
-files="-f $here/compose.yaml${TEST_OVERRIDE:+ -f $TEST_OVERRIDE} --profile demo" # down leaves a profile's services otherwise
+files="-f $here/compose.yaml${TEST_OVERRIDE:+ -f $TEST_OVERRIDE}"
 cleanup() {
 	release
 	kill "$canary_pid" 2>/dev/null || true
 	wait "$canary_pid" 2>/dev/null || true
 	if [ -n "${started:-}" ]; then
-		# jarvis's and links's profiles too, which test-jarvis.sh and test-links.sh start (10j-4, F13130): a down of the demo's alone leaves them up.
+		# jarvis's and links's profiles too, which test-jarvis.sh and test-links.sh start: a down of the default services alone leaves them up.
 		docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 ||
-			echo "test.sh: the project $project is still up: docker compose -p $project --profile demo --profile jarvis --profile links down -v" >&2
+			echo "test.sh: the project $project is still up: docker compose -p $project --profile jarvis --profile links down -v" >&2
 	fi
 	rm -r "$tmp"
 }
@@ -207,18 +197,20 @@ targets() {
 }
 
 # What a network reaches: no service of the host (the canary among them), its addresses, its LAN
-# or Docker's gateways; the internet only when $3 says yes; $4, the DNS servers the guard lets out.
+# or Docker's gateways; the internet only when $3 says yes; $4, the DNS servers the guard lets out; $5, the stack's own
+# target the probe must see (web:8080 by default, empty for the guard's network, which reaches no container of the stack).
 reach() {
-	network=$1 name=$2 internet=$3 allowed=${4:-}
+	network=$1 name=$2 internet=$3 allowed=${4:-} sees=${5-web:8080}
 	if [ -z "${list:-}" ]; then
 		targets >"$tmp/targets" # in this shell, not a subshell: a missing fact stops the run
 		list=$(sort -u "$tmp/targets")
 	fi
-	# web:8080 rides along: if it is missing from the answers, the fan-out saw nothing at all.
+	# web:8080 rides along: where it must answer and is missing, the fan-out saw nothing at all; where it must not, it is
+	# one more target no network may reach.
 	found=$(answering "$network" $list 1.1.1.1:443 web:8080)
-	expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c '^web:8080$' || true)" 1
+	if [ -n "$sees" ]; then expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c "^$sees\$" || true)" 1; fi
 	for server in $allowed; do printf 'waived %s: %s, a DNS server the guard lets it ask\n' "$name" "$server"; done
-	printf '%s\n' 1.1.1.1:443 web:8080 $allowed >"$tmp/expected"
+	printf '%s\n' 1.1.1.1:443 $sees $allowed >"$tmp/expected"
 	host=$(printf '%s\n' "$found" | grep -vxF -f "$tmp/expected" | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
 	expect "$name reaches nothing of the host, its LAN or Docker's networks ($(printf '%s\n' "$list" | grep -c .) tried, the canary among them)" "$host" ""
 	out=$(printf '%s\n' "$found" | grep -c '^1\.1\.1\.1:443$' || true)
@@ -347,19 +339,23 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "no cpu cap" "web: cpu" compose 'services: { web: { cpus: 8 } }'
 	mutant "no process cap" "web: no process cap" compose 'services: { web: { pids_limit: -1 } }'
 	mutant "logs that grow for good" "web: its logs grow for good" compose 'services: { web: { logging: { options: { max-size: 50g } } } }'
-	mutant "the guard loads no rule" "the guard's network, which Tailscale shares, reaches nothing" \
+	mutant "the guard loads no rule" "the guard's network reaches nothing of the host, its LAN or Docker's networks" \
 		compose 'services: { guard: { entrypoint: [sleep, "2147483647"], healthcheck: { test: [CMD, "true"] } } }'
 	mutant "the guard forgets a private range" "the guard refuses 192.168.0.0/16" guard sed 's# 192\.168\.0\.0/16##'
-	mutant "the guard forgets the tailnets' range" "the guard refuses 100.64.0.0/10" guard sed 's# 100\.64\.0\.0/10##'
+	mutant "the guard forgets the carrier range, a VPN's" "the guard refuses 100.64.0.0/10" guard sed 's# 100\.64\.0\.0/10##'
 	mutant "the guard lets UDP out before it refuses" "the guard lets something out before it refuses" \
-		guard awk '!done && /--dport 8080 -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp -j ACCEPT\""; done = 1; next } { print }'
+		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp -j ACCEPT\""; done = 1; next } { print }'
+	mutant "the guard lets UDP out after it refuses" "the guard lets nothing else out" \
+		guard awk '/--dports 80,443 -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp -j ACCEPT\""; next } { print }'
+	mutant "the guard under a profile of its own" "the default services are web, Ergo, the server, the guard and the server's way out" \
+		compose 'services: { guard: { profiles: [guarded] } }'
+	mutant "the guard lets its network start a connection to web" "the guard's network reaches neither web nor the server" \
+		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -o $inside -d $web -p tcp --dport 8080 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard lets every port out" "the guard lets out no other public port" \
 		guard sed 's#-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT#-A OUTPUT -p tcp -j ACCEPT#'
 	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
-	mutant "web's port let out to any network" "the guard lets nothing else out" guard sed 's#-o $inside ##'
-	mutant "web's port open to the whole network" "the guard's network reaches the server only through web" guard sed 's#-d $web ##'
 	mutant "the way out's port answers what it did not accept" "the guard lets nothing else out" \
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
@@ -392,7 +388,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
 	mutant "a page cached" "/ revalidates" nginx sed 's#default "no-cache";#default "max-age=600";#'
-	# Slice 3's (3e): a file mounted over the image's own, through one edit.
+	# A file mounted over the image's own, through one edit.
 	over() { # $1 the service, $2 its file, $3 the repository's; the rest the edit
 		service=$1 target=$2 source=$3
 		shift 3
@@ -431,7 +427,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a forged X-Forwarded-For handed on" "never a forged X-Forwarded-For" \
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
 	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
-	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
+	mutant "the password handed to the upstreams" "and never the stack's password" nginx sed '/proxy_set_header Authorization "";/d'
 	mutant "the session's cookie handed to Ergo" "and the session's cookie to the API alone, never to Ergo" nginx sed '/proxy_set_header Cookie "";/d'
 	mutant "a large body passed to the server" "web refuses a body past 16 KiB itself, on the login and on a room's route" nginx sed '/client_max_body_size 16k;/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
@@ -466,7 +462,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed '/worlds-count/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
 	mutant "web follows a link at worlds-count.json" "web does not follow a link planted at worlds-count.json" \
 		nginx awk '/location = \/worlds-count\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
-	# The preview captures (8f) ride the same volume and location.
+	# The preview captures ride the same volume and location.
 	mutant "previews.json is not served" "web serves previews.json from the volume the server writes" \
 		nginx sed '/location = \/previews\.json {/,/}/d'
 	mutant "previews.json open without the password" "web serves previews.json only with the password" \
@@ -475,7 +471,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed '/previews/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
 	mutant "web follows a link at previews.json" "web does not follow a link planted at previews.json" \
 		nginx awk '/location = \/previews\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
-	# Each realm's rollup (13a) rides the same volume, under a folder of hashed names.
+	# Each realm's rollup rides the same volume, under a folder of hashed names.
 	mutant "rollups are not served" "web serves a rollup from the volume the server writes" \
 		nginx sed '/location ~ "\^\/rollups\//,/^ *}$/d'
 	mutant "rollups open without the password" "web serves a rollup only with the password" \
@@ -499,17 +495,17 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
 	mutant "a host added to the way out" "the way out lets six hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
-	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
+	# The prices timer's host: its line gone, widened to the whole domain, or the server's own way out off for it.
 	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
 	mutant "CoinGecko's whole domain let out" "the way out lets six hosts out" \
 		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
-	# The default universe's RPC (decision of 2026-10-31): its line gone, another universe's RPC let out beside it, its whole domain
+	# The default universe's RPC: its line gone, another universe's RPC let out beside it, its whole domain
 	# let out. A server with no data file fails closed at boot (main.test.ts), which the stack's start shows, no mutant needed.
 	mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC" acl sed '/- rpc\.onyx\./d'
 	mutant "another chain's node let out" "the way out lets six hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.sapphire.testnets.gno.land" }'
 	mutant "the default RPC's whole domain let out" "the way out lets six hosts out" \
 		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
-	# The worlds job's indexers (slice 7, 7c): each universe's host gone, or its whole domain let out beside it.
+	# The worlds job's indexers: each universe's host gone, or its whole domain let out beside it.
 	mutant "Onyx's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.onyx.testnets.gno.land" \
 		acl sed '/- indexer\.onyx\./d'
 	mutant "gno.land's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.gno.land" \
@@ -518,9 +514,9 @@ if [ "${1:-}" = --mutants ]; then
 		acl awk '{ print } /- indexer\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
 	mutant "gno.land's indexer's whole domain let out" "the way out lets six hosts out" \
 		acl awk '{ print } /- indexer\.gno\.land/ { print "    - \"*.gno.land\"" }'
-	# The door's mainnet names (D120): its node's line gone.
+	# The door's mainnet names: its node's line gone.
 	mutant "the names' node dropped from the way out" "the server does not reach the names' node" acl sed '/- rpc\.gno\.land/d'
-	# jarvis's faults (10j, 10j-4), planted from the file that holds its checks.
+	# jarvis's faults, planted from the file that holds its checks.
 	. "$here/test-jarvis.sh"
 . "$here/test-links.sh"
 	mutant "the admin API on the loopback alone" "the admin API answers on its own network" compose 'services: { server: { environment: { ADMIN_HOST: 127.0.0.1 } } }'
@@ -530,30 +526,29 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the server's requests straight out" "the server does not reach OpenAI's API" compose 'services: { server: { environment: { NODE_USE_ENV_PROXY: "0" } } }'
 	mutant "the guard drops the way out's replies" "does not answer through the way out" guard sed '/--sport 4750/d'
 	mutant "the way out open to the guard's other network" "the guard's rules refuse 4750 but from the inside" guard sed '/--dport 4750 -j REJECT/d'
-	mutant "the stack past the ceiling" "the demo's caps pass" compose 'services: { ergo: { mem_limit: 1g }, server: { mem_limit: 1g } }'
+	mutant "the stack past the ceiling" "the stack's caps pass" compose 'services: { ergo: { mem_limit: 1g }, server: { mem_limit: 1g } }'
 	mutant "Ergo's root writable" "ergo: read-only root" compose 'services: { ergo: { read_only: false } }'
 	mutant "the server's capabilities kept" "server: every capability dropped" compose 'services: { server: { cap_drop: !reset [] } }'
 	mutant "the way out's process cap off" "egress: no process cap" compose 'services: { egress: { pids_limit: -1 } }'
 	mutant "Ergo's folder closed to its user" "ergo's user may enter /ergo" dockerfile ergo sed 's#chmod 755 /ergo \&\& ##'
 	mutant "the way out's folder closed to its user" "egress's user may enter /etc/smokescreen" dockerfile egress \
 		sed 's#^COPY --from=build /out/etc/ /etc/smokescreen/$#COPY --chmod=644 deploy/egress/config.yaml deploy/egress/acl.yaml /etc/smokescreen/#'
-elif [ "${1:-}" != --demo ]; then
-	# The static server and the guard, with a password of their own; no Tailscale key is needed.
+else
+	# The stack, with a password of its own.
 	inside=${project}_inside
 	outside=${project}_outside
 	for file in "$here/compose.yaml" "$here/web/Dockerfile" "$here/ergo/Dockerfile" "$here/server/Dockerfile" "$here/egress/Dockerfile" "$here/jarvis/Dockerfile"; do
 		unpinned=$(grep -nE '^[[:space:]]*(image:[[:space:]]*[^*[:space:]]|x-[a-z-]*image:|FROM )' "$file" | grep -v '@sha256:[0-9a-f]\{64\}' || true)
 		expect "every image $(basename "$file") pulls is pinned by digest" "$unpinned" ""
 	done
-	for secret in demo_htpasswd ts_authkey ergo_oper_password log_pepper openai_api_key anthropic_api_key; do
+	for secret in demo_htpasswd ergo_oper_password log_pepper openai_api_key anthropic_api_key; do
 		if git -C "$repo" check-ignore -q "deploy/secrets/$secret"; then pass "git ignores deploy/secrets/$secret"; else fail "git would track deploy/secrets/$secret"; fi
 	done
 	expect "git tracks nothing in deploy/secrets" "$(git -C "$repo" ls-files deploy/secrets)" ""
 	if grep -qx 'deploy/secrets' "$repo/.dockerignore"; then pass "the build leaves deploy/secrets out"; else fail "the build would send deploy/secrets"; fi
 	if grep -qF 'Read(/deploy/secrets/**)' "$repo/.claude/settings.json"; then pass "Claude Code may not read the secrets"; else fail "Claude Code may read the secrets"; fi
-	# deploy/k6/run.sh against a Docker that answers as a stack would and logs each call (3n-b): it never starts
-	# on the demo's host, even with the demo stopped (F643), and a run stopped in a scenario leaves nothing behind
-	# (F642).
+	# deploy/k6/run.sh against a Docker that answers as a stack would and logs each call: it never starts
+	# on the stack's host, even with the stack stopped, and a run stopped in a scenario leaves nothing behind.
 	mkdir "$tmp/fake"
 	cat >"$tmp/fake/docker" <<'FAKE'
 #!/bin/sh
@@ -571,10 +566,10 @@ FAKE
 	: >"$tmp/fake.log"
 	code=0
 	(load yes all) >"$tmp/load.log" 2>&1 || code=$?
-	if [ "$code" = 2 ] && grep -q "the demo's containers are on this host" "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
-		pass "the load runs refuse the demo's host, its containers stopped, before making anything"
+	if [ "$code" = 2 ] && grep -q "the stack's containers are on this host" "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
+		pass "the load runs refuse the stack's host, its containers stopped, before making anything"
 	else
-		fail "the load runs start on the demo's host (exit $code)"
+		fail "the load runs start on the stack's host (exit $code)"
 	fi
 	# Stopped by TERM (a shell in the background ignores INT), it removes its project, its folder, which holds the
 	# operator's key, and its sampler.
@@ -589,12 +584,11 @@ FAKE
 	sleep 3
 	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
 	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
-	# Both of its down calls (the one before the stack starts too) take its profiled services, the guard and the way out.
+	# Both of its down calls count, the one before the stack starts too.
 	expect "it removes the project twice, at its start and at its end" "$(grep -c '^compose .* down -v$' "$tmp/fake.log" || true)" 2
-	expect "and each takes its profiled services too" "$(grep '^compose .* down -v$' "$tmp/fake.log" | grep -c -e '--profile demo' || true)" 2
 	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
 	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
-	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
+	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything.
 	for size in ACCOUNTS=abc CROWD=0 HOLD=1.5 RATE=-1 STREAMS=250001 ACCOUNTS=62501; do
 		: >"$tmp/fake.log"
 		code=0
@@ -605,7 +599,7 @@ FAKE
 			fail "the load runs take $size (exit $code)"
 		fi
 	done
-	# Without OpenAI's key the lines measure no check (F644): the messages alone are refused, among the rest skipped.
+	# Without OpenAI's key the lines measure no check: the messages alone are refused, among the rest skipped.
 	: >"$tmp/fake.log"
 	code=0
 	(load "" messages) >"$tmp/load.log" 2>&1 || code=$?
@@ -618,28 +612,26 @@ FAKE
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
 	chmod 644 "$tmp/htpasswd"
 	export DEMO_HTPASSWD_FILE="$tmp/htpasswd"
-	printf 'not a key\n' >"$tmp/ts_authkey" # Compose wants each secret's file, even one no started service reads
-	export TS_AUTHKEY_FILE="$tmp/ts_authkey"
-	# Slice 3's services (3e): secrets of their own, an origin, an internal network apart from the demo's.
+	# Secrets of their own, an origin, and an internal network apart from the defaults.
 	for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key jarvis_door_key; do
 		openssl rand -hex 24 >"$tmp/$secret"
 		chmod 644 "$tmp/$secret"
 	done
 	export ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password" LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 	export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key" # a made-up key: no key at all, jarvis reads it only when on, and no proof here asks the model
-	export JARVIS_DOOR_KEY_FILE="$tmp/jarvis_door_key" # the door's key, made up too: the server's and jarvis's, which prove each other (10u-g2)
+	export JARVIS_DOOR_KEY_FILE="$tmp/jarvis_door_key" # the door's key, made up too: the server's and jarvis's, which prove each other
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
-	# jarvis's network and the admin API's, apart from the demo's (172.30.91 and 172.30.92) as the internal one is.
+	# jarvis's network and the admin API's, apart from the defaults (172.30.91 and 172.30.92) as the internal one is.
 	export JARVIS_SUBNET="${TEST_JARVIS_SUBNET:-172.30.93.0/24}" JARVIS_ADDRESS="${TEST_JARVIS_ADDRESS:-172.30.93.10}"
 	export ADMIN_SUBNET="${TEST_ADMIN_SUBNET:-172.30.94.0/24}" ADMIN_ADDRESS="${TEST_ADMIN_ADDRESS:-172.30.94.10}"
-	# jarvis's way out's network and the guard's address there, and the server's address inside (10j's review, V2, V12).
+	# jarvis's way out's network and the guard's address there, and the server's address inside.
 	export JARVIS_OUT_SUBNET="${TEST_JARVIS_OUT_SUBNET:-172.30.96.0/24}" GUARD_JARVIS_ADDRESS="${TEST_GUARD_JARVIS_ADDRESS:-172.30.96.2}"
 	export SERVER_ADDRESS="${TEST_SERVER_ADDRESS:-172.30.90.11}"
-	# The reader's network, its way out's, and the guard's address there (10u-g2).
+	# The reader's network, its way out's, and the guard's address there.
 	export READER_SUBNET="${TEST_READER_SUBNET:-172.30.100.0/24}" READER_ADDRESS="${TEST_READER_ADDRESS:-172.30.100.10}"
 	export READER_OUT_SUBNET="${TEST_READER_OUT_SUBNET:-172.30.101.0/24}" GUARD_READER_ADDRESS="${TEST_GUARD_READER_ADDRESS:-172.30.101.2}"
-	# The link reader's network, its way out's, and the guard's address there (slice 13), apart from the demo's defaults and the others'.
+	# The link reader's network, its way out's, and the guard's address there, apart from the defaults and the others'.
 	export LINKS_SUBNET="${TEST_LINKS_SUBNET:-172.30.102.0/24}" LINK_READER_ADDRESS="${TEST_LINK_READER_ADDRESS:-172.30.102.10}"
 	export LINKS_OUT_SUBNET="${TEST_LINKS_OUT_SUBNET:-172.30.104.0/24}" GUARD_LINKS_ADDRESS="${TEST_GUARD_LINKS_ADDRESS:-172.30.104.2}"
 	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
@@ -655,7 +647,9 @@ FAKE
 	[ "$failed" = "$before" ] || exit 1
 	started=yes
 	docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 || true # what an interrupted run left
-	# The demo without jarvis, which test-jarvis.sh starts under its own profile at the end (10j-4).
+	# The services a start with no profile brings up (checked below against compose's own list), named here so that a fault
+	# planted in the default set, jarvis put there, is judged by that check and not by a longer start.
+	# test-jarvis.sh and test-links.sh start theirs under their own profiles at the end.
 	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress; then
 		echo "test.sh: the stack did not start: $(docker compose -p "$project" $files logs --no-log-prefix --tail 1 guard web ergo server egress 2>&1 | tr '\n' ' ')" >&2
 		exit 3
@@ -664,7 +658,7 @@ FAKE
 	guard=$(docker compose -p "$project" $files ps -q guard)
 
 	hardened "$web" web
-	# nginx's 4,096 connections take two files each, a limit Docker sets: nginx, no root, cannot raise it (F645).
+	# nginx's 4,096 connections take two files each, a limit Docker sets: nginx, no root, cannot raise it.
 	expect "web may hold 8,192 files" "$(docker inspect --format '{{range .HostConfig.Ulimits}}{{.Name}}={{.Soft}}/{{.Hard}} {{end}}' "$web")" "nofile=8192/8192 "
 	expect "web sits on the internal network only" "$(networks_of "$web")" "$inside "
 	expect "that network has no way out" "$(docker network inspect --format '{{.Internal}}' "$inside")" true
@@ -677,7 +671,7 @@ FAKE
 	hash=$(cut -d: -f2- "$tmp/htpasswd")
 	expect "Docker holds no copy of the password's hash" "$(docker inspect "$web" | grep -cF "$hash" || true)" 0
 	expect "the image holds no secret file" \
-		"$(docker run --rm --entrypoint sh "$(docker inspect --format '{{.Image}}' "$web")" -c 'find / -xdev \( -name "*htpasswd*" -o -name ts_authkey \) 2>/dev/null' || true)" ""
+		"$(docker run --rm --entrypoint sh "$(docker inspect --format '{{.Image}}' "$web")" -c 'find / -xdev -name "*htpasswd*" 2>/dev/null' || true)" ""
 	reach "$inside" "the internal network" no
 
 	hardened "$guard" guard "user net-admin"
@@ -685,9 +679,9 @@ FAKE
 		"$(sorted "$inside" "${project}_jarvis_out" "${project}_reader_out" "${project}_links_out" "$outside")"
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
-	reach "container:$guard" "the guard's network, which Tailscale shares," yes "$(guard_dns)"
-	# Its rule for port 8080 names web: the server listens on 8080 too, behind web's password and limits (F618).
-	expect "the guard's network reaches the server only through web" "$(answering "container:$guard" server:8080)" ""
+	# No container of the stack: web's 8080 and the server's, which web's password and limits stand in front of, are both refused.
+	reach "container:$guard" "the guard's network" yes "$(guard_dns)" ""
+	expect "the guard's network reaches neither web nor the server" "$(answering "container:$guard" web:8080 server:8080)" ""
 	# TCP leaves on 80 and 443 only: a public port that a plain container reaches stays shut.
 	expect "a plain container reaches a public port beside 80 and 443 (the next check sees)" "$(answering bridge 1.1.1.1:853)" 1.1.1.1:853
 	expect "the guard lets out no other public port" "$(answering "container:$guard" 1.1.1.1:853)" ""
@@ -695,6 +689,7 @@ FAKE
 	# refused for every protocol, before anything leaves; nothing else let out; IPv6 closed.
 	v4=$(docker exec "$guard" iptables-nft -S OUTPUT)
 	v6=$(docker exec "$guard" ip6tables-nft -S OUTPUT)
+	expect "the guard opens no UDP but DNS" "$(printf '%s\n' "$v4" | grep -e '-p udp' | grep -vc -e '-d [0-9.]*/32 -p udp -m udp --dport 53 -j ACCEPT' || true)" 0
 	expect "the guard drops what no rule lets out" "$(printf '%s\n' "$v4" | grep -cx -- '-P OUTPUT DROP' || true)" 1
 	for range in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 \
 		192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4; do
@@ -707,8 +702,8 @@ FAKE
 	else
 		fail "the guard lets something out before it refuses"
 	fi
-	expect "the guard lets nothing else out" "$(printf '%s\n' "$v4" | grep -e '-j ACCEPT' | grep -vx -e '-A OUTPUT -o lo -j ACCEPT' -e '-A OUTPUT -p udp -j ACCEPT' |
-		grep -vx -e "-A OUTPUT -d $WEB_ADDRESS/32 -o [^ ]* -p tcp -m tcp --dport 8080 -j ACCEPT" -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
+	expect "the guard lets nothing else out" "$(printf '%s\n' "$v4" | grep -e '-j ACCEPT' | grep -vx -e '-A OUTPUT -o lo -j ACCEPT' |
+		grep -vx -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
 			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' \
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
@@ -716,7 +711,7 @@ FAKE
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4754 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
-	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
+	# Requests as a TLS front sends them: through the PROXY protocol, with the visitor's address. Each
 	# is sent once, and its headers answer every question about it.
 	ask() {
 		answer=$tmp/ask.$(printf '%s\n' "$@" | cksum | tr ' ' -)
@@ -781,7 +776,7 @@ FAKE
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png; do
 		expect "$path revalidates" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" no-cache
 	done
-	# The build's policies (app/src/csp.ts, 5f): the table the image's csp.conf holds, a policy for each page by its path and a
+	# The build's policies (app/src/csp.ts): the table the image's csp.conf holds, a policy for each page by its path and a
 	# bare one (no script hash) for any other answer. Each answer carries the policy of the file nginx serves it from ($uri).
 	conf=$(docker exec "$web" cat /etc/nginx/csp.conf)
 	bare=$(printf '%s\n' "$conf" | sed -n 's/^    default "\(.*\)";$/\1/p')
@@ -806,7 +801,7 @@ FAKE
 	expect "a 401 carries the policy" "$(header content-security-policy / 203.0.113.1)" "$(keyed /)"
 	expect "a 405 carries the policy" "$(header content-security-policy / 203.0.113.1 -u "$auth" -X POST)" "$(keyed /)"
 	# nginx builds the table in a hash of fixed size: the longest names the data allows (40 characters in a 40-character universe,
-	# 100-character keys, a page's file as try_files joins it, F2460) in 480 pages must give a table it starts with, and the same
+	# 100-character keys, a page's file as try_files joins it) in 480 pages must give a table it starts with, and the same
 	# table without its sizes must not (so the check sees the fault). The keys and sizes are csp.ts's, stated again here: a
 	# bucket of a power of two over key + 18, a table of a power of two over twice the keys.
 	longconf() { # $1 "sized" or "default": the table's directives; written to $tmp/csp.long.$1
@@ -851,14 +846,14 @@ PY
 	case $(header content-type /sw.js 203.0.113.1 -u "$auth") in */javascript*) pass "the worker is a script" ;; *) fail "the worker is no script" ;; esac
 	expect "the manifest's type" "$(header content-type /manifest.webmanifest 203.0.113.1 -u "$auth")" application/manifest+json
 	expect "an icon's type" "$(header content-type /icon-192.png 203.0.113.1 -u "$auth")" image/png
-	# The design system's sheet and fonts (slice 2b): CSS and woff2, kept a year as every hashed file.
+	# The design system's sheet and fonts: CSS and woff2, kept a year as every hashed file.
 	sheet=$(printf '%s\n' "$assets" | grep '\.css$' | head -1)
 	font=$(docker exec "$web" find /usr/share/nginx/html/assets -name '*.woff2' | head -1 | sed 's#^/usr/share/nginx/html##')
 	case $(header content-type "$sheet" 203.0.113.1 -u "$auth") in text/css*) pass "a style sheet is CSS" ;; *) fail "a style sheet ($sheet) is no CSS" ;; esac
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	# 1,600 requests, twice those that met the burst of 320: a slow host's refill then eats no more of the floor of 200 than it did (F3665).
+	# 1,600 requests, twice those that met the burst of 320: a slow host's refill then eats no more of the floor of 200 than it did.
 	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-1600]')" 200
 	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-1600]')" 200
 	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-1600]')" 200
@@ -879,10 +874,10 @@ PY
 		--haproxy-clientip 198.51.100.9 -u "$auth" --parallel --parallel-max 50 $fetches || true)
 	expect "a visitor's first load, twice its files at once, gets no 429" "$(printf '%s\n' "$load" | grep -c '^429$' || true)" 0
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
-	# The room itself (F3665): a build's first load sits under 320, so only this tells a burst of 640 from the one before it. A real file: a
+	# The room itself: a build's first load sits under 320, so only this tells a burst of 640 from the one before it. A real file: a
 	# made-up path is the app's 404, which would count nothing.
 	at_least "a burst of 640 requests is served whole" "$(codes 200 198.51.100.13 -u "$auth" 'http://web:8080/sw.js?[1-640]')" 640
-	# The hashed files' own room (D13127, F13131): the first load above asks their JS and CSS twice, about 620 requests, which the visitors'
+	# The hashed files' own room: the first load above asks their JS and CSS twice, about 620 requests, which the visitors'
 	# zone, 640 at once and 20 a second, serves too; a real one adds the textures and the worlds' pictures. Only a burst past 640 tells them apart.
 	at_least "a burst of 1,024 on a hashed file is served whole" "$(codes 200 198.51.100.14 -u "$auth" "http://web:8080$first?[1-1024]")" 1024
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
@@ -891,20 +886,22 @@ PY
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
-	# --- Slice 3 (3e): Ergo, the server and the way out, as the demo runs them.
+	# --- Ergo, the server and the way out, as the stack runs them.
 	ergo=$(docker compose -p "$project" $files ps -q ergo)
 	server=$(docker compose -p "$project" $files ps -q server)
-	# Its image, for the node checks run beside it on the inside network (the crowd's first, F2135).
+	# Its image, for the node checks run beside it on the inside network (the crowd's first).
 	server_image=$(docker inspect --format '{{.Image}}' "$server")
 	egress=$(docker compose -p "$project" $files ps -q egress)
 	hardened "$ergo" ergo
 	hardened "$server" server
 	hardened "$egress" egress network
-	# jarvis, its reader and their ways out sit in a profile of their own (10j-4): the demo holds none, and the server's name for
-	# jarvis answers nothing, so its door answers off, or not_ready when on (10l-1).
-	expect "the demo profile holds no jarvis, nor its reader, nor their ways out" \
+	# jarvis, its reader and their ways out sit in a profile of their own: the default services hold none, and the server's name for
+	# jarvis answers nothing, so its door answers off, or not_ready when on.
+	expect "the default services hold no jarvis, nor its reader, nor their ways out" \
 		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
-	expect "the server finds no jarvis in the demo" "$(docker exec "$server" /nodejs/bin/node -e \
+	expect "the default services are web, Ergo, the server, the guard and the server's way out" \
+		"$(docker compose -p "$project" $files config --services | sort | tr '\n' ' ')" "egress ergo guard server web "
+	expect "the server finds no jarvis by default" "$(docker exec "$server" /nodejs/bin/node -e \
 		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
 	expect "the server sits on the internal network, jarvis's, the link reader's and the admin API's" "$(networks_of "$server")" \
@@ -915,7 +912,7 @@ PY
 		"$(docker inspect --format "{{(index .NetworkSettings.Networks \"$inside\").IPAddress}}" "$web")" "$WEB_ADDRESS"
 	reach "container:$ergo" "Ergo's network" no
 	reach "container:$server" "the server's network" no
-	# The demo's ceiling (OPERATIONS.md): every service's caps summed, the demo profile's whole.
+	# The stack's ceiling (OPERATIONS.md): every default service's caps summed.
 	caps=$(docker compose -p "$project" $files config --format json | python3 -c '
 import json, re, sys
 units = {"": 1, "b": 1, "k": 2**10, "m": 2**20, "g": 2**30}
@@ -925,13 +922,13 @@ def size(value):
 services = list(json.load(sys.stdin)["services"].values())
 print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.get("mem_limit", 0)) for s in services)))')
 	if python3 -c 'import sys; c, m = sys.argv[1].split(); sys.exit(float(c) > 2 or int(m) > 2**31)' "$caps"; then
-		pass "the demo's caps fit 2 cores and 2 GB ($caps)"
+		pass "the stack's caps fit 2 cores and 2 GB ($caps)"
 	else
-		fail "the demo's caps pass 2 cores or 2 GB ($caps)"
+		fail "the stack's caps pass 2 cores or 2 GB ($caps)"
 	fi
 	expect "the server's image installs the lockfile's versions" "$(grep -c -- '--frozen-lockfile' "$here/server/Dockerfile")" 1
 
-	# Ergo's rendered settings, read back (the plan's keys; docs/decisions.md for the history's days).
+	# Ergo's rendered settings, read back.
 	# /tmp is in memory, which docker cp cannot see: read it through the container.
 	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
@@ -944,19 +941,19 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
 	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
-	# A message of several lines (draft/multiline, slice 4): capped as core's composer counts, its whole lines read.
+	# A message of several lines (draft/multiline): capped as core's composer counts, its whole lines read.
 	expect "Ergo's settings cap a message of several lines at 4096 bytes" "$(grep -cE '^ +max-bytes: 4096$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings cap a message of several lines at 40 lines" "$(grep -cE '^ +max-lines: 40$' "$tmp/ircd.yaml")" 1
-	# The whole line: +i alone holds the words '+i' too (F1091).
+	# The whole line: +i alone holds the words '+i' too.
 	expect "Ergo's settings set +i and +R at each connection" "$(grep -cE '^ +default-user-modes: \+iR$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
-	# Its start refuses an origin list that would let every site in (F422): checked by the service's own render.
+	# Its start refuses an origin list that would let every site in: checked by the service's own render.
 	render() { docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e ORIGINS="$1" ergo 2>&1; }
 	expect "Ergo's start takes a list of origins" "$(render "$ORIGINS" | tail -n 1)" "render: the settings are whole"
 	for origins in "" "*" "$ORIGINS,*" "gnoworld.test" "http://gnoworld.test/path"; do
 		case $(render "$origins") in *"render: ORIGINS"*) pass "Ergo's start refuses ORIGINS [$origins]" ;; *) fail "Ergo starts with ORIGINS [$origins]" ;; esac
 	done
-	# A short oper's password, which Ergo's genpasswd hashes all the same (F621).
+	# A short oper's password, which Ergo's genpasswd hashes all the same.
 	printf 'hunter2\n' >"$tmp/short_oper_password"
 	chmod 644 "$tmp/short_oper_password"
 	case $(ERGO_OPER_PASSWORD_FILE=$tmp/short_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1) in
@@ -964,7 +961,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	*) fail "Ergo starts with a short oper password" ;;
 	esac
 	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
-	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
+	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps. Each case is the file's text.
 	oper_render() { # printf's arguments: the file's text, in a new file each time, as `nginx` above (a run is a subshell: no counter)
 		shaped=$(mktemp "$tmp/shaped_oper_password.XXXXXX")
 		printf "$@" >"$shaped"
@@ -995,7 +992,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's start takes an oper password of $length characters" \
 			"$(oper_render '%s' "$(head -c "$length" /dev/zero | tr '\0' a)" | tail -n 1)" "render: the settings are whole"
 	done
-	# The inside network is the one the connection limits leave alone, with the loopback (F720).
+	# The inside network is the one the connection limits leave alone, with the loopback.
 	expect "Ergo's settings leave the inside network's connections unlimited" \
 		"$(grep -cF -- "exempted: [\"localhost\",\"$INSIDE_SUBNET\"]" "$tmp/ircd.yaml")" 1
 	# Nothing, a word, every address (v4 and v6) or a value that breaks out of the JSON list it is put in.
@@ -1041,14 +1038,14 @@ setTimeout(() => process.exit(2), 20000);' 2>&1 || true)
 		expect "Docker holds no secret of $name's" "$(docker inspect "$id" | grep -cF -e "$oper" -e "$pepper" -e "$key" || true)" 0
 		box=$(docker create "$(docker inspect --format '{{.Image}}' "$id")")
 		expect "$name's image holds no secret file" \
-			"$(docker export "$box" | tar -t | grep -E '(^|/)secrets/|htpasswd|pepper|oper_password|api_key|authkey' || true)" ""
+			"$(docker export "$box" | tar -t | grep -E '(^|/)secrets/|htpasswd|pepper|oper_password|api_key' || true)" ""
 		docker rm "$box" >/dev/null
 	done
 
 	# Visitors' WebSockets to Ergo through web's /ws: this client, run in the server's image, which has Node.
 	cat >"$tmp/test-ws.cjs" <<'CLIENT'
-// The test's IRC client: a visitor's WebSocket to Ergo through web's /ws, as Tailscale hands it on (the
-// PROXY protocol, the visitor's address), with the demo's password, an Origin and a forged X-Forwarded-For.
+// The test's IRC client: a visitor's WebSocket to Ergo through web's /ws, as a TLS front hands it on (the
+// PROXY protocol, the visitor's address), with the stack's password, an Origin and a forged X-Forwarded-For.
 // It sends each line after the last one's pause and prints every line Ergo sends, then the HTTP status first.
 // Usage (node 24): node test-ws.cjs <visitor address> <user:password> <origin> <line>...; a line "+" waits;
 // "-" for no password or no origin. WS_TARGET (host:port, web:8080) and WS_PROXY=0 serve a check without web.
@@ -1140,8 +1137,8 @@ CLIENT
 		"$server_image" /test-ws.cjs "$@" 2>&1 || true; }
 	first() { printf '%s\n' "$1" | head -n 1; }
 	holds() { if printf '%s\n' "$2" | grep -qE -- "$3"; then pass "$1"; else fail "$1"; fi; }
-	# Ergo renames a connection with no account Guest-<nick> (force-guest-format, F722): its answers name that nick.
-	# The bot makes the worlds' rooms once it is in Ergo (3h): a guest can join none before.
+	# Ergo renames a connection with no account Guest-<nick> (force-guest-format): its answers name that nick.
+	# The bot makes the worlds' rooms once it is in Ergo: a guest can join none before.
 	bot=""
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
 		# In the room: Ergo lists an invisible (+i) member to the room's members alone.
@@ -1187,7 +1184,7 @@ CLIENT
 		expect "and one from [$origin]" "$(first "$(ws 203.0.113.23 "$auth" "$origin" "NICK y")")" "HTTP/1.1 403 Forbidden"
 	done
 	expect "no password, no WebSocket" "$(first "$(ws 203.0.113.24 - "$ORIGINS" "NICK z")")" "HTTP/1.1 401 Unauthorized"
-	# The address Ergo sees, as a WHOIS of oneself shows it (338; its log holds none, connect-ip off: F702): the
+	# The address Ergo sees, as a WHOIS of oneself shows it (338; its log holds none, connect-ip off): the
 	# visitor's own through web, and straight from another container of the internal network, never the forged
 	# X-Forwarded-For. The variables are exported: docker run reads them from its environment.
 	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS Guest-seen27" | grep ' 338 Guest-seen27 ' || true)
@@ -1199,7 +1196,7 @@ CLIENT
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
 	expect "the API answers with the password" "$(status '/api/activity?worlds=earth' 203.0.113.1 -u "$auth")" 200
-	# A body past the server's 16 KiB (its BODY_LIMIT) stops at web, before it is buffered in memory (F711's neighbour).
+	# A body past the server's 16 KiB (its BODY_LIMIT) stops at web, before it is buffered in memory.
 	post() { # <bytes> <path>: the status and type of a JSON POST of that size through web
 		docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %{content_type}' --haproxy-protocol \
 			--haproxy-clientip 203.0.113.36 -u "$auth" -H 'Content-Type: application/json' -H "Origin: $ORIGINS" \
@@ -1208,7 +1205,7 @@ CLIENT
 	expect "web refuses a body past 16 KiB itself, on the login and on a room's route" \
 		"$(post 16385 /api/login/challenge) $(post 16385 /api/rooms)" "413 text/html 413 text/html"
 	expect "and hands one of 16 KiB to the server, whose own answer is no 413" "$(post 16384 /api/login/challenge | grep -c '^413' || true)" 0
-	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped (F617).
+	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped.
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
 	done
@@ -1238,13 +1235,13 @@ CLIENT
 	stream=$(docker run --rm --network "$inside" "$CURL" -s -N --max-time 20 --haproxy-protocol --haproxy-clientip 203.0.113.41 -u "$auth" \
 		'http://web:8080/api/stream?rooms=%23earth' || true)
 	holds "the stream comes through web: its heartbeat within 20 s" "$stream" '^:'
-	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant, 2026-10-24): its setting, read back.
+	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant did): its setting, read back.
 	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
-	# Compressed at the level the budgets measure (F683), by its effect and not its line (a commented-out line, or one in
+	# Compressed at the level the budgets measure, by its effect and not its line (a commented-out line, or one in
 	# another block, would count): a hashed file fetched with and without gzip. The compressed answer is within 1% of
 	# zlib's level 6 of the file (nginx's compressor), and nearer it than level 1, nginx's own default, 14% bigger. The
 	# file is the client's entry, some 200 KB: below a few hundred bytes both levels give the same size, and the first
-	# file of the list, a 203-byte stylesheet since slice 5, could not tell them apart (2026-10-30, Alexis).
+	# file of the list, a 203-byte stylesheet once, could not tell them apart.
 	entry=$(printf '%s\n' "$assets" | grep '^/assets/entry\.client-' | head -1 || true)
 	expect "the worker lists the client's entry, the file the compression is judged on" "$(printf '%s' "$entry" | grep -c . || true)" 1
 	asset() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.71 -u "$auth" "$@" "http://web:8080$entry"; }
@@ -1259,9 +1256,9 @@ six, one = gzip(6), gzip(1)
 print("compressed at 6" if one > six * 1.02 and got <= six * 1.01 and abs(got - six) < abs(got - one) else f"got {got}, level 6 {six}, level 1 {one}")
 PY
 )" "compressed at 6"
-	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
-	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
-	# in the background while the holds below run (F651).
+	# Connections that send nothing more are closed: headers never ended, a body never sent, a kept-alive
+	# connection left idle; each one's seconds until web closed it, printed as it closes;
+	# in the background while the holds below run.
 	docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const started = Date.now();
@@ -1287,10 +1284,10 @@ setTimeout(() => {
   process.exit(0);
 }, 40_000).unref();' "$auth" >"$tmp/timed.out" 2>&1 &
 	timing=$!
-	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets (Ergo takes
+	# Each visitor holds 32 requests at once (a request counts while it is served): $1 WebSockets (Ergo takes
 	# 16 of one address), $2 streams (the server takes 4) and $7 POSTs whose body never comes, which web holds, of
 	# visitor $3, held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the end (a
-	# WebSocket's 101, a stream's 200, a POST still waiting: web's 100 Continue, or 000), and $3's request once they ended. Two at once (F651).
+	# WebSocket's 101, a stream's 200, a POST still waiting: web's 100 Continue, or 000), and $3's request once they ended. Two at once.
 	hold() {
 		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
 			ws=$1 streams=$2 auth=$3 origin=$4 other=$6 posts=$7
@@ -1327,15 +1324,15 @@ setTimeout(() => {
 	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
 	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
 		"$(cat "$tmp/hold.32")" "429 200 32 200"
-	# Forty visitors each at 16 WebSockets leave room for another (3NB-1, F638): a held request takes two of web's
+	# Forty visitors each at 16 WebSockets leave room for another: a held request takes two of web's
 	# connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when short, which
 	# 256 already survived), so these hold 1,280, past 1,024. Sixteen each, Ergo's max-concurrent-connections for
-	# one address (ircd.yaml.tmpl): past it Ergo closes the rest, which freed web's room and let 1,024 survive
-	# (F2137). The other goes once each of the 640 has settled, its first answer, an error or a close, 6 s at most:
-	# opened at once, they meet nginx's listen backlog, 511 on Linux, and a loaded host counted 638 at a fixed 3 s
-	# (F5486). Counted are the 101s still held when it goes (Ergo's registration waits 60 s), then its code within
+	# one address (ircd.yaml.tmpl): past it Ergo closes the rest, which freed web's room and let 1,024 survive.
+	# The other goes once each of the 640 has settled, its first answer, an error or a close, 6 s at most:
+	# opened at once, they meet nginx's listen backlog, 511 on Linux, and a loaded host counted 638 at a fixed 3 s.
+	# Counted are the 101s still held when it goes (Ergo's registration waits 60 s), then its code within
 	# 4 s; any other answer is printed by its status, an error by its code, a 101 closed before it as such (Ergo's
-	# way past 16 an address, F2137), the sockets still waiting by their number.
+	# way past 16 an address), the sockets still waiting by their number.
 	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const { randomBytes } = require("node:crypto");
@@ -1404,13 +1401,13 @@ function ask() {
 }
 setTimeout(ask, 6000);' "$auth" "$ORIGINS" 2>&1 || true)
 	expect "forty visitors at their 16 WebSockets each, and another is served" "$crowded" "640 200"
-	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
+	# The server reads Ergo's volume and never writes it: mounted read-only, named, and read with no fault.
 	expect "the server holds Ergo's volume read-only" \
 		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/ergo"}}{{.RW}}{{end}}{{end}}' "$server")" false
 	expect "and measures it, ERGO_DATA naming it" \
 		"$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$server" | grep -cx 'ERGO_DATA=/ergo' || true)" 1
 	expect "and reads it: no unreadable alert" "$(docker logs "$server" 2>&1 | grep -c '"ergo_volume_unreadable"' || true)" 0
-	# The volume itself, not only a read-only one: the server's /ergo and Ergo's /data are one (F633).
+	# The volume itself, not only a read-only one: the server's /ergo and Ergo's /data are one.
 	mounted() { docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Name}}{{end}}{{end}}" "$1"; }
 	expect "and it is Ergo's own volume" "$(mounted "$server" /ergo) $(mounted "$ergo" /data)" "${project}_ergo ${project}_ergo"
 	wait "$timing" || true
@@ -1425,7 +1422,7 @@ setTimeout(ask, 6000);' "$auth" "$ORIGINS" 2>&1 || true)
 	}
 	closes headers 10 11 "never ends its headers"
 	closes body 10 11 "never sends its body"
-	# nginx's keepalive_timeout stays 15 s; a host at a load of about 90 measured 19 (F5486): up to 20 s passes, its seconds printed.
+	# nginx's keepalive_timeout stays 15 s; a host at a load of about 90 measured 19: up to 20 s passes, its seconds printed.
 	closes idle 15 20 "stays idle between requests"
 	# What web hands its upstreams, seen in their place by an echo: no password, the visitor's own address. A
 	# second web of the same image and live settings, whose upstreams' names lead to the echo; high addresses of
@@ -1446,8 +1443,8 @@ setTimeout(ask, 6000);' "$auth" "$ORIGINS" 2>&1 || true)
 	heard=$(docker logs "$echo_box" 2>&1)
 	docker stop "$echo_box" "$mirror" >/dev/null
 	expect "web hands its upstreams both requests" "$(printf '%s\n' "$heard" | grep -c '^{' || true)" 2
-	expect "and never the demo's password" "$(printf '%s\n' "$heard" | grep -ci '"authorization"' || true)" 0
-	# The session's cookie goes to the server (8080), never to Ergo (8097), which needs only a ticket (decision 143, F711).
+	expect "and never the stack's password" "$(printf '%s\n' "$heard" | grep -ci '"authorization"' || true)" 0
+	# The session's cookie goes to the server (8080), never to Ergo (8097), which needs only a ticket.
 	cookie() { printf '%s\n' "$heard" | grep "\"port\":$1" | grep -c '__Host-session=sekret' || true; }
 	expect "and the session's cookie to the API alone, never to Ergo" "$(cookie 8080) $(cookie 8097)" "1 0"
 	expect "but the visitor's own address, X-Real-IP and X-Forwarded-For alike" \
@@ -1466,10 +1463,10 @@ print(u.urlparse(next(row["rpc"] for row in rows if row.get("default"))).hostnam
 	gnoweb_host=$(python3 -I -c 'import json, sys, urllib.parse as u
 rows = json.load(open(sys.argv[1]))
 print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
-	# The worlds job's indexers (slice 7, 7c): every universe's, each by its full name.
+	# The worlds job's indexers: every universe's, each by its full name.
 	indexer_hosts=$(python3 -I -c 'import json, sys, urllib.parse as u
 for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostname)' "$repo/app/data/universes.json")
-	# The door's mainnet names (D120): JARVIS_NAMES_RPC's default, server/src/door/settings.ts (universes.test.ts holds it).
+	# The door's mainnet names: JARVIS_NAMES_RPC's default, server/src/door/settings.ts (universes.test.ts holds it).
 	names_host=rpc.gno.land
 	expect "the way out lets six hosts out: CoinGecko's API, OpenAI's, the default universe's RPC, the names' node and the universes' indexers" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
 		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" "$names_host" $indexer_hosts | sort | tr '\n' ' ')"
@@ -1491,11 +1488,11 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# The server's own requests take the way out: Node's proxy from its settings (NODE_USE_ENV_PROXY, Node 24).
 	fetched() { docker exec "$server" /nodejs/bin/node -e "fetch('$1').then((r) => console.log(r.status), (e) => console.log('refused'))" 2>&1 || true; }
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
-	# The prices timer's host (5l): CoinGecko's keyless price endpoint, asked as the timer asks it.
+	# The prices timer's host: CoinGecko's keyless price endpoint, asked as the timer asks it.
 	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
-	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
+	# The home's block height: the default universe's RPC, asked as the timer asks it; any answer is a way through.
 	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
-	# The worlds job's indexers (slice 7, 7c): each universe's host, a GET of `/` (the job POSTs to `/graphql/query`: its answer is read
+	# The worlds job's indexers: each universe's host, a GET of `/` (the job POSTs to `/graphql/query`: its answer is read
 	# below, from a real pass); any answer is a way through.
 	for indexer_host in $indexer_hosts; do
 		case $(fetched "https://$indexer_host/") in [1-5][0-9][0-9]) pass "the server reaches the universe's indexer $indexer_host through the way out" ;; *) fail "the server does not reach the universe's indexer $indexer_host through the way out" ;; esac
@@ -1511,15 +1508,15 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 		[ "$timer_block" = block ] && break
 		sleep 5
 	done
-	# CoinGecko's 429 is its answer to this address, and the prices fail first: said, and not judged (F3378). Nothing else excuses it.
+	# CoinGecko's 429 is its answer to this address, and the prices fail first: said, and not judged. Nothing else excuses it.
 	if [ "$timer_block" != block ] && docker logs "$server" 2>&1 | grep -q '"error":"rate_limited"'; then
 		printf 'waived the running timer writes the block height: CoinGecko answered 429\n'
 	else
 		expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
 	fi
-	# The worlds job's first real pass (7c), not a planted file: the running job reads the list, each package, each realm's calls from the
-	# indexer and the names, one call at a time. This proves vm/qdoc, vm/qfile and the indexer's GraphQL filter against the real chain
-	# (F3516): the file must hold a realm with a deployer, functions and some call counted (F3545). A first pass takes minutes: it waits up to twenty.
+	# The worlds job's first real pass, not a planted file: the running job reads the list, each package, each realm's calls from the
+	# indexer and the names, one call at a time. This proves vm/qdoc, vm/qfile and the indexer's GraphQL filter against the real chain:
+	# the file must hold a realm with a deployer, functions and some call counted. A first pass takes minutes: it waits up to twenty.
 	worlds_real=none
 	for _ in $(seq 1 120); do
 		worlds_real=$(docker exec "$server" /nodejs/bin/node -e "try { const w = JSON.parse(require('fs').readFileSync('/markets/worlds.json', 'utf8')); console.log(w.worlds.some((x) => x.realms.some((r) => r.deployer !== null && r.functions.length > 0 && r.calls > 0)) ? 'read' : 'empty') } catch { console.log('none') }" 2>/dev/null || true)
@@ -1527,11 +1524,11 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 		sleep 10
 	done
 	expect "the running worlds job reads a realm's deployer, functions and calls from the chain and its indexer" "$worlds_real" read
-	# Its count (7n2), which the home's hero reads, written by the same pass beside it at the name nginx serves: a WORLDS_FILE named
+	# Its count, which the home's hero reads, written by the same pass beside it at the name nginx serves: a WORLDS_FILE named
 	# otherwise would leave the hero without its number for good.
 	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
 	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
-	# The preview job's first real pass (8f), not a planted file: at boot it reads the hubs' realms' home pages (GovDAO's) through the way out,
+	# The preview job's first real pass, not a planted file: at boot it reads the hubs' realms' home pages (GovDAO's) through the way out,
 	# then asks OpenAI to check each. This stack's key is test.sh's own (openssl rand), which OpenAI always refuses: every capture is then
 	# unchecked, so the file must hold none and the log say the page was read, then not checked. The "captured" branch runs only under an
 	# operator's real key: no run of test.sh proves a passed check writes a capture (server/src/previews/job.test.ts does). A read that
@@ -1552,10 +1549,10 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# What the job logged, its faults' kinds and each pass's length in ms (a line holds nothing a chain wrote): the stack's logs go with it at
 	# the end, and a first pass's length in Docker is what 7k3 could not measure from its sandbox.
 	printf 'the worlds job logged: %s\n' "$(docker logs "$server" 2>&1 | grep -oE '"event":"worlds_[a-z_]+"(,"error":"[a-z_]+"|,"ms":[0-9]+)?' | tr '\n' ' ' || true)"
-	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
+	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root.
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
-	# markets.json through the web container (5m): a file the server wrote, read-only there, kept for a minute, with the
+	# markets.json through the web container: a file the server wrote, read-only there, kept for a minute, with the
 	# server's headers (the location adds none of its own); the proof that Compose's volume, nginx's location and its cache
 	# line agree. The timer's file is replaced for the run and removed after: the timer writes it again.
 	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/markets.json', JSON.stringify({ source: 'CoinGecko', updated: new Date().toISOString(), tokens: [] }))" >/dev/null 2>&1 || true
@@ -1564,19 +1561,19 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
 	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
 	expect "web serves markets.json only with the password" "$(status /markets.json 203.0.113.3)" 401
-	# worlds.json (7c) rides the same volume and location: a file the server wrote, read-only there, with a short cache.
+	# worlds.json rides the same volume and location: a file the server wrote, read-only there, with a short cache.
 	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), worlds: [] }))" >/dev/null 2>&1 || true
 	expect "web serves worlds.json from the volume the server writes" "$(status /worlds.json 203.0.113.1 -u "$auth")" 200
 	expect "web serves worlds.json with a short cache" "$(header cache-control /worlds.json 203.0.113.1 -u "$auth")" "public, max-age=60"
 	expect "web serves worlds.json only with the password" "$(status /worlds.json 203.0.113.3)" 401
-	# Its count beside it (7n2), which the home's hero reads: the same volume, location and cache.
+	# Its count beside it, which the home's hero reads: the same volume, location and cache.
 	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds-count.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), count: 1 }))" >/dev/null 2>&1 || true
 	expect "web serves worlds-count.json from the volume the server writes" "$(status /worlds-count.json 203.0.113.1 -u "$auth")" 200
 	expect "web serves worlds-count.json with a short cache" "$(header cache-control /worlds-count.json 203.0.113.1 -u "$auth")" "public, max-age=60"
 	expect "web serves worlds-count.json only with the password" "$(status /worlds-count.json 203.0.113.3)" 401
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/worlds-count.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/worlds-count.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted at worlds-count.json" "$(status /worlds-count.json 203.0.113.4 -u "$auth")" 404
-	# The preview captures (8f): the same volume, location and cache, planted over the job's own file once its real pass was read.
+	# The preview captures: the same volume, location and cache, planted over the job's own file once its real pass was read.
 	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/previews.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), previews: [] }))" >/dev/null 2>&1 || true
 	expect "web serves previews.json from the volume the server writes" "$(status /previews.json 203.0.113.1 -u "$auth")" 200
 	expect "web serves previews.json with a short cache" "$(header cache-control /previews.json 203.0.113.1 -u "$auth")" "public, max-age=60"
@@ -1584,7 +1581,7 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves previews.json only with the password" "$(status /previews.json 203.0.113.3)" 401
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/previews.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/previews.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted at previews.json" "$(status /previews.json 203.0.113.4 -u "$auth")" 404
-	# Each realm's rollup (13a), written by the worlds job's real pass in a folder of the same volume, by its path's hash: a regex location.
+	# Each realm's rollup, written by the worlds job's real pass in a folder of the same volume, by its path's hash: a regex location.
 	# They follow worlds.json in the same pass: up to five minutes after it.
 	# A file the pass wrote, never one planted: a pass removes, at its end, every rollup it did not write.
 	rollups_real=missing
@@ -1616,7 +1613,7 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "and it is the volume the server writes" "$(mounted "$web" /markets) $(mounted "$server" /markets)" "${project}_markets ${project}_markets"
 	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
-	# D430's undo reaches the server (F13950): a guest's route is the server's (its origin check, 403) by default, and a 404 once the server
+	# The guest chat's undo reaches the server: a guest's route is the server's (its origin check, 403) by default, and a 404 once the server
 	# restarts under GUEST_CHAT=off; then the default again.
 	expect "a guest's route answers by default (no origin: 403)" "$(status /api/guest/ 203.0.113.41 -u "$auth" -X POST)" 403
 	guest_limits() { docker exec "$(docker compose -p "$project" $files ps -q server)" /nodejs/bin/node -e \
@@ -1633,7 +1630,7 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# guard's network on 4752 (4751 is jarvis's), asked from there: the guard's rules let no reply of 4752's out to a network.
 	mkdir "$tmp/egress"
 	docker cp "$egress:/etc/smokescreen/config.yaml" - | tar -xO >"$tmp/egress/config.yaml"
-	# Its tunnels close when quiet, and are capped (F627): read back, as Ergo's settings are.
+	# Its tunnels close when quiet, and are capped: read back, as Ergo's settings are.
 	for line in 'idle_timeout: 60s' 'max_concurrent_connect_tunnels: 32' 'max_concurrent_requests: 32'; do
 		expect "the way out's settings say $line" "$(grep -cxF -- "$line" "$tmp/egress/config.yaml")" 1
 	done
@@ -1657,93 +1654,9 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# The probe of Ergo's and the way out's health checks (deploy/probe), tested where Go is.
 	expect "the health probe passes its tests" "$(docker run --rm -v "$here/probe:/src:ro" -w /src -e GOCACHE=/tmp \
 		"$GOLANG" go test ./... 2>&1 | tail -n 1 | cut -c1-2)" ok
-	# jarvis's own proofs (10j), which start it under its profile on the demo: its networks, way out, file, key, image.
+	# jarvis's own proofs, which start it under its profile: its networks, way out, file, key, image.
 	. "$here/test-jarvis.sh"
 . "$here/test-links.sh"
-else
-	# The running demo.
-	if [ -z "${DEMO_PASSWORD:-}" ]; then # read, not typed on a command line: none in the shell's history
-		printf "The demo's password (not shown): " >&2
-		stty -echo 2>/dev/null || :
-		read -r DEMO_PASSWORD
-		stty echo 2>/dev/null || :
-		echo >&2
-	fi
-	project=gnoworld-demo
-	of() { docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$1"; }
-	ts=$(of tailscale)
-	guard=$(of guard)
-	web=$(of web)
-	ergo=$(of ergo) server=$(of server) egress=$(of egress)
-	jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis) reader=$(of jarvis_reader) egress_reader=$(of egress_reader)
-	if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then
-		echo "test.sh: the demo is not running (docker compose -f deploy/compose.yaml --profile demo up -d --build)" >&2
-		exit 3
-	fi
-	hardened "$ts" tailscale "user network"
-	expect "Tailscale's network is the guard's" "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$ts")" "container:$(docker inspect --format '{{.Id}}' "$guard")"
-	reach "container:$ts" "Tailscale's network" yes "$(guard_dns)"
-	memory=0 cpus=0
-	# The demo profile's six; jarvis, under its own profile, is out of the demo's cap (10j-4).
-	for id in $ts $guard $web $ergo $server $egress; do
-		memory=$((memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
-		cpus=$((cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
-	done
-	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2000000000 ]; then pass "the demo stays under 2 GB and 2 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
-	# Jarvis switched on: the four or none, locked as the rest, within their own caps, 656 MiB and 0.7 core (D184, 10u-g2).
-	if [ -n "$jarvis$egress_jarvis$reader$egress_reader" ]; then
-		if [ -z "$jarvis" ] || [ -z "$egress_jarvis" ] || [ -z "$reader" ] || [ -z "$egress_reader" ]; then
-			fail "jarvis, its reader and their ways out run together or not at all"
-		else
-			hardened "$jarvis" jarvis
-			hardened "$egress_jarvis" egress_jarvis network
-			hardened "$reader" jarvis_reader
-			hardened "$egress_reader" egress_reader network
-			jarvis_memory=0 jarvis_cpus=0
-			for id in $jarvis $egress_jarvis $reader $egress_reader; do
-				jarvis_memory=$((jarvis_memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
-				jarvis_cpus=$((jarvis_cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
-			done
-			if [ "$jarvis_memory" -le 687865856 ] && [ "$jarvis_cpus" -le 700000000 ]; then
-				pass "jarvis, its reader and their ways out stay under 656 MiB and 0.7 core"
-			else
-				fail "jarvis, its reader and their ways out: $jarvis_memory bytes, $jarvis_cpus nano-cpus"
-			fi
-		fi
-	fi
-
-	json=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock status --json)
-	read_json() { printf '%s' "$json" | python3 -c "import json, sys; d = json.load(sys.stdin); print($1)"; }
-	expect "the demo machine is logged in and running" "$(read_json 'd["BackendState"]')" Running
-	expect "it is online" "$(read_json 'd["Self"]["Online"]')" True
-	expect "it carries the demo's tag" "$(read_json '" ".join(d["Self"].get("Tags") or [])')" tag:gnoworld-demo
-	expect "it sees no device of the tailnet" "$(read_json 'len(d.get("Peer") or {})')" 0
-	serve=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock serve status --json)
-	expect "Funnel forwards 443 to web, with the visitor's address" \
-		"$(printf '%s' "$serve" | python3 -c 'import json, sys; t = json.load(sys.stdin)["TCP"]; print(sorted(t), t["443"].get("TCPForward"), t["443"].get("ProxyProtocol"))')" "['443'] web:8080 2"
-	expect "and only there, to the public" \
-		"$(printf '%s' "$serve" | python3 -c 'import json, sys; print(list(json.load(sys.stdin).get("AllowFunnel", {}).values()))')" "[True]"
-
-	name=$(read_json 'd["Self"]["DNSName"].rstrip(".")')
-	address=$(dig +short @1.1.1.1 "$name" A | tail -1)
-	expect "the public URL resolves, through public DNS, to a public address" "$(is_public "$address")" True
-	visit() { curl -s --max-time 20 --resolve "$name:443:$address" "$@"; }
-	# On stdin, quoted as curl's config wants: a " or a \ in the password is escaped.
-	signed() { printf 'user = "team:%s"\n' "$(printf '%s' "$DEMO_PASSWORD" | sed 's/[\\"]/\\&/g')" | visit -K - "$@"; }
-	expect "the public URL wants the password" "$(visit -o /dev/null -w '%{http_code}' "https://$name/")" 401
-	expect "the public URL serves the site with it" "$(signed -o /dev/null -w '%{http_code}' "https://$name/")" 200
-	expect "the public URL is not indexed" \
-		"$(signed -o /dev/null -D - "https://$name/" | tr -d '\r' | awk -F': ' 'tolower($1) == "x-robots-tag" { print $2 }')" noindex
-	expect "the public URL answers the API" "$(signed -o /dev/null -w '%{http_code}' "https://$name/api/activity?worlds=earth")" 200
-	# A WebSocket's handshake from the app's own origin (ORIGINS in deploy/.env): 101, then curl gives up at its time.
-	upgrade=$(signed -o /dev/null -w '%{http_code}' --max-time 5 --http1.1 -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
-		-H 'Sec-WebSocket-Version: 13' -H "Sec-WebSocket-Key: $(openssl rand -base64 16)" -H "Origin: https://$name" "https://$name/ws" || true)
-	expect "the public URL opens a WebSocket to Ergo from the app's origin" "$upgrade" 101
-	seen=$(docker logs --tail 1 "$web" 2>&1 | awk '{ print $1 }')
-	expect "web sees the visitor's own address, not the tailnet's" "$(is_public "$seen")" True
-	key=$(docker exec "$ts" cat /run/secrets/ts_authkey) # the key it was given, wherever its file lives
-	expect "Docker holds no copy of the auth key" "$(docker inspect "$ts" | grep -cF "$key" || true)" 0
-	expect "no log holds it" "$( (docker logs "$ts" 2>&1 && docker logs "$guard" 2>&1 && docker logs "$web" 2>&1) | grep -cF "$key" || true)" 0
 fi
 
 if [ "$failed" -gt 0 ]; then

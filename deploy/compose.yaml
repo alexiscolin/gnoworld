@@ -1,8 +1,8 @@
-# The demo stack (ADR-0002 §7). Run it, from the repository's root:
-#   docker compose -f deploy/compose.yaml --profile demo up -d --build
+# The stack. Run it, from the repository's root:
+#   docker compose -f deploy/compose.yaml up -d --build
 # with the link cards on (LINK_CARDS=1), --profile links too, and with Jarvis switched on (JARVIS=on), its profile too:
-# --profile demo --profile jarvis, once the door's key is made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
-# Ops runs the same file with its own settings (.env) and secrets. deploy/test.sh proves it.
+# --profile jarvis, once the door's key is made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
+# The host's own settings are in deploy/.env, its secrets in deploy/secrets. deploy/test.sh proves the file.
 name: gnoworld-demo
 
 # Every service: a read-only root, no capability, no new privilege, its logs rotated.
@@ -22,7 +22,8 @@ x-auth-socket: &auth-socket /run/gnoworld/auth.sock
 # web's fixed address on the internal network, the one Ergo and the server believe (deploy/.env.example).
 x-web-address: &web-address ${WEB_ADDRESS:-172.30.89.10}
 
-x-tailscale-image: &tailscale-image tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
+# The guard's image: a pinned one that carries iptables-nft, which is all the guard uses it for.
+x-guard-image: &guard-image tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
 
 services:
   web:
@@ -121,7 +122,7 @@ services:
       # Ergo's volume, read-only, measured against its cap at each retention tick.
       ERGO_DATA: /ergo
       ERGO_DATA_MB: ${ERGO_DATA_MB:-1024}
-      # The demo's way out; ops names its own proxy.
+      # The way out through the guard; EGRESS_PROXY names another proxy.
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
       NO_PROXY: ergo,jarvis,link_reader,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
@@ -181,7 +182,7 @@ services:
   # gnomcp, which runs in jarvis_reader, a container of its own with no secret). It listens on its address of the network it
   # shares with the server alone, and goes out through a proxy of its own (egress_jarvis). /ask and /budgets ask no session:
   # the network walls them, and the door's key (jarvis_door_key) is asked of every request besides.
-  # Its profile alone, out of the demo's cap: without it the door answers off, or not_ready when on.
+  # Its profile alone, out of the stack's cap: without it the door answers off, or not_ready when on.
   jarvis:
     <<: *locked
     profiles: [jarvis]
@@ -205,7 +206,7 @@ services:
       # The name the server's JARVIS_URL gives, which a request's Host must name.
       JARVIS_HOSTNAMES: jarvis
       JARVIS_DATABASE: /data/jarvis.db
-      # The demo's budgets, a day: the file keeps them from the first start, an admin changes them.
+      # The budgets, a day: the file keeps them from the first start, an admin changes them.
       JARVIS_BUDGET_USD: ${JARVIS_BUDGET_USD:-3}
       JARVIS_TRANSLATION_BUDGET_USD: ${JARVIS_TRANSLATION_BUDGET_USD:-1}
       JARVIS_DRAIN_S: "20"
@@ -218,7 +219,7 @@ services:
       JARVIS_INDEXER_PROFILES: onyx,gnoland
       JARVIS_GNOSCOPE: ${JARVIS_GNOSCOPE:-off}
       OTEL_SERVICE_NAME: jarvis
-      # The demo's way out for jarvis alone; ops names its own proxy.
+      # The way out for jarvis alone, through the guard; JARVIS_EGRESS_PROXY names another proxy.
       HTTPS_PROXY: ${JARVIS_EGRESS_PROXY:-http://guard:4751}
       NO_PROXY: localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
@@ -297,7 +298,7 @@ services:
   # The link reader: reads a public page's head and its picture for a chat line's card, in
   # Node, its own image and user (65530), no secret, no volume, nothing of the stack's: it fetches what strangers link, so it is walled
   # in. It listens on its address of the network it shares with the server alone, and goes out through egress_links (4754) on a network
-  # of its own, to any public https host, never a private one. Its profile alone, out of the demo's cap, as Jarvis: LINK_CARDS=1 and
+  # of its own, to any public https host, never a private one. Its profile alone, out of the stack's cap, as Jarvis: LINK_CARDS=1 and
   # --profile links turn the cards on. Its memory is 256 MiB, measured: the codecs at the 2 Mpx cap peak at 210 MiB resident with a 90 MiB JS heap, one picture at a time
   # (link-reader/src/memory.test.ts); 64 MiB and 128 MiB could not hold them.
   link_reader:
@@ -335,12 +336,11 @@ services:
     depends_on:
       egress_links: { condition: service_healthy, restart: true }
 
-  # The demo's only way out: it holds the network Tailscale shares, refuses every private address
-  # (the host, its LAN, any tailnet), then sleeps. It alone has NET_ADMIN.
+  # The only way out: it holds the network the proxies below share, refuses every private address (the host, its LAN,
+  # any VPN), lets public TCP 80 and 443 out and nothing else, then sleeps. It alone has NET_ADMIN.
   guard:
     <<: *locked
-    profiles: [demo]
-    image: *tailscale-image
+    image: *guard-image
     entrypoint: [sh, /guard/guard.sh]
     stop_signal: SIGKILL # its sleep, as PID 1, ignores SIGTERM: a stop would wait 10 s for nothing
     user: "0:0"
@@ -374,13 +374,13 @@ services:
       retries: 3
       start_period: 10s
       start_interval: 1s
+    # guard.sh finds the internal network by web's name, which resolves once web runs.
     depends_on:
       web: { condition: service_healthy }
 
-  # The demo's way out: the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
+  # The server's way out: the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
   egress:
     <<: *locked
-    profiles: [demo]
     build:
       context: ..
       dockerfile: deploy/egress/Dockerfile
@@ -501,40 +501,6 @@ services:
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
-  tailscale:
-    <<: *locked
-    profiles: [demo]
-    image: *tailscale-image
-    network_mode: service:guard
-    environment:
-      TS_AUTHKEY: file:/run/secrets/ts_authkey
-      TS_AUTH_ONCE: "true"
-      TS_HOSTNAME: ${TS_HOSTNAME:-gnoworld-demo}
-      TS_EXTRA_ARGS: --advertise-tags=tag:gnoworld-demo
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_USERSPACE: "true"
-      TS_SOCKET: /tmp/tailscaled.sock
-      TS_SERVE_CONFIG: /config/serve.json
-      TS_ENABLE_HEALTH_CHECK: "true"
-      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
-    volumes:
-      - tailscale:/var/lib/tailscale
-      - ./tailscale:/config:ro
-    secrets: [ts_authkey]
-    cpus: 0.5
-    mem_limit: 256m
-    pids_limit: 128
-    healthcheck:
-      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:9002/healthz]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 30s
-      start_interval: 2s
-    # A guard restarted holds a new network: Tailscale restarts with it, never on the old one.
-    depends_on:
-      guard: { condition: service_healthy, restart: true }
-
 networks:
   # No way out, and no gateway: a container here reaches no address of the host either.
   inside:
@@ -615,7 +581,6 @@ networks:
   outside: {}
 
 volumes:
-  tailscale: {}
   ergo: {}
   server: {}
   # jarvis's file: its budgets and its caches, which it alone mounts.
@@ -628,8 +593,6 @@ volumes:
 secrets:
   demo_htpasswd:
     file: ${DEMO_HTPASSWD_FILE:-./secrets/demo_htpasswd}
-  ts_authkey:
-    file: ${TS_AUTHKEY_FILE:-./secrets/ts_authkey}
   ergo_oper_password:
     file: ${ERGO_OPER_PASSWORD_FILE:-./secrets/ergo_oper_password}
   log_pepper:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # deploy/k6/run.sh: the load runs, on the operator's host with Docker,
-# which Claude Code's sandbox refuses. A stack of its own in a throwaway project, never the demo (ADR-0002: load
+# which Claude Code's sandbox refuses. A stack of its own in a throwaway project, never the one a host runs for visitors (ADR-0002: load
 # tests never run on it), driven from inside its internal network: k6 for the logins, Ergo's crowd and the
 # messages, Node for the streams (k6 reads a response whole, and a stream never ends). It prints k6's summaries,
 # each container's memory and CPU at the peak, Ergo's volume and the verdicts, then removes the project.
@@ -33,13 +33,12 @@ done
 key=${OPENAI_API_KEY_FILE:-}
 [ "$only" != messages ] || [ -n "$key" ] || missing "messages: set OPENAI_API_KEY_FILE, OpenAI's key, which checks each line"
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
-# Never on the demo's host (ADR-0002): none of its containers, running or stopped, may be here.
+# Never on the stack's host (ADR-0002): none of its containers, running or stopped, may be here.
 [ -z "$(docker ps -aq --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
-	missing "the demo's containers are on this host: run the load on another (ADR-0002: never on the demo's host)"
+	missing "the stack's containers are on this host: run the load on another (ADR-0002: never on the stack's host)"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/gnoworld-load.XXXXXX")
-# --profile demo: a plain down leaves a profile's services (the guard, the way out) up after the run.
-files="-f $deploy/compose.yaml -f $tmp/load.yaml --profile demo"
+files="-f $deploy/compose.yaml -f $tmp/load.yaml"
 cleanup() {
 	kill "${sampler:-}" 2>/dev/null || true
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || echo "run.sh: docker compose -p $project down -v" >&2
@@ -51,11 +50,10 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 # The stack's own secrets; OpenAI's key the operator's, if given.
 htpasswd -nbB team "$(openssl rand -hex 16)" | grep . >"$tmp/htpasswd"
-printf 'not a key\n' >"$tmp/ts_authkey"
 for secret in ergo_oper_password log_pepper openai_api_key; do openssl rand -hex 24 >"$tmp/$secret"; done
 # cat, not cp: a copy would keep the key's own 0600, which the server's user cannot read; the folder is 0700.
 [ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key"
-export DEMO_HTPASSWD_FILE="$tmp/htpasswd" TS_AUTHKEY_FILE="$tmp/ts_authkey" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
+export DEMO_HTPASSWD_FILE="$tmp/htpasswd" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
 export LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test INSIDE_SUBNET=172.30.91.0/24 WEB_ADDRESS=172.30.91.10
 # The load comes from one address of the internal network, which the server and Ergo believe in web's place:

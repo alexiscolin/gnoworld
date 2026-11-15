@@ -6410,13 +6410,13 @@ JS
 fi
 
 if part deploy_lock; then
-# deploy/test.sh takes a lock: two runs at once share the Docker project gnoworld-demo-test and each one's
-# start removes the other's containers (`FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
-# the tools it calls are stubs on PATH; the first run is held at its first `docker run` while a second starts beside it.
+# deploy/test.sh takes a lock: two runs at once share the Docker project gnoworld-demo-test and each one's start removes the
+# other's containers (`FAIL ... No such container`). It needs Docker, which the sandbox refuses, so the tools it calls are stubs
+# on PATH; the first run is held at its first `docker run` while a second starts beside it.
 # Every process a run starts is recorded by pid (the stubs write them), killed by pid, and checked dead at the end: no pkill, which
 # the sandbox refuses.
 d="$t/lock" && mkdir -p "$d/bin" "$d/tmp" "$d/home"
-for tool in curl openssl htpasswd git netstat route ifconfig arp ss ip dig; do printf '#!/bin/sh\nexit 0\n' >"$d/bin/$tool"; done
+for tool in curl openssl htpasswd git netstat route ifconfig arp ss ip; do printf '#!/bin/sh\nexit 0\n' >"$d/bin/$tool"; done
 # macOS's mktemp -d ignores TMPDIR; the run's folder goes where the test can find it.
 printf '#!/bin/sh\nexec /usr/bin/mktemp -d "$TMPDIR/tmp.XXXXXX"\n' >"$d/bin/mktemp"
 # python3 records its pid (the canary's http.server is one) and becomes the real one.
@@ -6491,11 +6491,6 @@ mode=
 refused mutants || { stop_all; fail "deploy/test.sh --mutants ran beside a first run holding the project $p1"; }
 grep -q "$p1" "$d/mutants.out" || { stop_all; fail "the refused --mutants did not name the project: $(cat "$d/mutants.out")"; }
 grep -q '^run ' "$d/mutants.docker" && { stop_all; fail "the refused --mutants still started docker work: $(cat "$d/mutants.docker")"; }
-# --demo starts and removes nothing of the test's: the lock does not stop it, and it goes on to its own checks' first docker run.
-mode=--demo
-deploy_run demo "$p1"
-mode=
-reached demo || { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
 # Another project is no one's lock.
 deploy_run other "gnoworld-lock-b-$$"
 reached other || { stop_all; fail "a run of another project was refused by the first's lock: $(cat "$d/other.out")"; }
@@ -6511,7 +6506,7 @@ stop_all
 # A holder another sandbox owns (its pid refuses a signal, EPERM) is alive: pid 1 holds the lock, and the run is refused.
 mkdir -p "$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock" && printf '1\n' >"$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock/pid"
 deploy_run eperm "$p1"
-refused eperm || { stop_all; fail "deploy/test.sh took over the lock of a live holder it was not allowed to signal (F2616): $(cat "$d/eperm.out")"; }
+refused eperm || { stop_all; fail "deploy/test.sh took over the lock of a live holder it was not allowed to signal: $(cat "$d/eperm.out")"; }
 grep -q "$p1" "$d/eperm.out" || { stop_all; fail "the run refused for a holder it could not signal did not name the project: $(cat "$d/eperm.out")"; }
 stop_all
 # A first run stopped by TERM releases the lock, under a Linux host's shell too: dash, unlike macOS's sh, runs no EXIT trap for a
@@ -6528,7 +6523,7 @@ soon ended quit || { stop_all; fail "a run stopped by TERM never ended"; }
 deploy_run again "$p1"
 reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
 stop_all
-# A run left by a Ctrl+C (a gnoworld-demo-mutant-<pid>, whose network holds the test's 172.30.90.0/24) is named in the refusal
+# A run left by a Ctrl+C (a gnoworld-demo-mutant project, whose network holds the test's 172.30.90.0/24) is named in the refusal
 # with the command that removes it; nothing is started beside it.
 left=gnoworld-demo-mutant-77777777
 deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
@@ -6790,8 +6785,8 @@ if part deploy_stop; then
 # (STOP_AT), and the run ends at that check's FAIL, with the other checks' failures shown before it; every check after it, hours of the full
 # stack, is not run. The functions are read from the script, and run with no Docker. Not measured here: docker is refused in the sandbox.
 ds="$here/../deploy/test.sh"
-sed -n '/^pass() {/,/^is_public() {/p' "$ds" | sed '$d' >"$t/ds.fns"
-[ -s "$t/ds.fns" ] || fail "deploy/test.sh no longer defines pass and fail before is_public: update test_hooks.sh's deploy_stop"
+sed -n '/^pass() {/,/^# --- What the host offers/p' "$ds" | sed '$d' >"$t/ds.fns"
+[ -s "$t/ds.fns" ] || fail "deploy/test.sh no longer defines pass and fail before its host section: update test_hooks.sh's deploy_stop"
 stop_case() { # $1: STOP_AT, then the script after the functions
 	stop=$1
 	shift
@@ -6830,12 +6825,11 @@ printf '%s\n' "$out" | grep -q "failed=1" && printf '%s\n' "$out" | grep -q "sur
 : >"$dm/env.log"
 out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deploy/test.sh's first run under --mutants failed under a stub that passes: $out"
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
-# Each down -v of its project takes every profile compose.yaml names: test-links.sh starts `links`, which a down of demo and
-# jarvis left up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start.
+# Each down -v of its project takes every profile compose.yaml names: test-links.sh starts `links`, which a down of the default
+# services alone leaves up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start.
 profiles=$(sed -n 's/^ *profiles: \[\(.*\)\]$/\1/p' "$here/../deploy/compose.yaml" | tr ',' '\n' | tr -d ' "' | sort -u)
 [ -n "$profiles" ] || fail "deploy/compose.yaml names no profile any more: update test_hooks.sh's deploy_stop"
 given=$(sed -n 's/^files=.*\(--profile [a-z_-]*\).*/\1/p' "$ds")
-[ -n "$given" ] || fail "deploy/test.sh's files= gives no profile any more: update test_hooks.sh's deploy_stop"
 grep 'docker compose -p "$project" $files .*down -v' "$ds" >"$t/ds.downs" || true
 [ "$(grep -c . "$t/ds.downs")" -ge 2 ] || fail "deploy/test.sh no longer has its start's and its cleanup's down -v: update test_hooks.sh's deploy_stop"
 while IFS= read -r line; do
@@ -6843,11 +6837,21 @@ while IFS= read -r line; do
 		case "$line $given " in *"--profile $p "*) ;; *) echo "$p" ;; esac
 	done
 done <"$t/ds.downs" >"$t/ds.unprofiled"
-[ ! -s "$t/ds.unprofiled" ] || fail "a down -v of deploy/test.sh leaves its profile(s) $(sort -u "$t/ds.unprofiled" | tr '\n' ' ')up (F13130)"
+[ ! -s "$t/ds.unprofiled" ] || fail "a down -v of deploy/test.sh leaves its profile(s) $(sort -u "$t/ds.unprofiled" | tr '\n' ' ')up"
+# The stack has no front of its own: no Tailscale service or key, the guard and the server's way out start with no profile, and
+# the guard opens no UDP but DNS and no connection to web. Read as text: Docker runs none of it here (deploy/test.sh proves it live).
+cf="$here/../deploy/compose.yaml"
+gs="$here/../deploy/guard/guard.sh"
+if grep -qE '^  tailscale:|TS_AUTHKEY|ts_authkey' "$cf"; then fail "deploy/compose.yaml has a tailscale service or its auth key again"; fi
+if awk '/^  (guard|egress):$/ { on = 1; next } /^  [a-z_]+:$/ { on = 0 } on && /^    profiles:/ { found = 1 } END { exit !found }' "$cf"; then
+	fail "the guard or the server's way out is in a profile: a start with no profile would run without it"
+fi
+if grep 'udp' "$gs" | grep -qv -e '--dport 53 -j ACCEPT'; then fail "deploy/guard/guard.sh opens UDP beyond DNS"; fi
+if grep -q -e '--dport 8080' "$gs"; then fail "deploy/guard/guard.sh lets its network start a connection to web"; fi
 fi
 
 if part deploy_checks; then
-# Two checks of deploy/test.sh that a loaded host can fail, each run here on planted answers, with no
+# Two checks of deploy/test.sh that a loaded host failed, each run here on planted answers, with no
 # Docker. The crowd's script, read from deploy/test.sh and run by this Node against a web of its own on 127.0.0.1: the 641st request waits
 # until each of the 640 WebSockets has settled, 6 s at most, and counts only the 101s that came before it; every other answer is printed by
 # its status, every error by its code, every socket still waiting by their number. And closes(), read with its three calls: nginx's 15 s
@@ -6931,7 +6935,7 @@ stop_web
 	fail "deploy/test.sh's crowd counted a 101 that came after its 641st was asked, lost one, or waited past 6 s and 4 s: [$out]"
 tallied=$(printf '%s' "${out#* (}" | tr -d ')' | tr ',' '\n' | sed 's/^ *//' | LC_ALL=C sort | paste -sd, -)
 [ "$tallied" = "1 closed before an answer,2 ECONNRESET,2 answered 503,2 unanswered after 6 s" ] ||
-	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting (F5486): [$out]"
+	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting: [$out]"
 # web's port closed: every socket settles at once with its error's code (macOS gives a few EINVAL among them under load), so the
 # 641st goes then, not at the cap, set here to 30 s for a verdict no loaded host can blur.
 grep -q 'setTimeout(ask, 6000);' "$dc/crowd.js" || fail "deploy/test.sh's crowd has no 6 s cap for deploy_checks to raise: update test_hooks.sh's deploy_checks"
@@ -6941,8 +6945,8 @@ began=$(date +%s)
 crowd 's/setTimeout(ask, 6000);/setTimeout(ask, 30000);/'
 took=$(($(date +%s) - began))
 case $out in "0 none ("*ECONNREFUSED*")") ;; *) fail "deploy/test.sh's crowd did not print the code of an error it met, web's port closed: [$out]" ;; esac
-[ "$took" -lt 15 ] || fail "deploy/test.sh's crowd waited out its cap ($took s) though its 640 had all settled at once: the 641st goes once they have (F5486)"
-sed -n '/^pass() {/,/^is_public() {/p' "$ds" | sed '$d' >"$dc/fns"
+[ "$took" -lt 15 ] || fail "deploy/test.sh's crowd waited out its cap ($took s) though its 640 had all settled at once: the 641st goes once they have"
+sed -n '/^pass() {/,/^# --- What the host offers/p' "$ds" | sed '$d' >"$dc/fns"
 sed -n '/^\tcloses() {/,/^\t}$/p' "$ds" >>"$dc/fns"
 sed -n '/^\tcloses /p' "$ds" >"$dc/calls"
 [ "$(grep -c '^	closes() {' "$dc/fns") $(grep -c . "$dc/calls")" = "1 3" ] ||

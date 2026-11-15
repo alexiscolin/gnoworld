@@ -1,5 +1,5 @@
 # deploy/test-links.sh: the link reader's proofs, sourced by deploy/test.sh with its
-# helpers, as test-jarvis.sh is: in --mutants, its faults; else, once the demo is proven, it starts the reader and its way out under
+# helpers, as test-jarvis.sh is: in --mutants, its faults; else, once the default services are proven, it starts the reader and its way out under
 # the `links` profile and proves them. Not run where Docker is unreachable (the build sandbox): link-reader/src/deploy.test.ts reads the
 # same files as text; this proves them on Docker. Needs the network for its controls (example.com).
 if [ "${1:-}" = --mutants ]; then
@@ -20,7 +20,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a port of the link reader published on the host" "link_reader binds a port on the host" compose 'services: { link_reader: { ports: ["127.0.0.1:18084:8084"] } }'
 	mutant "the link reader listening on all its addresses" "the link way out's network reaches no listener of the link reader's" compose 'services: { link_reader: { environment: { LINKS_LISTEN: "0.0.0.0:8084" } } }'
 	mutant "a container joined to the link reader's network" "the link reader's network holds the reader and the server alone" compose 'services: { web: { networks: { links: {} } } }'
-	mutant "the link reader back in the demo" "the demo profile holds no link reader, nor its way out" compose 'services: { link_reader: { profiles: [demo] } }'
+	mutant "the link reader back among the default services" "the default services hold no link reader, nor its way out" compose 'services: { link_reader: { profiles: !reset [] } }'
 	# The server's API bound to every address (reaching the link reader's network): the reader would then reach the server, which holds OpenAI's
 	# key. And a hole in both layers of the link way out for web's network (smokescreen's private-range refusal off, the guard's 172.16/12 narrowed).
 	mutant "the server listening on every address" "the link reader reaches no port of the server's" compose 'services: { server: { environment: { HOST: 0.0.0.0 } } }'
@@ -37,11 +37,11 @@ if [ "${1:-}" = --mutants ]; then
 	return 0
 fi
 
-# The demo profile holds neither the reader nor its way out: they are outside its ceiling, as Jarvis.
-expect "the demo profile holds no link reader, nor its way out" \
+# The default services hold neither the reader nor its way out: they are outside the stack's ceiling, as Jarvis.
+expect "the default services hold no link reader, nor its way out" \
 	"$(docker compose -p "$project" $files config --services | grep -c -E '^(link_reader|egress_links)$' || true)" 0
 
-# --no-deps: the demo's services, proven already, are neither rebuilt nor recreated under the checks.
+# --no-deps: the default services, proven already, are neither rebuilt nor recreated under the checks.
 if ! docker compose -p "$project" $files --profile links up -d --build --wait --no-deps link_reader egress_links; then
 	echo "test-links.sh: the link reader did not start: $(docker compose -p "$project" $files --profile links logs --no-log-prefix --tail 1 link_reader egress_links 2>&1 | tr '\n' ' ')" >&2
 	exit 3
@@ -83,7 +83,7 @@ expect "the link reader reaches no port of the server's, from its network or fro
 	"$(answering "$links_net" server:8080 server:8082 "$SERVER_ADDRESS:8080" "$ADMIN_ADDRESS:8082") $(answering "container:$reader" server:8080 server:8082 "$SERVER_ADDRESS:8080" "$ADMIN_ADDRESS:8082")" " "
 expect "nothing on the internal network, nor on the link way out's network, reaches the link reader's port" \
 	"$(answering "$inside" "$LINK_READER_ADDRESS:8084") $(answering "$links_out" "$LINK_READER_ADDRESS:8084")" " "
-expect "the link reader reaches no address of the host or the internet but through its way out, nor any service of the demo" \
+expect "the link reader reaches no address of the host or the internet but through its way out, nor any service of the stack" \
 	"$(answering "container:$reader" "$hostip:$canary" 1.1.1.1:443 "$(default_gateway):80" "$SERVER_ADDRESS:8080" web:8080 ergo:6667 "$LINK_READER_ADDRESS:8084")" "$LINK_READER_ADDRESS:8084"
 
 # Its way out, on 4754: any public https host, no private target; from its own network alone. The server's list stays closed.
@@ -107,7 +107,7 @@ for target in http://10.0.0.1/ https://10.0.0.1/ http://127.0.0.1/ http://0.0.0.
 	http://web:8080/ "http://$WEB_ADDRESS:8080/" https://web:8080/ http://server/ "http://$SERVER_ADDRESS:8080/" http://guard/ http://ergo:6667/ http://link_reader:8084/ "http://$LINK_READER_ADDRESS:8084/"; do
 	case $(lvia "$target") in *407*) pass "the link way out refuses $target" ;; *) fail "the link way out does not refuse $target" ;; esac
 done
-# The host's own addresses, the LAN's, the tailnet's, on 80 and 443.
+# The host's own addresses, the LAN's, a VPN's, on 80 and 443.
 for address in $(host_addresses); do
 	for scheme in http https; do
 		case $(lvia "$scheme://$address/") in *407*) pass "the link way out refuses the host's $scheme://$address/" ;; *) fail "the link way out does not refuse the host's $scheme://$address/" ;; esac
@@ -125,8 +125,8 @@ expect "the server's own proxy holds its list: example.com via 4750 is 407, and 
 expect "nothing but the link reader's network reaches the link way out" \
 	"$(via https://example.com/ guard:4754 "$inside" | cut -c1-3) $(via https://example.com/ guard:4754 "${project}_jarvis_out" | cut -c1-3) $(via https://example.com/ guard:4754 "${project}_reader_out" | cut -c1-3) $(via https://example.com/ guard:4754 "${project}_jarvis" | cut -c1-3)" "000 000 000 000"
 expect "the guard's rules refuse 4754 but from the link reader's network" "$(docker exec "$guard" iptables-nft -S INPUT | grep -c -- '--dport 4754 -j REJECT')" 1
-expect "the link way out's network reaches only its own proxy of the guard's ports: not the server's, jarvis's or the reader's, nor Tailscale's" \
-	"$(answering "$links_out" guard:4750 guard:4751 guard:4753 guard:9002 guard:80 guard:443 guard:41641)" ""
+expect "the link way out's network reaches only its own proxy of the guard's ports: not the server's, jarvis's or the reader's" \
+	"$(answering "$links_out" guard:4750 guard:4751 guard:4753 guard:80 guard:443)" ""
 expect "the link way out's network reaches no listener of the link reader's" \
 	"$(answering "$links_out" "$LINK_READER_ADDRESS:8084")" ""
 expect "the link way out's network reaches no address of the host or the internet" "$(answering "$links_out" "$hostip:$canary" 1.1.1.1:443 "$(default_gateway):80")" ""
