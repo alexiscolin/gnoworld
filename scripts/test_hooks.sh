@@ -3816,6 +3816,46 @@ for cmd in 'echo $HOME' 'cd "$HOME" && git status' 'HOME=/tmp/h npm run build' '
 	'git commit -m "HOME=/tmp/h"' 'git log --format=%h -- HOME=x' 'grep -n HOME= scripts/check.sh' 'unset HOME' 'env -u HOME git status'; do
 	sh_ "$cmd" 0
 done
+# What a push sends is judged as git reads it, and git finds its programs (gitleaks, which the hooks run) on PATH and in
+# GIT_EXEC_PATH: a folder of the command's own first in either puts a fake scanner in front of the real one, and a push passes
+# blind. Given before the program, through env, exported, declared, bare, inside sh -c, a subshell or a function, or as git's
+# --exec-path=: each is refused on a line that pushes, `git subtree push` too. Reading them, a line that does not push, other
+# variables and a push with none pass.
+for cmd in 'PATH=/tmp/p git push origin x' 'GIT_EXEC_PATH=/tmp/p git push origin x' 'env PATH=/tmp/p git push origin x' \
+	'env GIT_EXEC_PATH=/tmp/p git push origin x' 'env -i PATH=/tmp/p git push origin x' 'git --exec-path=/tmp/p push origin x' \
+	'git -c user.name=t --exec-path=/tmp/p push origin x' '/usr/bin/git --exec-path=/tmp/p push origin x' \
+	'export PATH=/tmp/p:/usr/bin; git push origin x' 'export GIT_EXEC_PATH=/tmp/p && git push origin x' 'PATH=/tmp/p; git push origin x' \
+	'declare -x PATH=/tmp/p; git push origin x' 'PATH+=:/tmp/p git push origin x' 'PATH="/tmp/p:$PATH" git push origin x'; do
+	sh_ "$cmd" 2
+done
+for cmd in "PATH=/tmp/p sh -c 'git push origin x'" 'f() { local PATH=/tmp/p; git push origin x; }; f' \
+	'timeout 60 env PATH=/tmp/p git push origin x' "env -S 'PATH=/tmp/p git push origin x'" 'git push origin x; PATH=/tmp/p true' \
+	'PATH=/tmp/p git subtree push --prefix=a origin x' 'g=git; PATH=/tmp/p $g push origin x' 'PATH=/tmp/p git push --dry-run origin x' \
+	'export PATH=/tmp/p; git status && git push origin x'; do
+	sh_ "$cmd" 2
+done
+sh_ 'PATH=/tmp/p; (git push origin x)' 2
+for cmd in 'git push origin x' 'PATH=/tmp/p git status' 'PATH=/tmp/p npm run build' 'env PATH=/tmp/p npm test' 'export PATH=/tmp/p' \
+	'echo $PATH && git push origin x' 'git --exec-path' 'git --exec-path=/tmp/p status' 'MYPATH=/tmp/p git push origin x' \
+	'GIT_EXEC_PATH_X=1 git push origin x' 'git commit -m "PATH=/tmp/p git push"' 'env -u PATH git push origin x' 'unset PATH GIT_EXEC_PATH' \
+	'grep -n PATH= scripts/check.sh' 'git log --format=%h -- PATH=x' 'git status; PATH=/tmp/p true'; do
+	sh_ "$cmd" 0
+done
+# The spellings that give a variable its value without `NAME=value` before the program: a builtin that reads or prints into it, a
+# name a variable holds, the assignment quoted, one on a line of its own. A line that pushes and may set either is refused.
+for cmd in 'printf -v PATH %s /tmp/p; git push origin x' 'printf -v GIT_EXEC_PATH %s /tmp/p; git push origin x' 'read PATH <<< /tmp/p; git push origin x' \
+	'read -r GIT_EXEC_PATH <<< /tmp/p; git push origin x' 'h=PATH; export $h=/tmp/p; git push origin x' 'h=PATH; printf -v $h %s /tmp/p; git push origin x' \
+	'h=PATH; read $h <<< /tmp/p; git push origin x' 'export "PATH=/tmp/p"; git push origin x' "env 'PATH=/tmp/p' git push origin x" \
+	'env "GIT_EXEC_PATH=/tmp/p" git push origin x' "PATH='/tmp/p' git push origin x" 'typeset -x PATH=/tmp/p; git push origin x' \
+	'readonly PATH=/tmp/p; git push origin x'; do
+	sh_ "$cmd" 2
+done
+sh_ "$(printf 'PATH=/tmp/p\ngit push origin x')" 2
+sh_ "$(printf 'export GIT_EXEC_PATH=/tmp/p\n\ngit push origin x')" 2
+for cmd in 'printf %s PATH; git push origin x' 'read line <<< x; git push origin x' 'printf -v out %s x; git push origin x' 'h=PATH; echo $h; git push origin x' \
+	'export FOO=1; git push origin x'; do
+	sh_ "$cmd" 0
+done
 # A global option whose argument came as the next word was taken for the subcommand (F4920): `commit -n` and a forced push passed,
 # and a push got no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
 sh_ 'git --namespace x commit -n -m y' 2

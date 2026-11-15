@@ -45,6 +45,9 @@ INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
 GIT_PLACES = {"GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE"}  # where git reads its hooks, config and work tree
 CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}  # where git looks for its global config: one of the command's own can set a hooks folder (F5541)
 HOMED = []  # the VAR=value words that gave one of them a value, wherever the line has them
+# Where git looks for its programs, the secret scan's among them: a folder of the command's own first in either puts a fake in front.
+PROGRAM_HOMES = {"PATH", "GIT_EXEC_PATH"}
+PATHED = []  # the words that may have given one of them a value, wherever the line has them
 SETTERS = {"export", "declare", "typeset", "readonly", "local"}  # builtins that give a variable a value or export it
 # git's global options whose argument may come as the next word (git 2.53), beside -c and -C; --git-dir and --work-tree are refused.
 GIT_TAKES_ARG = {"-c", "-C", "--namespace", "--config-env", "--attr-source", "--shallow-file"}
@@ -473,6 +476,17 @@ def commands(text):
         # HOME and XDG_CONFIG_HOME, given as git's folders are: the line is refused below when it also runs git (F5541, H3).
         HOMED.extend(w for w in given + (words[1:] if words and words[0] in SETTERS else [])
                      if ASSIGNMENT.fullmatch(w) and bare(w.split("=", 1)[0]).rstrip("+") in CONFIG_HOMES)
+        # PATH and GIT_EXEC_PATH, given as those are, or by a builtin that reads or prints into a variable, or under a name a variable
+        # holds: the line is refused below when it also pushes.
+        given_all = given + (words[1:] if words and words[0] in SETTERS else [])
+        PATHED.extend(w for w in given_all if ASSIGNMENT.fullmatch(w) and bare(w.split("=", 1)[0]).rstrip("+") in PROGRAM_HOMES)
+        PATHED.extend(w for w in given_all if "=" in w and EXPANDS.search(w.split("=", 1)[0]))
+        names = []  # the variables a builtin gives a value
+        if words and words[0] == "read":
+            names = [w for w in words[1:] if not w.startswith("-")]
+        elif words and words[0] in ("printf", "print"):
+            names = [after for flag, after in zip(words[1:], words[2:]) if flag == "-v"]
+        PATHED.extend(n for n in names if bare(n) in PROGRAM_HOMES or EXPANDS.search(n))
         # A value may name a program run later, or be run (7w4's S4-3: `k=gnokey; $k list`): its words and its substitutions are read.
         for value in [w.split("=", 1)[1] for w in given + (words[1:] if words and words[0] in SETTERS else []) if ASSIGNMENT.fullmatch(w)]:
             try:
@@ -596,6 +610,8 @@ def check_git(words, strict=True):
     if any(w.lower().startswith("alias.") or w.lower().startswith("--config-env=alias.") for w in words[1:]):
         refuse("a git alias can carry any flag past these checks: write the command out")
     pushing = sub == "push" or sub == "subtree" and "push" in words[at + 1:]  # `git subtree push` pushes too (lot 3's S3-2)
+    if pushing and any(w.startswith("--exec-path") for w in words[1:at]):
+        refuse("git's programs from a folder of the command's own (--exec-path=) on a push: the hooks' scan would run from it")
     if pushing and (any("f" in flag for flag in short) or any(w.startswith(("--force", "+")) or w == "--mirror" for w in words[2:])):
         refuse("a forced push rewrites what others have; Alexis forces, if ever")
     return pushing
@@ -723,6 +739,9 @@ elif tool == "Bash":
     if HOMED and git_named:
         refuse("HOME or XDG_CONFIG_HOME given a value on a line that runs git: git reads its global config there, whose hooks folder skips "
                "every hook (F5541); give them in no line that runs git")
+if PATHED and push:
+    refuse("PATH or GIT_EXEC_PATH given a value on a line that pushes: the hooks' scan, found there, could be a fake; give them in no "
+           "line that pushes")
 if push:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
                                              "permissionDecisionReason": "a push leaves this machine: Alexis decides"}}))
