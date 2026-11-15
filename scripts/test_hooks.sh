@@ -2911,7 +2911,9 @@ done
 # A name the index holds in another case than the disk's (git update-index takes any), which this case-blind disk reads as the
 # harness file it names (F151).
 blob=$(echo planted | git -C "$c2" hash-object -w --stdin)
-for f in Scripts/guard.py .Claude/settings.json claude.md; do
+# (Scripts/guard.py, .Claude/settings.json and claude.md are equal but for case to a tracked path: the fold check refuses them before the list is
+# read, as the cases above.)
+for f in Stryker.config.json .Github/workflows/gate.yml; do
 	git -C "$c2" update-index --add --cacheinfo "100644,$blob,$f"
 	harnessed || fail "pre-commit let $f, a harness file on a case-blind disk, through in the sandbox (F151, D241)"
 	git -C "$c2" update-index --force-remove "$f"
@@ -2930,6 +2932,21 @@ fresh
 # character is refused too. A harness file deleted or moved out is a harness change, and so is one a merge brings.
 fold=$(printf '\305\277') && printf 'x\n' >"$c2/${fold}cripts-tool.sh" && git -C "$c2" add -- "${fold}cripts-tool.sh"
 said "non-ASCII" || fail "pre-commit let a staged path with a folded letter through in the sandbox (F164)"
+fresh
+# A name equal but for case to one the tree holds is the same path on this disk (A.ts lands on a.ts), so no list can match it:
+# refused as a non-ASCII one is, in the file's name, in a folder's (Scripts/ is scripts/), and between two new names of one commit,
+# written to the index as they are, as GitHub's changes job refuses them.
+blob=$(echo planted | git -C "$c2" hash-object -w --stdin)
+for names in A.ts Scripts/evil.py "Lone.md lone.md"; do
+	for name in $names; do git -C "$c2" update-index --add --cacheinfo "100644,$blob,$name"; done
+	said "names equal but for case:" || fail "pre-commit let $names, equal but for case to another path, through in the sandbox"
+	for name in $names; do git -C "$c2" update-index --force-remove "$name"; done
+done
+fresh
+# An index git cannot read proves no path clean: refused, and said so.
+printf 'not an index\n' >"$t/badindex"
+out=$(cd "$c2" && GIT_INDEX_FILE="$t/badindex" sh "$hk/pre-commit" 2>&1 >/dev/null) && fail "pre-commit passed with an index git cannot read"
+printf '%s\n' "$out" | grep -qF "could not list the tree" || fail "pre-commit refused an unreadable index without saying so: $out"
 fresh
 mkdir -p "$c2/.github" && echo x >"$c2/.github/gone.yml" && echo x >"$c2/scripts/moved.sh" && git -C "$c2" add .github/gone.yml scripts/moved.sh && git -C "$c2" commit -qm planted
 git -C "$c2" rm -q --cached .github/gone.yml
@@ -3039,6 +3056,13 @@ fold=$(printf '\305\277') && mkdir -p "$o/package$fold" && printf '{}\n' >"$o/pa
 (cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-commit outside the sandbox took a path this disk may fold (F164)"
 (cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-merge-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-merge-commit outside the sandbox took a path this disk may fold (F164)"
 git -C "$o" rm -qrf --cached -- "package$fold" && rm -r "$o/package$fold"
+blob=$(echo planted | git -C "$o" hash-object -w --stdin)
+for names in A.ts Scripts/evil.py "Lone.md lone.md"; do
+	for name in $names; do git -C "$o" update-index --add --cacheinfo "100644,$blob,$name"; done
+	(cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-commit 2>&1 >/dev/null) | grep -qF "names equal but for case:" || fail "pre-commit outside the sandbox took $names, equal but for case to another path"
+	(cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-merge-commit 2>&1 >/dev/null) | grep -qF "names equal but for case:" || fail "pre-merge-commit outside the sandbox took $names, equal but for case to another path"
+	for name in $names; do git -C "$o" update-index --force-remove "$name"; done
+done
 printf 'p = "/Us''ers/alice/x"\n' >"$o/private.py" && git -C "$o" add private.py
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home folder's path through"
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
@@ -8243,7 +8267,7 @@ done
 mv "$c/base/.githooks/records.sh" "$c/records.sh"
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a change it could not read the base's harness list for"
 grep -q "harness list" "$c/err" || fail "ci_changes.sh refused a base with no harness list without saying so: $(cat "$c/err")"
-printf 'harness() ( exit 3 )\nforeign() ( exit 1 )\n' >"$c/base/.githooks/records.sh"
+printf 'harness() ( exit 3 )\nfolded() ( exit 0 )\n' >"$c/base/.githooks/records.sh"
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a change whose base's harness list fails"
 grep -q "harness list" "$c/err" || fail "ci_changes.sh refused a base whose harness list fails without saying so: $(cat "$c/err")"
 rm "$c/base/.githooks/records.sh"

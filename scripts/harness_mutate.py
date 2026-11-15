@@ -1671,7 +1671,7 @@ def hooks_3b_mutants():
         ('if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0")', 'if ! (: >>"$0")', "takes SANDBOX_RUNTIME for the sandbox"),
         ("sandboxed=true; fi", "sandboxed=false; fi", "knows the sandbox"),
         ('	if [ -n "$held" ]; then', "	if false; then", "refuses a staged harness file from the sandbox (D241)"),
-        ("if foreign --cached; then", "if false; then", "refuses a path the disk may fold, everywhere (F164)"),
+        ("if ! folded_paths=$(folded ls-files -z); then", "if false; then", "refuses a path the disk may fold, everywhere (F164)"),
         ('xargs -0 -r sh -c "${format% .} --ignore-unknown', 'xargs -0 -r sh -c "${format% .}', "lets Prettier pass a file it does not know"),
         ('case $format in *" .") ;; *)', 'case $format in *) ;; *)', "refuses a format:check it cannot name the files in"),
         ('in (b"100644", b"100755")', 'in (b"100644", b"100755", b"120000")', "hands Prettier no link"),
@@ -1712,10 +1712,7 @@ def hooks_3b_mutants():
     yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit"', "exit 0", h, "pre-merge-commit gives a merge pre-commit's checks")
     cc = "scripts/ci_changes.sh"
     for find, replace, label in (
-        ('[ -z "$folded" ] ||', "true ||", "refuses a path this disk may read as another (F151, F164)"),
-        ("    if any(b > 0x7e for b in p):", "    if False:", "refuses a byte outside ASCII (F164)"),
-        ("    if len(names) > 1:", "    if False:", "refuses names equal but for case (F151)"),
-        ("[:i]).lower(), set())", "[:i]), set())", "compares names blind to case (F151)"),
+        ('if [ "$rc" != 0 ]; then', "if false; then", "refuses a path this disk may read as another (F151, F164)"),
         ('case $line in "Harness-changed: $1 - "?*) return 0', "case $line in *) return 0", "wants each harness file declared with its reason (F089)"),
         ('[ -z "$undeclared" ] ||', "true ||", "refuses a harness file no commit declares (F089)"),
         ('if [ "$all" = false ]; then\n\tlisted=', 'if false; then\n\tlisted=', "checks the declarations of a pull request and a push"),
@@ -1728,6 +1725,14 @@ def hooks_3b_mutants():
         (r"|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$')", "')", "calls deploy-stack for a change of the root's package files"),
     ):
         yield from each(cc, find, replace, h, f"ci_changes.sh {label}")
+    for find, replace, label in (
+        ("    if any(b > 0x7e for b in p):", "    if False:", "refuses a byte outside ASCII (F164)"),
+        ("    if len(names) > 1:", "    if False:", "refuses names equal but for case (F151)"),
+        ("[:i]).lower(), set())", "[:i]), set())", "compares names blind to case (F151)"),
+        ("    sys.exit(2)\nseen", "    sys.exit(0)\nseen", "refuses when git cannot list the tree"),
+        ("sys.exit(1 if found else 0)", "sys.exit(0)", "answers no finding whatever it found"),
+    ):
+        yield from each(".githooks/records.sh", find, replace, h, f"records.sh's folded {label}")
     yield from each("scripts/install_hooks.sh", 'ref=$(git rev-parse --verify --quiet "${1:-main}^{commit}")', "ref=${1:-main}", h, "install_hooks reads its commit once (L3)")
     yield from each("scripts/stop_gate.sh", "\nexit 0\n", "\nexit 2\n", h, "stop_gate never blocks a turn (D13173)")
     ck = "scripts/check.sh"

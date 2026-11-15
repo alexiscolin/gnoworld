@@ -13,10 +13,17 @@ unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 # for writing runs in the sandbox too. In a subshell: under dash, Linux's sh, a redirection `:` cannot open ends the whole shell (F13177).
 sandboxed=false
 if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0") 2>/dev/null; then sandboxed=true; fi
-# A letter the disk folds names a file no list can match (ſ is s on APFS: packageſ/ lands as packages/, a workspace pnpm installs): a
-# path with one is refused, from the sandbox and in Alexis's shell, a merge's too (F164); GitHub's changes job refuses it on its side.
-if foreign --cached; then
-	echo "pre-commit: a path with a non-ASCII character, which this disk may read as another, a harness file's among them (F164)" >&2
+# A path this disk may read as another is refused, from the sandbox and in Alexis's shell, a merge's too (F164, F151): a byte outside
+# ASCII (ſ is s on APFS: packageſ/ lands as packages/, a workspace pnpm installs), or a name equal but for case to another of the
+# tree, which no harness list can match (Packages/ is packages/). The index is what the commit holds. GitHub's changes job refuses
+# the same on its side.
+if ! folded_paths=$(folded ls-files -z); then
+	if [ -n "$folded_paths" ]; then
+		echo "pre-commit: a path this disk may read as another, a harness file's among them (F151, F164): a non-ASCII character, or a name equal but for case to another path" >&2
+		printf '%s\n' "$folded_paths" >&2
+	else
+		echo "pre-commit: git could not list the tree, so no path is proven free of one this disk may read as another" >&2
+	fi
 	exit 1
 fi
 if $sandboxed; then

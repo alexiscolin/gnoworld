@@ -15,22 +15,17 @@ esac
 git cat-file -e "$base^{commit}" || { echo "ci_changes.sh: no commit $base to judge against" >&2; exit 1; }
 changed=$(git diff -z --no-renames --name-only "$base" HEAD | tr '\0' '\n')
 # What reaches main by GitHub's merge met no hook of a clone (D13173), so the change is refused, whatever the event, when the tree
-# holds a path this disk may read as another, as pre-commit refuses one from the sandbox: a byte outside ASCII (F164), or a folder or
-# file name equal but for case to another (F151: Packages/evil/package.json lands as packages/evil/, a workspace pnpm installs).
-folded=$(git ls-tree -r -z --name-only HEAD | python3 -I -c '
-import sys
-seen = {}
-for p in [p for p in sys.stdin.buffer.read().split(b"\0") if p]:
-    if any(b > 0x7e for b in p):
-        print("a byte outside ASCII: " + p.decode("utf-8", "backslashreplace"))
-    parts = p.split(b"/")
-    for i in range(1, len(parts) + 1):
-        seen.setdefault(b"/".join(parts[:i]).lower(), set()).add(b"/".join(parts[:i]))
-for names in seen.values():
-    if len(names) > 1:
-        print("names equal but for case: " + " and ".join(sorted(n.decode("utf-8", "backslashreplace") for n in names)))
-') || { echo "ci_changes.sh: the tree's paths could not be read" >&2; exit 1; }
-[ -z "$folded" ] || { printf 'ci_changes.sh: a path this disk may read as another (F151, F164):\n%s\n' "$folded" >&2; exit 1; }
+# holds a path this disk may read as another, as pre-commit refuses one from the sandbox (the base's records.sh, whose `folded` it is).
+rc=0
+folded=$(. "$root/.githooks/records.sh" && folded ls-tree -r -z --name-only HEAD) || rc=$?
+if [ "$rc" != 0 ]; then
+	if [ "$rc" = 1 ] && [ -n "$folded" ]; then # a finding: folded prints one and exits 1; a records.sh that is missing or fails prints none
+		printf 'ci_changes.sh: a path this disk may read as another (F151, F164):\n%s\n' "$folded" >&2
+	else
+		echo "ci_changes.sh: the base's harness list (.githooks/records.sh) cannot check the tree's paths" >&2
+	fi
+	exit 1
+fi
 has() { [ "$all" = true ] || printf '%s\n' "$changed" | grep -Eq "$1"; }
 flag() { if "$@"; then echo true; else echo false; fi; }
 # Code: anything but prose, the harness and the linters' configs; a page under the sources is code.
