@@ -20,7 +20,7 @@ Run every command from the repository's root, in your own Terminal.
   and a screenshot. You match the time with `docker compose -f deploy/compose.yaml logs server`.
 - **If something breaks**: `docker compose -f deploy/compose.yaml ps`, then `logs <service>`. Restarting `ergo` or `server` restarts
   `web` too: the site is silent for some seconds. If `/ws` or `/api/` answer 502 after a crash, `restart web`.
-- **The chat lives in volumes** (`ergo`, `server`), which `down` keeps and `down -v` removes. There is no backup yet
+- **The chat lives in volumes** (`ergo`, `server`), which `down` keeps and `down -v` removes. There is no backup
   (OPERATIONS.md, "Known limits").
 
 ## Personal keys
@@ -51,7 +51,7 @@ the repository holds a key or names an account.
 
 ## Known limits
 
-- No Adena app on a phone yet: a phone is a guest.
+- No Adena app on a phone: a phone is a guest.
 - Jarvis answers logged-in accounts only, and each answer costs on Anthropic's key (a daily budget caps it).
 - A realm's two-sentence explanation comes from the seed shipped with the commit (onyx's realms explained in advance, no key spent). A realm
   the seed lacks shows its own first line, or, with Jarvis on, gets a line at its first visit, on the Anthropic key, 30 new in any 24 hours at most

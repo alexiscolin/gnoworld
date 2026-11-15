@@ -1,14 +1,14 @@
 # Operations
 
-The runbook (ADR-0002 §7). It holds the stack: the client behind a password on one Docker host, with Ergo (the chat), `server` (the login,
+The runbook. It holds the stack: the client behind a password on one Docker host, with Ergo (the chat), `server` (the login,
 the rooms, the bot, the search, the chain's jobs) and a way out to the hosts of `deploy/egress/acl.yaml` alone (`guard` and `egress`, started with
-the rest); `jarvis` (with its `jarvis_reader`) and the link reader (`link_reader`), each off by default and under a profile of its own, and Grafana
-later (`docs/decisions.md:151`). Nothing publishes the stack yet: `web` listens on `inside`, a network with no way out, and no port of the host is
-opened. The public front, a TLS front (Caddy) on a VM of its own with the refusal of the VM's own public address and the PROXY protocol's
+the rest); `jarvis` (with its `jarvis_reader`) and the link reader (`link_reader`), each off by default and under a profile of its own.
+Nothing publishes the stack: `web` listens on `inside`, a network with no way out, and no port of the host is
+opened. The public front, a TLS front (Caddy) on a VM of its own, refusing the VM's own public address and passing the PROXY protocol's
 one connection a visitor, comes with the automatic deploy's part (D13172), which builds the VM and proves it there. Until then the stack runs for
 its tests and for a developer who looks from a container of its network. Running it for a few testers is [DEMO.md](DEMO.md). Everything is in
-`deploy/`; nothing outside it is touched. It runs on any Docker host: Linux with Docker Engine 28 or later, Docker Desktop, or OrbStack. Every
-setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
+`deploy/` ([deploy/README.md](../deploy/README.md)); nothing outside it is touched. It runs on any Docker host: Linux with Docker Engine 28 or later,
+Docker Desktop, or OrbStack. Every setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## The services
 
@@ -47,18 +47,18 @@ and `link_reader` as 65530, users of their own.
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (D120).
-- `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
+- `jarvis` is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
   serves its budgets and answers `off`, reads no key and reaches no gnomcp. It, `jarvis_reader` and the two ways out sit in the profile
-  `jarvis`, out of the default services (10j-4): started only with Jarvis switched on, `--profile jarvis`, or by its name,
+  `jarvis`, out of the default services: started only with Jarvis switched on, `--profile jarvis`, or by its name,
   `docker compose up -d jarvis`, which switches its profile on; `JARVIS_EGRESS_PROXY` names another way out. Switching it on has an order (below, "Switching Jarvis on"): the door's key, the evals, then `JARVIS=on`.
   It listens on its fixed address of
   `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
-  `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
+  `/budgets` ask no session, so that network is their wall. It goes out through `egress_jarvis` alone, a
   smokescreen of its own on 4751 in `guard`'s network, which takes 4751 from `jarvis_out` alone and sends that network
   nothing but its replies: Anthropic's API, each universe's node and gnoscope (`deploy/egress/jarvis-acl.yaml`).
-  The indexers left that list (10u-g2): only gnomcp read them (`gno_history`, `gno_activity`, `jarvis/src/gnomcpTools.ts`,
-  `indexerReads`), and gnomcp runs in the reader now. The lists never mix. Its stop waits 35 s, its drain's 20 and 15 more.
-- `jarvis_reader` (10u-g2, D13987) is gnomcp alone, in a container of its own: no Node, no secret, no volume but a tmpfs,
+  The indexers are not on that list: only gnomcp reads them (`gno_history`, `gno_activity`, `jarvis/src/gnomcpTools.ts`,
+  `indexerReads`), and gnomcp runs in the reader. The lists never mix. Its stop waits 35 s, its drain's 20 and 15 more.
+- `jarvis_reader` is gnomcp alone, in a container of its own: no Node, no secret, no volume but a tmpfs,
   a user of its own (65531), `x-locked`, a network shared with jarvis alone (`reader`, `READER_ADDRESS` in
   `READER_SUBNET`) and one of its own to the guard (`reader_out`, `GUARD_READER_ADDRESS` in `READER_OUT_SUBNET`).
   gnomcp speaks over stdio, so the reader's bridge (`deploy/jarvis-reader/main.go`) serves it on 8083, one gnomcp a
@@ -74,7 +74,7 @@ and `link_reader` as 65530, users of their own.
   `app/data/universes.json` and fails when one of them differs. The reader's caps (0.2 core, 160 MB, 48 processes; its
   way out 0.1 core, 48 MB, 32 processes) are a ceiling chosen for two gnomcp, not measured on a running stack:
   `deploy/test.sh` (`test-jarvis.sh`) checks the four containers of Jarvis together under 656 MiB and 0.7 core.
-- `link_reader` (slice 13, D13919) fetches a public page's head and picture for a chat line's card, so it holds nothing worth taking:
+- `link_reader` (D13919) fetches a public page's head and picture for a chat line's card, so it holds nothing worth taking:
   no secret, no volume, a read-only root, a user of its own, and two networks, `links` (shared with the server alone, which asks it
   `POST /card`) and `links_out` (its way out). It has no DNS: it goes out through `egress_links`, a smokescreen on 4754 in `guard`'s network
   that takes 4754 from `links_out` alone, lets any public https host out (`deploy/egress/links-acl.yaml`, `action: open`) and refuses
@@ -83,12 +83,12 @@ and `link_reader` as 65530, users of their own.
   2,000,000-pixel cap, `link-reader/src/memory.test.ts`). It is in a profile of its own, out of the default services' cap, as Jarvis: its 0.3 core
   and 304 MB (reader and way out) come on top. "Switching the link cards on", below.
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
-  jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
+  jarvis's network reaches no port of the server's; web and the tests ask it as `server:8080`.
   The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
   no jarvis: without it, the stack runs, and the door answers `off` while Jarvis is off, never asking jarvis; switched
-  on without jarvis's profile, or with a jarvis that fails to start, the door answers `not_ready` (503) (10l-1).
-- The admin API (10g) listens on 8082 at the server's address of `admin` (`ADMIN_ADDRESS`, in `ADMIN_SUBNET`), a
-  network nobody else joins: the admin console joins it (slice 12); its sites are `ADMIN_ORIGINS`.
+  on without jarvis's profile, or with a jarvis that fails to start, the door answers `not_ready` (503).
+- The admin API listens on 8082 at the server's address of `admin` (`ADMIN_ADDRESS`, in `ADMIN_SUBNET`), a
+  network nobody else joins: the admin console joins it; its sites are `ADMIN_ORIGINS`.
 
 ## Before the first start (once)
 
@@ -100,14 +100,14 @@ and `link_reader` as 65530, users of their own.
 3. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own https origin, the address visitors will
    type (required: Ergo refuses a WebSocket from any other site, and the server any POST); the internal
    network's addresses may change there.
-4. Slice 3's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
+4. The chat's and the moderation's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
    (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
    deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
    `deploy/secrets/openai_api_key`.
-   Slice 10's: Anthropic's key, one line, in `deploy/secrets/anthropic_api_key`, a key of a workspace with its own
+   Jarvis's: Anthropic's key, one line, in `deploy/secrets/anthropic_api_key`, a key of a workspace with its own
    spend limit (ADR-0002 §5); with Jarvis off, any line (Compose wants the file, jarvis reads it only when on).
-   The door's key, which the server and jarvis alone hold (10u-g2): `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`,
-   then `chmod 644 deploy/secrets/jarvis_door_key`. Make it before the next `up`, Jarvis off or on: the server and jarvis read
+   The door's key, which the server and jarvis alone hold: `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`,
+   then `chmod 644 deploy/secrets/jarvis_door_key`. Make it before the first `up`, Jarvis off or on: the server and jarvis read
    the file whenever Compose names it, which is always, and refuse to start on no file or a key under 32 bytes. A
    placeholder line like Anthropic's key's stops the whole stack, the server included.
 5. On Linux, a clone made with a umask of 077 leaves `deploy/guard` unreadable to the container: `chmod -R a+rX deploy/guard`.
@@ -130,7 +130,7 @@ keep it so.
 | Remove it all, its volumes included | `docker compose -f deploy/compose.yaml --profile jarvis --profile links down -v` |
 
 GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` (D13180); run it by hand to debug, and
-after a change to the link reader or what it fetches, which deploy-stack does not see yet (F13210). Until F13163 is fixed, a
+after a change to the link reader or what it fetches, which deploy-stack does not run. A
 pull request that changes `deploy/` also gets this hand run and its `--mutants`, from the reviewed commit (D13191). App code
 alone needs neither: GitHub's journeys test it.
 
@@ -140,9 +140,8 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 ### Run test.sh from the commit you reviewed
 
 `deploy/test.sh` runs with Docker's socket, which is root on the host, and every session can write a
-worktree's `deploy/` (F204) and the shared `.git`'s objects: git does not check an object against its
-name as it reads it, so even `git archive <sha>` writes a planted object's text (F152's class,
-F4921). So run it neither from a worktree nor from a bare archive, but from a copy of the commit you
+worktree's `deploy/` and the shared `.git`'s objects: git does not check an object against its
+name as it reads it, so even `git archive <sha>` writes a planted object's text. So run it neither from a worktree nor from a bare archive, but from a copy of the commit you
 reviewed whose commit and files hash to that commit's name. Paste this in your own Terminal, `sha`
 set to that commit (read it once, right after you reviewed it: a session can move a branch), and
 add `--mutants` to the last line when the branch changes `deploy/`:
@@ -159,11 +158,11 @@ rc=$?; [ -z "${d:-}" ] || /bin/rm -rf "$d"; exit "$rc" )
 ```
 
 It runs in a subshell of its own, so nothing it sets stays in the Terminal (its exit code in `rc`: zsh keeps `status`
-read-only, and the copy was then never removed); it calls the system's
+read-only); it calls the system's
 programs by path, and the copy holds a repository of its own, for test.sh's checks of what git
 ignores, and is removed at the end. A run that prints no "test.sh runs from" line means the copy is
-not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh. The copy
-lives under `~/.local`, which Alexis's user settings of 2026-11-04 (7w2's `apply-7w2-user.sh`) close
+not that commit: run nothing more, and report it. It takes about 15 s before test.sh. The copy
+lives under `~/.local`, which the owner's user settings close
 to every session's file tools, as they close the programs test.sh calls (docker and its config,
 python3's user site, sh's startup files); the sandbox closes it to commands. Without those settings,
 anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
@@ -172,9 +171,9 @@ anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
 
 A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (1.5
 cores and 1,248 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
-cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.7 core and 656 MB more when on (jarvis, its
+cap, not the host). Jarvis, under its own profile, is out of that cap: 0.7 core and 656 MB more when on (jarvis, its
 reader and their two ways out). The
-limit lets one address 640 requests at once and 20 a second after that (F3665), and 1,024 more of the hashed files (assets,
+limit lets one address 640 requests at once and 20 a second after that, and 1,024 more of the hashed files (assets,
 textures, world pictures) in a zone of their own, 5 a second after that, which a first visit asks for twice (D13127); `auth_basic` runs after it, so a
 burst with a wrong password costs about 640 password checks, 1,664 at most with the hashed files', at the name in the file, before the 429s begin.
 To stop serving visitors at once, on the host and in seconds: `docker compose -f deploy/compose.yaml stop web` (back with `start web`). The public
@@ -187,37 +186,34 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 
 ## Known limits
 
-Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
-
 - **A host whose own public address serves something.** The guard refuses private addresses,
   then lets out TCP 80 and 443 to the rest: on a host with a public address on an
   interface (a rented server), the proxies' network would reach that address's services.
-  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office, until
-  the deploy part (D13172) builds the VM and refuses its own public address, proven on it (F202).
+  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office. The
+  deploy part (D13172) builds a VM that refuses its own public address, proven on it.
 - **A restart of the whole host, or of Docker.** Docker restarts the containers itself,
   without Compose's order: for a moment, a proxy may run before the guard's rules are in, and
   if `web` is not up yet the guard stops, leaving the proxies on a network with nothing in it.
   After such a restart, Compose's order again: `docker compose -f deploy/compose.yaml --profile jarvis --profile links
-  down`, then `up -d` with the profiles it ran with (F203).
+  down`, then `up -d` with the profiles it ran with.
 - **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
   lets that server's port 53 out, for the proxies' name lookups: an exception to "every private
-  address refused" (F205).
+  address refused".
 - **Open connections.** A visitor holds 32 requests at once, a WebSocket and a stream counting while
   they last, and a team behind one address shares them; `web` holds 4,096 connections, two for each
   held request (the visitor's and its upstream's): about 64 visitors at their 32 at once, by division;
   `deploy/test.sh` proves 16 at once (more than 1,024), the rest is a margin, and `web`'s 128 MB is not
-  measured past those 512 held requests (F645). A connection
-  that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests
-  (F208, sized before the first k6 run: 3n-b). Still a limit: a connection is counted for its visitor
+  measured past those 512 held requests. A connection
+  that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests.
+  Still a limit: a connection is counted for its visitor
   only once its headers are whole, and nginx takes back a silent or idle one when short, never one
   half-way through its headers; so one address opening about 410 such connections a second holds all
-  4,096 and nobody else is served (F641, measured on nginx 1.30.6 at 64).
+  4,096 and nobody else is served (measured on nginx 1.30.6 at 64).
 
-Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
+### The login
 
 - **The login's settings.** `ORIGINS` names the site's origins (`https://host`, no path): unset,
-  every login is refused. `TRUSTED_PROXY` names `web`, whose `X-Real-IP` gives the visitor
-  (3e): unset behind `web`, every visitor shares one limit of 10 login calls a minute.
+  every login is refused. `TRUSTED_PROXY` names `web`, whose `X-Real-IP` gives the visitor: unset behind `web`, every visitor shares one limit of 10 login calls a minute.
 - **A flood of challenges.** At most 100,000 nonces wait at once; a visitor holds 50 at most, so
   2,000 addresses (IPv6 /64s, which one provider's /48 holds by thousands) can fill it, and then
   every new login is refused until theirs expire, 5 minutes after each. Logins already made
@@ -226,16 +222,16 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
   new one; the limit of new accounts per visitor only slows a farm (decision 144).
 - **Ten tokens an account.** An account keeps its 10 newest logins; an eleventh logs the oldest
   device out. Accounts are free, so the tokens are bounded by the accounts, ten each, not by a
-  fixed number (F435).
-- **A logout or a ban leaves the IRC side for a while** (3d). A ticket minted before the logout logs in
+  fixed number.
+- **A logout or a ban leaves the IRC side for a while.** A ticket minted before the logout logs in
   until its 60 seconds end, and a connection already open lasts until it drops: only new tickets are
-  refused. A moderator's revoke that cuts live connections is slice 12's.
+  refused. The server does not cut live connections at a moderator's revoke.
 - **Ergo's socket.** `AUTH_SOCKET` names the socket Ergo's auth script dials; unset, Ergo lets nobody
   log in, guests still read. A socket left by a crash is removed at the next start, never a file. The
   sandbox binds no Unix socket, so the tests reach the same handler over TCP: the bind itself is proven
-  by 3e's operator tests.
+  by the operator tests.
 
-Slice 9h, the first signals (`docs/decisions.md`, D210 to D218):
+### The first signals (D210 to D218)
 
 - **First to chart.** The first logged-in account to open a world is recorded once, in `first_signals`
   (its own migration), with the first line of a public room that passed moderation (first words).
@@ -247,37 +243,36 @@ Slice 9h, the first signals (`docs/decisions.md`, D210 to D218):
   address share one count, so a burst of them refuses all such lines for a minute (logged as `limit`).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person
   and send the signature itself, so the cookie lands with it. The server cannot tell; only a
-  wallet that shows the requesting site and refuses another domain's text can, which slice
-  4's first merge checks against the real Adena. The 90-day cap and logout bound it.
+  wallet that shows the requesting site and refuses another domain's text can; that Adena does so is not checked here. The 90-day cap and logout bound it.
 
-Slice 3, the content security policy (3f):
+### The content security policy
 
 - **One policy, built.** The build writes it from its pages' inline scripts, so a page changed by
   hand on a host breaks until the next build; nginx serves `/_headers`, the policy itself, as a
   file (it is public anyway). A browser that does not read CSP 3's `'self'` as the page's `wss:`
-  refuses the chat's WebSocket: slice 4's first one checks Firefox and Safari.
+  refuses the chat's WebSocket; Firefox and Safari are not checked here.
 
-Slice 3, the bot's link and the rooms (3h):
+### The bot's link and the rooms
 
 - **The link's settings.** `ERGO_HOST` and `ERGO_PORT` name Ergo's internal listener (127.0.0.1:6667
   by default); `ERGO_OPER_PASSWORD_FILE` holds the operator's password, one word of printable ASCII,
   32 to 72 characters (bcrypt keeps 72 bytes, so Ergo's start refuses more; the server alone takes 256); Ergo's
-  start refuses any other shape, a blank line before the word included (F706). Unset, the server keeps no link: rooms exist, nobody's activity counts.
+  start refuses any other shape, a blank line before the word included. Unset, the server keeps no link: rooms exist, nobody's activity counts.
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
-  moderator's act (3l).
+  moderator's act.
 - **The bot's account.** The bot logs in by SASL as the account `gnoworld`, whose nick Ergo keeps for
   it (the server's auth takes the operator's password for that one name). After a link drops silently,
   its next connection joins the old session, which Ergo holds until its own ping timeout, as a second
   session of the account (multiclient). A refusal of the nick comes from a guest who took it before the
   account first logged in (a new Ergo database): the link logs `irc_refused` (`nick`), tries again, and
   raises the alert `irc_nick_taken` at the third in a row. A refused login logs `irc_refused` (`sasl`).
-- **The inside network is exempt from Ergo's connection limits** (`INSIDE_SUBNET`, F720): the server's link
+- **The inside network is exempt from Ergo's connection limits** (`INSIDE_SUBNET`): the server's link
   and web's own connections never meet the 16-at-once or the 32-in-10-minutes limit, so a crash loop of the
   server cannot lock the bot out. A visitor is limited by the address web passes, never one of that network.
-- **Ergo logs no address** (`-connect-ip`, slice 3's max review): its refusals by ip-limits go unlogged
-  with it, so a visitor behind a shared address who meets the limit leaves no trace (slice 4).
+- **Ergo logs no address** (`-connect-ip`): its refusals by ip-limits go unlogged
+  with it, so a visitor behind a shared address who meets the limit leaves no trace.
 
-Slice 3, the check (3i):
+### The moderation check
 
 - **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
   unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
@@ -290,52 +285,50 @@ Slice 3, the check (3i):
   Each scheme counts, however the links are joined: a link inside another's address is one more.
 - **Banned words** match as whole words, but a word of a script written without spaces (Chinese,
   Japanese, Thai, Lao, Khmer, Myanmar) matches anywhere in a line.
-- **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
+- **A message caught in a restart** stays `pending` in the verdicts; the catch-up (below) checks it again.
 - **OpenAI's rate limit.** One line a request, and OpenAI caps a key's requests a minute by its account's tier
-  (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page, read
-  2026-10-24): past it, its refusals count as down (logged `moderation_unchecked` with `rate_limited`, an outage's
-  `down`), five open the breaker for 30 s, and lines pass unchecked meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
-  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`), once OpenAI's rules for an array
-  input are read from a live answer (its reference states no maximum and no order of the results). The
+  (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page): past it, its refusals count as down (logged `moderation_unchecked` with `rate_limited`, an outage's
+  `down`), five open the breaker for 30 s, and lines pass unchecked meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked. The server sends one line a request: OpenAI's rules for an array
+  input are not read from a live answer (its reference states no maximum and no order of the results). The
   checks run four at a time, so the ceiling is 4 over OpenAI's latency a second (about 13 lines a second
   at 300 ms, measured): a faster crowd waits in the queue, and past a full queue its lines pass unchecked,
   with the alert.
 
-Slice 3, the bot acts and the stream (3j):
+### The bot's actions and the stream
 
-- **A mistaken hide stays.** Nothing restores a hidden line until slice 12's console (decision 146);
+- **A mistaken hide stays.** Nothing restores a hidden line until an admin console can restore one (decision 146);
   the verdict's row holds its scores and thresholds, and its author got the reason.
 - **The catch-up.** After a reconnect or a restart the bot asks each room's history from the time of
   the last line it settled in a row, 50 at a time, each page once the check's queue is empty. Not
   caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
   outage (its previews wait), a room's first lines said while the link was down, and, past a full
   page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
-  last line's millisecond, F542). A room's history is asked once Ergo says the bot is in it, one page at
+  last line's millisecond). A room's history is asked once Ergo says the bot is in it, one page at
   a time across the rooms, and a room's mark stays where its catch-up starts while it runs, so a live line
-  checked meanwhile loses no older line (F707, F708). A room Ergo refuses the history of keeps its mark
+  checked meanwhile loses no older line. A room Ergo refuses the history of keeps its mark
   until the next start.
 - **A line to a room's voices or operators** (`+#room`, STATUSMSG) is read as the room's line: checked,
-  counted, struck, and its author muted as for any line. Ergo keeps no history of it (#959), so its REDACT is
-  refused and the line stays on the screens it reached (F723). Ergo relays such a line by rank, so the bot reads
+  counted, struck, and its author muted as for any line. Ergo keeps no history of it, so its REDACT is
+  refused and the line stays on the screens it reached. Ergo relays such a line by rank, so the bot reads
   it only where it holds the prefix's power: in the rooms it made (it is their operator), not yet in a members
-  room it re-entered by SAJOIN after a restart, where it is a plain member (put to Alexis).
+  room it re-entered by SAJOIN after a restart, where it is a plain member.
 - **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
 - **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
-  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e). A HEAD is
-  refused with 405 and takes no place (F709).
+  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it. A HEAD is
+  refused with 405 and takes no place.
 
-Slice 3, the mute and the edits (3k):
+### The mute and the edits
 
 - **Its settings.** 3 hides in 10 minutes mute an account in that world's rooms for 5 minutes; 50 mutes at once
-  a world, the one ending first lifted early to make room (Ergo's list holds 100: 3b). These are the server's defaults
+  a world, the one ending first lifted early to make room (Ergo's list holds 100). These are the server's defaults
   (`MUTE_*`), which compose does not forward ([CONFIGURATION.md](CONFIGURATION.md), section 3). The roles file's team and trusted are never
   muted, their lines still hidden.
 - **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
 - **A message of several lines the bot cannot hold whole** (a part holding a CTCP's mark, or from another
   sender; more than 40 parts; a 17th open at once on its connection) is hidden as `unreadable` by the id of
-  its opening line, before any rule or provider, and is a strike (G1, G5 of slice 4's green pass). Ergo
+  its opening line, before any rule or provider, and is a strike. Ergo
   relays and keeps such a batch first (its +C refuses only a part that starts with a CTCP's mark): a
   reader with draft/multiline sees none of it, a later one finds none in the history, but a client without
   the capability got the parts as lines, the id on the first alone, so its REDACT hides that first line only.
@@ -344,10 +337,10 @@ Slice 3, the mute and the edits (3k):
 - **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
   end (the timer). An edit of a line the bot never checked (one the full queue dropped, one said
   before the bot, one the catch-up missed) is hidden as `unknown_edit`, its owner unknown, and counts
-  no strike (F549). The hides that brought a mute still count after it lifts: one more hide within
+  no strike. The hides that brought a mute still count after it lifts: one more hide within
   the window mutes again.
 
-Slice 3, the moderators' rooms (3l):
+### The moderators' rooms
 
 - **Who makes rooms.** A world's moderators and the team, through `POST /api/rooms`; 20 rooms a world
   besides its main one, archived rooms counted; 10 an hour per account. Ergo lets no one else create a
@@ -356,14 +349,14 @@ Slice 3, the moderators' rooms (3l):
   Nothing removes a room: an operator does it by hand in Ergo, then in the `rooms` table.
 - **The alert `unknown_room`** names a channel in Ergo the server did not make: an operator made it.
 
-Slice 3, rooms by role (3m):
+### Rooms by role
 
 - **The roles file's rooms.** Each world may list `groups` of accounts and `rooms`, each `#<world>` or
   `#<world>/<name>` with a `type`: `open`, `announcement` (its moderators and the team speak),
   `accounts` (no guest joins), `members` (its `readers` group joins and speaks) or `members-write` (its
   `readers` join, its `writers` speak), and `hidden` to keep it out of the lists. A change waits for a
   restart. The server makes the file's rooms at start.
-- **The roles file's sections (4b).** Each world may list `sections`, an ordered list of a `name` (1 to
+- **The roles file's sections.** Each world may list `sections`, an ordered list of a `name` (1 to
   64 characters, once in the world) and the `rooms` it holds (the world's own room ids, each in one
   section at most, a moderator's room included; 50 sections and 500 rooms a section at most). `GET
   /api/rooms?world=<slug>` answers a reader the rooms it may see in that order, then the world's other
@@ -386,19 +379,19 @@ Slice 3, rooms by role (3m):
 - **A room that refuses the bot** (invite-only, accounts only, or an operator's limit, key or ban) is
   joined by `SAJOIN`; Ergo's oper log then names it.
 
-Slice 3, the server's retention (3n):
+### The server's retention
 
 - **The verdicts** (ids, rooms, hashed accounts, categories and scores, never a text) are kept 180 days
   and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first; a verdict
   still waiting on OpenAI stays. A job runs at start and every five minutes, removing 500 rows at
   most a run (6 to 29 ms measured on a 190,000-row file on disk; 10,000 rows in one run held the server's
-  event loop about 400 ms, F710), and runs again at once while a backlog is left, the server free
+  event loop about 400 ms), and runs again at once while a backlog is left, the server free
   between runs. A verdict removed by the cap before its 180 days makes an edit of its line unknown:
   the edit is hidden (`unknown_edit`), with no strike.
 - **The pins** end with Ergo's history: the same job removes each pin whose line is more than 90 days old
   (Ergo's `expire-time`), a link that stays up included, since the re-read of a pin runs only when the bot
   joins a room.
-- **The search index** (slice 13; `lines`, `line_edits` and a full-text table in the server's database): the lines moderation let through,
+- **The search index** (`lines`, `line_edits` and a full-text table in the server's database): the lines moderation let through,
   2,048 a room, 400,000 in all and 90 days (Ergo's `expire-time`), the oldest going first at the same retention tick; a line leaves with its
   REDACT. SQLite's `secure_delete` is on for the connection, so a removed line's text is zeroed in its pages. No rebuild of it from Ergo's
   history is written (read for: none found in `server/src/search/`).
@@ -406,9 +399,9 @@ Slice 3, the server's retention (3n):
   their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
   database's file does not shrink: freed pages are reused, and its `-wal` file is not counted. A table
   held at its cap, the cap removing verdicts before their 180 days, says nothing more after its one
-  alert (put to Alexis: an alert of its own).
+  alert.
 - **The other stores** purge themselves (nonces, tokens, tickets, mutes) or hold a row a room or an
-  account; the accounts' addresses are kept for the new-account rule, until slice 12's erasure path.
+  account; the accounts' addresses are kept for the new-account rule, with no erasure path (a blocker before a public launch, below).
 - **Ergo's volume** is measured by the server, read-only (`ERGO_DATA`, the volume mounted at `/ergo`
   with `:ro`), against `ERGO_DATA_MB` (1024, `deploy/.env`): the alert `ergo_volume_near_cap` fires once
   at 80% and again only after a fall below, and `ergo_volume_unreadable` once while the folder cannot be
@@ -416,7 +409,7 @@ Slice 3, the server's retention (3n):
   alone (its one `expire-time`, 90 days), not by size: at the alert, give the disk room and raise
   `ERGO_DATA_MB`, or shorten `expire-time` in `deploy/ergo/ircd.yaml.tmpl` and restart Ergo; whether
   Ergo then frees the space at once is not verified.
-- **The prices** (`MARKETS_FILE`, `/markets/markets.json` in the `markets` volume, 5l): every five minutes, counted from
+- **The prices** (`MARKETS_FILE`, `/markets/markets.json` in the `markets` volume): every five minutes, counted from
   the end of the last read, the server asks CoinGecko's keyless `api.coingecko.com` (through the egress proxy, which
   lets that host out by its full name) for GNOT, ATONE and BTC and writes `markets.json` by renaming a temporary file.
   Any failure keeps the last file and logs `{"event":"prices_failed","error":"<kind>"}`, the kind one of `rate_limited`
@@ -425,22 +418,22 @@ Slice 3, the server's retention (3n):
   `proxy` (the way out refused the host, or could not reach it), `request` (a fault whose cause has no name), `too_large`, `not_json`,
   `shape`, `no_price` or `write` (the volume): never the answer, nor an error's message. One that reached nothing (`unresolved`,
   `refused`) or whose cause has no name (`request`) is asked again 15 s later, then twice as long for each such failure in a row, up to
-  the five minutes: the stack starts the server before its way out (F4872).
+  the five minutes: the stack starts the server before its way out.
   A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
   With `UNIVERSES_FILE` (`/app/app/data/universes.json`, copied into the image) the same read also asks the default universe's RPC
   for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
   chain. A failed height leaves `block` out and logs `{"event":"height_failed","error":"<kind>"}`, never what the answer held; a data
   file that is bad stops the server at boot, naming the file. Changing the default universe's RPC means changing `acl.yaml` with it.
-- **The worlds** (`WORLDS_FILE`, `/markets/worlds.json`, served at `/worlds.json`, 7c): with `UNIVERSES_FILE`, every half hour from
+- **The worlds** (`WORLDS_FILE`, `/markets/worlds.json`, served at `/worlds.json`): with `UNIVERSES_FILE`, every half hour from
   the end of the last pass the server reads the default universe's realm list (`vm/qpaths`), each new package once (`vm/qdoc`,
   `vm/qfile`), each new deployer's name, and every call of the chain from the universe's indexer, by pages of 2,000 transactions in
-  height order (7k3), one call at a time, each started at least a quarter-second after the last began, and writes the worlds by
+  height order, one call at a time, each started at least a quarter-second after the last began, and writes the worlds by
   renaming a temporary file, at most 4 MiB; each pass that wrote logs `{"event":"worlds_written","ms":<its length>}`. Beside it the same pass writes their count
-  (`/markets/worlds-count.json`, served at `/worlds-count.json`, 7n2): the file's universe and time and the worlds the cosmos draws
+  (`/markets/worlds-count.json`, served at `/worlds-count.json`): the file's universe and time and the worlds the cosmos draws
   with the Earth, which the home's hero reads, so a phone asks nothing of the cosmos before View in space. Both temporaries are written
   before either is renamed: a failed write keeps both last files and logs `write`. A failed list keeps the last file and logs
   `{"event":"worlds_failed","error":"<kind>"}`, and a pass whose list reached nothing (`unresolved`, `refused`) runs again 15 s later,
-  then twice as long for each such pass in a row, up to the half hour (F4872: Compose starts the server before its way out); a list the
+  then twice as long for each such pass in a row, up to the half hour (Compose starts the server before its way out); a list the
   chain cuts at its limit is read by prefix, up to 2,000 requests. A world
   keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
   `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of any indexer request (the network, an answer of the
@@ -450,12 +443,11 @@ Slice 3, the server's retention (3n):
   `worlds_history_skipped` once. The kinds
   are `unresolved`, `refused`, `proxy` and `request` (as the prices'), `timeout`, `status`, `rate_limited`, `too_large`, `too_many`,
   `not_json`, `shape`, `chain_refused`, `empty`, `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
-  of the realm list's and `vm/qdoc`'s answers in the stack is `deploy/test.sh`, which Alexis runs: it waits for the running job's own
+  of the realm list's and `vm/qdoc`'s answers in the stack is `deploy/test.sh`, which the owner runs: it waits for the running job's own
   first pass, asks for a realm with a deployer, functions and counts, and prints the job's log lines. The indexer's queries are those
-  onyx-1's answered on 2026-11-04 (`server/src/worlds/onyxIndexer.json`); 7c's per-realm filter was refused there (422), so no count
-  was read before 7k3. A first pass of onyx-1's 767 realms, measured outside Docker on 2026-11-04: 1,628 calls in 13.2 minutes and no
-  count before 7k3; 1,634 calls (7 of them the indexer's) in 7.0 minutes after, every realm counted.
-- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`, 8f): with `UNIVERSES_FILE` and
+  onyx-1's answers (`server/src/worlds/onyxIndexer.json`); its per-realm filter is refused there (422), so the counts come from the paged read
+  of every call. A first pass of onyx-1's 767 realms, measured outside Docker: 1,634 calls (7 of them the indexer's) in 7.0 minutes, every realm counted.
+- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`): with `UNIVERSES_FILE` and
   `OPENAI_API_KEY_FILE` (the server refuses to start with the file named and either missing), at start and then every six hours from
   the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
   `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
@@ -467,13 +459,12 @@ Slice 3, the server's retention (3n):
   kind one of `hidden`, `unchecked`, `empty`, `unresolved`, `refused`, `proxy`, `request` (as the prices'), `timeout`, `status`,
   `rate_limited`, `too_large`, `shape` or `chain_refused`. A
   pass none of whose reads reached anyone (`unresolved`, `refused`: the way out not there yet) writes nothing, keeps the last file, logs
-  `previews_failed` with that kind and runs again 15 s later, then twice as long for each such pass in a row, up to the six hours
-  (F4872); one read that reached the chain, or whose cause has no name (`request`), makes it a pass as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
+  `previews_failed` with that kind and runs again 15 s later, then twice as long for each such pass in a row, up to the six hours; one read that reached the chain, or whose cause has no name (`request`), makes it a pass as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
   last file. No
   capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
   a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
   capture down at once, remove its realm from `hubs.json` and redeploy: the next pass drops it, and so does a restart.
-- **What the worlds pass also keeps** (slice 13; each part after the worlds' file, a fault logged by its kind and never undoing the file): each
+- **What the worlds pass also keeps** (each part after the worlds' file, a fault logged by its kind and never undoing the file): each
   realm's rollup, its calls, callers, days, functions and last calls counted from the indexer above the height kept (`server/src/worlds/rollup.ts`), in
   the database and as one file a realm in `/markets/rollups/`, served at `/rollups/<32 hex>.json` (a minute's cache); the most called worlds of
   the last 7 UTC days (`GET /api/trending`, from memory, a 404 while the first pass has not run); the network's line, the transactions and
@@ -490,7 +481,7 @@ Slice 3, the server's retention (3n):
   (`CROWD`, 2,000), the rooms' streams (`STREAMS`, 1,000), the accounts' lines every 5 s (with
   `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory, processes and CPU, their
   restarts and Ergo's last fatal lines, Ergo's volume before and after, the verdicts and the server's errors.
-  The numbers are in slice 3's plan (3n's As built): Ergo holds 2,000 guests joining one room at 341 MiB and
+  Measured: Ergo holds 2,000 guests joining one room at 341 MiB and
   311 threads, under its 512 MiB and 1,024, but at its 0.4 core, so the last of them waits up to a minute to
   be in; the runs go straight to the server and Ergo, so `web`'s limits are not theirs to size.
 - **Logs** have a size and a count (3 × 10 MB a container), no age: decision 154's 14 days hold only
@@ -503,30 +494,28 @@ Slice 3, the server's retention (3n):
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
   `card_backlog` and `card_queue_full` (the link cards' queue, as the two above); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
   and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or the
-  lines' history a plate's messages an hour read (8g), beside the database: rising stays dark until the folder takes it).
+  lines' history a plate's messages an hour read, beside the database: rising stays dark until the folder takes it).
   `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 
-Slice 3, the stack (3e):
+### The stack
 
 - **The operator's password works on any listener.** Ergo checks an OPER by its password or a client
   certificate, never by the listener it comes through (irc/handlers.go, v2.19.1), so the bot's
-  password would work through `/ws` too: it is 48 random characters (Ergo's start refuses one under
-  32, F621), and Ergo answers one OPER a connection every 10 seconds. A certificate for the bot alone would close it (a later slice).
+  password would work through `/ws` too: it is 48 random characters (Ergo's start refuses one under 32), and Ergo answers one OPER a connection every 10 seconds. A certificate for the bot alone would close it.
 - **One time for all history.** Ergo keeps rooms' and messages' history the same 90 days
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
-  apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until
-  slice 4 makes them a product. History fills the `ergo` volume, which has no quota.
+  apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`). History fills the `ergo` volume, which has no quota.
 - **A thousand rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client
   (its config.go:1937), and the bot needs 1,000: a guest may join every world's room and receive each one's
-  names. Load, not a hole; k6's crowd measures it (F631).
+  names. Load, not a hole; k6's crowd measures it.
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
 - **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses
   once: the site answers nothing for those seconds. One Docker makes itself, after a crash, does
   not, nor does `egress` follow `guard` then: if `/ws` or `/api/` answer 502, or the checks stop
-  reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
+  reaching OpenAI, `docker compose ... restart web egress` .
 - **No backup** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
   `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` from the commit you reviewed (in "Run, test, stop") before
@@ -534,7 +523,7 @@ Slice 3, the stack (3e):
 - **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
   to start the stack (Compose names the overlap); set both in `deploy/.env`.
 
-Slice 4, pins and what an account keeps (4d):
+### Pins and what an account keeps
 
 - **Pins live in the server's database** (the `pins` table), not in Ergo, which writes a channel's metadata back for
   registered channels alone and ours are not (`unregistered-channels: true`). A world's moderators and the team pin,
@@ -547,27 +536,29 @@ Slice 4, pins and what an account keeps (4d):
 - **Saved messages and "Mark unread" are on the reader's device** (ADR-0002) and nowhere on the server: nothing
   to back up, and a cleared browser loses them.
 
-- **gnomcp reaches the chain through the reader's relay** (10j, F5296, question 10j-2; built by 10u-g2). gnomcp never
+### Jarvis and gnomcp
+
+- **gnomcp reaches the chain through the reader's relay.** gnomcp never
   sees `HTTPS_PROXY`, and its node reads go through gno's own RPC client (tm2), which dials the node itself and would
   ignore the proxy anyway, so the reader names each chain host to a loopback address in `/etc/hosts` and a relay there
   tunnels it through `egress_reader` (see `jarvis_reader` above). Proven by `deploy/test-jarvis.sh` (gnomcp's reads
   through the reader), with its mutants.
-- **gnomcp no longer runs where Anthropic's key is** (10j, question 10j-3, closed by 10u-g2). It is the reader's, a
+- **gnomcp does not run where Anthropic's key is.** It is the reader's, a
   container with no secret and no volume, so it cannot read `/run/secrets/anthropic_api_key`, which is jarvis's alone;
   jarvis's image holds no gnomcp. What the reader can still do is read the public chain: its worst case is a read of
   any public realm, through the four hosts of its list.
-- **The door's key** (10u-g2). The server sends it to jarvis in one header (`x-jarvis-key`) and jarvis answers 401 to
+- **The door's key.** The server sends it to jarvis in one header (`x-jarvis-key`) and jarvis answers 401 to
   every request without it, on every route, before it reads a body. Both read `jarvis_door_key`; the network's wall stays.
-- **A model call past a minute of silence** (10j). `egress_jarvis` shares `config.yaml`'s `idle_timeout: 60s` with the
+- **A model call past a minute of silence.** `egress_jarvis` shares `config.yaml`'s `idle_timeout: 60s` with the
   server's way out: a request to Anthropic quiet for longer than a minute is cut, whatever jarvis's own
   `JARVIS_CALL_TIMEOUT_S` says (60 s by default, up to 600 s; compose does not forward it, so it is the code's 60 s unless
   `compose.yaml` lists it). Raise both together, or neither.
 
 ## Switching Jarvis on
 
-Jarvis is off until all three steps are done, in this order (10u-g2, D13987):
+Jarvis is off until all three steps are done, in this order (D13987):
 
-1. **The door's key**: step 6 of the set-up above, `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then
+1. **The door's key**: step 4 of the set-up above, `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then
    `chmod 644` on it. Without it, `docker compose` refuses to start the stack.
 2. **The evals**, on a machine with Anthropic's key in a file nobody pastes (`evals/run.sh`'s header names the command),
    and their result committed in `evals/results/`: the last result must pass the gate, `python3 -I
@@ -585,8 +576,8 @@ stop `JARVIS=on` being written without it.
 
 The door's key changes by writing a new file and recreating the two that read it, the server and jarvis, together:
 `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then `docker compose -f deploy/compose.yaml --profile jarvis up -d
---force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's, 10u-g2's G2-code);
-`web` restarts with the server (F622). Nothing else holds it. A key that leaked is changed the same way at
+--force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's);
+`web` restarts with the server. Nothing else holds it. A key that leaked is changed the same way at
 once: it opens jarvis's routes to anyone who can also reach jarvis's network, which is the server's alone.
 
 ### Forget Jarvis's kept explanations (D13920)
@@ -637,7 +628,7 @@ remove it from the seed file too (a new commit).
 
 ## Switching the link cards on
 
-The link cards (a card under a chat line that links a public page, slice 13, D13919) are off until three steps are done, in this order:
+The link cards (a card under a chat line that links a public page, D13919) are off until three steps are done, in this order:
 
 1. **`sh deploy/test.sh`, first**, from the commit you reviewed (the box in "Run, test, stop"). It starts the reader and its way out under the
    `links` profile and proves their isolation and the way out's refusals (`deploy/test-links.sh`, sourced by `test.sh`; it needs the network for
@@ -662,6 +653,6 @@ addresses an identity). A person unlinks an address with their own session, or r
 - **The operator's password:** write a new file, then `docker compose ... restart ergo server`: Ergo
   hashes it at its start, and the bot logs in with it.
 - **OpenAI's key:** write the new one, `restart server`, then revoke the old one at OpenAI.
-- **The pepper:** it keys the logs' hashed accounts and visitors, and the verdicts' accounts (3i, 3k): a
+- **The pepper:** it keys the logs' hashed accounts and visitors, and the verdicts' accounts: a
   new one matches none of the older ones, so the strikes toward a mute start again and an edit's owner
   is unknown. Change it only when it may have leaked, then `restart server`.

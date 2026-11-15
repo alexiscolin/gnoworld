@@ -1,7 +1,7 @@
 # Configuration
 
-Every setting of the site in one place: what to create, what to set, what each knob changes, and what cannot be set. Each row was read
-in the code (the file is named in each section's heading). Nothing here is a secret value or a real address; `docs/OPERATIONS.md` is how to run it.
+Every setting of the site in one place: what to create, what to set, what each knob changes, and what cannot be set. Each row comes
+from the code (the file is named in each section's heading). Nothing here is a secret value or a real address; `docs/OPERATIONS.md` is how to run it.
 
 A bad value never starts the service: it stops at start and names the setting, never its value (`packages/service/src/settings.ts`, `parseSettings`).
 A setting is read once at start: change it, then recreate the service (`docker compose ... up -d --force-recreate <service>`).
@@ -82,7 +82,7 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `ERGO_DATA_MB` | `1024` | 1 to 1048576 | The cap; set without `ERGO_DATA` stops the server |
 | `MARKETS_FILE`, `WORLDS_FILE`, `PREVIEWS_FILE` | none: no timer or job | absolute path | Files the prices timer, the worlds job and the preview job write (compose: `/markets/markets.json`, `worlds.json`, `previews.json`) |
 | `UNIVERSES_FILE` | none | absolute path | The universes' data file (compose: `/app/app/data/universes.json`) |
-| `HUBS_FILE` | none | absolute path | The hubs' data file; set without `UNIVERSES_FILE` stops the server. Not set by compose (finding 3) |
+| `HUBS_FILE` | none | absolute path | The hubs' data file; set without `UNIVERSES_FILE` stops the server. Not set by compose |
 | `OPENAI_API_KEY_FILE` | none: no moderation | secret file | OpenAI's key |
 | `MODERATION_THRESHOLDS` | `{}` | JSON, a score above 0 and at most 1 per category | A score that hides a category instead of OpenAI's own flag; `sexual/minors` always hides on OpenAI's flag. Categories: `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `self-harm`, `self-harm/instructions`, `self-harm/intent`, `sexual`, `sexual/minors`, `violence`, `violence/graphic` |
 | `NEW_ACCOUNT_HOURS` | `24` | 1 to 720 | How long an account is "new" |
@@ -127,7 +127,7 @@ Read when on alone:
 | `JARVIS_GNOMCP_COMMAND`, `JARVIS_GNOMCP_CONFIG` | none | absolute path | A gnomcp child it spawns; both required without the address |
 | `JARVIS_PROFILES` | required | comma list of profile names | Chain profiles gnomcp may read (compose: `onyx,gnoland`) |
 | `JARVIS_INDEXER_PROFILES` | none | each in `JARVIS_PROFILES` | Those with an indexer |
-| `JARVIS_TRACES_URL` | none: no export | http or https URL | OTLP/HTTP collector for Jarvis's traces. Not in compose or `.env.example` (finding 2) |
+| `JARVIS_TRACES_URL` | none: no export | http or https URL | OTLP/HTTP collector for Jarvis's traces. Not in compose or `.env.example` |
 
 `ANTHROPIC_CUSTOM_HEADERS`, if set in jarvis's environment, stops it (`model.ts` line 29): it would add headers to every request.
 
@@ -167,7 +167,7 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 
 | Where | Limit | Value | Source |
 |---|---|---|---|
-| Moderation | a card's `sexual` score hides it from | 0.3, never above the lines' own threshold | `cards/settings.ts` line 7 |
+| Moderation | a card's `sexual` score hides it from | 0.3, never above the lines' own threshold | `cards/settings.ts` line 8 |
 | Moderation | mute | section 3 (`MUTE_*`) | `config.ts` |
 | Rules of a world | links, mentions per message; links for a new account | 3, 5, 2 (defaults) | `server/roles.json` |
 | Jarvis | question, answer, buttons, quota, dollars, unlimited accounts (ceilings) | 8000, 8000, 5, 1000, 500, 1000 | `packages/schemas/src/jarvis.ts` line 81 |
@@ -175,20 +175,20 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 | Jarvis | room lines carried to a question | 30 lines, 8192 bytes | same, line 96 |
 | Jarvis | memory | 384 MiB, heap 268 MiB (70%), 128 processes | `compose.yaml` lines 231 and 232; `deploy/jarvis/Dockerfile` line 32 |
 | Cards | title, description, site, host, picture, side | 200, 500, 100, 253 characters; 16384 bytes; 160 px | `packages/schemas/src/cards.ts` line 10 |
-| Link reader | a page, a picture (bytes, time) | 256 KiB and 5 s, 1 MiB and 5 s | `link-reader/src/fetch.ts` line 39 |
+| Link reader | a page, a picture (bytes, time) | 256 KiB and 5 s, 1 MiB and 5 s | `link-reader/src/fetch.ts` line 41 |
 | Link reader | a picture's side, pixels | 64 to 4096 px, 2,000,000 px at most (D13943) | `link-reader/src/picture.ts` lines 34 to 36 |
-| Link reader | memory | 256 MiB, 48 processes, measured peak 210 MiB (F13951) | `compose.yaml` lines 304 to 322 |
+| Link reader | memory | 256 MiB, 48 processes, measured peak 210 MiB | `compose.yaml` lines 304 to 322 |
 | Link way out | tunnels | 32 (smokescreen's `max_concurrent_connect_tunnels`) | `deploy/egress/config.yaml` |
 | Search | lines kept per room, rows in all, edits per line | 2048, 400000, 50 | `server/src/search/index.ts` lines 15 to 18 |
 | Search | requests a minute per visitor, per account; a second in all | 20, 60, 10 | `server/src/search/routes.ts` lines 19 to 22 |
-| Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 30 to 33 |
+| Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 29 to 32 |
 | Guest | a line's length | 280 characters, 400 bytes | `server/src/guest/rules.ts` |
-| nginx | requests a visitor | 20 a second, burst 640 (Alexis, F3665) | `deploy/web/nginx.conf` lines 45 and 101 |
+| nginx | requests a visitor | 20 a second, burst 640 | `deploy/web/nginx.conf` lines 45 and 102 |
 | nginx | hashed files a visitor (assets, textures, world pictures) | 5 a second, burst 1,024, a zone of its own (D13127) | `deploy/web/nginx.conf` lines 49 and 125 |
-| nginx | login | 1 a second, burst 20, besides the server's 10 a minute | lines 48 and 193 |
-| nginx | connections a visitor, per worker | 32; 4096 | lines 100 and 12 |
-| nginx | API body | 16 KiB | line 184 |
-| nginx | timeouts | header and body 10 s, keep-alive 15 s; API stream and `/ws` 1 h | lines 54 to 56, 172, 188 |
+| nginx | login | 1 a second, burst 20, besides the server's 10 a minute | lines 51 and 202 |
+| nginx | connections a visitor, per worker | 32; 4096 | lines 103 and 12 |
+| nginx | API body | 16 KiB | line 195 |
+| nginx | timeouts | header and body 10 s, keep-alive 15 s; API stream and `/ws` 1 h | lines 57 to 59, 181 to 182, 197 |
 | Egress | connect, idle | 10 s, 60 s; 32 tunnels and requests | `deploy/egress/config.yaml` |
 | Containers | cpus, memory, processes | web 0.5, 128m, 64; ergo 0.4, 512m, 1024; server 0.4, 512m, 128; jarvis 0.3, 384m, 128; reader 0.2, 160m, 48; links 0.2, 256m, 48; guard 0.1, 32m, 16; egress 0.1, 64m, 64; egress_reader and egress_links 0.1, 48m, 32 | `compose.yaml` |
 
@@ -213,7 +213,7 @@ The app reads no `VITE_*` setting for production. What it reads:
 | `GNOWORLD_DATA` | `app/react-router.config.ts` line 14, `app/vite.config.ts` line 55 | The data folder (default `app/data`) |
 | `GNOWORLD_BUILD` | `app/react-router.config.ts` line 26 | The build folder (default `build`) |
 | `import.meta.env.BASE_URL`, `MODE`, `PROD` | `app/src/` | Vite's own: the base path of the files and of the data, the mode |
-| `VITE_GNOWORLD_TEST_GPU` | `app/src/features/universe/gpu.ts` line 24 | `1`: lets a test use the GPU path outside development |
+| `VITE_GNOWORLD_TEST_GPU` | `app/src/features/universe/gpu.ts` line 25 | `1`: lets a test use the GPU path outside development |
 | `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR` | `app/vite.config.ts` lines 93 to 153 | The workshop's dev server |
 
 ## 8. Not configurable, and where it is fixed
@@ -222,7 +222,7 @@ The app reads no `VITE_*` setting for production. What it reads:
 |---|---|
 | The CSP of each page | built from the app: `app/src/csp.ts`, `/etc/nginx/csp.conf` |
 | Security headers (`noindex`, `nosniff`, `no-referrer`) | `deploy/web/nginx.conf` lines 106 to 112 |
-| Cache lifetimes (hashed files a year; the data files a minute) | `nginx.conf` lines 73 to 92 |
+| Cache lifetimes (hashed files a year; the data files a minute) | `nginx.conf` lines 76 to 95 |
 | The link reader's URL rule (https, 443, three redirects) | `link-reader/src/url.ts`, `fetch.ts` |
 | Jarvis's price table and its allowed models | `jarvis/src/prices.ts` |
 | The password's name `team` | `docs/OPERATIONS.md` |
