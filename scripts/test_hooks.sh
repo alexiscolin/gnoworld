@@ -154,6 +154,8 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/.git
            "Edit(/link-reader/package.json)", "Edit(/evals/pnpm-workspace.yaml)", "Edit(/evals/.pnpmfile.cjs)", "Edit(/evals/.pnpmfile.mjs)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
            "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
+           "Edit(/scripts/check.sh)", "Edit(/scripts/check_docs.py)", "Edit(/scripts/ergo.sh)", "Edit(/scripts/hidden.py)", "Edit(/scripts/related.py)",
+           "Edit(/scripts/speeds.py)", "Edit(/scripts/workshop.sb)", "Edit(/scripts/workshop.sh)",
            "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 # This tree's own, and the main checkout's few that 10a names (F5058, F5095): the other twins of every other worktree's and the main checkout's are the section `siblings`' (7z).
@@ -298,6 +300,214 @@ ignored = lambda f: any(fnmatch.fnmatchcase(f, s[1:]) if s.startswith("/") else 
 copies = [f for f in harnessed if not ignored(f) and any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
 assert not copies, f"a write ban reaches StrykerJS's copies of {copies}, which a StrykerJS run writes (F111)"
 PY
+# What runs outside the sandbox or at Alexis's hand, and what that runs in turn (an `sh`, `bash`, `zsh`, a dot or `source`, `exec`,
+# `env`, `python`, `python3`, `node` or `sandbox-exec -f` with its options, a path run itself, or a `git show <rev>:<file>` of a
+# script) is a file a shell cannot write (denyWrite) and the file tools cannot either (an Edit deny of the project settings): the
+# next run of one a session wrote runs the session's code. Only shell is read for what it runs; a Python file reached is judged, its
+# own subprocess calls are not followed, and nor are the configs the gate's tools load (eslint.config.ts, vitest.config.ts,
+# lint/*.config.ts: denyWrite, no Edit deny). A command the walk cannot resolve fails it, so it never skips one it could not read.
+# The walker is run on this tree and on trees with one unprotected callee planted in each form, which each must fail.
+cat >"$t/walk.py" <<'PY'
+import json, os, re, shlex, sys
+
+root = os.path.realpath(sys.argv[1])
+s = json.load(open(os.path.join(root, ".claude/settings.json")))
+OUTSIDE = "/outside-the-repository"
+INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node", "source", "."}
+TEXT = {"echo", "printf", "awk", "sed", "grep", "cat", "[", "[[", "test", "case", "read", "export", "local", "cd", "mkdir", "rm", "mv", "cp", "ln", "chmod", "kill", "wait"}  # they name files, never run one
+PREFIXES = {"exec", "env", "command", "time", "nohup", "boxed", "!", "if", "while", "until", "elif"}
+VALUED = {"node": {"-r", "--require", "--import", "--loader", "--env-file"}, "python3": {"-W", "-X"}, "python": {"-W", "-X"}}
+# What the walk cannot resolve and may leave: (file, word), each with its reason. Anything else it cannot resolve fails it.
+ALLOWED = {}
+HERE = ('$(dirname "$0")', "$(dirname $0)", "${0%/*}", '"${0%/*}"')
+problems = []
+
+
+def read(f):
+    text = open(os.path.join(root, f), errors="replace").read()
+    for h in HERE:
+        text = text.replace(h, "__HERE__")
+    return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+
+
+def expand(token, text, depth=0):
+    """A word's text with the variables the file or the walk knows, or None when one is not known."""
+    token = token.strip("\"'")
+    out = ""
+    for part in re.split(r"(\$\{[^}]*\}|\$\w+)", token):
+        m = re.fullmatch(r"\$\{?(\w+)(?::?[-=][^}]*)?\}?", part) if part.startswith("$") else None
+        if not m:
+            out += part
+            continue
+        name = m.group(1)
+        if name in ("root", "PWD", "CLAUDE_PROJECT_DIR", "main", "top"):
+            out += root
+        elif name in ("HOME", "TMPDIR", "scratch", "home", "NVM_DIR", "GNOWORLD_TOOLS", "RUNNER_TEMP"):
+            out += OUTSIDE
+        elif depth < 4 and (a := re.search(rf"(?:^|[\s;(]){name}=(\"[^\"]*\"|'[^']*'|[^\s;)]+)", text)):
+            value = expand(a.group(1), text, depth + 1)
+            if value is None:
+                return None
+            out += value
+        else:
+            return None
+    return out
+
+
+def target(token, text, where):
+    """The repository file a word names: its path, OUTSIDE for a place out of the repository, None when it names nothing known."""
+    value = expand(token, text)
+    if value is not None and value.startswith(OUTSIDE):
+        return OUTSIDE
+    if value is None or "$" in value or "`" in value:
+        return None
+    if (os.path.isabs(value) and not os.path.realpath(value).startswith(root + os.sep)):
+        return OUTSIDE
+    value = value.replace("__HERE__/", "")
+    where_dir = os.path.dirname(where)
+    # The installed hooks sit beside the scripts they run, as the repository's .githooks do not.
+    bases = [root, os.path.join(root, where_dir)] + ([os.path.join(root, "scripts")] if where.startswith(".githooks/") else [])
+    for base in bases:
+        p = os.path.realpath(os.path.join(base, value))
+        if p.startswith(root + os.sep) and os.path.isfile(p):
+            return os.path.relpath(p, root)
+    return None
+
+
+def commands(text):
+    for line in text.splitlines():
+        for seg in re.split(r"\s*(?:;|&&|\|\||\||\(|\)|`|(?:^|\s)[{}](?=\s|$)|\bthen\b|\bdo\b|\belse\b)\s*", line):
+            try:
+                words = shlex.split(seg)
+            except ValueError:
+                words = seg.split()
+            while words and (re.fullmatch(r"\w+=\S*", words[0]) or words[0] in PREFIXES):
+                if words[0] == "env":
+                    words = words[1:]
+                    while words and (words[0].startswith("-") or re.fullmatch(r"\w+=\S*", words[0])):
+                        words = words[1:]
+                    continue
+                words = words[1:]
+            words = [w for w in words if not re.fullmatch(r"\d*[<>]+&?\S*", w)]  # redirections
+            if words and words[0] not in TEXT:
+                yield words
+
+
+def callees(text):
+    """Each word a command of the text runs as a script, with the form it was in."""
+    for words in commands(text):
+        name = os.path.basename(words[0]) if "/" not in words[0] or words[0].startswith("/") else None
+        if name in INTERPRETERS or (name and re.fullmatch(r"python[\d.]*", name)):
+            name = "python3" if name.startswith("python") else name
+            args, i = words[1:], 0
+            if name in ("sh", "bash", "zsh", "dash", "ksh") and args[:1] == ["-n"]:
+                continue  # a syntax check runs nothing
+            while i < len(args) and args[i].startswith("-") and args[i] != "-":
+                if args[i] == "-c" and name in ("sh", "bash", "zsh", "dash", "ksh") and i + 1 < len(args):
+                    yield from callees(args[i + 1])
+                    i = len(args)
+                    break
+                if args[i] in ("-c", "-e", "-p", "-m") and name in ("python3", "node") and args[i] != "-e":
+                    i = len(args)
+                    break
+                if args[i] == "-e" and name == "node":
+                    i = len(args)
+                    break
+                i += 2 if args[i] in VALUED.get(name, ()) else 1
+                if args[i - 1] == "--":
+                    break
+            if i < len(args) and args[i] != "-":
+                yield args[i]
+        elif os.path.basename(words[0]) == "sandbox-exec" and "-f" in words[:-1]:
+            yield words[words.index("-f") + 1]
+        elif words[0] == "git" and words[1:2] == ["show"] and len(words) > 2 and re.search(r":.*\.(py|sh)$", words[2]):
+            yield words[2].split(":", 1)[1]
+        elif words[0].startswith(("./", "../", "/")) or re.match(r"\$\{?\w+\}?/", words[0]):
+            yield words[0]
+
+
+reached, queue, lost = set(), [], []
+
+
+def follow(text, where):
+    for word in callees(text):
+        found = target(word, text, where)
+        if found is None:
+            if (where, word) not in ALLOWED and not (where == "" and "scripts/check.sh" in word):
+                lost.append((where or "settings", word))
+        elif found != OUTSIDE:
+            queue.append(found)
+
+
+entries = [h["command"] for event in s["hooks"].values() for e in event for h in e["hooks"]] + s["sandbox"]["excludedCommands"]
+entries += [json.load(open(os.path.join(root, "package.json")))["scripts"].get("workshop", "")]
+for command in entries:
+    follow(command.replace("$CLAUDE_PROJECT_DIR", root), "")
+queue += [os.path.join(".githooks", f) for f in sorted(os.listdir(os.path.join(root, ".githooks")))]
+if os.path.isfile(os.path.join(root, "scripts/check.sh")):
+    queue.append("scripts/check.sh")  # the gate: Alexis runs it by hand before each commit
+while queue:
+    f = queue.pop()
+    if f not in reached:
+        reached.add(f)
+        # Only shell is read for what it runs; a Python file's own subprocess calls are not followed, and each file the walk reaches is
+        # still judged.
+        if f.endswith(".sh") or f.startswith(".githooks/"):
+            follow(read(f), f)
+
+
+def rule(p):
+    out, i = "", 0
+    while i < len(p):
+        step = next((x for x in ("**/", "**", "*", "?") if p.startswith(x, i)), p[i])
+        out, i = out + {"**/": "(.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}.get(step, re.escape(step)), i + len(step)
+    return re.compile(out + "(/.*)?$")
+
+
+boxed = [rule(p) for p in s["sandbox"]["filesystem"]["denyWrite"] if not p.startswith("~")]
+edits = [rule(r[6:-1]) for r in s["permissions"]["deny"] if r.startswith("Edit(/") and not r.startswith("Edit(//")]
+assert not lost, f"the walk met a command it cannot follow, so it cannot say what runs outside the sandbox: {lost}"
+no_box = sorted(f for f in reached if not any(b.match(f) for b in boxed))
+no_edit = sorted(f for f in reached if not any(b.match(f) for b in edits))
+assert not no_box, f"a file run outside the sandbox is not under its denyWrite: {no_box}"
+assert not no_edit, f"a file run outside the sandbox has no Edit deny in the project settings: {no_edit}"
+PY
+python3 -I "$t/walk.py" "$here/.." || fail "a file that runs outside the sandbox, or one it runs, can be written by a session, or the walk cannot read what runs"
+w="$t/walked"
+cat >"$t/forms" <<'FORMS'
+sh scripts/x
+sh -e scripts/x
+sh -- scripts/x
+python -I scripts/x
+python3 -u scripts/x
+python3 -B -I scripts/x
+. scripts/x
+source scripts/x
+exec ./scripts/x
+./scripts/x
+sh "$(dirname "$0")/../scripts/x"
+tools=scripts; sh "$tools/x"
+sh $PWD/scripts/x
+zsh scripts/x
+bash scripts/x
+env -i sh scripts/x
+sh -c "sh scripts/x"
+sh scripts/missing
+sh "$unknown/x"
+FORMS
+planted() { # the entry script holds $1; scripts/x is the unprotected callee, scripts/ok.sh a protected one
+	rm -rf "${w:?}" && mkdir -p "$w/scripts" "$w/.githooks" "$w/.claude" && printf '%s\n' "$1" >"$w/scripts/entry.sh" && printf 'exit 0\n' >"$w/scripts/x" && cp "$w/scripts/x" "$w/scripts/ok.sh"
+	printf '{"scripts":{}}\n' >"$w/package.json"
+	printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"sh \"$CLAUDE_PROJECT_DIR/scripts/entry.sh\""}]}]},' \
+		'"sandbox":{"excludedCommands":[],"filesystem":{"denyWrite":["scripts/entry.sh","scripts/ok.sh"]}},' \
+		'"permissions":{"deny":["Edit(/scripts/entry.sh)","Edit(/scripts/ok.sh)"]}}' >"$w/.claude/settings.json"
+	python3 -I "$t/walk.py" "$w" >/dev/null 2>&1
+}
+planted 'sh scripts/ok.sh' || fail "the walk refused a callee that is protected"
+planted 'sh -n scripts/x' || fail "the walk read a syntax check as a run"
+while IFS= read -r form; do
+	planted "$form" && fail "the walk let an unprotected callee through in the form: $form"
+done <"$t/forms"
 at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
 [ "$(at 'sh scripts/ergo.sh')" -lt "$(at 'sh -c "$tests --tags-filter=!timing"')" ] || fail "check.sh runs the tests before it builds the Ergo they start"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
@@ -379,7 +589,8 @@ want_writes |= {f"{NEW}/*/{w}" for w in twin_writes} | {f"{NEW}/*/.git"} | {f"{N
 want_writes |= {f"{NEW}/.claude"}
 # The unlock opens these in a worktree (the main checkout keeps them closed); of .githooks, the hooks that guard main stay closed.
 OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
-          "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh"}
+          "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh", "/scripts/check.sh", "/scripts/check_docs.py", "/scripts/ergo.sh",
+          "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py", "/scripts/workshop.sb", "/scripts/workshop.sh"}
 twin_rules = [(k, p) for k, p in own_rules if p not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
 want_rules = {f"{k}({MAIN}{p})" for k, p in own_rules}
 want_rules |= {f"{k}({NEW}/*{p})" for k, p in twin_rules} | {f"Edit({NEW}/*/.git)"}

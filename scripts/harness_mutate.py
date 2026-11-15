@@ -1044,6 +1044,11 @@ def mutants():
         ('      "Read(~/.local/share/gnomcp/**)",\n', "the Read tool cannot open gnomcp's key store"),
     ):
         yield from each(".claude/settings.json", find, "]" if find.endswith('"]') else "", "hooks", f"settings: {label}")
+    # What runs outside the sandbox or at Alexis's hand, and what that runs, is out of the file tools' reach (the walk in `wiring`), its
+    # twins in the main checkout beside it.
+    for name in ("check.sh", "check_docs.py", "ergo.sh", "hidden.py", "related.py", "speeds.py", "workshop.sb", "workshop.sh"):
+        yield from each(".claude/settings.json", f'      "Edit(/scripts/{name})",\n', "", "hooks", f"settings keep scripts/{name}, which runs outside the sandbox, out of the file tools")
+        yield from each(".claude/settings.json", f'      "Edit(~/Server/gnoworld/scripts/{name})",\n', "", "hooks", f"settings keep the main checkout's scripts/{name} out of the file tools")
     # F129: the hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
     yield from each(ih, 'git cat-file -e "$ref:.githooks/$hook" 2>/dev/null ||', "true ||", "hooks", "install_hooks refuses a commit missing a hook")
