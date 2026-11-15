@@ -39,8 +39,7 @@ export function Centre({ label, cx, cy, halo }: { label: string; cx: number; cy:
   );
 }
 
-// What a side with no dot says: on that side, level with the centre and close to it, where its curves would start (Alexis, 2026-11-11:
-// "aligne-le mieux", the words read with the centre); with both sides empty, under the centre.
+// What a side with no dot says: on that side, level with the centre and close to it, where its curves would start (the words read with the centre); with both sides empty, under the centre.
 export function Nones({
   left,
   right,

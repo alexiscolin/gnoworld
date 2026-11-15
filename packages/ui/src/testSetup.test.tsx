@@ -63,7 +63,7 @@ it("says nothing of a popover asked to be what it is already, as the browser doe
   expect(states).toEqual(["open", "closed"]);
 });
 
-// Chromium 156 fires toggle as a later task, once for changes made in a row (F924): code that reads
+// Chromium 156 fires toggle as a later task, once for changes made in a row: code that reads
 // the focus or the state there runs after the page's own handlers, not inside them.
 it("tells of a popover's toggle after the change, once for changes in a row", async () => {
   const states: string[] = [];

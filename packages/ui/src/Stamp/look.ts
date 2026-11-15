@@ -5,7 +5,7 @@ function unit(seed: string, key: string): number {
   return (hash >>> 0) / 4294967296;
 }
 
-export interface StampLook {
+interface StampLook {
   /** The superellipse's exponent: 2 an ellipse, more a squarer outline. */
   roundness: number;
   rx: number;

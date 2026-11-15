@@ -30,7 +30,7 @@
   }
 
   /* The title's clip: its words rise from 40 % below their own box (the arrival's), and the plate's title is fitted to its words (Panel.tsx),
-     500 weight over a 1.12 line; a narrow plate (a phone) fits its own width. Never a heading in a dialog, a picture (8f) or an article (a realm's Render, D382). */
+     500 weight over a 1.12 line; a narrow plate (a phone) fits its own width. Never a heading in a dialog, a picture or an article (a realm's Render). */
   .title {
     overflow: hidden;
   }
@@ -73,7 +73,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* The plate's fill, drawn on the wide plate alone (below); a page's arrival (D401) fades it by its opacity (the app's features/universe/arrival.ts). */
+  /* The plate's fill, drawn on the wide plate alone (below); a page's arrival fades it by its opacity (the app's features/universe/arrival.ts). */
   .fill {
     display: none;
   }
@@ -82,7 +82,7 @@
     /* The world's tint over the night (the prototype's #fPlate), of the plate's own --world (data-world). */
     --_fill: var(--color-plate);
 
-    /* The plain fill, no dot grid (D486). */
+    /* The plain fill, no dot grid. */
     --_ground: var(--_fill);
 
     background: var(--_ground);
@@ -188,7 +188,7 @@
       border-color: transparent;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
-      /* raw: the fill's own layer holds the background now, so the words stack over it */
+      /* raw: the fill's own layer holds the background, so the words stack over it */
       isolation: isolate;
       background: none;
     }
@@ -207,7 +207,7 @@
       /* hidden where a page's canvas paints the plate's fill itself (globe.module.css); its colour stays readable for it */
       visibility: var(--plate-fill);
       /* raw: the fill itself fades into space over the plate's last --plate-fade, never a layer over the scene, whose planet passes over
-         the plate's edge (Alexis, 2026-11-10: "la planète de ce côté doit passer au-dessus") */
+         the plate's edge */
       mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - var(--plate-fade)), transparent);
     }
 

@@ -40,7 +40,7 @@ interface Pressed extends Look {
 interface Linked extends Look {
   href: string;
   /** Loads the document again, past the page's link: an error page's way out, the app being what
-   * may have failed (F325). */
+   * may have failed. */
   reload?: boolean;
   type?: never;
   disabled?: never;

@@ -1,12 +1,12 @@
 /* The flash: a pill of the surface (opaque night, its strong line) sized to what it says, until the
-   blur behind a panel is widely Baseline (F262); in the top layer, at the top of the screen (F331). */
+   blur behind a panel is widely Baseline; in the top layer, at the top of the screen. */
 @layer components {
   .flash {
     inset: var(--space-m) 0 auto;
     /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
     margin: 0 auto;
     inline-size: fit-content;
-    /* The page's gutter on both sides, never edge to edge on a phone (8j). */
+    /* The page's gutter on both sides, never edge to edge on a phone. */
     max-inline-size: calc(100% - var(--space-s) * 2);
     padding-block: var(--space-2xs);
     /* Its Close sits close to the edge, as a pill's last control does. */
@@ -47,7 +47,7 @@
   }
 
   /* An arrival's banner: the top centre's slot (tokens.css, --banner-top), over the scene (frames 23, 93), in the page and not
-     the top layer, so a dialog's layer covers it (8j: the search drawer at 390 px); above the dock and the full chat's 3. */
+     the top layer, so a dialog's layer covers it (the search drawer at 390 px); above the dock and the full chat's 3. */
   .flash[data-banner] {
     position: fixed;
     inset-block-start: var(--banner-top);
@@ -55,13 +55,13 @@
     z-index: 4;
   }
 
-  /* While a flash shows, what the keyboard reaches scrolls clear of it (F355, WCAG 2.4.11); */
-  /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller: measure it then */
+  /* While a flash shows, what the keyboard reaches scrolls clear of it (WCAG 2.4.11). */
+  /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller. */
   :root:has(.flash:popover-open, .flash[data-banner]) {
     scroll-padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
   }
 
-  /* The top layer covers what is under it, and no scroll clears that: the page starts below a flash that stays; a timed one would shift it twice (F2165). */
+  /* The top layer covers what is under it, and no scroll clears that: the page starts below a flash that stays; a timed one would shift it twice. */
   :root:has(.flash[data-stays]:popover-open) {
     --flash-room: calc(var(--space-m) * 2 + var(--control-l));
   }

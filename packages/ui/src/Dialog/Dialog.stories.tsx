@@ -77,7 +77,7 @@ export const WithAction: Story = {
     ),
   },
 };
-// A confirmation that quotes what it is about (4c's delete), its danger button naming the act.
+// A confirmation that quotes what it is about, its danger button naming the act.
 export const Asking: Story = {
   args: {
     title: "Delete message?",

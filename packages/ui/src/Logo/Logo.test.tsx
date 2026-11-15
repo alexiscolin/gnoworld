@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Logo } from "./Logo.tsx";
 
-// Slice 5r: the header's mark and the wordmark "gnoworld" (docs/DESIGN-SYSTEM.md, the component table).
+// The header's mark and the wordmark "gnoworld" (docs/DESIGN-SYSTEM.md, the component table).
 describe("Logo", () => {
   it("draws the mark alone as a picture no reader says, with no text of its own", () => {
     const { container } = render(<Logo />);
@@ -29,7 +29,7 @@ describe("Logo", () => {
     expect(container.querySelector("a, button")).toBeNull();
   });
 
-  // F3264: the mark of the video's frames 6 and 20 and the prototype's #hnav .brand: a dotted ring, an inner ring, a dot at the
+  // The mark of the video's frames 6 and 20 and the prototype's #hnav .brand: a dotted ring, an inner ring, a dot at the
   // heart and two moons; and the word is "gno" in 600 and "world" in 300.
   it("draws the video's mark: a dotted ring, an inner ring, a dot and two moons", () => {
     const { container } = render(<Logo />);

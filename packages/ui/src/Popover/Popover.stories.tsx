@@ -44,7 +44,7 @@ export const MessageMenuOpen: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "More" }));
   },
 };
-// 4c's message bar: the More menu's trigger, an icon, outline and plain, small as a toolbar's control; its own
+// The message bar's More menu trigger: an icon, outline and plain, small as a toolbar's control; its own
 // line's Delete apart, in danger's tone.
 const own = [...actions, { label: "Delete", tone: "danger" as const, onSelect: () => undefined }];
 export const MessageMenuIcon: Story = {

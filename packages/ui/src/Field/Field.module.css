@@ -2,7 +2,7 @@
    invalid, coral. */
 @layer components {
   /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
-  /* The strong line at rest and under the pointer, frame 10's edge (F5968). */
+  /* The strong line at rest and under the pointer, frame 10's edge. */
   .box,
   .frame {
     --_line: var(--color-line-strong);
@@ -25,8 +25,7 @@
 
     /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
     max-inline-size: 100%;
-    /* A field is a control's height, its edges inside it, so a field and a button on one row line up (Alexis, 2026-11-08: "la même
-       hauteur de CTA et recherche"; was frame 10's 46 px, F5967). */
+    /* A field is a control's height, its edges inside it, so a field and a button on one row line up. */
     min-block-size: var(--control-m);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
@@ -46,7 +45,7 @@
     color: var(--color-text-faint);
   }
 
-  /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls (F1722, F1729); a
+  /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls; a
      browser without field-sizing keeps the two rows of the markup. The handle moves its height alone. */
   textarea.box {
     --_frame: calc(2 * (var(--space-2xs) + var(--line-width)));

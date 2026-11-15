@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 
-// What a tooltip's words and a chart's hold in common (F2862): the keyboard's focus alone holds them, and Esc takes them down first.
+// What a tooltip's words and a chart's hold in common: the keyboard's focus alone holds them, and Esc takes them down first.
 
 /** True when the focus came by the keyboard: a mouse click or a tap on a control also focuses it, and must not hold words
- * that the pointer's leaving would take away (WCAG 1.4.13; Tooltip's own guard, now shared). */
+ * that the pointer's leaving would take away (WCAG 1.4.13; the guard a tooltip and a chart share). */
 export function keyboardFocus(event: { target: EventTarget }): boolean {
   return event.target instanceof Element && event.target.matches(":focus-visible");
 }

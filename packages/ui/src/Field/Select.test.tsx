@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Select, type SelectProps } from "./Select.tsx";
 
-// The browser's own list, for a choice of many fixed rows, where a phone's picker does better than ours (7j, a country).
+// The browser's own list, for a choice of many fixed rows, where a phone's picker does better than ours.
 const OPTIONS = [
   { value: "", label: "No country" },
   { value: "FR", label: "France" },

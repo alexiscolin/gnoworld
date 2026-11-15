@@ -91,7 +91,7 @@ describe("Chip", () => {
   });
 });
 
-// 4d: a reaction's chip says more than its words to a screen reader (its emoji, its count, "including you":
+// A reaction's chip says more than its words to a screen reader (its emoji, its count, "including you":
 // docs/DESIGN-SYSTEM.md), a label of its own; a static mark is read by its words alone.
 describe("Chip: its label", () => {
   it("names a control by its label, its words and its count still shown", () => {

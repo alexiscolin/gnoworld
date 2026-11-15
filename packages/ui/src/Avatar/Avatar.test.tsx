@@ -161,7 +161,7 @@ describe("Avatar", () => {
     expect(container.querySelector("[data-presence]")).toBeNull();
   });
 
-  // The row says the name; only the avatar shows the state, so it still says it (F320).
+  // The row says the name; only the avatar shows the state, so it still says it.
   it("still says here and speaking beside a name that says the rest", () => {
     render(<Avatar address={ONE} name="a" decorative here speaking />);
     expect(screen.getByRole("img", { name: "here now, speaking" })).toBeTruthy();

@@ -13,7 +13,7 @@
     flex-flow: column;
     block-size: 100%;
     min-block-size: 0;
-    /* The surface, as opaque as the plate's (D13925). */
+    /* The surface, as opaque as the plate's. */
     background: var(--color-surface);
   }
 

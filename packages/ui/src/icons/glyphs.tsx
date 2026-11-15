@@ -128,7 +128,7 @@ export const GLYPHS = {
       <path d="M2 10c2 1.5 10 -1 12 -4" />
     </>
   ),
-  // Space seen flat (D427): a map folded in three.
+  // Space seen flat: a map folded in three.
   map: <path d="M2 4l4-1.5 4 1.5 4-1.5v9.5L10 13l-4-1.5L2 13zM6 2.5v9M10 4v9" />,
   orbits: (
     <>

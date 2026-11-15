@@ -88,7 +88,7 @@
     --_fill: var(--_accent);
     --_ink: var(--color-ink);
     --_line: var(--_accent);
-    /* The text's veil is lost on a light fill: the ink's shows (F369). */
+    /* The text's veil is lost on a light fill: the ink's shows. */
     --_hover: var(--color-ink-hover);
   }
 

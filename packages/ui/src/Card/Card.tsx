@@ -70,9 +70,9 @@ export interface CardHeaderProps {
   kicker?: string;
   /** Where it stands: live, ended, won, signed. */
   state?: string;
-  /** Its title's level under the page's headings: 3 unless the page says (F305). */
+  /** Its title's level under the page's headings: 3 unless the page says. */
   level?: 2 | 3 | 4;
-  /** Large is the light title of a card that is a screen's subject (F5730): the body's size otherwise. */
+  /** Large is the light title of a card that is a screen's subject: the body's size otherwise. */
   size?: "large";
   /** An Expand button after the title (the dock's icon): whether the card is open, and the click that toggles it. */
   expand?: {
@@ -153,7 +153,7 @@ function Header({ title, icon, kicker, state, level = 3, size, expand, hint, act
                 <Kicker>{kicker}</Kicker>
               </Cluster>
             )}
-            {/* With no kicker, the type's icon leads the title on its row, muted: a card known at a glance (Alexis, 2026-11-10). */}
+            {/* With no kicker, the type's icon leads the title on its row, muted: a card known at a glance. */}
             <Cluster space="2xs" wrap="no">
               {icon === undefined || kicker !== undefined ? null : (
                 <span className={styles["lead"]}>

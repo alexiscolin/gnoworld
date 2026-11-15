@@ -205,7 +205,7 @@ describe("Button", () => {
     expect([link.dataset["tone"], link.dataset["size"]]).toEqual(["danger", "l"]);
   });
 
-  // The composer's Ask Jarvis drew its violet and its close spark from outside, over the button's own rules (lot E, E4).
+  // The composer's Ask Jarvis draws its violet and its close spark from outside, over the button's own rules.
   it("takes the signal tone, Jarvis's violet: its words', its edge's and, solid, its fill's", () => {
     render(<Button tone="signal">Jarvis</Button>);
     expect(screen.getByRole("button").dataset["tone"]).toBe("signal");
@@ -222,7 +222,7 @@ describe("Button", () => {
     expect(rule('.button[data-lead="close"]')).toBe("--_pad: var(--space-2xs) var(--space-xs);");
   });
 
-  // The plate's talk bar stretched its link over the bar and lit it with the bar's hover, from outside (lot E, E4).
+  // The plate's talk bar stretches its link over the bar and lights it with the bar's hover, from outside.
   it("stretched, covers its positioned box with its press and answers that box's hover as its own", () => {
     const { rerender } = render(<Button href="#chat">Open chat</Button>);
     expect(screen.getByRole("link").hasAttribute("data-stretch")).toBe(false);
@@ -236,7 +236,7 @@ describe("Button", () => {
     expect(rule(".button[data-stretch]:hover")).toBe("--_fill: var(--color-fill-hover);");
   });
 
-  // The composer's format bar drew its tools' ink and their narrow height from outside, reaching its link tool's button too (lot E, E4).
+  // The composer's format bar draws its tools' ink and their narrow height from outside, reaching its link tool's button too.
   it("as a bar's tool, takes the bar's faint ink, and the smallest height where its box is under 24 rem", () => {
     const { rerender } = render(<Button>Link</Button>);
     expect(screen.getByRole("button").hasAttribute("data-tool")).toBe(false);
@@ -248,7 +248,7 @@ describe("Button", () => {
     );
   });
 
-  // The plate set its links' 20 px from outside, on every link in its actions' box (lot E, E4).
+  // The plate sets its links' 20 px from outside, on every link in its actions' box.
   it("sits its words 20 px in when its padding is wide, a large button keeping its own", () => {
     const { rerender } = render(<Button href="#chat">Say hi</Button>);
     expect(screen.getByRole("link").hasAttribute("data-pad")).toBe(false);

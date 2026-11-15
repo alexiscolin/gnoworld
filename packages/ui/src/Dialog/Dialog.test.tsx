@@ -53,7 +53,7 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: "Close", hidden: true })).toBeTruthy();
   });
 
-  // 4c's UX review (U5): what the dialog asks about, read with its title by assistive technology.
+  // What the dialog asks about, read with its title by assistive technology.
   it("is described by its description, when it has one", () => {
     render(
       <>
@@ -139,7 +139,7 @@ describe("Dialog", () => {
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }));
   });
 
-  // The first field the browser can focus, never a button-typed input: one hidden by CSS cannot take it (F367).
+  // The first field the browser can focus, never a button-typed input: one hidden by CSS cannot take it.
   it.each([
     ["a submit input", <input key="i" type="submit" value="Send" />],
     ["an image input", <input key="i" type="image" alt="Send" src="data:," />],
@@ -157,10 +157,10 @@ describe("Dialog", () => {
     expect(focusedPast(before)).toBe(screen.getByRole("textbox", { name: "Name" }));
   });
 
-  // A text area and a select are fields too, the first one focused (F367).
+  // A text area and a select are fields too, the first one focused.
   it.each([
     ["a text area", <textarea key="f" aria-label="First" />, "textbox"],
-    // The composer of slice 4 may be an editable box rather than a text area (F390).
+    // The composer may be an editable box rather than a text area.
     [
       "an editable box",
       <div key="f" role="textbox" aria-label="First" contentEditable suppressContentEditableWarning />,
@@ -240,7 +240,7 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(false);
   });
 
-  // 9k (answer 9f-1, F5856): the kicker above the title, in the one label style, read with the description.
+  // The kicker above the title, in the one label style, read with the description.
   it("draws its kicker above its title in the label style, and says it in its description before the description", () => {
     render(
       <Dialog
@@ -264,7 +264,7 @@ describe("Dialog", () => {
     expect(dialog().getAttribute("aria-labelledby")).toBe(title.id);
   });
 
-  // F5973, F5965: the kicker is the Kicker component in a wrapper that carries the description's id, and it stays with the
+  // The kicker is the Kicker component in a wrapper that carries the description's id, and it stays with the
   // title in a stack of its own, tighter than the one that holds the description and the body.
   it("draws its kicker with the Kicker component, grouped with the title apart from the description and the body", () => {
     render(
@@ -317,7 +317,7 @@ describe("Dialog", () => {
     ));
   });
 
-  // 9k (F5868): another way out is drawn (the name dialog's Later); Esc still asks the page.
+  // Another way out is drawn (the name dialog's Later); Esc still asks the page.
   it("draws no Close button when asked, and Esc still asks its page to close", () => {
     const { rerender } = render(
       <Dialog title="Passport" open onClose={vi.fn()}>
@@ -382,7 +382,7 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
-  // A file picker dismissed inside it fires a cancel that bubbles: the picker's, not an Esc (F332).
+  // A file picker dismissed inside it fires a cancel that bubbles: the picker's, not an Esc.
   it("takes a cancel from a control inside it for that control's, not for Esc", () => {
     const onClose = vi.fn();
     render(
@@ -399,7 +399,7 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
-  // The browser closes a dialog itself on a second Esc, or for a form's dialog method (F330).
+  // The browser closes a dialog itself on a second Esc, or for a form's dialog method.
   it("tells its page when the browser closes it, and shows again while its page keeps it open", () => {
     const onClose = vi.fn();
     render(
@@ -414,7 +414,7 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
-  // Each close counts, not only the first: a page that keeps it sees it shown again every time (F347).
+  // Each close counts, not only the first: a page that keeps it sees it shown again every time.
   it("shows again after every close the browser makes while its page keeps it open", () => {
     const onClose = vi.fn();
     render(
@@ -431,7 +431,7 @@ describe("Dialog", () => {
     }
   });
 
-  // React passes a close up from a dialog inside it: that close is the inner dialog's (F352, F332's class).
+  // React passes a close up from a dialog inside it: that close is the inner dialog's.
   it("is not closed by a dialog inside it closing", () => {
     const onClose = vi.fn();
     render(
@@ -448,7 +448,7 @@ describe("Dialog", () => {
   });
 
   // A browser queues the close event of its own close(): one still queued when its page opens it again is
-  // not the browser closing it (F361).
+  // not the browser closing it.
   it("takes the close event of its own close for none of the browser's, even after it opens again", () => {
     const onClose = vi.fn();
     const shut = (open: boolean) => (

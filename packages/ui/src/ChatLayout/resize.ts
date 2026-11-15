@@ -1,4 +1,4 @@
-/** The two columns the reader may drag, in px: where each stands by default and the bounds it keeps (Alexis, 2026-11-07). */
+/** The two columns the reader may drag, in px: where each stands by default and the bounds it keeps. */
 export const COLUMNS = {
   rooms: { start: 232, min: 180, max: 360 },
   info: { start: 360, min: 280, max: 520 },

@@ -1,4 +1,4 @@
-// A card that opens alone (D13979): the plate holds which card is open, so two never are. A card asks `useAlone(id)` for its Expand button's state; the
+// A card that opens alone: the plate holds which card is open, so two never are. A card asks `useAlone(id)` for its Expand button's state; the
 // room around the cards (`Room`) swaps the plate for the opened card (flip.ts moves it: the others fade, the card grows from its cell), and puts the plate
 // back as it was: scrolled where it was, the focus on the Expand button. With no motion (the reader asks for calm, or the browser cannot animate) the swap is
 // at once. The sheet (utilities.css) hides what is not on the card's way.
@@ -108,7 +108,7 @@ function useWhileOpen(
   }, [open, rootRef, backRef]);
 }
 
-export interface RoomProps {
+interface RoomProps {
   children: ReactNode;
   [data: `data-${string}`]: string | undefined;
 }

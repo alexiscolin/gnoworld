@@ -201,7 +201,7 @@ const sheetsIn = (css: string) => new Set([...css.matchAll(/\._([a-z]+)_[0-9a-z]
 
 // Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
 // styles.css: an app importing the components first, then the sheet, must still meet the six layers in
-// their order, or reset and base outrank the components (F363).
+// their order, or reset and base outrank the components.
 it("an app importing the components before the sheet meets the layers in their order", async () => {
   const css = await cssOf(APP);
   expect(sheetsIn(css).has("button")).toBe(true);
@@ -211,7 +211,7 @@ it("an app importing the components before the sheet meets the layers in their o
 });
 
 // ui's JavaScript is free of side effects but for its sheets: an app ships the sheets of the components
-// it uses, not every component's (F370). A sheet is a module's classes, which share its hash.
+// it uses, not every component's. A sheet is a module's classes, which share its hash.
 it("an app using Button alone ships Button's sheets and no other component's", async () => {
   const css = await cssOf(APP);
   const modules = new Map<string, Set<string>>();

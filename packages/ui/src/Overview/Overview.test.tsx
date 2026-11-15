@@ -67,7 +67,7 @@ const SHOWN: Record<
   ShowMore: ["Paged list", 'button[data-emphasis="outline"]'],
   Disclosure: ["Paged list", "button[aria-expanded][aria-controls]"],
   Network: ["Network", "svg[role='group'] circle"],
-  // The band's cells (977255f1 rebuilt it: a figure is a cell of its grid, its value a span, no longer a Stat's `data-value`).
+  // The band's cells (a figure is a cell of its grid, its value a span).
   Figures: ["Figures", "section[data-look='hub'] [data-span='3']"],
   Sparkline: ["Activity", "svg[data-tone]"],
   Planet: ["Planets", "span.disc[aria-hidden='true']"],

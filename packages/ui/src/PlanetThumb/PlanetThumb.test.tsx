@@ -40,8 +40,8 @@ describe("PlanetThumb", () => {
     }
   });
 
-  // F336: an image from another host tells it each visitor's address. The refusal lives in the component, so no
-  // caller (a data file's value, a future capture) can pass around it. A refused src draws the thumb's own fallback.
+  // An image from another host tells it each visitor's address. The refusal lives in the component, so no
+  // caller (a data file's value) can pass around it. A refused src draws the thumb's own fallback.
   const FOREIGN = [
     "https://evil.example/a.png",
     "HTTPS://evil.example/a.png",

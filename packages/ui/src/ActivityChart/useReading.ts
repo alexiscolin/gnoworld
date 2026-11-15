@@ -2,7 +2,7 @@ import { useState, type FocusEvent, type KeyboardEvent, type PointerEvent } from
 import { keyboardFocus, useFirstEscape } from "../Tooltip/hold.ts";
 
 // The bar under the pointer, and the one the keyboard rests on when the chart has the focus: each its own, so one
-// leaving never hides the other's words (F334's class); Esc hides the words until either comes again (WCAG 1.4.13).
+// leaving never hides the other's words; Esc hides the words until either comes again (WCAG 1.4.13).
 export function useReading(bars: number) {
   const last = bars - 1;
   const [pointerAt, setPointerAt] = useState<number | null>(null);
@@ -33,7 +33,7 @@ export function useReading(bars: number) {
     shown,
     focusAt: dismissed ? null : focusAt,
     group: {
-      // Only the keyboard's focus holds the words: a click or a tap focuses the group too, and the hold would outlast the pointer (F2862).
+      // Only the keyboard's focus holds the words: a click or a tap focuses the group too, and the hold would outlast the pointer.
       onFocus: (event: FocusEvent<HTMLDivElement>) => {
         if (!keyboardFocus(event)) return;
         setFocusAt(last);
@@ -45,7 +45,7 @@ export function useReading(bars: number) {
       onKeyDown: walk,
     },
     // One handler for the plot, not one per bar: the hour is read from where the pointer is, so a zero hour, a short bar's column
-    // and the gap between two bars all answer (F2863). O(1) a move.
+    // and the gap between two bars all answer. O(1) a move.
     plot: {
       onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
         // The words themselves sit inside the plot: the pointer on them keeps the bar it came from (WCAG 1.4.13).

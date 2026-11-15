@@ -1,4 +1,4 @@
-// The motion of a card opening alone (D13979), by hand on the compositor (opacity and transform only, never a layout or a repaint per frame): the plate's
+// The motion of a card opening alone, by hand on the compositor (opacity and transform only, never a layout or a repaint per frame): the plate's
 // other blocks fade and settle away, then the card grows from its cell to the pane; closing, the card shrinks back to its cell while the others come in
 // one after another. The card is laid out where it ends and drawn where it began (a FLIP), its words appearing only as it nears its size.
 import { motionWelcome } from "./motion.ts";

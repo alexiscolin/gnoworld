@@ -126,7 +126,7 @@
     grid-column: span var(--_span);
   }
 
-  /* A cell's one block fills its row's height: the cards of a row stand as tall as each other (the proposal's bento). */
+  /* A cell's one block fills its row's height: the cards of a row stand as tall as each other. */
   :where(.grid[data-cols="12"]) > [data-span] > :only-child {
     block-size: 100%;
   }

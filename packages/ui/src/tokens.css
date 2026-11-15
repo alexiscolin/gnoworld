@@ -24,7 +24,7 @@
     --color-space: var(--p-space);
     --color-text: var(--p-text);
     --color-text-muted: var(--p-muted);
-    /* A placeholder, dimmer than muted as frame 10's (F5980), at 4.5:1 or more on a field over night, space or a card. */
+    /* A placeholder, dimmer than muted as frame 10's, at 4.5:1 or more on a field over night, space or a card. */
     --color-text-faint: color-mix(in oklab, var(--p-muted) 80%, transparent);
     --color-primary: var(--p-cream);
     --color-ink: var(--p-space);
@@ -42,7 +42,7 @@
     --color-danger-soft: color-mix(in oklab, var(--p-coral) 12%, transparent);
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
     --color-new-line: color-mix(in oklab, var(--p-coral) 60%, transparent);
-    /* The world's own colour on its plate: a cool blue until the planet's colour comes with the scene (slice 7). At 16 % over the
+    /* The world's own colour on its plate: a cool blue by default. At 16 % over the
        night it gives the frames' navy, #182033 sampled in frame 37 (amber at 16 % read brown). */
     --world: var(--p-dusk);
     /* A link's ink on a page that sets one (a realm's page in its plate); the words' own ink otherwise. */
@@ -83,7 +83,7 @@
     --font-ui: 500 0.8125rem/1 var(--family-sans);
     --font-reading: 400 0.8125rem/1.5 var(--family-sans);
     --font-chat: 400 0.84375rem/1.45 var(--family-sans);
-    /* A chat with room for it, the full chat's and the dock's on a computer (Alexis, 2026-11-07 and 2026-11-08): a step over the chat's. */
+    /* A chat with room for it, the full chat's and the dock's on a computer: a step over the chat's. */
     --font-chat-l: 400 0.9375rem/1.5 var(--family-sans);
     --font-hint: 400 0.65625rem/1.4 var(--family-sans);
     --font-body: 400 0.875rem/1.5 var(--family-sans);
@@ -150,7 +150,7 @@
     --popover-wide: 440px;
     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
     --plate-w: 808px;
-    /* The plate's inner step, the step between its zones and the day chart's height (docs/plans/slice-realm-plate.md); a narrow plate sets the first two smaller. */
+    /* The plate's inner step, the step between its zones and the day chart's height; a narrow plate sets the first two smaller. */
     --plate-pad: var(--space-m);
     --plate-zone: var(--space-xl);
     --chart-h: 176px;
@@ -179,15 +179,15 @@
     --chat-item: 38px;
     --chat-item-gap: 6px;
     --chat-worlds: 82px;
-    /* The rooms' column wide enough for its search field and a room's whole name (Alexis, 2026-11-07); the video's was 158 px. */
+    /* The rooms' column wide enough for its search field and a room's whole name; the video's was 158 px. */
     --chat-rooms: 232px;
-    /* The info panel as wide as the dock (Alexis, 2026-11-07: "plus large"); the video's was 300 px. */
+    /* The info panel as wide as the dock; the video's was 300 px. */
     --chat-info: var(--chat-dock);
-    /* Wider than the video's 360 px, its words and its box larger (Alexis, 2026-11-08: "un peu plus large le chat, plus convivial"). */
+    /* Wider than the video's 360 px, its words and its box larger. */
     --chat-dock: 420px;
     /* The dock under 1400 px. */
     --chat-dock-s: 380px;
-    /* The dock's width at this screen: 380 px, 420 from 1400 px (D419). */
+    /* The dock's width at this screen: 380 px, 420 from 1400 px. */
     --chat-dock-now: var(--chat-dock-s);
     /* The column of a room's times at the lines' end, which a line's bar keeps clear: "20:40" in 10 px mono and a step. */
     --chat-times: 40px;
@@ -202,12 +202,12 @@
     --flash-room: 0px;
     /* The top centre's slot (DESIGN-SYSTEM.md, Layout): the bottom of the header in view, the shell's or a full chat's, which sets
        it; the arrival's pill a step under it; and the room a page keeps free above its first line so the pill covers none of it
-       and nothing moves when it comes: one row of the pill and a step (8b, 8j). */
+       and nothing moves when it comes: one row of the pill and a step. */
     --banner-under: 96px;
     --banner-top: calc(var(--banner-under) + var(--space-s));
     /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it (frames 4, 20, 26). */
     --dock-top: 98px;
-    /* The page's side on a computer, one line for the header's ends, the rail, the dock, the plate and their outline (Alexis, 2026-11-09). */
+    /* The page's side on a computer, one line for the header's ends, the rail, the dock, the plate and their outline. */
     --page-edge: var(--space-m);
     /* Whether the plate's own fill shows: a page that draws a globe beside it sets `hidden`, its canvas painting the fill. */
     --plate-fill: visible;
@@ -243,7 +243,7 @@
     --spark-area: 1.2s;
     --motion-spin: 0.8s;
     --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
-    /* The arrival's curve, GSAP's power3.out (D401), for what the arrival does in CSS (the title's power4.out is the arrival's own). */
+    /* The arrival's curve, GSAP's power3.out, for what the arrival does in CSS (the title's power4.out is the arrival's own). */
     --ease-out-3: cubic-bezier(0.215, 0.61, 0.355, 1);
     --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
     --ease-emphasized: cubic-bezier(0.7, 0, 0.2, 1);
@@ -292,7 +292,7 @@
 
   @media (pointer: coarse) {
     :root {
-      /* Under 16 px, iOS Safari zooms into a field that takes the focus (F371). */
+      /* Under 16 px, iOS Safari zooms into a field that takes the focus. */
       --font-field: 400 1rem/1.5 var(--family-sans);
     }
   }
@@ -314,7 +314,7 @@
     }
   }
 
-  /* The same at the settings' word (slice 8): "Reduce animations" on this device. */
+  /* The same at the settings' word: "Reduce animations" on this device. */
   :root[data-motion="reduce"] {
     --motion-fast: 0s;
     --motion-base: 0s;

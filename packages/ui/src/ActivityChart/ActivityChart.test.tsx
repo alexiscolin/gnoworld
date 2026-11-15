@@ -56,7 +56,7 @@ describe("ActivityChart", () => {
     const tall = heights(container);
     expect(tall[1]).toBeGreaterThan(tall[0] ?? 0);
     expect(tall[2]).toBeGreaterThan(tall[1] ?? 0);
-    // An hour with none is a dash on the baseline (Alexis, 2026-11-07, option A), marked empty.
+    // An hour with none is a dash on the baseline, marked empty.
     expect(tall[0]).toBe(2);
     expect(container.querySelector('svg [data-hour="0"]')?.hasAttribute("data-empty")).toBe(true);
     expect(container.querySelector('svg [data-hour="1"]')?.hasAttribute("data-empty")).toBe(false);
@@ -82,7 +82,7 @@ describe("ActivityChart", () => {
   });
 
   // Its line is --line-width wide (1 px) and centred on its points: at the drawing's edge half of it
-  // was cut. The peak and zero sit half a pixel in, of a drawing 48 high (F337).
+  // would be cut. The peak and zero sit half a pixel in, of a drawing 48 high.
   it.each([
     [
       [0, 3, 0],
@@ -150,7 +150,7 @@ describe("ActivityChart", () => {
     const steps = points.slice(1).map((point, at) => (point[0] ?? 0) - (points[at]?.[0] ?? 0));
     expect(new Set(steps).size).toBe(1);
     expect(steps[0]).toBeGreaterThan(0);
-    // Half a pixel in, so the line's stroke is whole (F337).
+    // Half a pixel in, so the line's stroke is whole.
     expect(points[1]?.[1]).toBe(0.5);
     expect(points[3]?.[1]).toBe(height - 0.5);
     expect(rows("Calls this week").at(-1)).toEqual(["Today", "0"]);
@@ -170,7 +170,7 @@ describe("ActivityChart", () => {
   });
 });
 
-// F304 (slice 5j): DESIGN-SYSTEM.md's table gives the bars a hover tooltip: the count and the hour of the bar under the
+// DESIGN-SYSTEM.md's table gives the bars a hover tooltip: the count and the hour of the bar under the
 // pointer, as the table says them. The keyboard reaches the same words: the chart is one group, its arrows walk the bars.
 // The queries are anchored on the tooltip's own words: the chart's hidden table holds "This hour" and "N hours ago" rows too.
 describe("ActivityChart's tooltip (F304)", () => {
@@ -304,7 +304,7 @@ describe("ActivityChart's tooltip (F304)", () => {
 
   it("shows the hour of the column the pointer is in, over a zero hour, a short bar's column or the gap, not only the ink (F2863)", () => {
     const { container } = render(<ActivityChart label="Calls per hour, today" values={day} />);
-    // Hour 0 is a zero: a bar of no height, never under a pointer before.
+    // Hour 0 is a zero: a bar of no height.
     over(container, 0);
     expect(words(0, "23 hours ago")).not.toBeNull();
     // The gap after a bar still belongs to its hour's slot.

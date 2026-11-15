@@ -186,7 +186,7 @@ describe("Menu", () => {
     expect(screen.getByRole("menuitem", { name: "Jarvis, Open a room to ask Jarvis" })).toBeTruthy();
   });
 
-  // 4c's UX review (U3): the message bar's trigger is a toolbar's small control (docs/DESIGN-SYSTEM.md: "a toolbar's
+  // The message bar's trigger is a toolbar's small control (docs/DESIGN-SYSTEM.md: "a toolbar's
   // small controls stay at 32").
   it("takes a toolbar's small size for its icon trigger, medium unless asked", () => {
     render(
@@ -199,7 +199,7 @@ describe("Menu", () => {
     expect(screen.getByRole("button", { name: "Medium" }).dataset["size"]).toBe("m");
   });
 
-  // 4c's UX review (U7): an irreversible act is coral with the alert icon and its word (docs/DESIGN-SYSTEM.md,
+  // An irreversible act is coral with the alert icon and its word (docs/DESIGN-SYSTEM.md,
   // "Severity"), apart from the others after a separator, which the arrows pass over.
   it("draws a danger item apart: after one separator, its tone danger, the alert icon beside its words", async () => {
     render(
@@ -296,7 +296,7 @@ describe("Menu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  // An item that opens a dialog: the dialog gives the focus back, as it closes, to what held it as it opened (F905).
+  // An item that opens a dialog: the dialog gives the focus back, as it closes, to what held it as it opened.
   it("acts with the focus on its trigger, never on its hidden item", async () => {
     let focused: Element | null = null;
     await opened(
@@ -332,7 +332,7 @@ describe("Menu", () => {
     staysText((text) => <Menu trigger={text} label={text} items={[{ label: text, onSelect: vi.fn() }]} />);
   });
 
-  // 4c's message menu (docs/decisions.md, 2026-10-26): a trigger of an icon alone, its words its name and tooltip.
+  // The message menu: a trigger of an icon alone, its words its name and tooltip.
   it("draws an icon for its trigger when given one, named by its words, which its tooltip shows", async () => {
     render(<Menu trigger="More" icon="more" label="Message actions" items={items} />);
     const trigger = screen.getByRole("button", { name: "More" });
@@ -361,13 +361,13 @@ describe("Menu", () => {
     };
     expect(look("More")).toEqual(look("Alike"));
     expect(look("Plain")).toEqual(look("Plain alike"));
-    // The green pass (G16): the look stated apart from iconLook, which both sides above call.
+    // The look stated apart from iconLook, which both sides above call.
     expect(look("More").slice(1)).toEqual(["outline", "neutral", "m"]);
     expect(look("Plain").slice(1)).toEqual(["plain", "neutral", "m"]);
     expect(screen.getByRole("button", { name: "More" }).querySelector("svg")?.dataset["size"]).toBe("m");
   });
 
-  // The red pass (M13): the words name the trigger, as text, and the trigger draws none of them.
+  // The words name the trigger, as text, and the trigger draws none of them.
   it("names an icon trigger by its words, made of markup or very long, as text, drawing none of them", () => {
     for (const text of ["<b>More</b>", `More ${"x".repeat(400)}`]) {
       const { unmount } = render(<Menu trigger={text} icon="more" label="Message actions" items={items} />);

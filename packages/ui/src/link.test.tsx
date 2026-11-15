@@ -49,7 +49,7 @@ describe("LinkProvider", () => {
     expect(mark).toBe("");
   });
 
-  // An error page's way out: the app may be what failed, so the document loads again (F325).
+  // An error page's way out: the app may be what failed, so the document loads again.
   it("leaves a link that reloads the page to a plain anchor, even to the site's own path", () => {
     render(
       <LinkProvider link={PageLink}>
@@ -80,7 +80,7 @@ describe("LinkProvider", () => {
     "//gno.land/",
     "//",
     "/\\gno.land/",
-    // A browser drops tabs and line ends from an address, so these are "//gno.land/" too (F311).
+    // A browser drops tabs and line ends from an address, so these are "//gno.land/" too.
     "/\t/gno.land/",
     "/\n/gno.land/",
     "/\r/gno.land/",
@@ -100,7 +100,7 @@ describe("LinkProvider", () => {
   });
 });
 
-// F326: the app says which paths are its pages; a path that names a file (the sitemap) stays a plain anchor.
+// The app says which paths are its pages; a path that names a file (the sitemap) stays a plain anchor.
 describe("LinkProvider's pages", () => {
   const pages = (href: string) => !href.endsWith(".xml");
 

@@ -14,7 +14,7 @@ export interface SparklineProps {
   arrives?: boolean;
 }
 
-// The drawing's own units, stretched to its box; the line half its stroke inside, so neither the peak nor the low is cut in half (F337's rule).
+// The drawing's own units, stretched to its box; the line half its stroke inside, so neither the peak nor the low is cut in half.
 const WIDTH = 100;
 const HEIGHT = 32;
 const INSET = 1;

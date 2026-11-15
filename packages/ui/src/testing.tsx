@@ -1,5 +1,5 @@
-// What the component tests share: their stories as elements, the threat model's abuse cases (slice
-// 2's plan, §3), and the rule that no component takes outside styling (DESIGN-SYSTEM.md).
+// What the component tests share: their stories as elements, the threat model's abuse cases, and the
+// rule that no component takes outside styling (DESIGN-SYSTEM.md).
 import { act, render } from "@testing-library/react";
 import { createElement, type ComponentType, type ReactElement, type ReactNode } from "react";
 import { expect } from "vitest";
@@ -14,7 +14,7 @@ export const toggled = () =>
   );
 
 // True only for props that accept neither className nor style: a test assigns `true` to it, so
-// tsc fails the day either prop is added. Each member of a union is read, not their shared keys (F333).
+// tsc fails the day either prop is added. Each member of a union is read, not their shared keys.
 export type Unstyled<P> = [P extends unknown ? Extract<keyof P, "className" | "style"> : never] extends [never]
   ? true
   : false;

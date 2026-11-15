@@ -101,7 +101,7 @@ interface Entry {
   icon?: IconName;
 }
 
-/** An act of the menu; or one a later slice brings, greyed and inert, said to be coming soon as ComingSoon says it (`soon`). */
+/** An act of the menu; or one not available yet, greyed and inert, said to be coming soon as ComingSoon says it (`soon`). */
 export type MenuItem =
   | (Entry & {
       onSelect: () => void;

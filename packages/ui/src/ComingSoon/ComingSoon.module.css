@@ -1,4 +1,4 @@
-/* What a later slice brings: the control's own look, greyed, refusing the pointer's promise of an act. */
+/* A control for what is not built yet: the control's own look, greyed, refusing the pointer's promise of an act. */
 @layer components {
   .soon {
     opacity: var(--opacity-disabled);

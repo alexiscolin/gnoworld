@@ -24,11 +24,11 @@ export interface ActivityChartProps {
 const HEIGHT = 48;
 const BAR = 6;
 const GAP = 2;
-// An hour with none: a dash on the baseline, so the row of hours reads even when all is quiet (Alexis, 2026-11-07, option A).
+// An hour with none: a dash on the baseline, so the row of hours reads even when all is quiet.
 const DASH = 2;
 const STEP = 16;
 // Half the line's width (--line-width, 1 px, which the stroke keeps whatever the drawing's scale): its
-// points sit that far inside the drawing, so neither the peak nor zero is cut in half (F337).
+// points sit that far inside the drawing, so neither the peak nor zero is cut in half.
 const INSET = 0.5;
 // A value's height on the line: from zero, half a pixel above the bottom, to the peak, half below the top.
 const lineY = (high: number) => HEIGHT - INSET - (high * (HEIGHT - 2 * INSET)) / HEIGHT;
@@ -146,7 +146,7 @@ function Plot({
 
 /** Activity over time, in SVG for the eye: past bars muted, the current one in text; the peak and the
  * current value written beside it, and every value in a table for assistive technology. The bars have a
- * tooltip (F304), by the pointer and by the keyboard: the chart is one group whose arrows walk them. */
+ * tooltip, by the pointer and by the keyboard: the chart is one group whose arrows walk them. */
 export function ActivityChart({ label, values, sparkline = false, unit = "hour", figures = true }: ActivityChartProps) {
   const counts = values.map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
   const peak = Math.max(0, ...counts);
