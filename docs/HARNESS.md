@@ -162,7 +162,8 @@ gives it the paths: every changed path but prose, whose importers, at any depth,
 the server, core or the schemas, as it runs the server as a child process, outside that graph; and the code that reads a changed place
 from disk, found by a grep of `new URL(<place>, import.meta.url)`, of a path written from the repository's root and of `join("deploy",
 ...)`. A place named any other way (`__dirname`, `process.cwd()`, `import.meta.dirname`, `import.meta.url` outside `new URL(...)`, a
-resolve, `createRequire`) is refused, file and line, in a run of the related tests and, as `related.py --check`, in a run of every one.
+resolve, `createRequire`) is refused, file and line, in a run of the related tests and, as `related.py --check`, in a run of every one. The map reads `app`, `server`, `jarvis`, `link-reader` and `packages`: a `deploy/` change asks for the stack's static proofs under `jarvis/src` and
+`link-reader/src`, and the gate's deploy-stack job runs them before Docker (`EXEMPT` in `related.py` names the two lines that read no file of the repository).
 
 **The timing tests:** a test that reads a clock carries Vitest's tag `timing` (`{ tags: ["timing"] }`, defined in
 vitest.config.ts). The commit gate and GitHub's gate leave them out (`--tags-filter=!timing`); the night runs them. Run them alone:

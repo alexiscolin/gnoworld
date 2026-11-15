@@ -60,7 +60,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/related.py": "gate_lanes", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
 }
@@ -1331,6 +1331,13 @@ def mutants():
     # GitHub judges main: each promise of the two workflows and the two scripts, switched off.
     ci = ".github/workflows/gate.yml"
     # gate-ok's last step, its rights, and the script that writes the annotations.
+    yield from each(ci, "        run: pnpm exec vitest run jarvis/src/config.test.ts link-reader/src/main.test.ts\n", "        run: true\n", "hooks", "deploy-stack runs the stack's static proofs")
+    yield from each(ci, "      - *node\n      - *pnpm\n      - name: The stack's static proofs", "      - name: The stack's static proofs", "hooks", "deploy-stack installs what the static proofs need")
+    yield from each("scripts/related.py", "|jarvis/src|link-reader/src|", "|link-reader/src|", "hooks", "related.py maps the tests under jarvis/src")
+    yield from each("scripts/related.py", "|jarvis/src|link-reader/src|", "|jarvis/src|", "hooks", "related.py maps the tests under link-reader/src")
+    yield from each("scripts/related.py", '("app", "server", "jarvis", "link-reader", "packages")', '("app", "server", "packages")', "hooks", "related.py walks jarvis/src and link-reader/src")
+    yield from each("scripts/related.py", '    "jarvis/src/testing/fakeGnomcp.ts": "process.cwd()",\n', "", "hooks", "related.py lets a fake's own process folder stand")
+    yield from each("scripts/related.py", '    "link-reader/src/picture.ts": "import.meta.resolve(`${pkg}/package.json`)",\n', "", "hooks", "related.py lets a package's resolved file stand")
     yield from each(ci, "        if: failure()\n        env:\n          GH_TOKEN", "        env:\n          GH_TOKEN", "hooks", "the token reaches the annotating step after a failure alone")
     yield from each(ci, "      contents: read\n      actions: read\n", "      contents: read\n      actions: write\n", "hooks", "gate-ok only reads its run")
     yield from each(ci, ' || rm -f "$out/$id.log"', "", "hooks", "a download that failed leaves no log")

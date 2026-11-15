@@ -415,6 +415,10 @@ jobs:
     timeout-minutes: 40
     steps:
       - *checkout
+      - *node
+      - *pnpm
+      - name: The stack's static proofs, read as text (Vitest's job runs on a change of code alone, and these tests read deploy/)
+        run: pnpm exec vitest run jarvis/src/config.test.ts link-reader/src/main.test.ts
       - name: The Docker the runner has (test.sh needs Engine 28 or later)
         run: docker version && docker compose version
       - name: htpasswd, which test.sh needs and the runner lacks

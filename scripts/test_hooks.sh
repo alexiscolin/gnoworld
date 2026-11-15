@@ -3349,6 +3349,21 @@ printf 'y\n' >>"$g/server/src/a.ts"
 out=$(gate) && fail "check.sh passed a change with a read the related map cannot follow"
 [ "$(last "$out")" = "check.sh: FAILED at tests:vitest" ] || fail "a refused map did not fail a change's tests lane: $(last "$out")"
 git -C "$g" reset -q --hard HEAD~1
+# The map covers jarvis/src and link-reader/src, whose static proofs read deploy/: a deploy/ change asks for them, and a read there the
+# map cannot follow is refused as one of the app's is.
+mkdir -p "$g/jarvis/src" "$g/link-reader/src" "$g/deploy"
+printf 'import { readFileSync } from "node:fs";\nexport const compose = readFileSync(new URL("../../deploy/compose.yaml", import.meta.url), "utf8");\n' >"$g/jarvis/src/c.test.ts"
+printf 'import { readFileSync } from "node:fs";\nexport const compose = readFileSync(new URL("../../deploy/compose.yaml", import.meta.url), "utf8");\n' >"$g/link-reader/src/c.test.ts"
+printf 'x\n' >"$g/deploy/compose.yaml"
+asked=$(cd "$g" && printf 'deploy/compose.yaml\n' | python3 -I scripts/related.py) || fail "related.py refused a deploy/ change with a static proof under jarvis/src"
+case " $asked " in *" jarvis/src/c.test.ts "*) case " $asked " in *" link-reader/src/c.test.ts "*) ;; *) fail "related.py did not ask for the link reader's static proof on a deploy/ change: $asked" ;; esac ;; *) fail "related.py did not ask for the static proofs of jarvis and the link reader on a deploy/ change: $asked" ;; esac
+for where in jarvis/src link-reader/src; do
+	printf 'export const here = process.cwd();\n' >"$g/$where/where.ts"
+	(cd "$g" && python3 -I scripts/related.py --check >/dev/null 2>&1) && fail "related.py let a read it cannot follow stand under $where"
+	rm "$g/$where/where.ts"
+done
+rm -r "$g/jarvis" "$g/link-reader"
+(cd "$here/.." && python3 -I scripts/related.py --check >/dev/null 2>&1) || fail "related.py refuses a read of this repository's own jarvis/src or link-reader/src"
 # A tool missing fails its lane, never passes on nothing: Vitest, the related map, gno.
 printf 'y\n' >>"$g/server/src/a.ts"
 mv "$g/node_modules/.bin/vitest" "$t/vitest.away"
@@ -7589,6 +7604,12 @@ for job in ("lint", "coverage", "risk", "regressions", "gate-ok"):
 # D13190: the lint job scans the pull request with the base's scan_secrets.sh, the one the hooks run, never a loop of its own.
 assert re.search(r'^        run: sh "\$RUNNER_TEMP/base/scripts/scan_secrets\.sh" --range "\$BASE\.\.HEAD"$', J["lint"], re.M), "lint scans the change otherwise than with the base's scan_secrets.sh over its range"
 assert "gitleaks git" not in gate and "--ignore-gitleaks-allow" not in gate, "gate.yml holds a gitleaks run of its own beside scan_secrets.sh"
+# The static proofs of the stack (the compose file, the guard's and the egress's rules, the images, read as text) run on a deploy/
+# change too, before Docker: the Vitest job runs on a change of code alone, and these tests read deploy/.
+ds = J["deploy-stack"]
+assert "- *node" in ds and "- *pnpm" in ds, "deploy-stack has no Node or locked dependencies for the static proofs"
+assert "run: pnpm exec vitest run jarvis/src/config.test.ts link-reader/src/main.test.ts" in ds, "deploy-stack does not run the static proofs of the stack"
+assert ds.index("vitest run jarvis/src/config.test.ts") < ds.index("docker version"), "deploy-stack runs the static proofs after Docker"
 z = J["zizmor"]
 assert re.search(r'echo "zizmor==[0-9.]+ --hash=sha256:[0-9a-f]{64}" >"\$RUNNER_TEMP/zizmor\.txt"', z), "zizmor is installed unpinned"
 assert re.search(r"^        run: \$RUNNER_TEMP/zizmor/bin/zizmor --offline --no-progress \.github/workflows$", z, re.M), "zizmor does not read every workflow"

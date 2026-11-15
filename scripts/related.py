@@ -27,7 +27,13 @@ import shlex
 import stat
 import sys
 
-SOURCES = re.compile(r"(?:app/src|app/tests|server/src|packages/[^/]+/src)/")
+SOURCES = re.compile(r"(?:app/src|app/tests|server/src|jarvis/src|link-reader/src|packages/[^/]+/src)/")
+# The two places under jarvis/src and link-reader/src that name a place the grep cannot follow, and read none of the repository's
+# files: a fake's own process folder, and a package's file in node_modules. Each is read as written, no other line of its file.
+EXEMPT = {
+    "jarvis/src/testing/fakeGnomcp.ts": "process.cwd()",
+    "link-reader/src/picture.ts": "import.meta.resolve(`${pkg}/package.json`)",
+}
 CODE = re.compile(r"\.(?:[cm]?[jt]s|[jt]sx)$")
 TEST = re.compile(r"\.test\.tsx?$")
 SERVER = ("server/src/", "packages/core/src/", "packages/schemas/src/")
@@ -54,7 +60,7 @@ def tops():
 def sources():
     """(path, plain) for every code file under the sources, from the disk (a commit's staged copy has no repository to ask);
     plain is false for a link or a special file, and for a linked folder, which the walk does not follow."""
-    for top in ("app", "server", "packages"):
+    for top in ("app", "server", "jarvis", "link-reader", "packages"):
         for folder, dirs, files in os.walk(top):
             dirs[:] = sorted(d for d in dirs if d != "node_modules")
             for name in dirs + sorted(files):
@@ -131,6 +137,8 @@ def scan(top_folders):
                 reads.append((file, *got, False))
         for m in bare.finditer(text):
             reads.append((file, m.group(1), False, False))
+        if file in EXEMPT:
+            spans.extend((m.start(), m.end()) for m in re.finditer(re.escape(EXEMPT[file]), text))
         for m in ANCHOR.finditer(text):
             if not any(a <= m.start() < b for a, b in spans):
                 line = text.count("\n", 0, m.start()) + 1
