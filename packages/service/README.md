@@ -25,17 +25,10 @@ import { openDatabase } from "@gnoworld/service/db";
 
 The package exports every `src/*.ts` file by its name. `openDatabase(path, migrations)` is in `src/db.ts`.
 
-## Build, test and run
+## Build and test
 
-There is no build step and no `scripts` entry in `package.json`: the server imports the sources directly. From the repository root, with the Node version in `.node-version`:
-
-```bash
-pnpm run test
-pnpm run typecheck   # includes packages/service/tsconfig.json
-pnpm run lint
-```
-
-Setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+No build step: the other packages import `packages/service/src` as it is. Its tests run with everyone's, or alone with
+`pnpm exec vitest run packages/service` from the root; the setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
 ## Rules
 

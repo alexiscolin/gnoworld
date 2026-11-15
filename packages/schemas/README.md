@@ -22,17 +22,10 @@ import { FunctionList } from "@gnoworld/schemas/functions";
 
 `StatusAnswer` and `FunctionList` are the schemas `packages/chain/src/node.ts` imports this way.
 
-## Build, test and run
+## Build and test
 
-There is no build step and no `scripts` entry in `package.json`: other packages import the sources directly. From the repository root, with the Node version in `.node-version`:
-
-```bash
-pnpm run test
-pnpm run typecheck
-pnpm run lint
-```
-
-Setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+No build step: the other packages import `packages/schemas/src` as it is. Its tests run with everyone's, or alone with
+`pnpm exec vitest run packages/schemas` from the root; the setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
 ## Rules
 

@@ -25,17 +25,10 @@ import { /* ... */ } from "@gnoworld/chain/read";
 
 The package exports every `src/*.ts` file by its name.
 
-## Build, test and run
+## Build and test
 
-There is no build step and no `scripts` entry in `package.json`: other packages import the sources directly. From the repository root, with the Node version in `.node-version`:
-
-```bash
-pnpm run test
-pnpm run typecheck   # includes packages/chain/tsconfig.json
-pnpm run lint
-```
-
-Setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+No build step: the other packages import `packages/chain/src` as it is. Its tests run with everyone's, or alone with
+`pnpm exec vitest run packages/chain` from the root; the setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
 ## Rules
 

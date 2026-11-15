@@ -24,17 +24,10 @@ import { /* ... */ } from "@gnoworld/core/bubbles";
 
 Import from the package root, or from `./bubbles`. `guestName` is exported from `src/index.ts`.
 
-## Build, test and run
+## Build and test
 
-There is no build step and no `scripts` entry in `package.json`: other packages import the TypeScript sources directly. Run these from the repository root, with the Node version in `.node-version`:
-
-```bash
-pnpm run test        # vitest; core also runs in the Chromium project core_chromium
-pnpm run typecheck
-pnpm run lint
-```
-
-The package is not run on its own. Setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+No build step: the other packages import `packages/core/src` as it is. Its tests run with everyone's, or alone with
+`pnpm exec vitest run packages/core` from the root; the setup is in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
 ## Rules
 
