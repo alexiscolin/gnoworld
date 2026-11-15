@@ -1,9 +1,11 @@
 # The gate on GitHub's machines (the harness overhaul, phase 2: docs/plans/harness-overhaul.md). One job, `changes`, reads what
 # the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
 # at most but deploy/test.sh's; `gate-ok`, the one check main will require (D13165), reads every result with the base commit's
-# scripts/ci_gate_ok.py. It reads the repository and nothing more, holds no secret, pins every action and download, and runs on a
-# pull request to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only
-# token and no secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
+# scripts/ci_gate_ok.py. It reads the repository, and after a failure gate-ok's last step reads the repository's Actions data
+# to write each failed job's end as an annotation with the base's scripts/ci_annotate.py (D13179: after the verdict, in a job
+# already failed, so it can never pass a run); it holds no secret, pins every action and download, and runs on a pull request
+# to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only token and no
+# secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
 # The first run after this file lands judges against a base that has no ci_gate_ok.py: gate-ok fails it, by design; a run by
 # hand then judges against the base that has it.
 name: gate
@@ -484,6 +486,9 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - *checkout-history
       - *base
@@ -492,3 +497,17 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py" "$EVENT"
+      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          out="$RUNNER_TEMP/failed"
+          mkdir -p "$out"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" >"$out/jobs.json"
+          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids "$out" >"$out/ids"
+          while read -r id; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" >"$out/$id.log" || rm -f "$out/$id.log"
+          done <"$out/ids"
+          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" "$out"
