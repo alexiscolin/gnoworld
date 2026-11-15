@@ -128,6 +128,35 @@ describe("an account's mute, its hides settled out of order (the max review)", (
       expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);
   });
 
+  // F13188: a line with no server-time of its own is timed once, when its hide is written; a clock read again for its strike, a
+  // millisecond later, fell past the run's last hide, and nothing was ever muted.
+  it("mutes a line with no time of its own, however far the clock moved since its hide was written", () => {
+    const { db, verdict } = setup();
+    const muted: string[] = [];
+    let clock = T0;
+    const strike = makeStrike(db, {
+      pepper: PEPPER,
+      now: () => (clock += 1),
+      mute: { strikes: 3, windowMinutes: 10 },
+      mutes: {
+        muteKeeping: () => "muted",
+        mute: (account, world) => {
+          muted.push(`${account} ${world}`);
+          return true;
+        },
+        tick: () => undefined,
+        reapply: () => undefined,
+        putOn: () => undefined,
+      },
+      spared: () => false,
+    });
+    for (let n = 1; n <= 3; n += 1) {
+      verdict("g1a", "#bubble", { action: "hide", at: (clock += 1) });
+      strike({ room: "#bubble", account: "g1a", msgid: `m${String(n)}`, text: "x" });
+    }
+    expect(muted).toEqual(["g1a bubble"]);
+  });
+
   it("mutes once for an earlier cluster, and again for a later hide alone never", () => {
     for (const order of orders([0, 5 * MINUTE, 10 * MINUTE, 40 * MINUTE]))
       expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);

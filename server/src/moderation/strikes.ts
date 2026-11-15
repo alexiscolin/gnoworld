@@ -45,10 +45,14 @@ export function makeStrike(
   { pepper, now, mute, mutes, spared }: StrikeOptions,
 ): (said: Said) => void {
   const strikes = makeStrikes(db, pepper);
+  const Own = z.object({ at: z.number() }).optional();
+  const own = db.prepare("SELECT at FROM verdicts WHERE msgid = ?");
+  // The time its hide was written at: a line with no server-time of its own read the clock then, and would again here (F13188).
+  const timeOf = (said: Said): number => Own.parse(own.get(said.msgid))?.at ?? lineTime(said, now);
   return (said) => {
     const world = roomWorld(db, said.room);
     if (world === undefined || spared(said.account)) return;
-    const [at, window] = [lineTime(said, now), mute.windowMinutes * 60_000];
+    const [at, window] = [timeOf(said), mute.windowMinutes * 60_000];
     const hides = strikes.times(said.account, world, { since: at - window, to: at + window });
     // The runs of `strikes` hides in a row that fit one window and hold the line's time.
     for (let i = 0; i + mute.strikes <= hides.length; i += 1) {
