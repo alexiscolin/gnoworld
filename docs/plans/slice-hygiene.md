@@ -18,7 +18,7 @@ From D13170 (no backlog row: the decision is the row), with D13169, D13171, D131
 - D13194: the red team's attack tests 16 to 23 pass. F13210 to F13214 closed (the deploy flag on the images' sources, CLAUDE.md in
   the harness list, a PATH or GIT_EXEC_PATH prefix before a push, tag messages and merge content scanned).
 - D13171: the hosting decided; the demo profile, its runbook steps and `deploy/test.sh`'s demo checks out once two checks agree.
-- Every pull request green on GitHub's gate on its first push; main green at the end.
+- The pull request green on GitHub's gate on its first push; main green at the end.
 
 ## 2. Out of scope
 The automatic deploy and previews (D13172, the part after this one); any product feature or change of behaviour; git's history
@@ -39,26 +39,29 @@ No hot path added; deletions only lower it. The review's cost: about 3,460 files
 The agents' count is the limit (4 at once, CLAUDE.md): batches by folder, each agent a folder of a few hundred files at most.
 
 ## 6. Tests, by level
-- Every pull request: the whole gate (no new behaviour, so no new test but the guards' below).
+- The pull request: the whole gate (no new behaviour, so no new test but the guards' below).
 - New guards with their planted faults and mutants: the gitleaks-private Adena rule; the guard's refusal of a PATH or
   GIT_EXEC_PATH prefix before a push; pre-push reading tag messages and merge content; the deploy flag on the images' sources.
 - Attack tests 16 to 23 (`.claude/tmp/slice-13/reports/plan-review-2.md`) written into `test_hooks.sh`.
 
 ## 7. Files and branches
 Tier-1 files touched: `app/src/lib/adena/`, `deploy/`, the harness (`scripts/`, `.githooks/`, `.github/`, `.claude/`).
-1. **hygiene-adena** (tier 1, D13169): tests first (invented answers), the red pass, the security review.
-2. **hygiene-harness** (the harness's leftovers, F13210 to F13214, attack tests 16 to 23): tests first, the red pass, the security review.
-3. **hygiene-review** (the fan-out): Opus agents read each folder and report, per file, what to delete (with its static check),
-   which comments to rewrite, which names to change, what is unsafe; a second agent checks each deletion. Then one pull request a
-   folder or so, about 600 lines each: `packages/*`, `server/`, `link-reader/`, `jarvis/`, `gno/`, `deploy/`, then `app/` in
-   several (its 2,059 files), then the docs and READMEs.
-4. **hygiene-ops** (D13171): the hosting decision, then the demo profile out.
-1 and 2 run side by side, each in its own session and worktree; 3 starts once 1 is merged (it reads the tree without Adena's
-recording); 4 last.
+One branch, `hygiene`, and one pull request for the whole slice (D13199: the 400- and 600-line budgets waived for it, its size said
+in its body), its commits in this order:
+1. **Adena** (tier 1, D13169): tests first (invented answers), the red pass, then the deletions.
+2. **The harness's leftovers** (F13210 to F13214, attack tests 16 to 23): tests first, the red pass; each harness commit built in a
+   copy and applied by Alexis (D241).
+3. **The review** (the fan-out): Opus agents read each folder and report, per file, what to delete (with its static check), which
+   comments to rewrite, which names to change, what is unsafe; a second agent checks each deletion. One commit a folder or so:
+   `packages/*`, `server/`, `link-reader/`, `jarvis/`, `gno/`, `deploy/`, then `app/` in several (its 2,059 files), then the docs
+   and READMEs. It reads the tree after 1, without Adena's recording.
+4. **Ops** (D13171): the hosting decision, then the demo profile out.
+One review for the pull request, the reviewer and the security-reviewer, each fanned out by folder as the commits are, one round;
+the gate's jobs run once on the finished branch.
 
 ## 8. Dependencies to ask for
 None added. One possibly removed: `@hono/zod-validator` (server), if the double check finds it unused.
 
 ## 9. Questions for Alexis
 Answered (D13198, 2026-11-15): the fan-out through the Workflow tool, about 70 Opus agents; Jarvis's code and `evals/` reviewed too;
-the hosting a Hetzner VM with the same Compose and Caddy in front.
+the hosting a Hetzner VM with the same Compose and Caddy in front. Then (D13199): the whole slice in one pull request.
