@@ -16,7 +16,7 @@ import type { TranslationFlow } from "./translations/flow.ts";
 import type { makeQueue } from "./moderation/queue.ts";
 import type { Stream } from "./stream/stream.ts";
 import type { Present } from "./worlds/present.ts";
-import { ircLink, type Link, type Said } from "./irc/link.ts";
+import { ircLink, type Fetched, type Link, type Said } from "./irc/link.ts";
 import type { makeProgress } from "./moderation/catchup.ts";
 import type { pinsFor } from "./pins/wire.ts";
 import { typedRooms, type reconcilerFor } from "./rooms/wire.ts";
@@ -119,9 +119,10 @@ export function linkFor({
 /** What an owner's hide and mute do (D13936): the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
 export const ownerActs = (
   db: DatabaseSync,
-  send: (command: Command, params: readonly string[]) => boolean,
+  { send, link }: { send: (command: Command, params: readonly string[]) => boolean; link: () => Link | undefined },
   { muteKeeping }: Pick<Mutes, "muteKeeping">,
 ) => ({
+  line: (room: string, msgid: string): Promise<Fetched> => link()?.line(room, msgid) ?? Promise.resolve("unanswered"),
   hide: (room: string, msgid: string): boolean => send("REDACT", [room, msgid, "hidden by a moderator of this world"]),
   muteKeeping,
   roomsOf: (world: string): readonly string[] => worldRooms(db, world),
