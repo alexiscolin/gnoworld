@@ -143,24 +143,10 @@ jobs:
         run: python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
       - name: No locked dependency has a known advisory (npm's database)
         run: python3 -I scripts/audit.py
-      - name: gitleaks over the change, by the base's rules, both sets, no allow comment honoured
+      - name: gitleaks over the change, by the base's scan_secrets.sh, both rule sets, no allow comment honoured (D13190)
         env:
           BASE: ${{ needs.changes.outputs.base }}
-        run: |
-          set -eu
-          export GIT_NO_REPLACE_OBJECTS=1
-          [ ! -e .gitleaksignore ] || { echo "a .gitleaksignore at the root would hide secrets" >&2; exit 1; }
-          text="--text --no-ext-diff --no-textconv"
-          binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
-          found=0
-          for config in gitleaks.toml gitleaks-private.toml; do
-            paths=""
-            [ "$config" = gitleaks.toml ] || paths="-- . $binaries"
-            opts="--full-history $BASE..HEAD --diff-filter=tuxdb $text${paths:+ $paths}"
-            (set -f && git log -1 $opts >/dev/null) || { echo "git cannot read the range with $opts" >&2; exit 1; }
-            gitleaks git --no-banner --redact --config "$RUNNER_TEMP/base/scripts/$config" --gitleaks-ignore-path "$RUNNER_TEMP/base/scripts" --ignore-gitleaks-allow --log-opts="$opts" . || found=1
-          done
-          exit "$found"
+        run: sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"
 
   # zizmor over the workflows (D13144), after proving it refuses what it must: the red team's test 13.
   zizmor:

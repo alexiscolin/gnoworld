@@ -28,7 +28,8 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 
 ## How we work
 
-- Test first for tier 1 and the harness: the failing tests, the `test-auditor`'s red pass once per branch, then the code; a new
+- Test first for tier 1 and the harness: the failing tests, the `test-auditor`'s red pass once per branch (none for a small
+  harness change in the light lane, D13193), then the code; a new
   guard lands with its planted bypasses and a `harness_mutate` mutant a test kills. New logic gets a small test; pure display none.
 - Reuse and factor: search `packages/`, `server/src` and `app/src/lib` before writing a helper; two copies of one logic are a finding.
 - Read a file before changing it; find an exported symbol's references through the language server, not by text.
@@ -38,7 +39,9 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
   D13186): before asking Alexis to push, run once every job GitHub will run that the sandbox can (check.sh on the committed tree,
   the lint job, regressions, the harness's tests; deploy-stack and zizmor are GitHub's alone), and read every red job of main
   first. One push a fix pass.
-- One review a pull request: the `reviewer` agent, with the `security-reviewer` when tier 1 or the harness changes (D13181); high
+- One review a pull request: the `reviewer` agent, with the `security-reviewer` when tier 1 or the harness changes (D13181; a
+  small harness change, under about 50 lines, removing or weakening no guard and touching no secret, right or sandbox, takes the
+  light lane: its test seen failing and the `reviewer` alone, D13193); high
   and medium findings fixed before the push, low ones listed for Alexis. A fix touching a tier-1 or harness file after that review,
   or a merge whose conflicts touch one, gets the `security-reviewer` on its diff (`git show --remerge-diff` for a merge).
 - GitHub judges each pull request (`gate-ok`) and Alexis merges it with a merge commit; `deploy/test.sh` is its deploy-stack job

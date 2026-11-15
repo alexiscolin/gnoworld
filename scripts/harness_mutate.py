@@ -68,12 +68,12 @@ SECTIONS = {
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/ci_annotate.py": "ci_annotate", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
-    ".githooks/pre-push": "pre_push,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
+    ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
-    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
+    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
 }
 
 
@@ -1190,6 +1190,15 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", '. || found=1', ". || :", "hooks", "scan_secrets fails on what any rule set found")
     yield from each("scripts/scan_secrets.sh", '. || found=1', ".", "hooks", "scan_secrets runs both rule sets (F120)")
     yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
+    # D13184: --range takes commits alone, one to scan at least, and scans no more than them.
+    for find, replace, label in (
+        ("grep -Eqvx '\\^[0-9a-f]{40}' || refuse", "true || refuse", "takes a range with a commit to scan"),
+        ('[ "$count" = 0 ] || refuse', ': || refuse', "takes commits, ^commits and A..B alone"),
+        ("'\\^?[0-9a-f]{40}|", "'\\^?[0-9a-f]{4,40}|", "takes a commit's full name"),
+        ("|[0-9a-f]{40}\\.\\.([0-9a-f]{40}|HEAD)')", "|[0-9a-f]{40}\\.\\..*')", "takes A..B of commit names alone"),
+        ('[ "$mode" = all ] || opts=', ': || opts=', "scans the range alone"),
+    ):
+        yield from each("scripts/scan_secrets.sh", find, replace, "hooks", f"scan_secrets --range {label}")
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_OBJECT_DIRECTORY\n", "hooks", "pre-commit reads git's own common folder, never a caller's (F4923)")
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_COMMON_DIR\n", "hooks", "pre-commit reads git's own objects, never a caller's (F4923)")
     yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$copy/$m"; fi', 'else ln -s "$PWD/$m" "$copy/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
@@ -1375,7 +1384,7 @@ def mutants():
         ('"$RUNNER_TEMP/base/scripts/ci_changes.sh"', "scripts/ci_changes.sh", "the detector comes from the base"),
         ('python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py"', "python3 -I scripts/ci_gate_ok.py", "the verdict comes from the base"),
         ('"$RUNNER_TEMP/base/scripts/check_regressions.py"', "scripts/check_regressions.py", "the regressions are judged from the base"),
-        ('--config "$RUNNER_TEMP/base/scripts/$config"', '--config "scripts/$config"', "the change is scanned by the base's rules"),
+        ('sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range', 'sh scripts/scan_secrets.sh --range', "the change is scanned by the base's rules"),
         ("    timeout-minutes: 12\n", "    timeout-minutes: 60\n", "every job holds its budget"),
         ("    runs-on: ubuntu-24.04\n    timeout-minutes: 40\n", "    runs-on: ubuntu-latest\n    timeout-minutes: 40\n", "every job names its machine"),
         ("      - name: Prettier\n", "      - name: Prettier\n        continue-on-error: true\n", "no step may fail"),
@@ -1636,9 +1645,19 @@ def hooks_3b_mutants():
     for find, replace, label in (
         ('if [ "$remote_ref" = refs/heads/main ]; then', "if false; then", "refuses main (D13165)"),
         ("		exit 1\n	fi\n", "	fi\n", "stops at main"),
-        ('[ "$local_sha" = "$zero" ] || sending=true', ":", "scans what a push sends"),
-        ('! $sending || sh "$(dirname "$0")/scan_secrets.sh"', ":", "scans the history it sends"),
-        ('! $sending || sh "$(dirname "$0")/scan_secrets.sh"', "! $sending || sh scripts/scan_secrets.sh", "scans with the scan installed beside it, not the working tree's"),
+        ('\ttips="$tips $local_sha"\n', "", "scans what a push sends"),
+        ('export GIT_NO_REPLACE_OBJECTS=1\n', "", "reads the remote's commits past a replace ref (D13184)"),
+        ('git cat-file -e "$local_sha^{commit}" 2>/dev/null ||', "true ||", "refuses what is no commit"),
+        ('if [ "$(plain ls-remote --get-url -- "$2" 2>/dev/null)" = "$2" ]; then', "if true; then", "asks the remote only at the push's own URL"),
+        ('env -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT ', "env ", "asks the remote with no command-line configuration"),
+        ('-u GIT_SSH -u GIT_SSH_COMMAND ', "", "asks the remote with no ssh command of the push's"),
+        ('sh "$(dirname "$0")/scan_secrets.sh" --range $tips $not', ":", "scans what it sends"),
+        ('sh "$(dirname "$0")/scan_secrets.sh" --range $tips $not', "sh scripts/scan_secrets.sh --range $tips $not", "scans with the scan installed beside it, not the working tree's"),
+        ('--range $tips $not', "--range $tips", "leaves out what the remote holds (D13184)"),
+        ('plain ls-remote -- "$2"', "git for-each-ref --format='%(objectname)' refs/remotes", "asks the remote itself, never a remote-tracking ref (D13184)"),
+        ("grep -v ' missing$' | ", "", "leaves out the remote's commits it does not have"),
+        ('\ttips="$tips $local_sha"\n', '\ttips=" $local_sha"\n', "scans every ref it sends"),
+        ('[ -n "$tips" ] || exit 0', ":", "scans nothing when nothing is sent"),
     ):
         yield from each(pp, find, replace, h, f"pre-push {label}")
     yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit"', "exit 0", h, "pre-merge-commit gives a merge pre-commit's checks")

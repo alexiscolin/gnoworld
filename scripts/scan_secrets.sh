@@ -1,5 +1,6 @@
 #!/bin/sh
-# scan_secrets.sh [--staged]: gitleaks over what is staged, or over the whole history. Its rules
+# scan_secrets.sh [--staged | --range <revision>...]: gitleaks over what is staged, over the commits the revisions name (a commit,
+# ^commit, A..B; what a push sends, what a pull request adds: D13184, D13190), or over the whole history. Its rules
 # are scripts/gitleaks.toml, then gitleaks-private.toml (names a public repository must not hold),
 # both files Claude cannot edit, and --config takes precedence over GITLEAKS_CONFIG(_TOML); a root
 # .gitleaksignore and gitleaks:allow comments, which could turn the scan off, are refused or ignored.
@@ -11,6 +12,27 @@ if [ -e .gitleaksignore ]; then # gitleaks reads it at the root whatever --gitle
 	echo "scan_secrets: a .gitleaksignore at the root would hide secrets; remove it (an exception goes in scripts/, with a reviewed commit)" >&2
 	exit 1
 fi
+refuse() { echo "scan_secrets: --range takes commits, ^commits and A..B alone, one to scan at least: $1" >&2; exit 1; }
+mode=all revs=""
+case ${1:-} in
+--staged) mode=staged ;;
+--range)
+	shift
+	mode=range
+	# Each a commit's full name: an option or a ref's name here would reach git log. One grep reads them all (a function a word
+	# grew with the square of the remote's refs under macOS's sh).
+	[ $# -gt 0 ] || refuse "no commit to scan"
+	count=$(printf '%s\n' "$@" | grep -Ecvx '\^?[0-9a-f]{40}|[0-9a-f]{40}\.\.([0-9a-f]{40}|HEAD)') || :
+	[ "$count" = 0 ] || refuse "$*"
+	printf '%s\n' "$@" | grep -Eqvx '\^[0-9a-f]{40}' || refuse "no commit to scan"
+	revs=" $*"
+	;;
+"") ;;
+*)
+	echo "usage: scan_secrets.sh [--staged | --range <revision>...]" >&2
+	exit 1
+	;;
+esac
 export GIT_NO_REPLACE_OBJECTS=1
 text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png
@@ -20,13 +42,14 @@ found=0 # both rule sets run, so a secret does not hide a private name beside it
 for config in gitleaks.toml gitleaks-private.toml; do
 	paths="" # every file, but for the private rules
 	[ "$config" = gitleaks.toml ] || paths="-- . $binaries"
-	if [ "${1:-}" = --staged ]; then
+	if [ "$mode" = staged ]; then
 		# set -f: the pathspecs reach git as written; a failure stops the scan rather than scan nothing.
 		staged=$(set -f && git diff --cached -U0 $text $paths)
 		printf '%s\n' "$staged" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1
 	else
 		# --log-opts replaces gitleaks's own log options, so they are given again before the text ones.
 		opts="--full-history --all --diff-filter=tuxdb $text${paths:+ $paths}"
+		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $text${paths:+ $paths}"
 		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first (F140).
 		(set -f && git log -1 $opts >/dev/null) || { echo "scan_secrets: git cannot read the history with $opts" >&2; exit 1; }
 		gitleaks git --no-banner --redact --config "$here/$config" --gitleaks-ignore-path "$here" --ignore-gitleaks-allow \

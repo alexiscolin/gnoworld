@@ -127,6 +127,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
 | Retouch | a look tried live in the workshop (ping-pong) | at the batch's end: the gate, the pictures of the screens it touches, one `reviewer` |
 | Small fix | about 20 product lines, no tier-1 or harness file | its test seen failing, the gate, the journeys that watch it, one `reviewer` |
 | Feature | product code with no tier-1 or harness file | new logic a small test, one combined review a pull request (D13181; the design apart only for how space looks), two lots at most |
+| Light harness (D13193) | a harness change under about 50 lines that removes, narrows or weakens no guard and touches no secret, right or sandbox | its test seen failing, one combined review |
 | Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
 
 The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
