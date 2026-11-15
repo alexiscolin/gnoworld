@@ -504,7 +504,7 @@ costs context in every session.
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
 | `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `design-reviewer`, `dreamer` |
-| `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
+| `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream`, `/pose` |
 | `.claude/workflows/` | `branch`, a branch's loop |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the harness list and the check of a path the disk may fold |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
