@@ -126,9 +126,6 @@ StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every
 the script verbatim), and `--mutate a.ts b.ts` reads `b.ts` as its config file. Without `--mutate`
 the whole config runs (`pnpm run mutate`; `pnpm run mutate:all` runs `stryker.all.config.json`). Keep `checkers: ["typescript"]` (HARNESS.md).
 
-To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
-`go run ./tools/sealvec > r/seal/vectors_test.gno`.
-
 **Secrets** live in `deploy/secrets/`, one file each, gitignored and unreadable by Claude
 Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
 Anthropic key is Alexis's own for tests, then the company's.
@@ -268,4 +265,5 @@ most (`docs/HARNESS.md`, "Who does what").
 The order, from phase 0 to phase 3, is in [plans/backlog.md](plans/backlog.md), with the
 concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.
 
-Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2.
+Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2; the seal realm and its reference client are out
+of the tree until then (D13197), in git's history.

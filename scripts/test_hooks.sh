@@ -962,7 +962,7 @@ done
 mkdir -p "$mu/b/r/broken" && printf 'module = "gno.land/r/test/broken"\ngno = "0.9"\n' >"$mu/b/r/broken/gnomod.toml"
 printf 'package broken\n\nfunc Check(n int) int {\n\tk := n\n\tmustSmall(k)\n\treturn n\n}\n\nfunc mustSmall(k int) {\n\tif k > 9 {\n\t\tpanic("big")\n\t}\n}\n\nfunc Spare(n int) int { return n + 5 }\n' >"$mu/b/r/broken/broken.gno"
 printf 'package broken\n\nimport "testing"\n\nfunc panics(f func()) (yes bool) {\n\tdefer func() { yes = recover() != nil }()\n\tf()\n\treturn\n}\n\nfunc TestCheck(t *testing.T) {\n\tif Check(9) != 9 || !panics(func() { Check(10) }) {\n\t\tt.Fatal("check")\n\t}\n}\n' >"$mu/b/r/broken/broken_test.gno"
-gapped() { # $1: the copy of mutate.py to write, $2: its GAPS as JSON, $3: its EXTRA as JSON, none (not seal's) when absent
+gapped() { # $1: the copy of mutate.py to write, $2: its GAPS as JSON, $3: its EXTRA as JSON, none when absent
 	python3 -I - "$here/mutate.py" "$1" "$2" "${3:-[]}" <<'PY' || fail "the planted copy of mutate.py could not be written: GAPS or EXTRA is gone"
 import ast, json, sys
 src = open(sys.argv[1]).read()

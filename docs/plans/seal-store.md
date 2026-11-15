@@ -1,6 +1,8 @@
 # Seal store — `r/seal`: data apart from rules, the gaps closed, on onyx
 
 Status: deferred to phase 2, with private rooms (ADR-0001, Rollout). The tests below are written first, and are approved before any code.
+It starts by restoring from e44037b8 what D13197 took out: `gno/r/seal`, `gno/tools/sealvec`, `gno/go.mod`, the gate's vectors step,
+seal's GAPS and EXTRA in `scripts/mutate.py`; F057, F058, F059 and F061 are still open there.
 
 ## Goal
 

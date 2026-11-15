@@ -302,7 +302,7 @@ jobs:
           exe="$RUNNER_TEMP/tools/nginx-1.30.6/nginx"
           GNOWORLD_TOOLS="$RUNNER_TEMP/tools" NGINX_SHA256="$(sha256sum "$exe" | cut -d ' ' -f 1)" GNOWORLD_BUILD="$PWD/app/build-gate/ci" python3 -I scripts/check_nginx.py
 
-  # Realms and Go tools: gno lint and test, the realms' guard mutants (mutate.py), gofmt, vet and the seal vectors.
+  # The realms: gno lint and test, and the realms' guard mutants (mutate.py).
   gno-go:
     needs: [changes]
     if: needs.changes.outputs.gno == 'true'
@@ -333,13 +333,6 @@ jobs:
         run: cd gno && "$GNO" lint ./... && "$GNO" test ./...
       - name: Every guard removed must fail a test (mutate.py)
         run: cd gno && python3 -I ../scripts/mutate.py
-      - name: gofmt, vet, and the seal vectors they generate
-        run: |
-          set -eu
-          cd gno
-          test -z "$(gofmt -l tools)" || { gofmt -l tools >&2; exit 1; }
-          go vet ./tools/...
-          go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || { echo "gno/r/seal/vectors_test.gno differs from: go run ./tools/sealvec" >&2; exit 1; }
 
   # Tier-1 coverage floors and the change's own coverage, when a tier-1 path changed; it runs the `slow` project (real Ergo).
   coverage:

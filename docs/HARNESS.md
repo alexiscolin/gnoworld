@@ -147,7 +147,7 @@ app/playwright.config.ts <spec>`).
 (Prettier, ESLint, knip, jscpd, the CSS and comments rules, `check_docs.py`, every script parsing, the audit, gitleaks over the change by
 the base's rules); zizmor; Vitest in three shards with one retry; core's tests in Chromium and, for a change of the design system or the harness, the stories, never their pictures; the
 critical journeys; the build, the first screen's budget and nginx (`scripts/check_nginx.py`, for an app change alone: F13186), which a commit's gate no longer builds; gno, its mutants (`scripts/mutate.py`) and
-the Go tools; the coverage and the patch's (`scripts/patch_coverage.py`, from the base); StrykerJS on the changed tier-1 lines
+the coverage and the patch's (`scripts/patch_coverage.py`, from the base); StrykerJS on the changed tier-1 lines
 (`scripts/stryker_lines.py`, from the base; no job fails on its survivors yet, F13184); the regressions and the migrations (`scripts/check_regressions.py`,
 `scripts/check_migrations.py`, from the base); `deploy/test.sh` when `deploy/` changes; the harness's own `probe.py` and `test_hooks.sh`
 when the harness changes. `gate-ok` reads every job with the base's `scripts/ci_gate_ok.py`; after a failure, its last step writes
