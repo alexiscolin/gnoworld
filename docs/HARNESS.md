@@ -232,7 +232,11 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   and the file tools reach every worktree, so each closed path has twins: each relative `denyWrite`
   entry again under `~/Server/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there and in the main checkout
   (`~/Server/gnoworld/…`); and a linked worktree's `.git`, the file that names
-  git's folder. `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
+  git's folder. One class has no sibling twin on purpose: the paths `OPENED` names in the section `siblings` (`scripts/check.sh`,
+  `check_docs.py`, `ergo.sh`, `hidden.py`, `related.py`, `speeds.py`, `workshop.sb`, `workshop.sh`, `stop_gate.sh`, `borrow_node_modules.sh`,
+  the workflows, agents, commands and rules) are open to a worktree's own session, which builds its harness changes there (the
+  speed plan's unlock of 2026-11-06); the main checkout keeps them closed, and the section fails on a twin added for one of them.
+  `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
   real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the rules as Claude Code
   does and, in its sandbox, writes into a sibling to see each write refused. A session carries the twins once its own
   checkout's `settings.json` does; the chief's session, started in the main checkout, reads that checkout's settings, and
