@@ -146,4 +146,27 @@ describe("useUnread", () => {
     expect(t.counts).not.toHaveBeenCalled();
     expect(t.last()).toEqual({});
   });
+
+  // A tab in the background asks nobody for a count no one reads (the other timers skip a hidden document too).
+  it("asks nothing on its 30 s tick while the page is hidden, and asks again once shown", async () => {
+    const t = setup(ok({ bubble: 3 }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(t.counts).toHaveBeenCalledTimes(1);
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+      expect(t.counts).toHaveBeenCalledTimes(1);
+      hidden.mockReturnValue(false);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(t.counts).toHaveBeenCalledTimes(2);
+    } finally {
+      hidden.mockRestore();
+    }
+  });
 });
