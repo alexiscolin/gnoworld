@@ -18,7 +18,13 @@ export interface ComingSoonProps {
 
 /** What is not built yet, shown where the video draws it: greyed, inert, "Coming soon" under the pointer and the focus, and said so to
  * a screen reader. It stays focusable, so the keyboard finds it too; a click does nothing. */
-export function ComingSoon({ name, icon, words, size = "m", children }: ComingSoonProps) {
+export function ComingSoon(props: ComingSoonProps) {
+  return <Soon {...props} />;
+}
+
+/** ComingSoon with a class of the caller's, next to the greyed one: for the package's own parts (a NavItem that is yet to come lays itself
+ * out as its siblings do), never the entry's, which takes no class (docs/DESIGN-SYSTEM.md, "No outside styling"). */
+export function Soon({ name, icon, words, size = "m", children, className }: ComingSoonProps & { className?: string }) {
   const face =
     children === undefined ? (
       <>
@@ -31,7 +37,7 @@ export function ComingSoon({ name, icon, words, size = "m", children }: ComingSo
   // An icon alone wears an IconButton's own look, so it stands at the same size beside them (the chat's header).
   const look =
     children !== undefined
-      ? { className: "bare" }
+      ? { className: className ?? "bare" }
       : words === undefined
         ? iconLook("outline", size)
         : buttonLook("outline", "neutral", size);
@@ -40,7 +46,7 @@ export function ComingSoon({ name, icon, words, size = "m", children }: ComingSo
       <button
         type="button"
         {...look}
-        className={[look.className, styles["soon"]].join(" ")}
+        className={[look.className, styles["soon"], children === undefined ? className : undefined].join(" ")}
         aria-disabled="true"
         aria-label={`${name}, coming soon`}
       >

@@ -1,6 +1,6 @@
 // The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' /, the
 // field's words, when it has some to say, and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
-import { Cluster, Icon, IconButton, type IconName } from "@gnoworld/ui";
+import { Cluster, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, type ReactNode } from "react";
 import shared from "../../edge.module.css";
 import type { Format } from "./composer/kinds.ts";
@@ -96,10 +96,9 @@ export function MessageBox({
       {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} />}
       <div className={styles["field"]}>{children}</div>
       {quick === undefined ? null : <div className={styles["acts"]}>{quick}</div>}
-      <button type="submit" className={`grid-center disc ${String(styles["send"])}`} disabled={!goes}>
-        <Icon name="arrow" />
-        <span className="visually-hidden">{send}</span>
-      </button>
+      <span className={styles["send"]}>
+        <IconButton solid type="submit" size="s" icon="arrow" label={send} disabled={!goes} />
+      </span>
     </div>
   );
 }

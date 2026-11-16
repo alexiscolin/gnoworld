@@ -133,7 +133,7 @@ test("the panel has one cross, Escape clears then closes, and a failed search of
   await page.keyboard.press("Control+Shift+F");
   await field(page).fill("quorum");
   const again = panel(page).getByRole("button", { name: "Try again" });
-  await expect(panel(page).getByText("The search is out of reach.")).toBeVisible();
+  await expect(panel(page).getByText("The server is not answering.")).toBeVisible();
   const box = await again.boundingBox();
   expect(box?.width ?? Infinity).toBeLessThan(160);
   await shot(page, "9-error");

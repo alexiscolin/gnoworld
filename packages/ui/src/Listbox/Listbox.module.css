@@ -16,11 +16,7 @@
     border-radius: var(--radius-item);
     font: var(--font-chat);
     cursor: pointer;
-  }
-
-  .option:hover,
-  .option[aria-selected="true"] {
-    background: var(--color-fill-hover);
+    --lit-fill: var(--color-fill-hover);
   }
 
   .hint {

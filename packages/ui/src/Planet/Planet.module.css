@@ -10,4 +10,11 @@
       var(--world-deep) 100%
     );
   }
+
+  /* Filling a box: a thumb's disc, whatever its size. */
+  .planet[data-fill] {
+    display: block;
+    min-inline-size: 0;
+    inline-size: 100%;
+  }
 }

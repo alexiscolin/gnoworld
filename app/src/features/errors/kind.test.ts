@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { Unread } from "../../lib/query/client.ts";
 import { errorKind, isMissing, type ErrorKind } from "./kind.ts";
 
 // What the router hands a boundary for a loader's `data(null, { status })`.
@@ -34,6 +35,14 @@ describe("errorKind", () => {
   test("a browser with no network is offline, whatever failed, a chunk included", () => {
     expect(errorKind(new Error("a bug"), false)).toBe("offline");
     expect(errorKind(new TypeError("error loading dynamically imported module"), false)).toBe("offline");
+  });
+
+  test("a read that did not come whole says its status, and is unavailable when it has none", () => {
+    expect(errorKind(new Unread(undefined, { kind: "down", status: 404 }), true)).toBe("not-found");
+    expect(errorKind(new Unread(undefined, { kind: "down", status: 403 }), true)).toBe("forbidden");
+    expect(errorKind(new Unread(undefined, { kind: "down", status: 500 }), true)).toBe("unavailable");
+    expect(errorKind(new Unread(undefined), true)).toBe("unavailable");
+    expect(errorKind(new Unread(undefined), false)).toBe("offline");
   });
 
   test("only a 404 is missing", () => {

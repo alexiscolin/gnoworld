@@ -26,10 +26,6 @@
     min-block-size: var(--row-h);
   }
 
-  .row:hover {
-    background: var(--color-fill);
-  }
-
   /* A section of a column: its name in the label's capitals, the chevron before it, the control at the end a sibling of the button. */
   .head {
     /* layout: the name and its control at the two ends */
@@ -70,8 +66,8 @@
     order: -1;
   }
 
-  .disclosure[data-look="section"] .head .row:hover {
-    background: transparent;
+  .disclosure[data-look="section"] .head .row {
+    --lit-fill: transparent;
   }
 
   .disclosure[data-look="section"] .body[data-open] .inner {

@@ -270,7 +270,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await page.goto(`/w/bubble?dm=${OTHER}&chat=full`);
     await hydrated(page);
     await control(page).click();
-    await expect(drawer(page).getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    await expect(drawer(page).getByRole("alert").filter({ hasText: "The server is not answering." })).toBeVisible();
   });
 
   test("passes axe at 390 px, closed and open", async ({ page }) => {

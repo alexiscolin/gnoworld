@@ -30,18 +30,19 @@
     color: inherit;
   }
 
-  .item:hover {
-    background: var(--color-fill);
-  }
-
-  /* What is yet to come: greyed, refusing the pointer's promise of an act, no fill under it (as ComingSoon). */
+  /* What is yet to come: no fill under it; ComingSoon greys it and refuses the pointer's promise of an act. */
   .item[data-soon] {
-    opacity: var(--opacity-disabled);
+    --lit-fill: transparent;
+
     background: none;
+    /* the whole item greys, its end too; the button inside keeps its own ink */
+    opacity: var(--opacity-disabled);
   }
 
   .item[data-soon] .main {
-    cursor: not-allowed;
+    opacity: 1;
+    /* layout: the button stands in its tooltip's anchor, not in the item's grid: as tall as the pill all the same */
+    min-block-size: var(--chat-item);
   }
 
   .item[data-unread] .main {
@@ -49,7 +50,8 @@
   }
 
   .item[data-current] {
-    background: var(--color-primary);
+    --lit-now: var(--color-primary);
+
     color: var(--color-ink);
   }
 

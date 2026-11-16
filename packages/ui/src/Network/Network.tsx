@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Cluster, Stack } from "../compositions/index.ts";
+import { Icon } from "../icons/Icon.tsx";
 import styles from "./Network.module.css";
 import { CENTRE_R, Centre, nameHeight, Nones } from "./marks.tsx";
 import { useSeen } from "./useSeen.ts";
@@ -178,11 +179,15 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
       {/* The two sides of the legend 8 px apart (the proposal's). */}
       <div className={["meta", styles["legend"]].join(" ")}>
         <Cluster space="2xs">
-          <span>
-            ← {left.word} <b>{left.total ?? left.nodes.length}</b>
+          <span className="with-icon">
+            <span className={styles["back"]}>
+              <Icon name="arrow" size="s" />
+            </span>
+            {left.word} <b>{left.total ?? left.nodes.length}</b>
           </span>
-          <span>
-            {right.word} <b>{right.total ?? right.nodes.length}</b> →
+          <span className="with-icon">
+            {right.word} <b>{right.total ?? right.nodes.length}</b>
+            <Icon name="arrow" size="s" />
           </span>
         </Cluster>
       </div>

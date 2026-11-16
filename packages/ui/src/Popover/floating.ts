@@ -10,7 +10,7 @@ export function surface(own: string | undefined) {
 
 /** A box in the top layer, placed in script and faded in: the surface's classes and its own. */
 export function floating(own: string | undefined) {
-  return [shared["surface"], shared["floating"], own].join(" ");
+  return [shared["surface"], shared["floating"], "appears", own].join(" ");
 }
 
 interface Placing {

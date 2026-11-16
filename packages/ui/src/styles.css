@@ -6,4 +6,5 @@
 @import "./reset.css" layer(reset);
 @import "./tokens.css" layer(tokens);
 @import "./base.css" layer(base);
+@import "./appears.css" layer(components);
 @import "./utilities.css" layer(utilities);

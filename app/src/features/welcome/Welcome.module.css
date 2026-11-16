@@ -12,30 +12,17 @@
     /* the card's own fill is faint: over the page it needs the surface under it */
     background: var(--color-surface);
     border-radius: var(--radius-box);
-    opacity: 0;
+    /* It appears as appears.css says, coming from 8 px below. */
+    --appear-time: var(--motion-base);
+    --appear-from: 0 var(--space-2xs);
+
     visibility: hidden;
-    translate: 0 var(--space-2xs);
-    transition:
-      opacity calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--ease-in),
-      translate calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--ease-in),
-      visibility calc(var(--motion-base) * 0.7 * var(--motion-scale));
+    /* Not a popover: its visibility goes with the fade, the shared rule's other properties as they are. */
+    transition-property: opacity, translate, visibility;
   }
 
   .welcome[data-open] {
-    opacity: 1;
     visibility: visible;
-    translate: none;
-    transition:
-      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
-      translate calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
-      visibility calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
-  }
-
-  @starting-style {
-    .welcome[data-open] {
-      opacity: 0;
-      translate: 0 var(--space-2xs);
-    }
   }
 
   @media (width <= 40rem) {
