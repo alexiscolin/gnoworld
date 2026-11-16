@@ -86,6 +86,7 @@ describe("PlanetThumb", () => {
     for (const each of asked)
       if (!each.startsWith("data:")) expect(new URL(each, "https://site.test/list").origin).toBe("https://site.test");
     expect(container.querySelector("[data-fallback]")).not.toBeNull();
+    expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("img", { name: "Bubble" })).toBeTruthy();
   });
 
@@ -144,6 +145,8 @@ describe("PlanetThumb", () => {
       const { container, unmount } = render(<PlanetThumb src={src} name="Bubble" />);
       for (const img of container.querySelectorAll("img"))
         expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+      // The fallback asks for nothing at all, so it sends nothing.
+      if (src.startsWith("https:")) expect(container.querySelector("img")).toBeNull();
       unmount();
     }
   });

@@ -227,8 +227,9 @@ test("shows each world but a seed as its own planet's portrait, drawn by the sce
   await expect
     .poll(async () => (await sources()).slice(0, 6).every((src) => src.startsWith("data:image/jpeg")), SLOW)
     .toBe(true);
-  const seeds = (await sources()).slice(6);
-  expect(seeds.every((src) => src.startsWith("data:image/svg+xml"))).toBe(true);
+  // The seeds have no picture: ui's Planet stands in, asked of nobody (D13220).
+  expect((await sources()).slice(6)).toEqual([]);
+  expect(await rail(page).locator("li [data-fallback] .disc").count()).toBeGreaterThan(0);
   // A portrait holds a lit planet: a good share of its pixels are neither black nor one flat colour.
   const lit = await rail(page)
     .locator("li img")
