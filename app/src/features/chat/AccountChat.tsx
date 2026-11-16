@@ -17,7 +17,7 @@ export interface AccountChatProps extends Omit<LoadedProps, "sections" | "dms" |
 }
 
 export function AccountChat({ loaded, world, sections, dm, ...page }: AccountChatProps) {
-  const { session, current, link, failed } = page;
+  const { session, current, link } = page;
   const dms = useDms(world, session, dm);
   const noticing = useNotices({
     world,
@@ -28,7 +28,5 @@ export function AccountChat({ loaded, world, sections, dm, ...page }: AccountCha
     read: (room, time) => link.current?.markRead(room, time),
   });
   if (!loaded) return LOADING;
-  // A direct message waits on no room: it shows though the rooms could not load.
-  if (failed !== undefined && dms.partner === undefined) return failed;
   return <Loaded {...page} sections={sections ?? []} dms={dms} noticing={noticing} />;
 }

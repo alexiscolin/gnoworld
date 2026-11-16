@@ -51,6 +51,8 @@ interface GuestLoadedProps {
   dismissed: (room: string) => void;
   /** Whether the address asks for a direct message, which a visitor has none of. */
   asksDm: boolean;
+  /** What says the rooms could not load, in the conversation's place inside the chat's frame. */
+  failed?: ReactNode;
   /** The world the chat is in, for its header, its column of worlds and its info panel. */
   place: ChatPlace;
 }
@@ -79,12 +81,14 @@ function GuestRoom({
   view,
   place,
   open,
+  failed,
 }: {
   asksDm: boolean;
   shown: Shown | undefined;
   view: RoomViewOver;
   place: ChatPlace;
   open: string | undefined;
+  failed: ReactNode;
 }) {
   return (
     <>
@@ -92,7 +96,7 @@ function GuestRoom({
       {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
       {shown === undefined ? (
         asksDm ? null : (
-          <NoRoomYet />
+          (failed ?? <NoRoomYet />)
         )
       ) : (
         <RoomView
@@ -120,6 +124,7 @@ export function GuestLoaded({
   link,
   dismissed,
   asksDm,
+  failed,
   place,
 }: GuestLoadedProps) {
   // A direct message asked for shows its problem in the room's place, as an account's does.
@@ -165,6 +170,7 @@ export function GuestLoaded({
         view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
         place={place}
         open={openRoom(sections, room)}
+        failed={failed}
       />
     </ChatScreen>
   );
