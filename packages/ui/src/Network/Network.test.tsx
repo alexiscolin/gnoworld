@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Network } from "./Network.tsx";
+import { wrapWords } from "./marks.tsx";
 
 // A live pulse beats for a minute and rests; a new content beats it again, which a new element does (the animation starts with its element).
 describe("the halo's pulse", () => {
@@ -41,5 +42,15 @@ describe("a dot that answers a pick", () => {
   it("keeps its title, the hover's full path, when nothing answers a pick", () => {
     const view = render(graph());
     expect(view.container.querySelector("title")?.textContent).toBe("gno.land/r/a");
+  });
+});
+
+// An empty side's words stay inside their lane: they break between words when the lane is narrower than they are.
+describe("wrapWords", () => {
+  it("keeps a line that fits, breaks between words when it does not, and never splits a word", () => {
+    expect(wrapWords("imports nothing", 20)).toEqual(["imports nothing"]);
+    expect(wrapWords("imports nothing", 10)).toEqual(["imports", "nothing"]);
+    expect(wrapWords("no imported by yet", 12)).toEqual(["no imported", "by yet"]);
+    expect(wrapWords("imports nothing", 3)).toEqual(["imports", "nothing"]);
   });
 });

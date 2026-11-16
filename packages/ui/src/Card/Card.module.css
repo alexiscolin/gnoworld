@@ -87,6 +87,13 @@
     }
   }
 
+  /* raw: 30 rem, the room a title, a path of 24 characters and a button need: under it the meta line gives way, and the title is never cut beside it */
+  @container (inline-size < 30rem) {
+    .card[data-look="hub"] .meta {
+      display: none;
+    }
+  }
+
   /* raw: the narrowest square, where even the smaller title and the buttons fill the row: the hint gives way */
   @container (inline-size < 13rem) {
     .hint {
