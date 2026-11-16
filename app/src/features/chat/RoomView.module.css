@@ -358,6 +358,18 @@
   }
 }
 
+/* A phone's country chip: its letters at the phone's larger --text-3xs no longer fit the frames' 22 px, so it grows with them instead of wrapping. */
+@layer components {
+  @media (width < 900px) {
+    .country {
+      inline-size: auto;
+      /* raw: the frames' 22 px, the least a chip of two letters keeps */
+      min-inline-size: 22px;
+      white-space: nowrap;
+    }
+  }
+}
+
 /* A phone's finger: an author's name, one line high, gains an invisible box to 44 px (WCAG 2.5.5 target size), its look unchanged. The box
    grows upward only: under the name stands the message's first line, whose links a box over it would take. It sits in the utilities
    layer, with a selector one class and one attribute above the generic bare-button box's (the name button has both attributes): that rule

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { PHONE_QUERY } from "@gnoworld/core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { all, button, click, mount, noMedia, one } from "../../../tests/mount.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 
 // The composer's one box (frame 23.58.01): a small format bar, the field, and at its foot a round Send alone (the @ and /
@@ -17,6 +18,11 @@ const draw = (over: Partial<Parameters<typeof MessageBox>[0]> = {}) =>
       <textarea aria-label="Message #games" />
     </MessageBox>,
   );
+
+beforeEach(noMedia);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("the composer's box", () => {
   it("is one group holding the format bar, the field and Send", () => {
@@ -109,5 +115,34 @@ describe("the composer's box", () => {
 
   it("draws no format control for a box with no bar", () => {
     expect(button(draw({ onFormat: undefined }), "Formatting")).toBeUndefined();
+  });
+
+  // A phone folds the shell header while the field has the focus: a press that blurs it moves Send before the click lands.
+  it("keeps the field focused on a phone when a press lands on its own buttons, and not on the field", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === PHONE_QUERY,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    const box = draw();
+    const press = (target: Element | null | undefined, type: "pointerdown" | "mousedown") => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      target?.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    for (const type of ["pointerdown", "mousedown"] as const) {
+      expect(press(button(box, "Send"), type)).toBe(true);
+      expect(press(button(box, "Bold")?.querySelector("svg"), type)).toBe(true);
+      expect(press(box.querySelector("textarea"), type)).toBe(false);
+    }
+  });
+
+  it("leaves a computer's press to move the focus", () => {
+    const event = new Event("mousedown", { bubbles: true, cancelable: true });
+    button(draw(), "Send")?.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

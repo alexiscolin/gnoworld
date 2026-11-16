@@ -182,9 +182,17 @@
       --_bar: 0px;
       /* raw: no words */
       --_say: 0px;
+      /* raw: nothing under the box */
+      --_below: 0px;
       --_free: calc(
-        var(--chat-vh) - var(--banner-under) - var(--_dock) - var(--_foot) - var(--_bar) - var(--_say) - 3lh
+        var(--chat-vh) - var(--banner-under) - var(--_dock) - var(--_foot) - var(--_bar) - var(--_say) - var(--_below) -
+          3lh
       );
+    }
+
+    /* A guest's box has a row under it (what it speaks as, and Connect Adena at 44 px), set by GuestWriter. */
+    [data-guest] .box {
+      --_below: calc(var(--space-2xs) + var(--control-m));
     }
 
     .box:has(.format[data-open]) {

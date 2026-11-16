@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, useState, type ReactElement } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { all, button, click, mount, one, settled } from "../../../tests/mount.tsx";
+import { all, button, click, mount, noMedia, one, settled } from "../../../tests/mount.tsx";
 import {
   calling,
   CUR,
@@ -113,6 +113,8 @@ describe("the quick actions of a world with pinned actions", () => {
       Results: null,
     },
   ];
+  // A pinned card's heading level asks the window for a phone.
+  beforeEach(noMedia);
   afterEach(() => {
     vi.unstubAllGlobals();
   });

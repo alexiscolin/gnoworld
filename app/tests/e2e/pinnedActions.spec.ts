@@ -35,7 +35,11 @@ for (const width of [390, 1280] as const) {
     expect(await follows(above, form), "the form under the actions' row").toBe(true);
     expect(await follows(figures, form), "the form under the figures").toBe(true);
     expect(await follows(form, proposals), "the Proposals card under the form").toBe(true);
-    if (width < 900) await pageSheet(page).getByRole("button", { name: "Close" }).click();
+    // Close goes back to the sheet's Info (PhoneInfo.tsx), whose own Close leaves the sheet for the chat.
+    if (width < 900) {
+      await pageSheet(page).getByRole("button", { name: "Close" }).click();
+      await page.getByRole("dialog", { name: "Info" }).getByRole("button", { name: "Close" }).click();
+    }
     await expect(bar(page).getByRole("button")).toHaveText(["Vote"]);
 
     await bar(page).getByRole("button", { name: "Vote" }).click();

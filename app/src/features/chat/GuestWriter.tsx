@@ -131,6 +131,7 @@ export function GuestWriter({ room }: { room: string }) {
   return (
     <form
       aria-label={`Write in ${label} as a guest`}
+      data-guest=""
       onSubmit={(event) => {
         send(event).catch(reportError);
       }}

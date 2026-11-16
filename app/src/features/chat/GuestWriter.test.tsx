@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { mount, one, settled } from "../../../tests/mount.tsx";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mount, noMedia, one, settled } from "../../../tests/mount.tsx";
 import { GuestWriter } from "./GuestWriter.tsx";
+
+beforeEach(noMedia);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("a guest's composer", () => {
   // The workshop (2026-11-16): a bare textarea took the browser's resize grip. The design system's Field draws the box, and its fixed

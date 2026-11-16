@@ -125,8 +125,14 @@ test.describe("the country tag", () => {
       expect(name.x).toBeGreaterThanOrEqual(code.x + code.width);
       // Centred on the face, which is 20 px: the code's middle within a pixel of the face's.
       expect(Math.abs(code.y + code.height / 2 - (face.y + face.height / 2))).toBeLessThanOrEqual(1);
-      expect(Math.round(code.width)).toBe(22);
-      expect(Math.round(code.height)).toBe(15);
+      // A phone's larger --text-3xs grows the chip from the frames' 22 by 15 to what its two letters need, on one line.
+      if (screen === "phone") {
+        expect(code.width).toBeGreaterThanOrEqual(22);
+        expect(code.height).toBeLessThan(20);
+      } else {
+        expect(Math.round(code.width)).toBe(22);
+        expect(Math.round(code.height)).toBe(15);
+      }
       // The letters fit the box on every font: nothing spills past its padding.
       expect(await head.locator("[data-line-country]").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
       expect((await axeOf(page).include("ol[aria-label='Messages']").analyze()).violations).toEqual([]);

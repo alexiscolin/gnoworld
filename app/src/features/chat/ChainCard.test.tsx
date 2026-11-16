@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { PHONE_QUERY } from "@gnoworld/core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainCall } from "../../store/chain.ts";
-import { all, mount, one } from "../../../tests/mount.tsx";
+import { all, mount, noMedia, one } from "../../../tests/mount.tsx";
 import { ChainCard } from "./ChainCard.tsx";
 
 // Frames 20 to 35, the activity of a world's room: a call the chain told is a card of the room's thread, in words from the
@@ -30,7 +31,25 @@ const mountLine = (call: ChainCall) => {
   return { box, item: one(box, "li") };
 };
 
+beforeEach(noMedia);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("the chain's lines in a room", () => {
+  // The phone's full chat has no h2 between its h1 and the thread (its info is a sheet): the card's title follows the h1 at once.
+  it("titles its card at level 2 on a phone and 3 elsewhere", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === PHONE_QUERY,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    expect(mountLine(line(900030)).item.querySelector("h2")).not.toBeNull();
+  });
+
   it("is one item that is a dashed card with a link icon, its caller and function in its title, its realm and its height under it", () => {
     const { item } = mountLine(line(900030));
     expect(item.hasAttribute("data-chain")).toBe(true);

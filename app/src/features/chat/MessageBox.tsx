@@ -5,6 +5,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import shared from "../../edge.module.css";
 import type { Format } from "./composer/kinds.ts";
 import { useFull } from "./full.ts";
+import { useKeepFocus } from "./keepFocus.ts";
 import styles from "./MessageBox.module.css";
 
 // The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
@@ -101,8 +102,16 @@ export function MessageBox({
 }) {
   // A phone folds the bar behind one control (MessageBox.module.css): its nine tools at 44 px fill two rows of a short screen.
   const [folded, setFolded] = useState(false);
+  const keep = useKeepFocus();
   return (
-    <div role="group" aria-label="Message box" className={[shared["edge"], styles["box"]].join(" ")}>
+    <div
+      role="group"
+      aria-label="Message box"
+      className={[shared["edge"], styles["box"]].join(" ")}
+      // A press on the box's own buttons keeps the field focused: a phone folds the shell header while it is, and Send would move
+      // from under the finger at the blur, before the click. Also keeps the on-screen keyboard up after a send.
+      {...keep}
+    >
       {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} open={folded} />}
       <div className={styles["field"]}>{children}</div>
       {quick === undefined && onFormat === undefined ? null : (
