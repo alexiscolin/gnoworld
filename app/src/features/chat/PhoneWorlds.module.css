@@ -1,0 +1,42 @@
+/* A phone's row of worlds, the chat's foot: one line, scrolling sideways inside itself, never wrapping. Its height is a planet (44 px), the
+   name's line and the padding that leaves the ring room (about 75 px), plus the home bar's inset. The planet and its ring are the column's
+   (Worlds.module.css). */
+@layer components {
+  .row {
+    overflow: auto hidden;
+    border-block-start: var(--line-width) solid var(--color-line);
+    padding-block-end: env(safe-area-inset-bottom);
+    scroll-behavior: smooth;
+  }
+
+  .list {
+    /* layout: the first and last world clear the screen's edge, and the ring has room above and below */
+    padding: var(--space-2xs) var(--space-s);
+    inline-size: max-content;
+    min-inline-size: 100%;
+  }
+
+  /* a target of 44 px at least on both sides, the name's width capped so a long one is cut */
+  .link {
+    min-inline-size: var(--control-m);
+    max-inline-size: var(--space-2xl);
+    color: var(--color-text-muted);
+    font: var(--font-label);
+  }
+
+  .link[aria-current="page"] {
+    color: var(--color-text);
+  }
+
+  .name {
+    display: block;
+    /* layout: the name under its planet */
+    margin-block-start: var(--space-3xs);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .row {
+      scroll-behavior: auto;
+    }
+  }
+}

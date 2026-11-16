@@ -39,6 +39,13 @@ const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer
   failed: (error) => <ErrorView kind={errorKind(error)} size="inline" urgent />,
 });
 
+// A phone's row of worlds at the chat's foot, its code asked once the window is a phone's (a computer's chat never carries it). Its place is
+// reserved by the wrapper (ChatScreen.module.css), so its arrival moves nothing.
+const PhoneWorlds = chunked(async () => ({ default: (await import("./PhoneWorlds.tsx")).PhoneWorlds }), {
+  waiting: null,
+  failed: () => null,
+});
+
 /** The place a chat is in: what the page knows of its world and of the worlds beside it. */
 export interface ChatPlace {
   slug: string;
@@ -194,7 +201,7 @@ export function ChatScreen(props: ChatScreenProps) {
   const rooms = narrow ? roomsOf({ unread, rail, phone }, worlds.rows) : undefined;
   const header = (
     <ChatTop
-      {...{ place, title, menu, mark, rooms, talking, room, people, phone, screen: screenRef }}
+      {...{ place, title, menu, mark, rooms, talking, room, people, present, phone, screen: screenRef }}
       buttons={inPlaceView(full, compact, thread) ? undefined : buttons}
       acts={placeActs(searching.act, here.ask)}
       docked={dockable}
@@ -241,6 +248,11 @@ export function ChatScreen(props: ChatScreenProps) {
           <Docked>{chips}</Docked>
           {searching.banner}
           {children}
+          {phone ? (
+            <div className={styles["worlds"]}>
+              <PhoneWorlds worlds={place.worlds} current={place.slug} />
+            </div>
+          ) : null}
         </ChatLayout>
       </div>
       {here.dialog}

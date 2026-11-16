@@ -21,11 +21,19 @@ export function ChatTop({
   talking,
   room,
   people,
+  present,
   ...header
-}: ChatHeaderProps & Phone["header"] & Phone["info"] & { phone: boolean; screen: RefObject<HTMLElement | null> }) {
+}: ChatHeaderProps &
+  Phone["header"] &
+  Phone["info"] & { present?: number | undefined; phone: boolean; screen: RefObject<HTMLElement | null> }) {
   if (!phone) return <ChatHeader world={place.name} {...header} />;
   const { title, menu, mark, rooms } = header;
   return (
-    <PhoneTop header={{ title, menu, mark, rooms, acts }} info={{ place, talking, room, people }} screen={screen} />
+    <PhoneTop
+      header={{ title, menu, mark, rooms, acts }}
+      info={{ place, talking, room, people }}
+      present={present}
+      screen={screen}
+    />
   );
 }

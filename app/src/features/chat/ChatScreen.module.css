@@ -129,17 +129,51 @@
       padding-block-start: 0;
     }
 
-    /* The phone header's place while its code comes (ChatTop.tsx): its two rows and the step between them, so the conversation does not
-       move down as it arrives (PhoneHeader.module.css: one row on a short window). */
+    /* The phone header's place while its code comes (ChatTop.tsx): its row and the band's height (PhoneBand.module.css: its planet's square and the padding;
+       the slim one on a short window), so the conversation does not move down as it arrives. */
     .topWaiting {
       /* layout: reserved room, nothing drawn */
       display: block;
-      block-size: calc(var(--control-m) * 2 + var(--space-3xs));
+      block-size: calc(var(--control-m) * 3 + var(--space-s) + var(--space-2xs) * 4);
     }
 
     @media (height < 500px) {
       .topWaiting {
-        block-size: var(--control-m);
+        block-size: calc(var(--control-m) + var(--control-s) + var(--space-2xs) * 4);
+      }
+    }
+
+    /* The row of worlds at the foot (PhoneWorlds.tsx, about 75 px: its planet, its name, its padding and rule, and the home bar's inset):
+       its room is kept while its code comes. --phone-worlds is what MessageBox's field cap counts. Nothing while a chat field has the focus
+       (the keyboard takes the foot), nor on a short window, where the rooms' drawer holds the worlds and the lines keep their height. */
+    .worlds {
+      /* layout: the foot of the conversation, never squeezed */
+      flex: none;
+      min-block-size: var(--phone-worlds);
+    }
+
+    :root:has(.worlds) {
+      --phone-worlds: calc(
+        var(--control-m) + var(--space-2xs) * 2 + var(--space-3xs) + var(--space-xs) + var(--line-width) +
+          env(safe-area-inset-bottom)
+      );
+    }
+
+    :root:has([data-chat-screen] :is(textarea, input):focus) {
+      --phone-worlds: 0px;
+    }
+
+    :root:has([data-chat-screen] :is(textarea, input):focus) .worlds {
+      display: none;
+    }
+
+    @media (height < 500px) {
+      .worlds {
+        display: none;
+      }
+
+      :root:has(.worlds) {
+        --phone-worlds: 0px;
       }
     }
   }

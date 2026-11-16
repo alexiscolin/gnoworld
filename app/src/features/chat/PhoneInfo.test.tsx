@@ -163,11 +163,10 @@ describe("the info sheet of a phone", () => {
     ).toBe(1);
   });
 
-  it("mounts the planet's view only once open", async () => {
-    const before = view.mounted;
+  it("never draws the planet: the band over the chat holds it, and a second view would make a second WebGL context", async () => {
     sheet(false, () => undefined);
-    expect(view.mounted).toBe(before);
     sheet(true, () => undefined);
-    await settled(() => view.mounted === before + 1);
+    await settled(() => document.querySelector("dialog[open]") !== null);
+    expect(view.mounted).toBe(0);
   });
 });

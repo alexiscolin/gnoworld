@@ -213,8 +213,8 @@ const drawPanel = (entry: string) => {
 
 describe("the screen's header", () => {
   const at = (entry: string, phone: boolean) => {
-    // An earlier test's screen may still stand in the body: count this one's Back alone.
-    const before = document.querySelectorAll("[aria-label='Back']").length;
+    // An earlier test's screen may still stand in the body: count this one's Info alone (the phone header's: it has no Back).
+    const before = document.querySelectorAll("[aria-label='Info']").length;
     vi.stubGlobal("fetch", roomsAnswer(200));
     // jsdom has none, and a browser's is none while the document is not fully active.
     vi.stubGlobal("visualViewport", null);
@@ -230,18 +230,18 @@ describe("the screen's header", () => {
     act(() => {
       state().loginActions.signedOut();
     });
-    return () => document.querySelectorAll("[aria-label='Back']").length > before;
+    return () => document.querySelectorAll("[aria-label='Info']").length > before;
   };
 
-  it("is the phone's, with its back, in the full chat of a phone", async () => {
-    const back = at("/?chat=full", true);
-    await settled(back);
-    expect(back()).toBe(true);
+  it("is the phone's, with its Info, in the full chat of a phone", async () => {
+    const info = at("/?chat=full", true);
+    await settled(info);
+    expect(info()).toBe(true);
   });
 
-  it("is the desktop's, with no back, on a computer", async () => {
-    const back = at("/?chat=full", false);
+  it("is the desktop's, with no phone Info, on a computer", async () => {
+    const info = at("/?chat=full", false);
     await settled(() => document.querySelector("[data-chat-screen]") !== null);
-    expect(back()).toBe(false);
+    expect(info()).toBe(false);
   });
 });

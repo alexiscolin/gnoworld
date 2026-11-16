@@ -1,7 +1,7 @@
 // The info of a place on a phone (under 900 px), where the wide full chat's info column has no room: a sheet over the chat holding that
 // same Info (one copy of the panel's logic), opened from the chat's header. Its title and Close are ui's Dialog's, which gives the focus
-// back to the control that opened it. Closed it holds nothing, so the planet's code (PlaceView's lazy MiniSpace, the engine and its
-// textures) is asked only once the sheet is open. "Its page" swaps the sheet's content for the place's page, with a way back: one modal.
+// back to the control that opened it. Closed it holds nothing; it draws no planet (the place band over the chat holds it).
+// "Its page" swaps the sheet's content for the place's page, with a way back: one modal.
 import type { ComponentProps, MouseEvent } from "react";
 import { useRef } from "react";
 import { Button, Dialog } from "@gnoworld/ui";
@@ -34,7 +34,7 @@ export function PhoneInfo({
   place,
   panelRef,
   ...info
-}: Omit<InfoProps, "buttons" | "close" | "page" | "panelRef"> &
+}: Omit<InfoProps, "buttons" | "close" | "page" | "panelRef" | "planet"> &
   Partial<Pick<InfoProps, "panelRef">> & {
     open: boolean;
     /** The page shows in place of the info (the address's, phoneSheet.ts). */
@@ -88,6 +88,7 @@ export function PhoneInfo({
               panelRef={panelRef ?? ownRef}
               buttons={null}
               close={null}
+              planet={false}
               page={
                 <div className={styles["page"]}>
                   <PageButton

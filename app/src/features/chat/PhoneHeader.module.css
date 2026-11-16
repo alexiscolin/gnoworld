@@ -1,5 +1,4 @@
-/* A phone's chat header: two rows of 44 px controls in portrait (Stack of two Clusters); one row in a short landscape window, where height
-   is what is scarce. */
+/* A phone's chat header: one row of 44 px controls, at every width and height. */
 @layer components {
   .bar {
     /* the notch's side, in landscape */
@@ -22,71 +21,13 @@
     flex: none;
   }
 
-  /* The arrow of Send points up and Back's points against the text: the icon's own points along it. */
-  .back svg {
-    rotate: 180deg;
-  }
-
-  .rooms {
-    /* layout: Rooms takes the row's start; the acts follow at its end */
-    margin-inline-end: auto;
-  }
-
-  /* The arrival's pill stands under the headers (the shell's, --shell-head, and this one; --banner-under, over ChatScreen's compact one, which this selector outweighs): the rows'
-     height, a step between them, the region's padding (ChatScreen.module.css) and its rule. Only a phone draws this header. */
+  /* The arrival's pill stands under the headers (the shell's, --shell-head, this one and the place band, PhoneBand.module.css's
+     --phone-band; --banner-under, over ChatScreen's compact one, which this selector outweighs): the row's height, the region's padding
+     (ChatScreen.module.css) and its rule. Only a phone draws this header. */
   :root:has([data-chat-screen][data-full][data-compact] .bar) {
     --banner-under: calc(
-      var(--flash-room) + var(--shell-head) + var(--control-m) * 2 + var(--space-3xs) + var(--space-2xs) * 2 +
-        var(--line-width)
+      var(--flash-room) + var(--shell-head) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width) +
+        var(--phone-band, 0px)
     );
-  }
-
-  /* Short windows (a phone on its side): one row, the name first, Rooms and the acts after it, Info at the end. */
-  @media (height < 500px) {
-    :root:has([data-chat-screen][data-full][data-compact] .bar) {
-      --banner-under: calc(
-        var(--flash-room) + var(--shell-head) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width)
-      );
-    }
-
-    .bar {
-      /* layout: one row in place of two */
-      flex-direction: row;
-      /* layout: centred on the row's line */
-      align-items: center;
-      /* layout: a step between the controls, as the rows' own */
-      gap: var(--space-2xs);
-    }
-
-    .top,
-    .tools {
-      display: contents;
-    }
-
-    .back {
-      order: 0;
-    }
-
-    .title {
-      order: 1;
-    }
-
-    .mark {
-      order: 2;
-    }
-
-    .rooms {
-      order: 3;
-      /* layout: Rooms stands by the name here, the acts after it */
-      margin-inline-end: 0;
-    }
-
-    .tools > :not(.rooms) {
-      order: 4;
-    }
-
-    .top > :last-child {
-      order: 5;
-    }
   }
 }

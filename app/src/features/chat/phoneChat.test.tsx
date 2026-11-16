@@ -37,6 +37,15 @@ vi.mock("./PhoneInfo.tsx", () => ({
     ) : null,
 }));
 
+// The band (planet, key info, Its page) is PhoneBand.test.tsx's: here it is its press and its fold.
+vi.mock("./PhoneBand.tsx", () => ({
+  PhoneBand: ({ onPage, folded }: { onPage: () => void; folded: boolean }) => (
+    <button type="button" data-band={folded ? "folded" : "open"} onClick={onPage}>
+      band
+    </button>
+  ),
+}));
+
 // A phone's header and its Info sheet, drawn by `PhoneTop`, with links to move to another address.
 function Probe() {
   const { search } = useLocation();
@@ -74,6 +83,19 @@ const draw = (at = "/r/news?chat=full") => {
 const sheets = (box: HTMLElement) => all(box, "p").map((p) => p.textContent);
 
 describe("a phone's Info sheet", () => {
+  it("draws no Back, and the place band above the sheets", () => {
+    const box = draw();
+    expect(button(box, "Back")).toBeUndefined();
+    expect(button(box, "band")?.getAttribute("data-band")).toBe("open");
+  });
+
+  it("opens the page sheet from the band's Its page", () => {
+    const box = draw();
+    click(button(box, "band"));
+    expect(sheets(box)).toEqual(["The page sheet"]);
+    expect(one(box, "output").textContent).toBe("?chat=full&sheet=page");
+  });
+
   it("opens at Info, by an entry whose address holds it", () => {
     const box = draw();
     expect(sheets(box)).toEqual([]);

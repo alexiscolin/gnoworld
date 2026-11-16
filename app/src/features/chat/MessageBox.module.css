@@ -171,7 +171,7 @@
     }
 
     /* The whole composer is budgeted inside the visual viewport (--chat-vh), so Send never leaves the screen: what is left of it after the
-       header, the dock's padding and rule, the foot, the open format bar (two rows, worst case), the words' row when there are some and a few
+       header and the place band (folded while a field has the focus, whose --banner-under follows), the row of worlds under the box (hidden then, so none), the dock's padding and rule, the foot, the open format bar (two rows, worst case), the words' row when there are some and a few
        lines of the conversation is the field's cap. Where that is under the field's own minimum, the minimum wins. */
     .box {
       --_foot: calc(var(--control-m) + var(--space-3xs) + var(--space-2xs));
@@ -185,8 +185,8 @@
       /* raw: nothing under the box */
       --_below: 0px;
       --_free: calc(
-        var(--chat-vh) - var(--banner-under) - var(--_dock) - var(--_foot) - var(--_bar) - var(--_say) - var(--_below) -
-          3lh
+        var(--chat-vh) - var(--banner-under) - var(--phone-worlds) - var(--_dock) - var(--_foot) - var(--_bar) -
+          var(--_say) - var(--_below) - 3lh
       );
     }
 

@@ -1,0 +1,127 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { MemoryRouter } from "react-router";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { all, mount as draw, one } from "../../../tests/mount.tsx";
+import { FullChatLinks } from "../../routerLink.tsx";
+import type { Known } from "../../railWorlds.ts";
+import { SEARCH } from "../../space/openEvent.ts";
+import { StoreProvider } from "../../storeContext.tsx";
+import type { CosmosWorld } from "../../space/cosmosWorld.ts";
+import type { WorldSignals } from "../universe/signals.ts";
+import { PhoneWorlds } from "./PhoneWorlds.tsx";
+
+// The phone's row of worlds: one link each, in the order given, the world in view marked, each link its world's full chat.
+const EARTH = { slug: "earth", name: "Earth", href: "/earth" };
+const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
+const GOVDAO = { slug: "govdao", name: "GovDAO", href: "/w/govdao" };
+
+// The rail's feed (railFeed.ts), told by hand: what `data` gives, and who listens.
+const feeding = vi.hoisted((): { held: Known | undefined; listeners: Set<() => void> } => ({
+  held: undefined,
+  listeners: new Set(),
+}));
+vi.mock("../../railFeed.ts", () => ({
+  subscribe: (listener: () => void) => {
+    feeding.listeners.add(listener);
+    return () => feeding.listeners.delete(listener);
+  },
+  data: () => feeding.held,
+  feed: () => undefined,
+}));
+const world = (id: string): CosmosWorld => ({
+  id,
+  namespace: id.split("/")[0] ?? id,
+  realms: [{ callers: 1, path: `gno.land/r/${id}` }],
+  seen: "2026-09-01T00:00:00.000Z",
+});
+const SIGNALS: WorldSignals = {
+  present: new Map([
+    ["earth", { here: 3, perHour: 0, rise: null }],
+    ["games/go", { here: 7, perHour: 0, rise: null }],
+    ["art/hall", { here: 4, perHour: 0, rise: null }],
+  ]),
+  names: new Map(),
+  visited: () => false,
+  now: Date.parse("2026-11-03T12:00:00.000Z"),
+};
+async function tell(held: Known) {
+  feeding.held = held;
+  await act(async () => {
+    for (const listener of feeding.listeners) listener();
+    await new Promise((done) => setTimeout(done, 20));
+  });
+}
+afterEach(() => {
+  feeding.held = undefined;
+});
+
+// jsdom draws no layout and has no scrollIntoView: a spy stands in, and tells which element was brought into view.
+const scrolled = vi.fn<(this: Element) => void>();
+Element.prototype.scrollIntoView = scrolled;
+
+const mount = (current: string) =>
+  draw(
+    <StoreProvider>
+      <MemoryRouter>
+        <FullChatLinks full>
+          <PhoneWorlds worlds={[EARTH, BUBBLE, GOVDAO]} current={current} />
+        </FullChatLinks>
+      </MemoryRouter>
+    </StoreProvider>,
+  );
+
+describe("PhoneWorlds", () => {
+  it("is a navigation named Worlds listing each world in order, its name under its planet", () => {
+    const nav = one(mount("earth"), 'nav[aria-label="Worlds"]');
+    const links = all(nav, "a");
+    expect(links.map((link) => link.textContent)).toEqual(["Earth", "Bubble", "GovDAO"]);
+  });
+
+  it("links each world to its full chat", () => {
+    const hrefs = all(mount("earth"), "a").map((link) => link.getAttribute("href"));
+    expect(hrefs).toEqual(["/earth?chat=full", "/w/bubble?chat=full", "/w/govdao?chat=full"]);
+  });
+
+  it("marks the world in view as the current page, and no other", () => {
+    const box = mount("bubble");
+    expect(all(box, "a").map((link) => link.getAttribute("aria-current"))).toEqual([null, "page", null]);
+  });
+
+  it("brings the world in view into the row's view when drawn, sideways only", () => {
+    scrolled.mockClear();
+    mount("govdao");
+    expect(scrolled).toHaveBeenCalledOnce();
+    expect(scrolled.mock.contexts[0]).toBe(one(document.body, 'a[aria-current="page"]'));
+  });
+
+  it("grows to the rail's worlds once read, the Earth and the world in view first, none twice, ending with See all", async () => {
+    const box = mount("bubble");
+    await act(async () => {
+      await new Promise((done) => setTimeout(done, 20));
+    });
+    expect(all(box, "a")).toHaveLength(3);
+    await tell({ worlds: [world("games/go"), world("art/hall")], signals: SIGNALS });
+    const names = all(box, "li").map((item) => item.textContent.trim());
+    expect(names.slice(0, 2)).toEqual(["Earth", "Bubble"]);
+    expect(names.at(-1)).toBe("See all places");
+    expect(names.filter((name) => name === "Earth" || name === "Bubble")).toHaveLength(2);
+    expect(names.length).toBeGreaterThan(4);
+    expect(all(box, "a").map((link) => link.getAttribute("aria-current"))).toContain("page");
+    expect(all(box, '[aria-current="page"]').map((link) => link.textContent)).toEqual(["Bubble"]);
+  });
+
+  it("opens the search list from See all, as the rail's does", async () => {
+    const box = mount("earth");
+    await tell({ worlds: [world("games/go")], signals: SIGNALS });
+    const heard = vi.fn<(event: Event) => void>();
+    window.addEventListener(SEARCH, heard);
+    const button = all(box, "button").at(-1);
+    act(() => {
+      button?.click();
+    });
+    window.removeEventListener(SEARCH, heard);
+    expect(button?.textContent).toContain("See all");
+    expect(heard).toHaveBeenCalledOnce();
+  });
+});

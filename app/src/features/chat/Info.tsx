@@ -24,6 +24,7 @@ export function Info({
   buttons,
   close,
   page,
+  planet = true,
 }: Pick<ChatScreenProps, "place" | "talking" | "people"> & {
   /** The place's buttons, in the planet's bar (PlaceView.tsx). */
   buttons: ReactNode;
@@ -31,12 +32,14 @@ export function Info({
   close: ReactNode;
   /** The control that opens the place's own page (PlaceSheet.tsx), where the page is not beside the chat. */
   page?: ReactNode;
+  /** Whether the place's small planet is drawn at the panel's top; a phone's band holds it, so its sheet does not (a second WebGL context). */
+  planet?: boolean;
   room: ChatScreenProps["here"];
   panelRef: RefObject<HTMLElement | null>;
 }) {
   return (
     <PlaceInfo
-      view={<PlaceView place={place} buttons={buttons} close={close} />}
+      view={planet ? <PlaceView place={place} buttons={buttons} close={close} /> : undefined}
       kicker={place.kicker}
       name={place.name}
       description={place.description}

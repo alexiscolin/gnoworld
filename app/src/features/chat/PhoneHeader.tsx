@@ -1,6 +1,6 @@
-// A phone's chat header: back, the place's name and Info on a first row; Rooms and the place's acts (search, who is here) on a second,
-// in thumb reach. Landscape, where height is short, lays them on one row (PhoneHeader.module.css). Every control is 44 px.
-import { Cluster, IconButton, Stack } from "@gnoworld/ui";
+// A phone's chat header, one row at every size: Rooms, the place's name, its acts (search, who is here) and Info. No Back: a phone has no
+// home to go back to (the browser's own back still works). Every control is 44 px.
+import { Cluster, IconButton } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { Name, type ChatHeaderProps } from "./ChatHeader.tsx";
 import type { Act } from "./PlaceActs.tsx";
@@ -13,7 +13,6 @@ export interface PhoneHeaderProps {
   menu?: ChatHeaderProps["menu"];
   /** A short mark after the name: a direct message's "Not encrypted". */
   mark?: ReactNode;
-  onBack: () => void;
   onInfo: () => void;
   /** The control to the rooms' drawer. */
   rooms: ReactNode;
@@ -21,30 +20,23 @@ export interface PhoneHeaderProps {
   acts: readonly Act[];
 }
 
-export function PhoneHeader({ title, menu, mark, onBack, onInfo, rooms, acts }: PhoneHeaderProps) {
+export function PhoneHeader({ title, menu, mark, onInfo, rooms, acts }: PhoneHeaderProps) {
   return (
-    <Stack space="3xs" className={styles["bar"]}>
-      <Cluster space="2xs" wrap="no" className={styles["top"]}>
-        <span className={styles["back"]}>
-          <IconButton icon="arrow" label="Back" emphasis="plain" onClick={onBack} />
+    <Cluster space="2xs" wrap="no" className={styles["bar"]}>
+      {rooms}
+      {/* The name is ChatHeader's own (its menu, its one line cut with an ellipsis), in the room the row leaves. */}
+      <div className={styles["title"]}>
+        <Name title={title} menu={menu} short />
+      </div>
+      {mark === undefined ? null : (
+        <span className={styles["mark"]} data-mark="">
+          {mark}
         </span>
-        {/* The name is ChatHeader's own (its menu, its one line cut with an ellipsis), in the room the row leaves. */}
-        <div className={styles["title"]}>
-          <Name title={title} menu={menu} short />
-        </div>
-        {mark === undefined ? null : (
-          <span className={styles["mark"]} data-mark="">
-            {mark}
-          </span>
-        )}
-        <IconButton icon="info" label="Info" onClick={onInfo} />
-      </Cluster>
-      <Cluster space="2xs" wrap="no" className={styles["tools"]}>
-        <div className={styles["rooms"]}>{rooms}</div>
-        {acts.map(({ label, icon, onSelect }) =>
-          onSelect === undefined ? null : <IconButton key={label} icon={icon} label={label} onClick={onSelect} />,
-        )}
-      </Cluster>
-    </Stack>
+      )}
+      {acts.map(({ label, icon, onSelect }) =>
+        onSelect === undefined ? null : <IconButton key={label} icon={icon} label={label} onClick={onSelect} />,
+      )}
+      <IconButton icon="info" label="Info" onClick={onInfo} />
+    </Cluster>
   );
 }
