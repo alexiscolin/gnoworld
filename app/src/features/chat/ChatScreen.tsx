@@ -7,8 +7,7 @@ import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import type { ChatHeaderProps } from "./ChatHeader.tsx";
-import { useHeader } from "./phoneChat.tsx";
-import { useViewport } from "./viewport.ts";
+import { ChatTop } from "./ChatTop.tsx";
 import { PlaceActs, placeActs } from "./PlaceActs.tsx";
 import { PlaceBar } from "./PlaceView.tsx";
 import { usePeople } from "./usePeople.tsx";
@@ -29,6 +28,7 @@ import type { ChatWorld } from "./place.ts";
 import { DOCKED, useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
 import { useWorldsOf } from "./chatWorlds.tsx";
+import type { WorldsProps } from "./Worlds.tsx";
 import styles from "./ChatScreen.module.css";
 
 // The rooms of a narrow chat (a dock's, a phone's) sit behind a control and a drawer, whose code is asked once the box is
@@ -116,7 +116,7 @@ const inPlaceView = (full: boolean, compact: boolean, thread: ReactNode): boolea
   full && !compact && thread === undefined;
 
 // The narrow full chat's rooms: the worlds join them in the drawer on a phone (the window under 900 px) alone.
-const roomsOf = (props: { unread: number; rail: ReactElement; phone: boolean }, rows: ReactNode) => (
+const roomsOf = (props: { unread: number; rail: ReactElement; phone: boolean }, rows: WorldsProps) => (
   <RoomsDrawer {...props} worlds={props.phone ? rows : undefined} />
 );
 
@@ -173,47 +173,36 @@ function useBox(place: ChatPlace) {
     warmPictures(place.worlds);
   }, [place.worlds]);
   const [compact, setCompact] = useState(true);
-  // A phone's full chat is the visual viewport's size, so the on-screen keyboard never covers the composer (viewport.ts).
   const phone = useMedia(PHONE_QUERY) && full && compact;
-  useViewport(screenRef, phone);
-  return { dockable, full, screenRef, compact, setCompact, phone };
+  return { dockable, full, screenRef, compact, setCompact, phone, narrow: full && compact };
 }
 
 export function ChatScreen(props: ChatScreenProps) {
   const { place, title, chips, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
   const { status, children, search } = props;
-  const { dockable, full, screenRef, compact, setCompact, phone } = useBox(place);
+  const { dockable, full, screenRef, compact, setCompact, phone, narrow } = useBox(place);
   const navigate = useNavigate();
   const worlds = useWorldsOf(place, full);
   const here = usePeople({ screenRef, people, compact, present, closeThread: threads.close });
   const searching = useSearching(search, { world: place, full, compact, closeThread: threads.close });
   const thread = threadAside(threads);
-
   // The place's buttons stand in the planet's bar where the info panel shows, else in the header.
   const buttons = <PlaceActs acts={placeActs(searching.act, here.ask)} />;
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
   // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: fullMove.ts).
   const columns = { ...useColumns(), band: bar.wide };
-  const rooms = compact && full ? roomsOf({ unread, rail, phone }, worlds.rows) : undefined;
-  const head = useHeader({
-    phone,
-    desktop: {
-      world: place.name,
-      buttons: inPlaceView(full, compact, thread) ? undefined : buttons,
-      title,
-      menu,
-      mark,
-      rooms,
-      docked: dockable,
-      onClose: () => {
+  const rooms = narrow ? roomsOf({ unread, rail, phone }, worlds.rows) : undefined;
+  const header = (
+    <ChatTop
+      {...{ place, title, menu, mark, rooms, talking, room, people, phone, screen: screenRef }}
+      buttons={inPlaceView(full, compact, thread) ? undefined : buttons}
+      acts={placeActs(searching.act, here.ask)}
+      docked={dockable}
+      onClose={() => {
         closeChat(place, navigate);
-      },
-    },
-    phoneOf: {
-      header: { title, menu, mark, rooms, acts: placeActs(searching.act, here.ask) },
-      info: { place, talking, room, people },
-    },
-  });
+      }}
+    />
+  );
   const aside = asideOf({ thread, panel: searching.panel, bar });
   return (
     <FullProvider value={full}>
@@ -228,7 +217,7 @@ export function ChatScreen(props: ChatScreenProps) {
       >
         <ChatLayout
           {...columns}
-          header={head.header}
+          header={header}
           worlds={worlds.column}
           rooms={compact ? undefined : <div className={styles["rail"]}>{rail}</div>}
           info={
@@ -254,7 +243,6 @@ export function ChatScreen(props: ChatScreenProps) {
           {children}
         </ChatLayout>
       </div>
-      {head.sheet}
       {here.dialog}
       {status}
     </FullProvider>

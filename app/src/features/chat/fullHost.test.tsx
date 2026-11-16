@@ -9,15 +9,17 @@ vi.mock("./Chat.tsx", async () => {
   const { usePlacePage } = await import("./placePage.ts");
   return { Chat: () => <p data-testid="chat">{usePlacePage()}</p> };
 });
-const asked = vi.hoisted(() => ({ full: false, going: false }));
+const asked = vi.hoisted(() => ({ full: false, going: false, phone: false }));
 vi.mock("./full.ts", () => ({
   asksFull: (params: URLSearchParams) => params.get("chat") === "full",
   useChatAlone: () => asked.full,
 }));
 
 vi.mock("./phoneGo.ts", () => ({ usePhoneGo: () => asked.going }));
+vi.mock("./useMedia.ts", () => ({ DOCKED: "(min-width: 1280px)", useMedia: () => asked.phone }));
 
-const { chatHeld, DockedChatHost, PlaceChat } = await import("./fullHost.tsx");
+const { chatHeld, DockedChatHost } = await import("./fullHost.tsx");
+const { PlaceChat } = await import("./PlaceChat.tsx");
 
 const chatOf = (slug: string): ChatProps => ({
   world: slug,
@@ -60,7 +62,7 @@ describe("the dock's chat that heals itself", () => {
     const host = document.createElement("div");
     document.body.append(host);
     const root = createRoot(host);
-    const draw = (mod: typeof import("./fullHost.tsx"), chat: ChatProps) => {
+    const draw = (mod: typeof import("./fullHost.tsx") & typeof import("./PlaceChat.tsx"), chat: ChatProps) => {
       act(() => {
         root.render(
           <>
@@ -70,10 +72,10 @@ describe("the dock's chat that heals itself", () => {
         );
       });
     };
-    draw(await import("./fullHost.tsx"), chatOf("a"));
+    draw({ ...(await import("./fullHost.tsx")), ...(await import("./PlaceChat.tsx")) }, chatOf("a"));
     expect(host.querySelector("[data-testid=dock] [data-testid=chat]")).not.toBeNull();
     vi.resetModules();
-    draw(await import("./fullHost.tsx"), chatOf("a"));
+    draw({ ...(await import("./fullHost.tsx")), ...(await import("./PlaceChat.tsx")) }, chatOf("a"));
     expect(host.querySelectorAll("[data-testid=dock] [data-testid=chat]")).toHaveLength(1);
     act(() => {
       root.unmount();
@@ -303,6 +305,7 @@ describe("the shell's chat host, drawn on the server", () => {
 describe("a page a phone is being sent away from", () => {
   afterEach(() => {
     asked.going = false;
+    asked.phone = false;
     asked.full = false;
     document.body.replaceChildren();
   });
@@ -323,12 +326,28 @@ describe("a page a phone is being sent away from", () => {
     return root;
   };
 
-  it("draws neither its page nor its chat while it goes", () => {
+  it("draws neither its page nor its chat while it goes", async () => {
+    asked.phone = true;
     asked.going = true;
     const page = vi.fn(() => <section data-testid="page" />);
     const root = draw(page);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
     expect(page).not.toHaveBeenCalled();
     expect(document.querySelector("[data-testid=chat]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("draws its page once the phone's code is here, when it stays", async () => {
+    asked.phone = true;
+    const root = draw(() => <section data-testid="page" />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(document.querySelector("[data-testid=page]")).not.toBeNull();
     act(() => {
       root.unmount();
     });

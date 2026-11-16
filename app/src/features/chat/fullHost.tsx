@@ -1,24 +1,14 @@
 // The full chat, one for the whole site: a page opened full says which chat it holds
 // (PlaceChat), and the shell draws that one chat over everything (FullChatHost). A move from one place to another changes the chat's
 // world and keeps its rooms, its link and its history; it never makes the chat again.
-import {
-  useEffect,
-  useInsertionEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { useInsertionEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Heard } from "../../lib/heard.ts";
 import { Chat, type ChatProps } from "./Chat.tsx";
 import { FullLoading } from "./FullLoading.tsx";
-import { DockCover } from "./DockCover.tsx";
 import { asksFull, useChatAlone } from "./full.ts";
-import { usePhoneGo } from "./phoneGo.ts";
 import { PlacePageProvider } from "./placePage.ts";
-import { keyOf, leaveDocked, leaveFull, leaveRoom, scrollsOf, restoreScrolls } from "./stillScreen.ts";
+import { keyOf, leaveDocked, leaveFull, leaveRoom } from "./stillScreen.ts";
 
 // The chat held and the page of its place (placePage.ts) as one snapshot: a chat never shows another place's plate, and a docked one none.
 interface Held {
@@ -26,8 +16,8 @@ interface Held {
   readonly plate: ReactNode;
 }
 let held: Held | undefined;
-const heard = new Heard();
-const hold = (next: Held | undefined) => {
+export const heard = new Heard();
+export const hold = (next: Held | undefined) => {
   if (next !== undefined && held !== undefined && keyOf(held.chat.place) !== keyOf(next.chat.place))
     leaveRoom(keyOf(held.chat.place));
   held = next;
@@ -37,39 +27,10 @@ const hold = (next: Held | undefined) => {
 /** Whether a chat stands from the page before: a page shows its dock at once, never waiting for the door to space its first chat waits for. */
 export const chatHeld = (): boolean => held !== undefined;
 
-// The pages that hold a chat now, docked or full: the one leaving and the one coming are told in the same commit.
-let holders = 0;
-
-// A page's hold on the shell's one chat. The chat is let go once no page holds it after the commit that moved from one page to the next,
-// so a move never makes it again.
-function useHolding() {
-  useEffect(() => {
-    holders += 1;
-    return () => {
-      holders -= 1;
-      queueMicrotask(() => {
-        if (holders === 0) hold(undefined);
-      });
-    };
-  }, []);
-}
-
-// A page's word in the full chat: its chat is the shell's. It draws nothing. A next page whose chat cannot be drawn yet keeps the one
-// before till it can: the full chat never gives way to space between two places.
-// A place whose chat failed lets the old one go, so the failure shows in its place.
-function FullChat({ chat, plate, failed }: { chat: ChatProps | undefined; plate: ReactNode; failed: boolean }) {
-  useEffect(() => {
-    if (chat !== undefined) hold({ chat, plate });
-    else if (failed) hold(undefined);
-    else heard.tell();
-  }, [chat, plate, failed]);
-  return null;
-}
-
 // The element the docked chat is drawn in, one for the whole site: each page's dock takes it in, so the chat stands once across the
 // pages that dock it (a realm, a hub, the Earth) and a move changes its world in place.
 let seat: HTMLElement | undefined;
-const seatOf = (): HTMLElement => {
+export const seatOf = (): HTMLElement => {
   if (seat === undefined) {
     seat = document.createElement("div");
     seat.style.display = "contents";
@@ -79,90 +40,12 @@ const seatOf = (): HTMLElement => {
 };
 
 // The seat taken to `place`: what stood focused in it keeps its focus, which a node moved loses.
-function putSeat(place: Element): void {
+export function putSeat(place: Element): void {
   const chair = seatOf();
   if (chair.parentElement === place) return;
   const focused = chair.contains(document.activeElement) ? document.activeElement : null;
   place.append(chair);
   if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
-}
-
-let stood: ReturnType<typeof scrollsOf> = [];
-
-// A page's dock: the shell's chat is drawn in it once the page has one, or as soon as the chat stands from the page before (inert while this
-// page's own cannot be drawn yet), never a skeleton in the place of a chat that is there.
-function DockSlot({ chat }: { chat: ChatProps | undefined }) {
-  const slotRef = useRef<HTMLDivElement>(null);
-  // A dock whose chat stands from the page before has no skeleton: the chat is there.
-  const [fresh] = useState(held === undefined);
-  const ready = chat !== undefined;
-  const takes = ready || held !== undefined;
-  useLayoutEffect(() => {
-    const box = slotRef.current;
-    if (!takes || box === null) return;
-    const chair = seatOf();
-    chair.toggleAttribute("data-stood", held !== undefined);
-    putSeat(box);
-    restoreScrolls(chair, stood);
-    return () => {
-      stood = scrollsOf(chair);
-    };
-  }, [takes]);
-  useLayoutEffect(() => {
-    if (!takes) return;
-    const chair = seatOf();
-    chair.inert = !ready;
-    if (ready) chair.removeAttribute("aria-busy");
-    else chair.setAttribute("aria-busy", "true");
-  }, [takes, ready]);
-  useEffect(() => {
-    if (chat !== undefined) hold({ chat, plate: null });
-  }, [chat]);
-  // Heals itself: a render that finds the chat let go or its seat out of this box (module state reset by a hot reload, a seat left in the
-  // body) holds it and takes the seat again.
-  useLayoutEffect(() => {
-    const box = slotRef.current;
-    if (box === null || !takes) return;
-    if (held === undefined && chat !== undefined) hold({ chat, plate: null });
-    putSeat(box);
-  });
-  return (
-    <div ref={slotRef} style={{ display: "contents" }}>
-      {fresh ? <DockCover waiting={!ready} /> : null}
-    </div>
-  );
-}
-
-/** A place's page and its chat: the page with its chat docked in it, or, asked full in the address, the shell's one chat alone (no space,
- * no plate). `chat` is none while it cannot be drawn yet. */
-export function PlaceChat({
-  chat,
-  page,
-  plate,
-  failed,
-}: {
-  chat: ChatProps | undefined;
-  page: (dock: ReactNode) => ReactNode;
-  /** The page's own plate (lazy), for the phone's "Its page" sheet of the chat alone (placePage.ts); none for a place with no page. */
-  plate?: ReactNode;
-  /** What the chat alone (a phone's) draws in the chat's place when the place's chat cannot be made, with its way to try again. */
-  failed?: ReactNode;
-}) {
-  useHolding();
-  const going = usePhoneGo();
-  const alone = useChatAlone();
-  if (going) return null;
-  if (!alone) return page(<DockSlot chat={chat} />);
-  return (
-    <>
-      <FullChat chat={chat} plate={plate} failed={failed !== undefined} />
-      {chat !== undefined ? null : failed !== undefined ? (
-        <div data-chat-failed="">{failed}</div>
-      ) : chatHeld() ? null : (
-        <Pending />
-      )}
-    </>
-  );
 }
 
 // Whether the page was opened full from its address: the skeleton stands for that first draw alone, never for a chat that grows out of its dock.
@@ -183,7 +66,7 @@ function Shape() {
 }
 
 // The skeleton for a chat that is being made after the first draw (a realm's room), when the page's own address did not open it.
-function Pending() {
+export function Pending() {
   return isOpening() ? null : <Shape />;
 }
 

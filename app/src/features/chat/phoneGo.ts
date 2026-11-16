@@ -3,9 +3,25 @@
 import { PHONE_QUERY } from "@gnoworld/core";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { phoneGoes } from "../../fullChat.ts";
+import { cosmosAt } from "../../cosmosAt.ts";
+import { fullOnPhone } from "../../fullChat.ts";
 import { site } from "../../places.ts";
 import { useMedia } from "./useMedia.ts";
+
+const ECOSYSTEM_PAGE = /^(?:\/net\/[^/]+)?\/e\//;
+
+/** Where a phone leaves the address `at` for, a phone being the full chat only: a place goes to its full chat (what the address asked of
+ * the room or the person kept), the cosmos's addresses and an ecosystem's to the universe's `home`; none anywhere else, on a computer or
+ * in the full chat already. */
+export function phoneGoes(
+  phone: boolean,
+  at: { readonly pathname: string; readonly search: string; readonly hash: string },
+  home: string,
+): string | undefined {
+  if (!phone) return undefined;
+  if (cosmosAt(at.pathname) !== undefined || ECOSYSTEM_PAGE.test(at.pathname)) return home;
+  return fullOnPhone(at);
+}
 
 /** Takes a phone off an address it has no page for (fullChat.ts's `phoneGoes`), by a replace; true while it goes, so the page draws
  * nothing in between. */

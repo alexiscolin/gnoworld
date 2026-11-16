@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { MemoryRouter } from "react-router";
+import { StoreProvider } from "../../storeContext.tsx";
 import { describe, expect, it } from "vitest";
 import { all, button, click, mount } from "../../../tests/mount.tsx";
 import { RoomsDrawer } from "./RoomsDrawer.tsx";
@@ -7,18 +8,20 @@ import { RoomsDrawer } from "./RoomsDrawer.tsx";
 // The rooms on a phone: one control, and a drawer with the rooms, then the worlds below them.
 const draw = (unread = 0, phone = true) =>
   mount(
-    <MemoryRouter>
-      <RoomsDrawer
-        unread={unread}
-        phone={phone}
-        rail={<a href="/r/news">news</a>}
-        worlds={
-          <nav aria-label="Worlds">
-            <a href="/w/bubble">Bubble</a>
-          </nav>
-        }
-      />
-    </MemoryRouter>,
+    <StoreProvider>
+      <MemoryRouter>
+        <RoomsDrawer
+          unread={unread}
+          phone={phone}
+          rail={<a href="/r/news">news</a>}
+          worlds={{
+            worlds: [{ slug: "bubble", name: "Bubble", href: "/w/bubble" }],
+            current: "x",
+            universe: { id: "onyx", isDefault: true },
+          }}
+        />
+      </MemoryRouter>
+    </StoreProvider>,
   );
 
 describe("the rooms' drawer", () => {

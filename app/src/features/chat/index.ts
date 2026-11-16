@@ -1,7 +1,7 @@
 // The chat: a world's rooms by section, a room's lines and people, the page's link to Ergo.
 import { lazy } from "react";
 
-export { chatHeld, DockedChatHost, FullChatHost, PlaceChat } from "./fullHost.tsx";
+export { chatHeld, DockedChatHost, FullChatHost } from "./fullHost.tsx";
 export { LOADING } from "./Loading.tsx";
 export { PlateFrame } from "./PlateFrame.tsx";
 export { roomsChanged } from "./roomsListed.ts";

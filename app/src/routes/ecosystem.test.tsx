@@ -1,8 +1,6 @@
 import type { RouteObject } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { render } from "../../tests/render.tsx";
-const phone = vi.hoisted(() => ({ goes: false }));
-vi.mock("../features/chat/phoneGo.ts", () => ({ usePhoneGo: () => phone.goes }));
 
 import Ecosystem, { clientLoader as loader, ErrorBoundary } from "./ecosystem.tsx";
 
@@ -22,14 +20,14 @@ describe("an ecosystem's page", () => {
 });
 
 describe("an ecosystem's page on a phone", () => {
-  test("draws nothing while the phone is sent home", async () => {
-    // No loader: the page itself is what draws, as the build's fallback does.
-    const page: RouteObject = { path: "/e/:ecosystem", Component: Ecosystem };
-    expect(await render(page, "/e/tokens")).toContain('role="alert"');
-    phone.goes = true;
-    const html = await render(page, "/e/tokens");
-    phone.goes = false;
-    expect(html).not.toContain('role="alert"');
-    expect(html).not.toMatch(/No ecosystem/i);
+  test("its loader sends the phone to the universe's home, before reading the data", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
+    try {
+      const sent = loader({ request: new Request("http://x/e/tokens") });
+      expect(sent).toBeInstanceOf(Response);
+      expect(sent instanceof Response ? sent.headers.get("location") : undefined).toBe("/");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

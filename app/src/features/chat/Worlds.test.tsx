@@ -7,6 +7,7 @@ import { all, button, click, modals, mount as draw, one, settled } from "../../.
 import { pictureOf } from "../../lib/worldPictures.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { inRailOrder, Worlds } from "./Worlds.tsx";
+import { WorldRows } from "./WorldRows.tsx";
 
 // The full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
 const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
@@ -171,7 +172,7 @@ describe("Worlds, the unread pills", () => {
 // A phone has no column: the worlds are rows of a navigation, each its planet and its name, in the rail's order.
 describe("Worlds, as rows (a phone's drawer)", () => {
   const rows = (current = "bubble") =>
-    mount(<Worlds rows universe={UNIVERSE} worlds={[BUBBLE, EARTH, GOVDAO]} current={current} />);
+    mount(<WorldRows universe={UNIVERSE} worlds={[BUBBLE, EARTH, GOVDAO]} current={current} />);
 
   it("is the navigation named Worlds, one link to each world with its name in words, the Earth first", () => {
     const nav = one(rows(), 'nav[aria-label="Worlds"]');

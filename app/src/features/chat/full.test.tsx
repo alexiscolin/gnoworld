@@ -24,7 +24,8 @@ vi.stubGlobal(
 // The address as the visitor opened it, read once when the host's module loads.
 window.history.replaceState(null, "", "/earth?chat=full");
 
-const { DockedChatHost, FullChatHost, PlaceChat } = await import("./fullHost.tsx");
+const { DockedChatHost, FullChatHost } = await import("./fullHost.tsx");
+const { PlaceChat } = await import("./PlaceChat.tsx");
 
 const chat = { world: "a", place: { slug: "a", name: "a" } as unknown as ChatProps["place"] } satisfies ChatProps;
 const tree = (

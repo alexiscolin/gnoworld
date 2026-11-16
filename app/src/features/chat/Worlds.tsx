@@ -1,7 +1,7 @@
 // The full-screen chat's column of worlds (the video's left edge, frame 80): the picture of each world's real planet at 44 px, the world in
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
-import { Cluster, Stack, Tooltip } from "@gnoworld/ui";
+import { Cluster, Tooltip } from "@gnoworld/ui";
 import { useState } from "react";
 import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
@@ -29,11 +29,9 @@ export interface WorldsProps {
   universe: { id: string; isDefault: boolean };
   /** Each world's lines not yet seen, by its slug: a pill beside its planet, the world in view's left to its rooms. */
   unread?: Readonly<Record<string, number>> | undefined;
-  /** Rows with each world's name in words, no column: a phone's drawer holds the worlds below the rooms. */
-  rows?: boolean | undefined;
 }
 
-const NONE: readonly string[] = [];
+export const NONE: readonly string[] = [];
 
 /** The rail's order, as far as the chat knows it: the Earth, the worlds followed (the last followed first), then the rest as listed.
  * The rail's rest is by what is trending now, which the chat does not load. */
@@ -45,12 +43,12 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
 }
 
 // The followed worlds the hubs do not hold: the rest of the column, which WorldsMore draws.
-const beyond = ({ worlds, followed = NONE }: Pick<WorldsProps, "worlds" | "followed">) =>
+export const beyond = ({ worlds, followed = NONE }: Pick<WorldsProps, "worlds" | "followed">) =>
   followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id));
 
 // The textures' credit, which the pictures carry wherever they show (DESIGN-SYSTEM.md): the button and the universe's own dialog,
 // asked at the first press.
-function Credits({ className }: { className: string | undefined }) {
+export function Credits({ className }: { className: string | undefined }) {
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);
   return (
@@ -77,45 +75,7 @@ function Credits({ className }: { className: string | undefined }) {
   );
 }
 
-// A world as a row: its planet and its name, a link at the control's height; its unseen lines after the name. Under the rows, what the
-// column holds past the hubs (the worlds followed, the places opened last, "+" to Discover) and the credits.
-function WorldRows({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
-  const session = useApp(({ login }) => login.session);
-  return (
-    <nav aria-label="Worlds">
-      <Stack as="ul" space="3xs">
-        {inRailOrder(worlds, followed).map((world) => (
-          <li key={world.slug}>
-            <RouterLink
-              href={world.href}
-              onPointerEnter={() => {
-                listAhead(world.slug, session);
-              }}
-              aria-current={world.slug === current ? "page" : undefined}
-              className={styles["row"]}
-            >
-              <Cluster space="s" wrap="no" className={styles["rowBody"]}>
-                <span className={styles["planet"]}>
-                  <WorldPlanet world={hubWorldOf(world)} fallback="" name={world.name} decorative />
-                </span>
-                <span className="truncate">{world.name}</span>
-                {world.slug === current ? null : <UnreadPill count={unread?.[world.slug] ?? 0} />}
-              </Cluster>
-            </RouterLink>
-          </li>
-        ))}
-      </Stack>
-      <WorldsMore universe={universe} followed={beyond({ worlds, followed })} />
-      <Credits className={styles["creditsRow"]} />
-    </nav>
-  );
-}
-
-export function Worlds(props: WorldsProps) {
-  return props.rows === true ? <WorldRows {...props} /> : <Column {...props} />;
-}
-
-function Column({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
+export function Worlds({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
   const session = useApp(({ login }) => login.session);
   return (
     <nav aria-label="Worlds" className={[styles["list"], "fill-column"].join(" ")}>

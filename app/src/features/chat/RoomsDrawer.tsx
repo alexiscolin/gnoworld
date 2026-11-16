@@ -4,7 +4,9 @@
 import { Button, Chip, Dialog } from "@gnoworld/ui";
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { useLocation } from "react-router";
-import { Folding } from "./RoomSections.tsx";
+import { Folding } from "./Folding.tsx";
+import { WorldRows } from "./WorldRows.tsx";
+import type { WorldsProps } from "./Worlds.tsx";
 import { countWords } from "./unread.ts";
 import styles from "./RoomsDrawer.module.css";
 
@@ -25,7 +27,8 @@ export function RoomsDrawer({
 }: {
   unread: number;
   rail: ReactNode;
-  worlds?: ReactNode;
+  /** The worlds, listed under the rooms of a phone's drawer (WorldRows.tsx, whose code comes with the drawer's). */
+  worlds?: WorldsProps | undefined;
   phone: boolean;
 }) {
   // Open at an address: a move to another closes it, as the room behind it changes (as Saved's does).
@@ -71,7 +74,9 @@ export function RoomsDrawer({
               <div>{rail}</div>
               {worlds === undefined ? null : (
                 <div className={styles["worlds"]}>
-                  <Folding name="Worlds">{worlds}</Folding>
+                  <Folding name="Worlds">
+                    <WorldRows {...worlds} />
+                  </Folding>
                 </div>
               )}
             </div>

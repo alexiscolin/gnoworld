@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fullChatHref, markFullEarly, phoneGoes } from "./fullChat.ts";
+import { phoneGoes } from "./features/chat/phoneGo.ts";
+import { fullChatHref, markFullEarly } from "./fullChat.ts";
 
 const at = (path: string) => {
   const [rest = "", hash] = path.split("#", 2);

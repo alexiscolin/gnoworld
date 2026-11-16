@@ -1,4 +1,4 @@
-// The worlds the chat shows: the full chat's column and, for a phone's drawer, the same worlds as rows.
+// The worlds the chat shows: the full chat's column and, for a phone's drawer, what its rows are drawn from (the drawer's own code).
 import { worldsFollowedIn } from "../follow/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
@@ -15,5 +15,5 @@ export function useWorldsOf(place: ChatPlace, full: boolean) {
     universe: place.universe,
     unread,
   };
-  return { column: <Worlds {...shown} />, rows: <Worlds rows {...shown} /> };
+  return { column: <Worlds {...shown} />, rows: shown };
 }

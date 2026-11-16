@@ -1,14 +1,17 @@
 // An ecosystem's page, from the data: /e/<slug> in the default universe, /net/<id>/e/<slug> in another.
 // No `loader`: with no ecosystem in the data no page of this route is pre-rendered, and React Router refuses a build
 // whose loader no page uses (ssr: false). The page reads its own path; the browser's loader answers the 404.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Breadcrumb } from "@gnoworld/ui";
-import { useLocation, type MetaArgs } from "react-router";
-import { usePhoneGo } from "../features/chat/phoneGo.ts";
+import { redirect, useLocation, type MetaArgs } from "react-router";
 import { ErrorView, isMissing, RouteError, useWhere } from "../features/errors/index.ts";
 import { ecosystemMeta, failedPageMeta } from "../meta.ts";
 import { site } from "../places.ts";
 
 export function clientLoader({ request }: { request: Request }) {
+  // A phone has no ecosystem page: the universe's home list, before anything is read (as the cosmos's views do).
+  if (typeof matchMedia === "function" && matchMedia(PHONE_QUERY).matches)
+    return redirect(site.universeAt(new URL(request.url).pathname).home.path);
   return site.ecosystem(request);
 }
 
@@ -20,7 +23,6 @@ export function meta({ location, error }: MetaArgs) {
 function Ecosystem() {
   const ecosystem = site.ecosystemAt(useLocation().pathname);
   const where = useWhere();
-  if (usePhoneGo()) return null;
   if (ecosystem === undefined) return <ErrorView kind="not-found" noun="ecosystem" where={where} />;
   const universe = site.home(ecosystem);
   return (

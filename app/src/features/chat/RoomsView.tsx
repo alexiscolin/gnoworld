@@ -11,7 +11,7 @@ import { dmHref, hrefProp, roomHref, roomLabel, shortAddress, whoIs } from "./na
 import { noticeDone } from "../../told.ts";
 import { badged } from "./unread.ts";
 import { RoomsList, RoomsNav } from "./RoomsList.tsx";
-import { Folding } from "./RoomSections.tsx";
+import { Folding } from "./Folding.tsx";
 import shared from "./lists.module.css";
 import { askFor } from "../../pageAsks.ts";
 import styles from "./RoomsView.module.css";

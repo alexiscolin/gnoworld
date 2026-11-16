@@ -1,35 +1,32 @@
 // @vitest-environment jsdom
+import type { ComponentProps } from "react";
 import { Link, MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount } from "../../../tests/mount.tsx";
 import { FullProvider } from "./full.ts";
-import { useHeader } from "./phoneChat.tsx";
+import { PhoneTop } from "./phoneChat.tsx";
 
 // The sheet's own content is PhoneInfo.test.tsx's: here it is only open or shut.
 vi.mock("./PhoneInfo.tsx", () => ({
   PhoneInfo: ({ open }: { open: boolean }) => (open ? <p>The info sheet</p> : null),
 }));
 
-// A phone's header and its Info sheet, drawn by `useHeader`, with links to move to another address.
+// A phone's header and its Info sheet, drawn by `PhoneTop`, with links to move to another address.
 function Probe() {
-  const none = () => undefined;
-  const { header, sheet } = useHeader({
-    phone: true,
-    desktop: { title: "#games", onClose: none },
-    phoneOf: {
-      header: { title: "#games", rooms: null, acts: [] },
-      info: {
-        place: { kicker: "k" },
-        talking: undefined,
-        room: undefined,
-        people: null,
-      } as unknown as Parameters<typeof useHeader>[0]["phoneOf"]["info"],
-    },
-  });
   return (
     <>
-      {header}
-      {sheet}
+      <PhoneTop
+        header={{ title: "#games", rooms: null, acts: [] }}
+        info={
+          {
+            place: { kicker: "k" },
+            talking: undefined,
+            room: undefined,
+            people: null,
+          } as unknown as ComponentProps<typeof PhoneTop>["info"]
+        }
+        screen={{ current: null }}
+      />
       <Link to="/r/news?chat=full#links">Links</Link>
       <Link to="/r/other?chat=full">Other</Link>
     </>

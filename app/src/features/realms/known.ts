@@ -10,14 +10,18 @@ import type { Realm, RealmSource } from "./useRealm.ts";
 
 export type { Known } from "../../knownOf.ts";
 
+// The realm's page read, its code in a chunk of its own; out of the hook, where the React Compiler takes no import().
+const readPage = (source: RealmSource) => {
+  import("./useRealm.ts")
+    .then(({ realmPageQuery }) => queryClient.query(realmPageQuery(source)).catch(quietUnread))
+    .catch(reportError);
+};
+
 /** `knownOf` for the realm of `source`, as its read comes into the cache; `listed` is whether the worlds' file holds it. `ask` reads the
  * realm's page here (a phone, which draws no plate to read it); its code comes in a chunk then, never with this route's. */
 export function useKnown({ rpc, realm, origin }: RealmSource, listed: boolean, ask = false): Known {
   useEffect(() => {
-    if (!ask) return;
-    import("./useRealm.ts")
-      .then(({ realmPageQuery }) => queryClient.query(realmPageQuery({ rpc, realm, origin })).catch(quietUnread))
-      .catch(reportError);
+    if (ask) readPage({ rpc, realm, origin });
   }, [ask, rpc, realm, origin]);
   const { data, error } = useQuery<Realm>({ queryKey: keys.page(rpc, realm, origin), queryFn: skipToken }, queryClient);
   return knownOf(listed, data ?? (isUnread<Realm>(error) ? error.read : undefined));
