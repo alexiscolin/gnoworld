@@ -46,13 +46,19 @@
   }
 
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls; a
-     browser without field-sizing keeps the two rows of the markup. */
+     browser without field-sizing keeps the two rows of the markup. The handle moves its height alone. */
   textarea.box {
     --_frame: calc(2 * (var(--space-2xs) + var(--line-width)));
 
     field-sizing: content;
+    resize: block;
     min-block-size: calc(2lh + var(--_frame));
     max-block-size: calc(10lh + var(--_frame));
+  }
+
+  /* A box that grows on its own has no handle to drag. */
+  textarea.box[data-fixed] {
+    resize: none;
   }
 
   /* With a prefix the frame is the one box; the input inside is bare, and the ring is the frame's, around the prefix too. */

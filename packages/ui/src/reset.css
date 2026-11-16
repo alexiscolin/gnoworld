@@ -26,11 +26,6 @@
     color: inherit;
   }
 
-  /* No textarea has a grip to drag: the guest's line is one plain line, a box that grows on its own has no use for it. */
-  textarea {
-    resize: none;
-  }
-
   /* The browser's own face of a button, its fill, edge and padding: each control draws its own; its words read as those round it, a
      label's tracking and capitals too, and the pointer says it acts. */
   button {
