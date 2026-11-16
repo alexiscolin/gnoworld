@@ -8,8 +8,8 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: its measured size, 256 B ahead.
-const FIRST_SCREEN_JS = 278_863;
+// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627).
+const FIRST_SCREEN_JS = 279_143;
 // A page with no plate (the home), exact: its measured size, 256 B ahead.
 const PLAIN_FIRST_SCREEN_JS = 276_255;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);

@@ -3,6 +3,7 @@
 // in either is written out (`shown`).
 import type { Problem } from "@gnoworld/core";
 import { HIDDEN } from "@gnoworld/core";
+import { MAX_DEPOSIT } from "../../lib/adena/deposit.ts";
 import type { CardFailure } from "../../lib/calls.ts";
 
 /** A text as the card draws it: each hidden character written out as `<U+202E>`, so what is drawn is what was written. */
@@ -30,6 +31,10 @@ export function warningsOf(call: { realm: string; func: string }): readonly stri
   if (!isGovVote(call)) return [NOT_CHECKED];
   return [NOT_CHECKED, "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost."];
 }
+
+/** The deposit line: the cap every call is signed with (deposit.ts), held while the data stays on chain. Here, not in fee.ts,
+ * which the card loads late: the card's chunk carries the line alone. */
+export const depositText = `up to ${String(Number.parseInt(MAX_DEPOSIT, 10) / 1_000_000)} GNOT, held while the data stays on chain`;
 
 /** A chain as the card names it. */
 export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;

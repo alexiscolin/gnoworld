@@ -10,7 +10,7 @@ import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
 import { CallStatus } from "./CallStatus.tsx";
 import { problemsOf } from "./problems.ts";
-import { networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
+import { depositText, networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
@@ -182,6 +182,7 @@ export function CallCard({
           </Fact>
           <Fact label="NETWORK">{networkOf(network)}</Fact>
           <Fact label="FEE">{fee}</Fact>
+          <Fact label="DEPOSIT">{depositText}</Fact>
         </dl>
         {preview
           ? warningsOf(card).map((warning) => (

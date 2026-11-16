@@ -17,6 +17,7 @@ import {
   type CallFailure,
   type Failed,
 } from "./answers.ts";
+import { MAX_DEPOSIT } from "./deposit.ts";
 import { serially } from "./queue.ts";
 
 export type CallResult =
@@ -104,25 +105,28 @@ async function switchTo(need: Need, { chainId, name, rpc }: Universe): Promise<F
   return again.type === "UNADDED_NETWORK" ? refusal("wrong-network") : again;
 }
 
-/** What DoContract is given: the request's one MsgCall, no coins, no memo; pinned to the universe's chain and node. */
-const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
-  messages: [
-    {
-      type: "/vm.m_call",
-      value: {
-        caller: request.caller,
-        send: "",
-        max_deposit: "",
-        pkg_path: request.realm,
-        func: request.func,
-        args: [...request.args],
+/** What DoContract is given: the request's one MsgCall, no coins, no memo, the fixed deposit cap; pinned to the universe's chain and node. */
+// A declaration, not an arrow in a const: StrykerJS's runner never reloads a module, so a mutant of a const set at load lived on.
+function transaction(request: CallRequest, { chainId, rpc }: Universe) {
+  return {
+    messages: [
+      {
+        type: "/vm.m_call",
+        value: {
+          caller: request.caller,
+          send: "",
+          max_deposit: MAX_DEPOSIT,
+          pkg_path: request.realm,
+          func: request.func,
+          args: [...request.args],
+        },
       },
-    },
-  ],
-  gasFee: GAS_FEE,
-  gasWanted: GAS_WANTED,
-  networkInfo: { chainId, rpcUrl: rpc },
-});
+    ],
+    gasFee: GAS_FEE,
+    gasWanted: GAS_WANTED,
+    networkInfo: { chainId, rpcUrl: rpc },
+  };
+}
 
 // Once DoContract was asked, the popup may have broadcast whatever came back: so says a failure but a lock or a pending
 // request, any naming a hash, an account switched mid-send, and a refusal, as closing the window after Confirm answers
