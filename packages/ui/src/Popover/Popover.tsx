@@ -9,13 +9,12 @@ import {
   type ToggleEvent,
 } from "react";
 import { buttonLook, type IconControlSize } from "../Button/control.ts";
-import { Icon, type IconName } from "../icons/Icon.tsx";
-import { Chip } from "../Chip/Chip.tsx";
+import { type IconName } from "../icons/Icon.tsx";
 import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
+import { Row } from "./MenuRow.tsx";
 import { Trigger } from "./Trigger.tsx";
-import soon from "../ComingSoon/ComingSoon.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -106,6 +105,12 @@ interface Entry {
 export type MenuItem =
   | (Entry & {
       onSelect: () => void;
+      /** A choice among the items (one network of several): a radio of the menu, checked or not. */
+      checked?: boolean;
+      /** Its act is still being read: said to assistive technology (aria-busy). */
+      busy?: boolean;
+      /** A word of the item as a chip at its end ("Testnet"). */
+      note?: string;
       /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
       tone?: "danger";
     })
@@ -161,14 +166,14 @@ export function Menu({
   const apart = items.findIndex((item) => "onSelect" in item && item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
   useLayoutEffect(() => {
-    if (open) panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+    if (open) panelRef.current?.querySelector<HTMLElement>("[role^='menuitem']")?.focus();
   }, [open, panelRef]);
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Tab") {
       event.currentTarget.hidePopover();
       return;
     }
-    rove(event, "[role='menuitem']", ["ArrowUp", "ArrowDown"]);
+    rove(event, "[role^='menuitem']", ["ArrowUp", "ArrowDown"]);
   };
   return (
     <>
@@ -186,35 +191,16 @@ export function Menu({
         {items.map((item, at) => (
           <Fragment key={item.label}>
             {at === apart ? <div role="separator" className={styles["separator"]} /> : null}
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className={["lit", "tint", "full-start", styles["item"], "soon" in item ? soon["soon"] : undefined].join(
-                " ",
-              )}
-              {...("soon" in item
-                ? { "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
-                : {
-                    "data-tone": item.tone,
-                    onClick: () => {
-                      panelRef.current?.hidePopover();
-                      // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
-                      // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
-                      trigger.ref.current?.focus();
-                      item.onSelect();
-                    },
-                  })}
-            >
-              {"onSelect" in item && item.tone === "danger" ? <Icon name="alert" /> : null}
-              {item.icon === undefined ? null : <Icon name={item.icon} />}
-              {item.label}
-              {"soon" in item ? (
-                <span className={styles["soon"]}>
-                  <Chip>{item.why ?? "Soon"}</Chip>
-                </span>
-              ) : null}
-            </button>
+            <Row
+              item={item}
+              onAct={(act) => {
+                panelRef.current?.hidePopover();
+                // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
+                // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+                trigger.ref.current?.focus();
+                act();
+              }}
+            />
           </Fragment>
         ))}
       </div>

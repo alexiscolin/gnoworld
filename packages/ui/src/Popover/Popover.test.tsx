@@ -388,3 +388,32 @@ it("draws an icon trigger as a bar's tool when its icon says so", () => {
   );
   expect(screen.getByRole("button", { name: "Link" }).hasAttribute("data-tool")).toBe(true);
 });
+
+// A menu that chooses one of several (the network switch, D13501): the chosen item is a radio of the menu, checked, and an item whose
+// act is still being read says so, so a screen reader and the eye both know. Items with neither stay plain menu items.
+async function opened(items: Parameters<typeof Menu>[0]["items"]) {
+  render(<Menu trigger="Network" label="Choose the network" items={items} />);
+  await userEvent.click(screen.getByRole("button", { name: "Network" }));
+}
+
+describe("Menu, a choice among items", () => {
+  it("draws an item with `checked` as a menuitemradio, checked or not, and the rest as menu items", async () => {
+    await opened([
+      { label: "Onyx", checked: true, onSelect: vi.fn() },
+      { label: "gno.land", checked: false, onSelect: vi.fn() },
+      { label: "Settings", onSelect: vi.fn() },
+    ]);
+    expect(screen.getByRole("menuitemradio", { name: "Onyx" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("menuitemradio", { name: "gno.land" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("marks an item that is working aria-busy, and no other", async () => {
+    await opened([
+      { label: "Onyx", checked: true, onSelect: vi.fn() },
+      { label: "gno.land", checked: false, busy: true, onSelect: vi.fn() },
+    ]);
+    expect(screen.getByRole("menuitemradio", { name: "gno.land" }).getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("menuitemradio", { name: "Onyx" }).hasAttribute("aria-busy")).toBe(false);
+  });
+});
