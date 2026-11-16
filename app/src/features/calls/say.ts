@@ -32,11 +32,11 @@ export function warningsOf(call: { realm: string; func: string }): readonly stri
   return [NOT_CHECKED, "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost."];
 }
 
-/** A chain as the card names it. */
 /** The deposit line: the cap every call is signed with (deposit.ts), held while the data stays on chain. Here, not in fee.ts,
  * which the card loads late: the card's chunk carries the line alone. */
 export const depositText = `up to ${String(Number.parseInt(MAX_DEPOSIT, 10) / 1_000_000)} GNOT, held while the data stays on chain`;
 
+/** A chain as the card names it. */
 export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;
 
 interface Said {
