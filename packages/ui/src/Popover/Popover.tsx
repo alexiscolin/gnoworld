@@ -15,7 +15,7 @@ import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
 import { row } from "./MenuRow.tsx";
-import { Trigger } from "./Trigger.tsx";
+import { triggerButton } from "./Trigger.tsx";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -88,7 +88,7 @@ export function Popover({
   const { open, trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <Trigger {...{ plain, icon, tabbable, label, attrs: trigger }}>{words}</Trigger>
+      {triggerButton({ plain, icon, tabbable, label, attrs: trigger, children: words })}
       <div {...panel} aria-label={label} data-wide={wide ? "" : undefined}>
         {lazy && !open ? null : children}
       </div>
@@ -186,17 +186,20 @@ export function Menu({
   };
   return (
     <>
-      <Trigger
-        attrs={trigger}
-        busy={busy}
-        plain={false}
-        icon={icon === undefined ? undefined : { name: icon, size, emphasis }}
-        tabbable
-        label={words}
-      >
-        {lead}
-        {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
-      </Trigger>
+      {triggerButton({
+        attrs: trigger,
+        busy,
+        plain: false,
+        icon: icon === undefined ? undefined : { name: icon, size, emphasis },
+        tabbable: true,
+        label: words,
+        children: (
+          <>
+            {lead}
+            {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
+          </>
+        ),
+      })}
       <div {...panel} aria-label={label} onClickCapture={close} onKeyDown={move}>
         {items.map((item, at) => (
           <Fragment key={item.label}>
