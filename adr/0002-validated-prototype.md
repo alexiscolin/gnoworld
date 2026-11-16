@@ -541,6 +541,9 @@ since Adena's SDK is young (0.1.x) and its docs lag its code.
 - **The fee is an estimate.** Adena simulates again and sets the gas and fee itself
   (gas used × 1.1 by default), so the preview labels its fee an estimate. gno charges the
   whole fee, not the gas used.
+- **The storage deposit is capped.** Every call is signed with `max_deposit` of 5 GNOT
+  (an empty cap falls back to the chain's 100 GNOT default), and the card shows it as a
+  DEPOSIT line beside the fee (D13625).
 - **Every failure is a state with its next step,** from Adena's error codes: connect (1000),
   finish the open request (1001), unlock (2000), the wrong account (3001), set up Adena
   (3002), refused (4000), failed, with its log (4001), Adena too old or the account type

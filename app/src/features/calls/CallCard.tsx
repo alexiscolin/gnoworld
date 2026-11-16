@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
+import { depositText } from "./fee.ts";
 import { CallStatus } from "./CallStatus.tsx";
 import { problemsOf } from "./problems.ts";
 import { networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
@@ -182,6 +183,7 @@ export function CallCard({
           </Fact>
           <Fact label="NETWORK">{networkOf(network)}</Fact>
           <Fact label="FEE">{fee}</Fact>
+          <Fact label="DEPOSIT">{depositText}</Fact>
         </dl>
         {preview
           ? warningsOf(card).map((warning) => (

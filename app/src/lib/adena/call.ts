@@ -17,6 +17,7 @@ import {
   type CallFailure,
   type Failed,
 } from "./answers.ts";
+import { MAX_DEPOSIT } from "./deposit.ts";
 import { serially } from "./queue.ts";
 
 export type CallResult =
@@ -104,7 +105,7 @@ async function switchTo(need: Need, { chainId, name, rpc }: Universe): Promise<F
   return again.type === "UNADDED_NETWORK" ? refusal("wrong-network") : again;
 }
 
-/** What DoContract is given: the request's one MsgCall, no coins, no memo; pinned to the universe's chain and node. */
+/** What DoContract is given: the request's one MsgCall, no coins, no memo, the fixed deposit cap; pinned to the universe's chain and node. */
 const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
   messages: [
     {
@@ -112,7 +113,7 @@ const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
       value: {
         caller: request.caller,
         send: "",
-        max_deposit: "",
+        max_deposit: MAX_DEPOSIT,
         pkg_path: request.realm,
         func: request.func,
         args: [...request.args],

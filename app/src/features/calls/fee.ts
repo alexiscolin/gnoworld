@@ -2,6 +2,7 @@
 // stands on. Adena simulates the call again and sets the real gas and fee when the person signs.
 import type { CallFees } from "@gnoworld/chain/fees";
 import { grouped } from "@gnoworld/ui";
+import { MAX_DEPOSIT_UGNOT } from "../../lib/adena/deposit.ts";
 
 const UGNOT = 1_000_000;
 
@@ -24,3 +25,6 @@ export function feeText(read: CallFees | undefined): string {
   const median = low + Math.round((high - low) / 2);
   return `≈ ${gnotOf(median)} GNOT, an estimate from calls up to block ${grouped(read.height)}`;
 }
+
+/** The deposit line: the cap every call is signed with (deposit.ts), held while the data stays on chain. */
+export const depositText = `up to ${gnotOf(MAX_DEPOSIT_UGNOT)} GNOT, held while the data stays on chain`;
