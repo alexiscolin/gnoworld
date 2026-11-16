@@ -31,8 +31,10 @@ CREATE INDEX earth_rooms_by_maker ON earth_rooms (maker, created_at);
 
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
-/** The public rooms ever made, archived ones too: an archived room stays a row, a channel and a list entry, so making and archiving frees none. */
+/** The public rooms made in the last EARTH_WINDOW_DAYS, archived ones too: archiving frees no place, only time does (C12, D13675). */
 export const EARTH_ROWS_MAX = 5_000;
+/** The window the rows cap counts over: a month, the longest an archived room is worth holding a place for; older rows stay, uncounted. */
+export const EARTH_WINDOW_DAYS = 30;
 /** The public rooms an account makes in a day, archived ones counted. */
 export const EARTH_PER_DAY = 3;
 
@@ -79,10 +81,10 @@ interface Options {
   earthRowsMax?: number;
 }
 
-// The Earth's public rooms' statements: how many there are (all, and live), an account's in a day, one made, a room's maker.
+// The Earth's public rooms' statements: how many there are (made in the window, and live), an account's in a day, one made, a room's maker.
 const earthSql = (db: DatabaseSync) => ({
   earth: db.prepare(
-    "SELECT count(*) AS rows, coalesce(sum(r.archived = 0), 0) AS live FROM earth_rooms e JOIN rooms r ON r.name = e.name",
+    "SELECT coalesce(sum(e.created_at > ?), 0) AS rows, coalesce(sum(r.archived = 0), 0) AS live FROM earth_rooms e JOIN rooms r ON r.name = e.name",
   ),
   today: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE maker = ? AND created_at > ?"),
   made: db.prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, ?, ?)"),
@@ -139,7 +141,7 @@ export function makeRooms({
     if (room.length > CHANNEL_MAX) return "too_long";
     if (stateOf(room) !== undefined) return "exists";
     if (Count.parse(sql.today.get(maker, now() - DAY_MS)).n >= EARTH_PER_DAY) return "day";
-    const { rows, live } = Held.parse(sql.earth.get());
+    const { rows, live } = Held.parse(sql.earth.get(now() - EARTH_WINDOW_DAYS * DAY_MS));
     return live >= earthMax || rows >= earthRowsMax ? "full" : "ok";
   };
   const mayRealm: Rooms["mayRealm"] = (room, reserve = 0) => {

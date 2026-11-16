@@ -352,12 +352,48 @@ describe("a room anyone makes on the Earth", () => {
     expect(rooms.earth(B, "b")).toBe("full");
   });
 
-  it("keeps 5,000 rooms at most, archived ones included, so making and archiving frees no place for ever", () => {
+  it("keeps 5,000 rooms at most, archived ones included, so making and archiving frees no place within the 30-day window", () => {
     expect(EARTH_ROWS_MAX).toBe(5000);
     const { rooms } = setup({ earthRowsMax: 2 });
     rooms.earth(A, "a");
     rooms.earth(B, "b");
     rooms.archive("earth", "a");
+    expect(rooms.earth(B, "c")).toBe("full");
+  });
+
+  // C12 (the 2026-11-15 audit): 5,000 rooms made then archived with throwaway keys blocked creation for ever.
+  it("counts the rooms made over a 30-day window: archived, they free no place for 29 days, and one at 31", () => {
+    const { rooms, clock } = setup({ earthRowsMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    rooms.archive("earth", "a");
+    rooms.archive("earth", "b");
+    expect(rooms.earth(B, "c")).toBe("full");
+    clock.now += 29 * 24 * 60 * 60_000;
+    expect(rooms.earth(B, "c")).toBe("full");
+    expect(rooms.mayEarth(B, "c")).toBe("full");
+    clock.now += 2 * 24 * 60 * 60_000;
+    expect(rooms.mayEarth(B, "c")).toBe("ok");
+    expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
+  });
+
+  it("keeps a room past the window as it was: its row, its name, its maker, archived, never destroyed", () => {
+    const { rooms, clock, db } = setup({ earthRowsMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    rooms.archive("earth", "a");
+    clock.now += 31 * 24 * 60 * 60_000;
+    expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
+    expect(rooms.earth(A, "a")).toBe("exists");
+    expect([rooms.exists("#earth/a"), rooms.archived("#earth/a"), rooms.maker("#earth/a")]).toEqual([true, true, A]);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 3 });
+  });
+
+  it("keeps the live cap whatever the window: live rooms made long ago still fill it", () => {
+    const { rooms, clock } = setup({ earthMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    clock.now += 31 * 24 * 60 * 60_000;
     expect(rooms.earth(B, "c")).toBe("full");
   });
 });
