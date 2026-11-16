@@ -2,7 +2,7 @@
 // is asked, then one line, done or the failure in the words the linked accounts use (but a session that ended says its own).
 import { Button, Cluster } from "@gnoworld/ui";
 import { useState } from "react";
-import { pageLoginApi } from "../../lib/api/login.ts";
+import { pageSessionsApi } from "../../lib/api/sessions.ts";
 import { linkProblem } from "./linkWords.ts";
 import { useSignInAgain } from "./useSignInAgain.ts";
 
@@ -15,7 +15,7 @@ export function OtherSessions() {
     setSaid("");
     setBusy(true);
     setStale(false);
-    const done = await pageLoginApi().logoutOthers();
+    const done = await pageSessionsApi().logoutOthers();
     setBusy(false);
     if (done.ok) setSaid("Your other sessions are logged out.");
     else if (done.reason === "unauthenticated") {

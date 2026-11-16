@@ -13,7 +13,7 @@ const LABEL = "Log out my other sessions";
 const DONE = "Your other sessions are logged out.";
 
 const login = vi.hoisted(() => ({ logoutOthers: vi.fn<() => Promise<unknown>>() }));
-vi.mock("../../lib/api/login.ts", () => ({ pageLoginApi: () => login }));
+vi.mock("../../lib/api/sessions.ts", () => ({ pageSessionsApi: () => login }));
 const links = vi.hoisted(() => ({
   list: vi.fn(() => Promise.resolve({ ok: true, value: { members: [], worlds: [], linked: false } })),
 }));
