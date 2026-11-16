@@ -14,7 +14,7 @@ export interface IrcMessage {
   readonly params: readonly string[];
 }
 
-export type IrcParseError =
+type IrcParseError =
   "empty" | "bad-character" | "empty-source" | "no-command" | "bad-command" | "tags-too-long" | "body-too-long";
 
 export type IrcParsed =
