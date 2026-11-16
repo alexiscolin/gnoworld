@@ -2,7 +2,7 @@
 // network list holds gnoland-1 and onyx-1 and which picks one by `chainId` (its scripts); a chain it does not list has none.
 import { REALM_PREFIX } from "@gnoworld/core";
 
-const GNOSCAN = "https://gnoscan.io";
+export const GNOSCAN = "https://gnoscan.io";
 const LISTED = new Set(["gnoland-1", "onyx-1"]);
 
 /** gno.land's documentation. */
