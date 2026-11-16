@@ -9,6 +9,7 @@ import { useJarvisHere } from "../../jarvisHere.ts";
 import { onAsked } from "../../pageAsks.ts";
 import { JARVIS_ASKS, loadListener, type FirstAsk } from "../jarvis/index.ts";
 import { LoginControl, useLogin } from "../login/index.ts";
+import styles from "./AccountPill.module.css";
 import { useNaming, useNamelessTold } from "./naming.ts";
 
 const JarvisListener = lazy(async () => ({ default: await loadListener() }));
@@ -37,9 +38,12 @@ function AccountPill({
       <Suspense fallback={null}>
         <Face address={address} />
       </Suspense>
-      <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
-        <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
-      </Suspense>
+      {/* A phone's pill is its face: the address would take the network's room (it is in the menu and the accessible name). */}
+      <span className={styles["who"]}>
+        <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
+          <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
+        </Suspense>
+      </span>
     </>
   );
 }

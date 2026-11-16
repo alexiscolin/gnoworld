@@ -39,9 +39,36 @@
       border-end-end-radius: 0;
     }
 
+    /* A small button is 32 px with a 44 px hit box: here its box is the 44 px target. */
     .welcome button {
       min-block-size: var(--control-m);
       min-inline-size: var(--control-m);
+    }
+
+    /* The page keeps room under its end while the sheet shows, so its last rows scroll clear of it. */
+    :root:has(.welcome[data-open]) main {
+      /* raw: the sheet's height with its text, 14.5 rem; no token holds a share of a sheet */
+      padding-block-end: 15rem;
+    }
+  }
+
+  /* A short screen (a landscape phone, a small one): the sheet is its title and its buttons; the page's first rows stay in view. */
+  @media (width < 900px) and (height < 600px) {
+    .welcome p {
+      display: none;
+    }
+
+    .welcome h2 {
+      /* layout: one line of title, cut */
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+    }
+
+    :root:has(.welcome[data-open]) main {
+      /* raw: the sheet with no text, 9.5 rem */
+      padding-block-end: 9.5rem;
     }
   }
 }

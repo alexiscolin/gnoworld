@@ -12,6 +12,11 @@
     min-inline-size: 0;
   }
 
+  /* The name that opens the rooms is a 44 px control, its words centred in it. */
+  .title button {
+    min-block-size: var(--control-m);
+  }
+
   .mark {
     /* layout: kept whole beside the name */
     flex: none;
@@ -27,18 +32,21 @@
     margin-inline-end: auto;
   }
 
-  /* The arrival's pill stands under the header (--banner-under, over ChatScreen's compact one, which this selector outweighs): the rows'
+  /* The arrival's pill stands under the headers (the shell's, --shell-head, and this one; --banner-under, over ChatScreen's compact one, which this selector outweighs): the rows'
      height, a step between them, the region's padding (ChatScreen.module.css) and its rule. Only a phone draws this header. */
   :root:has([data-chat-screen][data-full][data-compact] .bar) {
     --banner-under: calc(
-      var(--flash-room) + var(--control-m) * 2 + var(--space-3xs) + var(--space-2xs) * 2 + var(--line-width)
+      var(--flash-room) + var(--shell-head) + var(--control-m) * 2 + var(--space-3xs) + var(--space-2xs) * 2 +
+        var(--line-width)
     );
   }
 
   /* Short windows (a phone on its side): one row, the name first, Rooms and the acts after it, Info at the end. */
   @media (height < 500px) {
     :root:has([data-chat-screen][data-full][data-compact] .bar) {
-      --banner-under: calc(var(--flash-room) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width));
+      --banner-under: calc(
+        var(--flash-room) + var(--shell-head) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width)
+      );
     }
 
     .bar {

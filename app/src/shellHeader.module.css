@@ -374,9 +374,17 @@
       display: none;
     }
 
+    /* The header's own height (tokens.css's --shell-head), which a full chat keeps visible and starts below (ChatScreen.module.css,
+       PhoneHeader.module.css, FullLoading.module.css): its padding twice and its row of 44 px targets, the network's row under 360 px. */
+    :root {
+      --shell-head: calc(var(--space-s) * 2 + var(--control-m));
+    }
+
     .header {
       /* layout: the logo, the network between, the controls: one row */
       grid-template-columns: auto minmax(0, 1fr) auto;
+      /* layout: a narrow step between the cells, so the network keeps its name's room */
+      column-gap: var(--space-2xs);
     }
 
     .logo {
@@ -399,6 +407,10 @@
 
     /* raw: under 360 px the row cannot hold the name, its Testnet chip and three controls: the network drops under the logo */
     @media (width < 360px) {
+      :root {
+        --shell-head: calc(var(--space-s) * 2 + var(--control-m) * 2 + var(--space-2xs));
+      }
+
       .network {
         /* layout: the network across the row under the logo */
         grid-column: 1 / -1;
@@ -524,6 +536,13 @@
   @keyframes chat-cover-out {
     to {
       visibility: hidden;
+    }
+  }
+
+  /* A phone keeps the header's row above its full chat: the cover starts under it. */
+  @media (width < 900px) {
+    :root[data-chat="full"]::before {
+      inset-block-start: calc(var(--flash-room) + var(--shell-head));
     }
   }
 

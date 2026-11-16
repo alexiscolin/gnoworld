@@ -29,6 +29,14 @@
   @media (width < 900px) {
     .network button {
       min-block-size: var(--control-m);
+      min-inline-size: var(--control-m);
+      /* a name never wraps: the row gives the network its room (shellHeader.module.css) */
+      white-space: nowrap;
+    }
+
+    /* The chip says it; the warning icon would take the room a 360 px row has not. */
+    .network .caution svg {
+      display: none;
     }
   }
 

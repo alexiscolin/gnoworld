@@ -102,14 +102,19 @@
     --chat-inset: var(--space-s);
   }
 
-  /* A phone's full chat (under 900 px): the visual viewport's height, which viewport.ts keeps in --chat-vh (the dynamic viewport's where
+  /* A phone's full chat (under 900 px): from under the shell header to the visual viewport's foot, which viewport.ts keeps in --chat-vh (the dynamic viewport's where
      unset), so the on-screen keyboard never covers the composer; a header of 44 px rows (PhoneHeader.module.css, which also says where the
      arrival's pill stands under it); and no room kept free over the lines for that pill, which floats over them instead of leaving an
      empty band. */
   @media (width < 900px) {
     .screen[data-full] {
-      inset-block-start: calc(var(--flash-room) + var(--chat-vtop));
-      block-size: calc(var(--chat-vh) - var(--flash-room));
+      /* the layer starts under the shell header's row, which stays visible and pressable (shellHeader.module.css); past it, where the
+         keyboard has panned the page up, at the visual viewport's top */
+      --_top: calc(var(--flash-room) + max(var(--shell-head), var(--chat-vtop)));
+
+      inset-block-start: var(--_top);
+      /* down to the visual viewport's foot */
+      block-size: calc(var(--chat-vtop) + var(--chat-vh) - var(--_top));
     }
 
     .screen[data-full][data-compact] [data-region="header"] {
@@ -133,5 +138,13 @@
   /* The place's bar over the search panel: the inset the info panel gives it, so its buttons stay where they were. */
   .bar {
     padding: var(--chat-panel-inset) var(--chat-panel-inset) 0;
+  }
+
+  /* While a chat's field has the focus on a phone, the keyboard takes the screen's foot: the chat takes the shell header's room back
+     (--shell-head, shellHeader.module.css) and covers it until the field lets go, so the lines and Send keep theirs. */
+  @media (width < 900px) {
+    :root:has([data-chat-screen] :is(textarea, input):focus) {
+      --shell-head: 0px;
+    }
   }
 }
