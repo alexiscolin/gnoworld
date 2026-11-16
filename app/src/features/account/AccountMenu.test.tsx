@@ -50,16 +50,32 @@ describe("the account's menu", () => {
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
   });
 
-  it("draws the note it is given atop a guest's menu, read as its description, and none otherwise", () => {
+  it("draws the note it is given atop a guest's menu, outside its items, and none otherwise", () => {
+    const guest = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />,
+    );
+    expect(guest.querySelector("[role='menu']")?.firstElementChild?.textContent).toBe("Use a computer.");
+    expect(items(guest)).not.toContain("Use a computer.");
+    const none = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(none.querySelector("[role='menu']")?.textContent).not.toContain("Use a computer.");
+  });
+
+  it("reads a guest's note as the menu's description, and says no description without one", () => {
     const guest = mount(
       <Opened address={undefined} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />,
     );
     const menu = guest.querySelector("[role='menu']");
-    expect(menu?.firstElementChild?.textContent).toBe("Use a computer.");
     expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
-    expect(items(guest)).not.toContain("Use a computer.");
     const none = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(none.querySelector("[role='menu']")?.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("gives an account no note, whatever a phone says: the note is for a guest", () => {
+    const box = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />);
+    const menu = box.querySelector("[role='menu']");
+    expect(menu?.textContent).not.toContain("Use a computer.");
+    expect(menu?.getAttribute("aria-describedby")).toBeNull();
+    expect(menu?.querySelector("p")).toBeNull();
   });
 
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {

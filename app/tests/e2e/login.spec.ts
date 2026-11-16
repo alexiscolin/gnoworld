@@ -116,6 +116,56 @@ test.describe("on a phone", () => {
   });
 });
 
+// A touch tablet keeps the words in the header from 900 px; under it the words move into the guest's menu (LoginView.module.css).
+const USE_A_COMPUTER = "To log in, use a computer; once logged in you can write from here.";
+for (const [width, here] of [
+  [899, "the menu"],
+  [900, "the header"],
+] as const) {
+  test.describe(`a touch screen ${String(width)} px wide`, () => {
+    test.use({ hasTouch: true, viewport: { width, height: 844 } });
+
+    test(`says to use a computer in ${here}`, async ({ page }) => {
+      await adena(page);
+      await page.goto("/");
+      await hydrated(page);
+      const words = page.getByRole("banner").getByText(USE_A_COMPUTER);
+      await expect(words).toHaveCount(1);
+      if (width < 900) await expect(words).toBeHidden();
+      else await expect(words).toBeVisible();
+      await page.getByRole("button", { name: "Menu" }).tap();
+      const note = page.getByRole("menu").getByText(USE_A_COMPUTER);
+      if (width < 900) await expect(note).toBeVisible();
+      else await expect(note).toHaveCount(0);
+    });
+  });
+}
+
+// Get started's steps read at the body size on a phone's width and the reading size from 900 px (GetStarted.module.css).
+for (const [width, size] of [
+  [390, "14px"],
+  [900, "13px"],
+] as const) {
+  test(`draws Get started's steps in ${size} at ${String(width)} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    await hydrated(page);
+    await connectButton(page).click();
+    const steps = page.getByRole("dialog", { name: "Get started" }).getByRole("list").first();
+    await expect(steps).toBeVisible();
+    expect(await steps.evaluate((el) => getComputedStyle(el).fontSize)).toBe(size);
+  });
+}
+
+// A narrow window with a mouse still shows the button, which a touch phone does not: it stays a 44 px target.
+test("draws the header's Connect Adena 44 px tall at 390 px", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await adena(page);
+  await page.goto("/");
+  await hydrated(page);
+  expect((await connectButton(page).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+});
+
 // The way out is in the account's menu, which a phone given a computer's session must still reach.
 test("logs out of a phone through the account's menu, the session handed from a computer", async ({
   page,

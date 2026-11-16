@@ -1,6 +1,11 @@
-import { Outlet, type RouteObject } from "react-router";
-import { describe, expect, test } from "vitest";
+// @vitest-environment jsdom
+import { act } from "react";
+import { MemoryRouter, Outlet, type RouteObject } from "react-router";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { mount, noObservers, popovers, settled } from "../tests/mount.tsx";
 import { render } from "../tests/render.tsx";
+import { USE_A_COMPUTER } from "./features/login/index.ts";
+import { StoreProvider } from "./storeContext.tsx";
 import Earth, { loader as earthLoader } from "./routes/earth.tsx";
 import { clientLoader as cosmosLoader } from "./routes/cosmos.tsx";
 import Home, { ErrorBoundary as HomeError, loader as homeLoader } from "./routes/home.tsx";
@@ -240,5 +245,68 @@ describe("the header's Testnet, on a planted site", () => {
     const html = await headerOf("main");
     expect(html).toContain("Mainland");
     expect(html).not.toContain("Testnet");
+  });
+});
+
+// The guest's note in the menu (shellHeader.tsx's Account): a touch screen narrower than 900 px, which has no wallet and no room for
+// LoginView's words. The screen is stubbed as the query reads it, part by part, so a tablet (touch, 900 wide) differs from a phone.
+const api = vi.hoisted(() => ({ me: vi.fn(), logout: vi.fn(), challenge: vi.fn(), verify: vi.fn() }));
+vi.mock("./lib/api/login.ts", () => ({ pageLoginApi: () => api }));
+
+describe("the header's guest note", () => {
+  beforeAll(() => {
+    popovers();
+    noObservers();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const screenOf = ({ coarse, width }: { coarse: boolean; width: number }) => {
+    vi.stubGlobal("reportError", vi.fn());
+    const holds = (part: string) =>
+      part === "(pointer: coarse)" ? coarse : part === "(width < 900px)" ? width < 900 : false;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.split(" and ").every(holds),
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+  };
+  // A guest's header, its menu pressed open: the menu, once drawn.
+  async function guestMenu() {
+    api.me.mockResolvedValue({ ok: true, value: { address: null } });
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <ShellHeader universe={site.universeAt("/")} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    await settled(() => box.querySelector("button[aria-label='Menu']") !== null);
+    act(() => {
+      box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
+    });
+    await settled(() => box.querySelector("[role='menu']") !== null);
+    return box.querySelector("[role='menu']");
+  }
+
+  test("a phone, touch and under 900 px, reads the words atop the menu", async () => {
+    screenOf({ coarse: true, width: 390 });
+    const menu = await guestMenu();
+    expect(menu?.firstElementChild?.textContent).toBe(USE_A_COMPUTER);
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+  });
+
+  test.each([
+    ["a computer", { coarse: false, width: 1280 }],
+    ["a narrow window with a mouse", { coarse: false, width: 390 }],
+    ["a tablet, touch and 900 px wide, whose header has the room", { coarse: true, width: 900 }],
+  ])("%s: no note in the menu", async (_, screen) => {
+    screenOf(screen);
+    const menu = await guestMenu();
+    expect(menu?.textContent).not.toContain(USE_A_COMPUTER);
+    expect(menu?.getAttribute("aria-describedby")).toBeNull();
   });
 });
