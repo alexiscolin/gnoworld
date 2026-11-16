@@ -108,6 +108,13 @@ describe("the composer's Markdown, to the editor and back", () => {
     }
   });
 
+  // fast-check found `~~~~a~~` (F13632, seed 1772115532): the reader leaves a tilde run of 3+ as text, so no `~~` inside it strikes.
+  it("leaves the room's reading of a tilde run of three or more as it was", () => {
+    for (const md of ["~~~~a~~", "~~~a~~", "~~~~a~~~~", "a ~~~~a~~ b", "~~a~~ ~~~b~~", "`~~~a~~` ~~~b~~"]) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
+  });
+
   // The room's reader, not the text, is what must not change: the tree of the draft and of what the editor gives back.
   it("leaves the room's reading of a draft as it was, on drafts of marks and blocks mixed", () => {
     // A failed property prints its shrunk counterexample and its seed, which `fc.assert` takes back to replay it.
