@@ -340,7 +340,12 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     const { url } = await served();
     const response = await fetch(`${url}${JARVIS_PATHS.budgets}`);
     expect(response.status).toBe(200);
-    expect(JarvisBudgets.parse(await response.json())).toMatchObject({ ask: 45, translate: 5 });
+    expect(JarvisBudgets.parse(await response.json())).toEqual({
+      ask: 45,
+      translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
+    });
   });
 
   // F13524: the caps alone were answered; what is reserved and what is spent today are beside them, in dollars, whole or not.
@@ -374,9 +379,10 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     const { post, budget, events } = await served({ ask: asking({ kind: "spent" }) });
     const response = await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 120 });
     expect(response.status).toBe(200);
-    expect(JarvisBudgets.parse(await response.json())).toMatchObject({
+    expect(JarvisBudgets.parse(await response.json())).toEqual({
       ask: 120,
       translate: 5,
+      spent: { ask: 0, translate: 0 },
       reserved: { ask: 0, translate: 0 },
     });
     expect(budget.caps()).toEqual({ ask: 120 * DOLLAR, translate: 5 * DOLLAR });
@@ -415,13 +421,17 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
 
   it("takes 1 and 500 dollars, the bounds", async () => {
     const { post } = await served();
-    expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 1 })).json()).toMatchObject({
+    expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 1 })).json()).toEqual({
       ask: 1,
       translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
     });
-    expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 500 })).json()).toMatchObject({
+    expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 500 })).json()).toEqual({
       ask: 500,
       translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
     });
   });
 });
