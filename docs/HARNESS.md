@@ -84,7 +84,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    non-ASCII character: D241), then wants each staged file as it is on disk, and runs Prettier on them and `scripts/check_docs.py`
    (D13173): seconds. It runs no gate: `sh scripts/check.sh` is what a session runs before committing code, and GitHub's gate judges each
    pull request. In the owner's shell it runs the scan alone, nothing of the working tree. So a harness change reaches GitHub as a git
-   bundle the owner approves with `land` (D13213), installed once in `~/.local/bin` by main's `install_hooks.sh`: the session drops the
+   bundle the owner approves with `land` (D13213), installed once in `~/.local/bin` by main's `install_hooks.sh`, with the python3,
+   git, gh and gitleaks his PATH finds written in (D13412): the session drops the
    bundle of one branch and the pull request's text in `/private/tmp/claude-<uid>/land/`; `land`, in the owner's Terminal, copies them,
    checks the bundle holds that branch, never main, from GitHub's main, runs that main's own secret scan over the range and its
    commit-msg on each message (what pre-push and commit-msg held for his own push), gitleaks over the text, refuses a character the
