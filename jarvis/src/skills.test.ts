@@ -176,6 +176,13 @@ describe("loadSkills: the gno skill's references Jarvis is never offered", () =>
     });
   });
 
+  it("offers none of their parts either, whatever the part's number", () => {
+    const files = { ...WITH_WRITING(), "gno/references/gnokey-12.md": "# gnokey, part 12\n" };
+    expect(z.toJSONSchema(loadSkills(folder(files)).tool.args, { io: "input" })).toMatchObject({
+      properties: { reference: { enum: ["audit.md", "security.md"] } },
+    });
+  });
+
   it.each(WRITING)("refuses load_skill for %s as any reference off its schema", (name) => {
     expect(checked(folder(WITH_WRITING())).check("load_skill", { skill: "gno", reference: name })).toEqual({
       ok: false,
