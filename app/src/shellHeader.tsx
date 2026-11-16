@@ -28,7 +28,7 @@ function Account({ universe }: { universe: UniverseView }) {
   const phone = useMedia(PHONE_QUERY);
   return (
     <Cluster space="2xs" wrap={phone ? "no" : "yes"}>
-      <SearchButton className="" emphasis="outline" />
+      <SearchButton className="" emphasis={phone ? "plain" : "outline"} />
       <BellSlot />
       <AccountMenu
         universe={universe.id}

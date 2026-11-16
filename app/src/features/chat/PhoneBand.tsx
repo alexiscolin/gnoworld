@@ -6,6 +6,7 @@ import { Cluster, Kicker, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useState } from "react";
 import { groundOn } from "../../earthGround.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
+import { WorldPlanet } from "../../WorldPlanet.tsx";
 import { PageButton } from "./PlaceSheet.tsx";
 import { worldOf } from "./PlaceView.tsx";
 import styles from "./PhoneBand.module.css";
@@ -28,6 +29,7 @@ export function PhoneBand({
   onPage: () => void;
 }) {
   const [ground] = useState(groundOn);
+  const [drawn, setDrawn] = useState(false);
   const counts = [
     talking === undefined ? undefined : `${String(talking)} talking now`,
     present === undefined ? undefined : `${String(present)} here now`,
@@ -36,8 +38,20 @@ export function PhoneBand({
     <section aria-label={place.name} className={styles["band"]} data-folded={folded ? "" : undefined}>
       <Cluster space="xs" wrap="no">
         <div className={styles["planet"]} aria-hidden="true">
+          {/* The planet's still (the worlds row's picture) stands till the engine has drawn, and stays where it cannot draw (no GPU). */}
+          {drawn ? null : (
+            <div className={styles["still"]}>
+              <WorldPlanet world={worldOf(place)} fallback="" name={place.name} size="l" decorative />
+            </div>
+          )}
           <Suspense fallback={null}>
-            <MiniSpace world={worldOf(place)} ground={ground} />
+            <MiniSpace
+              world={worldOf(place)}
+              ground={ground}
+              onDrawn={() => {
+                setDrawn(true);
+              }}
+            />
           </Suspense>
         </div>
         <div className={styles["words"]}>
@@ -49,8 +63,10 @@ export function PhoneBand({
             <p className={`${styles["more"] ?? ""} meta truncate`}>{firstLine(place.description)}</p>
             <div className={styles["more"]}>
               <Cluster justify="between" space="2xs" wrap="no">
-                <p className="meta">{counts.join(" · ")}</p>
-                <PageButton onOpen={onPage} />
+                <p className="meta truncate">{counts.join(" · ")}</p>
+                <div className={styles["page"]}>
+                  <PageButton onOpen={onPage} />
+                </div>
               </Cluster>
             </div>
           </Stack>

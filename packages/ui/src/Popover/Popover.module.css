@@ -82,6 +82,26 @@
     padding: var(--space-2xs) var(--space-xs);
   }
 
+  /* A phone: rows line up at one width, with room to breathe, the note set off by a rule. */
+  @media (width < 900px) {
+    .panel[data-kind="menu"] {
+      --_w: var(--popover-w);
+
+      padding: var(--space-2xs);
+    }
+
+    .item:has(svg) {
+      /* layout: the icon's distance from its words, wider on a phone */
+      gap: var(--space-xs);
+    }
+
+    .note {
+      /* layout: the rule under the note, apart from the first row */
+      margin-block-end: var(--space-3xs);
+      border-block-end: var(--line-width) solid var(--color-line);
+    }
+  }
+
   .separator {
     block-size: var(--line-width);
     /* layout: the rule apart from the rows on either side */

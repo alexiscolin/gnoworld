@@ -25,7 +25,7 @@ import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
-import { phoneAway } from "./phoneAway.ts";
+import { phoneAway, usePhoneAway } from "./phoneAway.ts";
 import { useFraming } from "./placeFrame.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
@@ -97,8 +97,13 @@ function FirstScreen({ to, people }: { to: string; people: People | undefined })
 // A system's name on the hero: the Earth's as the header says it, another's as its namespace.
 const systemTitle = (id: string): string => (isHome(id) ? "gno.land" : nameOf(id));
 
+// A phone has no home page: the pre-rendered one hydrates without the client loader's redirect, so it goes on here and draws nothing.
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
+  return usePhoneAway(universe.home.path) ? null : <HomePage universe={universe} />;
+}
+
+function HomePage({ universe }: { universe: UniverseView }) {
   // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's. The number reads that count,
   // whether the scene runs or not, from a few bytes of its own, so a phone asks nothing of the cosmos before View in space.
   const drawn = useWorldsCount(universe.isDefault);

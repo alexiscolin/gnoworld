@@ -5,6 +5,8 @@
   .band {
     --_planet: calc(var(--control-m) * 2 + var(--space-s));
 
+    /* layout: as the header's row (PhoneHeader.module.css), the band gives way to the screen's width */
+    min-inline-size: 0;
     padding-block: var(--space-2xs);
     padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   }
@@ -22,17 +24,31 @@
     overflow: clip;
   }
 
+  .still {
+    position: absolute;
+    /* raw: the engine's planet is a circle of 0.72 of the box (MiniSpace's FILL), centred */
+    inset: 14%;
+    /* the thumb fills this box, whatever its size name */
+    --thumb-l: 100%;
+  }
+
   .words {
     /* layout: the words take the row and give way at their end */
     flex: 1 1 0;
     min-inline-size: 0;
   }
 
+  .page {
+    /* layout: the button keeps its words on one line; the counts beside it give way */
+    flex: none;
+    white-space: nowrap;
+  }
+
   .name {
     font: var(--font-card-title);
   }
 
-  /* Folded: a chat field has the focus (the keyboard is up), the lines are scrolled up, or the window is short (a phone on its side). */
+  /* Folded: a chat field has the focus (the keyboard is up), the lines are scrolled up, or the window is short (a phone on its side, a small phone upright: under 640 px the composer, its note and the row of worlds need the room). */
   .band[data-folded],
   :root:has([data-chat-screen] :is(textarea, input):focus) .band {
     --_planet: var(--control-s);
@@ -47,7 +63,7 @@
     --phone-band: calc(var(--control-s) + var(--space-2xs) * 2);
   }
 
-  @media (height < 500px) {
+  @media (height < 640px) {
     .band {
       --_planet: var(--control-s);
     }

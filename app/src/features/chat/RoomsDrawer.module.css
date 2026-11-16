@@ -8,6 +8,21 @@
     block-size: 100%;
   }
 
+  /* The control's word folds to its icon on a narrow phone, so the name, the acts and Info keep the header's one row (PhoneHeader.tsx); it
+     stays for screen readers (the clip of utilities.css's .visually-hidden). */
+  @media (width < 480px) {
+    .word {
+      position: absolute;
+      /* raw: the clip's one pixel, as .visually-hidden's */
+      inline-size: 1px;
+      /* raw: the clip's one pixel */
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   .title {
     /* layout: no margin of the paragraph's own */
     margin: 0;

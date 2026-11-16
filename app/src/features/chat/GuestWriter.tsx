@@ -6,6 +6,8 @@ import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useId, useRef, useState, type SubmitEvent } from "react";
 import { pageGuestApi, type Refused } from "../../lib/api/guest.ts";
 import { askFor } from "../../pageAsks.ts";
+import { useComputerNeeded } from "./LogInToWrite.tsx";
+import { USE_A_COMPUTER } from "../login/index.ts";
 import { MessageBox } from "./MessageBox.tsx";
 import { roomLabel } from "./names.ts";
 import styles from "./LogInToWrite.module.css";
@@ -102,6 +104,7 @@ function GuestField(props: {
 
 export function GuestWriter({ room }: { room: string }) {
   const label = roomLabel(room);
+  const computer = useComputerNeeded();
   const guest = useGuestName();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -160,17 +163,19 @@ export function GuestWriter({ room }: { room: string }) {
           <span className="meta">
             {guest.off
               ? "Guests cannot speak here."
-              : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${ADENA_GIVES}`}
+              : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${computer ? USE_A_COMPUTER : ADENA_GIVES}`}
           </span>
-          <Button
-            size="s"
-            icon="key"
-            onClick={() => {
-              askFor("log-in");
-            }}
-          >
-            Connect Adena
-          </Button>
+          {computer ? null : (
+            <Button
+              size="s"
+              icon="key"
+              onClick={() => {
+                askFor("log-in");
+              }}
+            >
+              Connect Adena
+            </Button>
+          )}
         </Cluster>
       </Stack>
     </form>

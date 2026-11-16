@@ -50,6 +50,14 @@ afterEach(() => {
 });
 
 describe("an arrival", () => {
+  // D13720: a phone's chat has no room for a pill over its lines (the Passport stays one tap away in the account menu): the stamp is kept, nothing said.
+  it("stamps on a phone and raises no pill", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
+    await arrive();
+    expect(stamps()).toEqual({ [stampKey("onyx", "bubble")]: utcDay(new Date()) });
+    expect(raised).toHaveLength(0);
+  });
+
   it.each([
     ["2026-11-05T23:30:00Z", "2026-11-05"],
     ["2026-11-06T00:00:00Z", "2026-11-06"],

@@ -56,6 +56,10 @@ describe("a phone's place band", () => {
     expect(one(box, "canvas").getAttribute("data-world")).toBe(EARTH);
   });
 
+  it("shows the planet's still beside the engine's, for a device that cannot draw", () => {
+    expect(one(draw(), "section").querySelector("[data-size]")).not.toBeNull();
+  });
+
   it("opens the place's page from Its page, which a place with no page does not draw", () => {
     const onPage = vi.fn();
     click(button(draw({ onPage }, true), "Its page"));

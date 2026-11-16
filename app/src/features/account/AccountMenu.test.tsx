@@ -45,6 +45,18 @@ describe("the account's menu", () => {
     expect(on.querySelector("[role='menuitem']")?.getAttribute("aria-label")).toBe("Jarvis, Open a room to ask Jarvis");
   });
 
+  it("on a phone keeps the order note, Connect, Passport, Settings, networks, Release a key, with no greyed Jarvis", () => {
+    const box = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} onConnect={() => undefined} phone />,
+    );
+    const rows = [...box.querySelectorAll("[role^='menuitem']")].map((item) => item.textContent);
+    expect(rows.slice(0, 3)).toEqual(["Connect Adena", "Passport", "Settings"]);
+    expect(rows.at(-1)).toBe("Release a key");
+    expect(rows.filter((row) => row.startsWith("Network:")).length).toBeGreaterThan(0);
+    expect(rows.some((row) => row.startsWith("Jarvis"))).toBe(false);
+    expect(rows.findIndex((row) => row.startsWith("Network:"))).toBeGreaterThan(rows.indexOf("Settings"));
+  });
+
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);

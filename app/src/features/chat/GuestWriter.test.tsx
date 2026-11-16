@@ -50,4 +50,32 @@ describe("a guest's composer", () => {
     expect(box.getAttribute("aria-invalid")).toBeNull();
     vi.unstubAllGlobals();
   });
+
+  // D13720: Adena does not exist on a phone's browser, so a guest there is told how to log in, not offered a button that cannot work.
+  describe("on a phone", () => {
+    const phone = () => {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query === "(max-width: 899px)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }));
+    };
+    const connect = (room: HTMLElement) =>
+      [...room.querySelectorAll("button")].find((b) => b.textContent === "Connect Adena");
+
+    it("without Adena, says to use a computer and offers no Connect Adena", () => {
+      phone();
+      const view = mount(<GuestWriter room="#games" />);
+      expect(connect(view)).toBeUndefined();
+      expect(view.textContent).toContain("To log in, use a computer");
+    });
+
+    it("with Adena (a computer's narrow window), keeps Connect Adena", () => {
+      phone();
+      vi.stubGlobal("adena", { AddEstablish: () => undefined });
+      const view = mount(<GuestWriter room="#games" />);
+      expect(connect(view)).toBeDefined();
+      expect(view.textContent).not.toContain("use a computer");
+    });
+  });
 });

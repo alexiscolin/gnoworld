@@ -62,7 +62,8 @@ export function Opened({
   });
   const items: MenuItem[] = [
     ...(address === undefined && onConnect !== undefined ? [{ label: "Connect Adena", onSelect: onConnect }] : []),
-    jarvisRow(onJarvis, jarvisWhy),
+    // A phone has no use for a greyed "Jarvis, soon": the row shows once it can act.
+    ...(phone && onJarvis === undefined ? [] : [jarvisRow(onJarvis, jarvisWhy)]),
     to("Passport", "passport", "passport"),
     ...(address === undefined ? [] : [to("Saved", "bookmark", "saved")]),
     to("Settings", "sliders", "settings"),

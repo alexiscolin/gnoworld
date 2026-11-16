@@ -50,14 +50,16 @@ export function RoomsDrawer({
           {unread > 0 ? (
             <>
               {/* Named once, "Rooms, 3 unread", by the hidden words: the count follows as a mark. */}
-              <span aria-hidden="true">Rooms</span>
+              <span aria-hidden="true" className={styles["word"]}>
+                Rooms
+              </span>
               <span className="visually-hidden">{`Rooms, ${countWords(unread)} unread`}</span>
               <span aria-hidden="true">
                 <Chip tone="signal">{countWords(unread)}</Chip>
               </span>
             </>
           ) : (
-            "Rooms"
+            <span className={styles["word"]}>Rooms</span>
           )}
         </Button>
       </div>

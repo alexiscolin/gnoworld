@@ -84,6 +84,13 @@ describe("Tooltip", () => {
     expect(shown()).toBe("true");
   });
 
+  it("never shows them for a touch tap, which has no hover to wait on", () => {
+    draw();
+    fireEvent.pointerEnter(button(), { pointerType: "touch" });
+    advance(500);
+    expect(shown()).toBe("false");
+  });
+
   it("shows them at once when the keyboard brings the focus, and hides them when it leaves", () => {
     draw();
     keyboardFocus();

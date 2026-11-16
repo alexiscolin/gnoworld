@@ -118,6 +118,8 @@
 
     .screen[data-full][data-compact] [data-region="header"] {
       padding-block: var(--space-2xs);
+      /* the lines' own gutter, so the header's controls and the name keep the row at 320 px */
+      padding-inline: var(--chat-inset);
     }
 
     :root:has(.screen[data-full][data-compact]) {
@@ -137,7 +139,7 @@
       block-size: calc(var(--control-m) * 3 + var(--space-s) + var(--space-2xs) * 4);
     }
 
-    @media (height < 500px) {
+    @media (height < 640px) {
       .topWaiting {
         block-size: calc(var(--control-m) + var(--control-s) + var(--space-2xs) * 4);
       }
