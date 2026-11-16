@@ -3114,6 +3114,11 @@ git -C "$i" worktree remove --force "$t/wt-i"
 h9="$i/home 9" && mkdir -p "$h9/.claude" && echo '{}' >"$h9/.claude/settings.json"
 (cd "$i" && HOME="$h9" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && grep -q "home 9/.claude: [1-9][0-9]* rule(s)" "$t/out" ||
 	fail "install_hooks.sh did not write a profile in a home folder whose name holds a space: $(cat "$t/out")"
+# A reinstall over an installed land replaces it whole: the link, a stamped copy, no folder of the new one left (F13464's path, which
+# the owner's reinstall takes after every merge).
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed reinstalling land: $(cat "$t/out")"
+[ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && head -1 "$lh/share/land/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C (/[^ /@]+)+/python3 -I' &&
+	[ ! -e "$lh/share/land/new" ] && ! grep -q "no new land installed" "$t/out" || fail "install_hooks.sh did not replace an installed land whole: $(cat "$t/out")"
 # A reinstall that cannot install the new land keeps the old one, linked and whole (F13464: #33's install removed it first).
 cp "$lh/share/land/land.py" "$t/land_before.py"
 (cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh oldland >"$t/out" 2>&1) || fail "install_hooks.sh failed on a reinstall it refused: $(cat "$t/out")"
