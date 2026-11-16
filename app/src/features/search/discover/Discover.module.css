@@ -82,15 +82,14 @@
     font: var(--font-ui);
   }
 
+  /* The design system's dot (ui's `dot`), in the style's tint, a step wider from its name. */
   .dot {
-    /* layout: the dot keeps its size, a step before the name */
-    flex: none;
+    --_dot: var(--_tint, transparent);
     /* layout: a step before the name */
-    margin-inline-end: var(--space-xs);
-    inline-size: var(--size-dot);
-    block-size: var(--size-dot);
-    border-radius: var(--radius-pill);
-    background: var(--_tint, transparent);
+    --dot-gap: var(--space-xs);
+
+    /* layout: the dot keeps its size */
+    flex: none;
   }
 
   .count {

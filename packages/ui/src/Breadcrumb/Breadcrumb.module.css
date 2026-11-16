@@ -33,11 +33,13 @@
     gap: 0;
   }
 
-  .trail li + li::before {
+  /* The chevron between the steps: the design system's, turned to point on. */
+  .step {
     /* layout: the arrangement the prototype and the frames draw */
+    display: inline-flex;
     margin-inline: var(--space-2xs);
-    content: "\203a";
     opacity: 0.6;
+    rotate: -90deg;
   }
 
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */

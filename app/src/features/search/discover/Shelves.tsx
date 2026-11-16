@@ -64,7 +64,7 @@ export function Shelves({ discovery }: { discovery: Discovery }) {
                 show(id);
               }}
             >
-              {STYLES.some((style) => style.id === id) ? <span className={styles["dot"]} /> : null}
+              {STYLES.some((style) => style.id === id) ? <span className={["dot", styles["dot"]].join(" ")} /> : null}
               <span className={["truncate", styles["name"]].join(" ")}>{nameOfShelf(id)}</span>
               {id === "today" ? null : <span className={styles["count"]}>{counts.get(id)}</span>}
             </button>

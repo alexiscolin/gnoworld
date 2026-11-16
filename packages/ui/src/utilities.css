@@ -42,7 +42,7 @@
     display: inline-block;
     inline-size: var(--size-dot);
     block-size: var(--size-dot);
-    margin-inline-end: var(--space-2xs);
+    margin-inline-end: var(--dot-gap, var(--space-2xs));
     border-radius: var(--radius-pill);
     background: var(--_dot);
     vertical-align: middle;

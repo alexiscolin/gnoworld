@@ -22,6 +22,11 @@ export function Breadcrumb({ label, items }: BreadcrumbProps) {
       <Cluster as="ol" space="2xs">
         {items.map((item, index) => (
           <li key={item.href ?? item.label}>
+            {index === 0 ? null : (
+              <span className={styles["step"]} aria-hidden="true">
+                <Icon name="chevron" size="s" />
+              </span>
+            )}
             {index !== last && item.onSelect !== undefined ? (
               <button type="button" className={styles["back"]} onClick={item.onSelect}>
                 <span className={styles["arrow"]} aria-hidden="true">
