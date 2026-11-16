@@ -93,6 +93,7 @@ function GuestField(props: {
       label={`Message ${label}`}
       placeholder={`Message ${label}`}
       value={draft}
+      invalid={problem !== undefined}
       describedBy={problem}
       onChange={onDraft}
     />
