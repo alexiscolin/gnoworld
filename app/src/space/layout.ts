@@ -66,11 +66,14 @@ const GROW = 1.25;
 const SPREAD = 1.15;
 // A sun at least this many times its largest planet's radius.
 const SUN_OVER = 2;
-/** `v` made a unit, as a new vector. */
-export const normalized = (v: Vec): Vec => {
+// `v` made a unit, in place: what a frame computes, making nothing.
+export function normalise(v: Vec): Vec {
   const length = Math.hypot(v.x, v.y, v.z) || 1;
-  return { x: v.x / length, y: v.y / length, z: v.z / length };
-};
+  v.x /= length;
+  v.y /= length;
+  v.z /= length;
+  return v;
+}
 /** The cross product of `a` and `b`. */
 export const cross = (a: Vec, b: Vec): Vec => ({
   x: a.y * b.z - a.z * b.y,
@@ -81,13 +84,13 @@ export const cross = (a: Vec, b: Vec): Vec => ({
 // A plane tilted by up to 0.45 rad from the disc's, the way the hash of `id` says.
 function planeOf(id: string, home: boolean) {
   const [tilt, turn] = [home ? 0.06 : hashOf(id, 1) * 0.45, hashOf(id, 2) * Math.PI * 2];
-  const normal = normalized({
+  const normal = normalise({
     x: Math.cos(turn) * Math.sin(tilt),
     y: Math.cos(tilt),
     z: Math.sin(turn) * Math.sin(tilt),
   });
-  const across = normalized(cross(normal, { x: 0.3, y: 0.1, z: 1 }));
-  return { normal, across, along: normalized(cross(normal, across)) };
+  const across = normalise(cross(normal, { x: 0.3, y: 0.1, z: 1 }));
+  return { normal, across, along: normalise(cross(normal, across)) };
 }
 
 /** The disc's radius for `count` systems: the demo's, wider past what it holds, so each keeps its room however many come. */
@@ -101,10 +104,10 @@ function sunOf(id: string, home: boolean): readonly [number, number, number] {
 
 // A sun smaller than the demo's, so its planets keep the room round it; a namespace of many worlds a larger one,
 // a step each time its worlds double; never smaller than its largest planet, its first orbit past it.
-const coreOf = (home: boolean, { worlds, asked = [] }: Kept): number =>
+const coreOf = (home: boolean, kept: Kept): number =>
   Math.max(
-    (home ? 3.4 : Math.min(2 + 0.7 * Math.log2(1 + worlds.length), 6)) * SUN_SIZE * GROW,
-    SUN_OVER * Math.max(0, ...[...worlds, ...asked].map(radiusOf)),
+    (home ? 3.4 : Math.min(2 + 0.7 * Math.log2(1 + kept.worlds.length), 6)) * SUN_SIZE * GROW,
+    SUN_OVER * Math.max(0, ...allOf(kept).map(radiusOf)),
   );
 
 function systemOf(index: number, id: string, { place, use, home, kept }: Sun): System {
@@ -129,20 +132,23 @@ interface Kept {
   readonly worlds: Held;
   readonly asked?: Held;
 }
+// The file's worlds, then the asked ones.
+const allOf = ({ worlds, asked = [] }: Kept): Held => [...worlds, ...asked];
 
 // The orbits round a system `id` of the file's `worlds` and the `asked` ones past them, each one's and the reach past the last, which its
 // place keeps clear of the others'.
-function orbitsOf(id: string, home: boolean, { worlds, asked = [] }: Kept): { orbits: number[]; reach: number } {
-  const [first] = [...worlds, ...asked];
+function orbitsOf(id: string, home: boolean, kept: Kept): { orbits: number[]; reach: number } {
+  const all = allOf(kept);
+  const [first] = all;
   // The first planet's inner edge: its orbit, but never inside three of its sun's radii, out of its glare.
   let edge = Math.max(
     (FIRST_ORBIT + hashOf(id, 10) * 3 + (home ? 5 : 0)) * SPREAD - (first === undefined ? 0 : radiusOf(first)),
-    3 * coreOf(home, { worlds, asked }),
+    3 * coreOf(home, kept),
   );
   // A namespace of many worlds packs its gaps closer: past two dozen, its reach stays a large system's, not a galaxy's.
-  const packed = Math.max(Math.min(1, 24 / Math.max(worlds.length, 1)), 0.25);
+  const packed = Math.max(Math.min(1, 24 / Math.max(kept.worlds.length, 1)), 0.25);
   // Each planet past the last one's outer edge, both radii counted, so none touch; the gaps uneven, some close, some wide.
-  const orbits = [...worlds, ...asked].map((world) => {
+  const orbits = all.map((world) => {
     const radius = radiusOf(world);
     const at = edge + radius;
     edge = at + radius + (1.5 + hashOf(world.id, 15) * 6) * SPREAD * packed;
@@ -159,7 +165,7 @@ const radiusOf = (world: Held[number]) =>
 // The planets of `system`: the file's `worlds`, then the `asked` ones the file lacks, on orbits past them.
 function addPlanets(system: System, kept: Kept, planets: Planet[]): void {
   const { orbits, reach } = orbitsOf(system.id, system.home, kept);
-  for (const [at, world] of [...kept.worlds, ...(kept.asked ?? [])].entries()) {
+  for (const [at, world] of allOf(kept).entries()) {
     const still = world.id === EARTH;
     const orbit = orbits[at] ?? FIRST_ORBIT;
     const planet: Planet = {
@@ -240,8 +246,10 @@ export function layoutOf(worlds: readonly CosmosWorld[], asked: readonly CosmosW
 export function placeOf(planet: Planet, seconds: number, out: Vec): Vec {
   const angle = planet.phase + planet.speed * seconds;
   const { place, across, along } = planet.system;
-  out.x = place.x + (across.x * Math.cos(angle) + along.x * Math.sin(angle)) * planet.orbit;
-  out.y = place.y + (across.y * Math.cos(angle) + along.y * Math.sin(angle)) * planet.orbit;
-  out.z = place.z + (across.z * Math.cos(angle) + along.z * Math.sin(angle)) * planet.orbit;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  out.x = place.x + (across.x * cos + along.x * sin) * planet.orbit;
+  out.y = place.y + (across.y * cos + along.y * sin) * planet.orbit;
+  out.z = place.z + (across.z * cos + along.z * sin) * planet.orbit;
   return out;
 }

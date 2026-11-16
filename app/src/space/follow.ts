@@ -10,7 +10,6 @@ import {
   featuredPool,
   latch,
   lightOf,
-  normalise,
   quarterOf,
   rollOf,
   turnOf,
@@ -18,7 +17,7 @@ import {
   type Featured,
   type View,
 } from "./vista.ts";
-import type { Planet, Vec } from "./layout.ts";
+import { normalise, type Planet, type Vec } from "./layout.ts";
 
 // raw: seconds between two searches, the pause after the reader's hand, and the eased share's time constants (the view's, the pose's)
 const EVERY = 2;

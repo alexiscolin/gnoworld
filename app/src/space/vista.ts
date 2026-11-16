@@ -3,7 +3,7 @@
 // different sizes in the free part of the screen. Chosen once, as the first screen is framed; read as a pose's way and roll.
 import type { Circle } from "./goals.ts";
 import { HORIZON, layersOf, type Candidate, type Featured } from "./layers.ts";
-import { cross, placeOf, type Planet, type Universe, type Vec } from "./layout.ts";
+import { cross, normalise, placeOf, type Planet, type Universe, type Vec } from "./layout.ts";
 
 const FOV_HALF = Math.tan((50 * Math.PI) / 360);
 const STEP = 4;
@@ -13,15 +13,6 @@ const ROLLS = [-60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60];
 export const HOME_BOOST = 2;
 // The sun's way on the screen, up and to the left, in degrees: the roll of the eye.
 const SUN_ANGLE = 140;
-
-// `v` made a unit, in place: what a frame computes, making nothing.
-export function normalise(v: Vec): Vec {
-  const length = Math.hypot(v.x, v.y, v.z) || 1;
-  v.x /= length;
-  v.y /= length;
-  v.z /= length;
-  return v;
-}
 
 // At three quarters: 99° from the sun (cos -0.15) in its plane, whatever the sun's place, so of the disc the plate and the dock leave
 // in sight some 60 % stands in the light, the terminator across it; the eye rolled so the sun stands up and to the left, the night down to the right.
