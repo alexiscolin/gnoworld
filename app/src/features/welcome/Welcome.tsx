@@ -32,7 +32,7 @@ export function Welcome() {
   return (
     <aside
       aria-label="Welcome"
-      className={styles["welcome"]}
+      className={["appears", styles["welcome"]].join(" ")}
       data-open={open ? "" : undefined}
       inert={!open}
       onKeyDown={(event: KeyboardEvent) => {
