@@ -206,12 +206,13 @@ describe("the session", () => {
     const { app } = setup();
     const who = wallet();
     const [mine, other] = [tokenOf(await login(app, who)), tokenOf(await login(app, who))];
-    const stranger = tokenOf(await login(app));
+    const someone = wallet();
+    const stranger = tokenOf(await login(app, someone));
     const response = await post(app, "logout-others", { body: {}, headers: { cookie: session(mine) } });
     expect([response.status, await response.text(), response.headers.get("set-cookie")]).toEqual([204, "", null]);
     expect(await answer(await me(app, session(mine)))).toEqual([200, JSON.stringify({ address: who.address })]);
     expect(await answer(await me(app, session(other)))).toEqual([200, NOBODY]);
-    expect((await answer(await me(app, session(stranger))))[1]).not.toBe(NOBODY);
+    expect(await answer(await me(app, session(stranger)))).toEqual([200, JSON.stringify({ address: someone.address })]);
   });
 
   it("answers 401 unauthenticated to logout-others without a live session, and ends nothing", async () => {
