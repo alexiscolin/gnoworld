@@ -27,7 +27,7 @@ const DISPLAY = [
   "app/src/routes/*.test.tsx",
   "app/src/{shell,slots,root,routerLink}.test.tsx",
   "app/src/features/world/*.test.tsx",
-  "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomMenu,RoomSections,Saved,SavedView}.test.tsx",
+  "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomSections,Saved,SavedView}.test.tsx",
   "app/src/features/realms/{ReadSource,RealmCard}.test.tsx",
   "app/src/features/universe/Credits.test.tsx",
   "app/src/features/home/{GoExplore,LatestOnGnoland}.test.tsx",

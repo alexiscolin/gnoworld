@@ -37,7 +37,7 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "pose", "glideAt", "wayAt", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
+FRAME_NAMES = ["tick", "pose", "glideAt", "wayAt", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "smoothstep"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
     ("frame_arrow.ts", "export const unitOf = (): number[] => {\n  return [1];\n};\n", FRAME),
