@@ -517,6 +517,7 @@ func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	at(t0 + 3*oneDay) // venus's paid end: anyone may close it now
 	testing.SetRealm(testing.NewUserRealm(carol))
 	Close(cross(cur), "venus")
+	uassert.False(t, holds.Has("venus")) // its hold ended at that second: removed with the record
 	uassert.Equal(t, 0, held)
 	uassert.Equal(t, 0, rentals.Size())
 }
