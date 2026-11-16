@@ -2,7 +2,7 @@
 // account in the room's world, with the bot's own means (the link's REDACT, the mutes' table and SAMODE): no table, schema or Ergo right is new.
 // Each comes from a listed Origin in JSON (guard.ts) with the login's session; the right (mayModerate), a mute's scope and its target are checked
 // before the link is asked anything; an account makes 30 requests a minute; each act is logged with the acting account, the owner and `as`.
-import { Address, PinRequest } from "@gnoworld/schemas";
+import { Address, HIDE_IDS, PinRequest } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
@@ -36,13 +36,14 @@ export interface ModerationOptions {
 }
 
 // A line's id as a pin names it, and not a word an IRC line would read as its trailing part.
-// One or two of them: the line shown and its last edit, both redacted in one request.
+// The line and each edit folded into it, redacted in one request: no more than the edits the search index keeps of a line
+// (HIDE_IDS); a second limiter charges each id.
 const Hide = z.strictObject({
   room: PinRequest.shape.room,
   msgids: z
     .array(PinRequest.shape.msgid.check(z.regex(/^[^:]/)))
     .min(1)
-    .max(2)
+    .max(HIDE_IDS)
     .refine((ids) => new Set(ids).size === ids.length),
 });
 const Mute = z.strictObject({ room: PinRequest.shape.room, account: Address });
@@ -60,6 +61,8 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
   const { line, hide, mute, roomsOf, mayModerate, judge, identityOf, spared, session, origins, proxy, log, now } =
     options;
   const requests = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
+  // The lookups follow the ids, not the requests: 60 a minute is what 30 requests of 2 ids cost (F13547, F13555).
+  const ids = limiter({ max: 60, windowMs: 60_000, keys: 100_000 });
   const refuse = refuserOf(log, "moderation_refused", refusals);
   // A POST's account, body and right: the guard has run; the session, the body, the right and the limit come in that order.
   async function request<T extends { room: string }>(c: Context, schema: z.ZodType<T>) {
@@ -82,13 +85,14 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
     const asked = await request(c, Hide);
     if (asked instanceof Response) return asked;
     const { who, right, body } = asked;
+    if (!body.msgids.every(() => ids.take(who, now()))) return refuse(c, "limit", { room: body.room });
     // The right is for the room of the body, and the link's REDACT takes a line by its id alone: each id must be a line of
     // that room as Ergo holds it, or an owner of one room would take out the lines of any other.
     const held = await Promise.all(body.msgids.map((msgid) => line(body.room, msgid)));
     if (held.includes("unanswered")) return refuse(c, "unavailable", { room: body.room });
     if (!held.every((got, i) => isLineOf(got, body.room, body.msgids[i] ?? "")))
       return refuse(c, "not_found", { room: body.room });
-    // Every id is sent, whatever the first said: one answer for the pair.
+    // Every id is sent, whatever the first said: one answer for all.
     const sent = body.msgids.map((msgid) => hide(body.room, msgid));
     if (!sent.every(Boolean)) return refuse(c, "unavailable", { room: body.room });
     log("line_hidden", { room: body.room, msgid: body.msgids.join(","), account: who, ...asOf(right) });

@@ -186,7 +186,7 @@ describe("asking the stored translations of the lines on screen", () => {
 
   it("leaves lines whose request failed as failed, never asked again by this page", async () => {
     const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve({ ok: false, reason: "unavailable" }));
+    const ask = vi.fn<Ask>(() => Promise.resolve({ ok: false, reason: "malformed" }));
     want(t, "a1", ask);
     await settle();
     want(t, "a1", ask);
@@ -210,6 +210,27 @@ describe("asking the stored translations of the lines on screen", () => {
     expect(ask).toHaveBeenCalledTimes(3);
     expect(now(t)).toMatchObject({ state: "done", text: "Bonjour" });
     const down = vi.fn<Ask>(() => Promise.resolve({ ok: false, reason: "network" }));
+    want(t, "b1", down);
+    await settle();
+    await vi.advanceTimersByTimeAsync(t.RETRY_MS * 10);
+    expect(down).toHaveBeenCalledTimes(3);
+    expect(now(t, "b1")).toEqual({ state: "failed" });
+  });
+
+  // A 5xx is a server that may be back in a minute: like a dropped request, not a verdict on the line for the whole session.
+  it("asks the lines of a request the server failed (a 5xx) again after RETRY_MS, a bounded number of times", async () => {
+    const t = await fresh();
+    const ask = vi
+      .fn<Ask>()
+      .mockResolvedValueOnce({ ok: false, reason: "unavailable" })
+      .mockResolvedValue(ok({ translations: [HELLO] }));
+    want(t, "a1", ask);
+    await settle();
+    expect(now(t)).toEqual({ state: "asking" });
+    await vi.advanceTimersByTimeAsync(t.RETRY_MS + t.GATHER_MS);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(now(t)).toMatchObject({ state: "done", text: "Bonjour" });
+    const down = vi.fn<Ask>(() => Promise.resolve({ ok: false, reason: "unavailable" }));
     want(t, "b1", down);
     await settle();
     await vi.advanceTimersByTimeAsync(t.RETRY_MS * 10);

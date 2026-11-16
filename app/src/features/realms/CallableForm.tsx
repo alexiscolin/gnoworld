@@ -5,7 +5,6 @@
 // out of the drawing, or a `path`, which names the realm gnoweb sends to and which this form does not follow.
 import type { CallField, FormField } from "@gnoworld/core";
 import { Button, Cluster } from "@gnoworld/ui";
-import { useId } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
@@ -33,6 +32,7 @@ function prefill(listing: Listing, exec: string, form: readonly FormField[]) {
 
 /** The form of a page for the realm `call` names. */
 export function CallableForm({
+  cardId,
   exec,
   path,
   fields,
@@ -40,6 +40,8 @@ export function CallableForm({
   call,
   level,
 }: {
+  /** What names this form's card, from the caller: the same at each mount of the same form, another for another form. */
+  cardId: string;
   exec: string;
   path: string;
   fields: readonly FormField[];
@@ -50,8 +52,9 @@ export function CallableForm({
 }) {
   const store = useAppStore();
   const listing = useCallable(call.chain.rpc, call.realm, call.options);
-  // A card of its own for each form: two forms of one function, or a form and a row, never share one.
-  const id = `${call.chain.chainId} ${call.realm}.${exec}#${useId()}`;
+  // A card of its own for each form: two forms of one function, or a form and a row, never share one; a form that mounts
+  // again finds its card, never a fresh preview to sign twice.
+  const id = `${call.chain.chainId} ${call.realm}.${exec}#${cardId}`;
   const prefilled = path === "" && left === 0 ? prefill(listing, exec, fields) : undefined;
   if (prefilled === undefined) return <RealmForm exec={exec} path={path} fields={fields} left={left} />;
   return (

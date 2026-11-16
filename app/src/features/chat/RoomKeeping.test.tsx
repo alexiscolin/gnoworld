@@ -3,7 +3,7 @@ import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { z } from "zod";
@@ -12,6 +12,24 @@ import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
+
+// What a hide sends is the moderation client's: its call is kept, the rest of the module is real.
+const hides = vi.hoisted(() => [] as { room: string; ids: readonly string[] }[]);
+const refusing = vi.hoisted(() => ({ on: false }));
+vi.mock("../../lib/api/moderation.ts", async (original) => ({
+  ...(await original<typeof import("../../lib/api/moderation.ts")>()),
+  pageModerationApi: () => ({
+    hide: (room: string, ids: readonly string[]) => {
+      hides.push({ room, ids });
+      return Promise.resolve(
+        refusing.on
+          ? { ok: false as const, reason: "refused" as const }
+          : { ok: true as const, value: { ok: true as const } },
+      );
+    },
+    mute: () => Promise.resolve({ ok: true as const, value: { ok: true as const } }),
+  }),
+}));
 
 // Marks on a room's lines, apart from RoomView.test.tsx: a line saved or pinned says so in a word,
 // and a line marked unread takes the New mark. `keeping` is what the room is told of the reader's device and the room's
@@ -249,7 +267,9 @@ describe("the room in view's keeping, from the store", () => {
 // pin is of the newest version's id.
 describe("the version of an edited line that the room acts on", () => {
   const said = (id: string, text: string, edits?: string): IrcMessage => {
-    const tags = `msgid=${id};time=2026-10-25T10:00:0${id.slice(1)}.000Z;account=${ALICE}${edits === undefined ? "" : `;+gnoworld/edit=${edits}`}`;
+    const n = Number(id.slice(1));
+    const clock = `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+    const tags = `msgid=${id};time=2026-10-25T10:${clock}.000Z;account=${ALICE}${edits === undefined ? "" : `;+gnoworld/edit=${edits}`}`;
     const parsed = parseLine(`@${tags} :alice!u@h PRIVMSG #bubble :${text}`);
     if (!parsed.ok) throw new Error("the test's line does not parse");
     return parsed.message;
@@ -388,5 +408,54 @@ describe("the version of an edited line that the room acts on", () => {
       await keeping()?.pin?.pin("m1");
     });
     expect(calls).toEqual(["pin m1"]);
+  });
+
+  // Ergo keeps each version of an edited line at its own id: a hide that leaves one of them out brings its words back on reload.
+  it("hides an edited line by the line and every edit folded into it, the middle one too", async () => {
+    hides.length = 0;
+    const { keeping } = mounted([...EDITED, said("m3", "never mind, really", "m1")]);
+    await act(async () => {
+      await keeping()?.moderate?.hide("m1");
+    });
+    expect(hides).toHaveLength(1);
+    expect([...(hides[0]?.ids ?? [])].sort()).toEqual(["m1", "m2", "m3"]);
+  });
+
+  // Nothing bounds how often a line is edited (Ergo and the composer have no cap; MAX_EDITS is the search index's alone):
+  // the 61 ids go in requests of the most the server takes, 51, each one's answer awaited, so the line's every version goes.
+  it("hides a line edited sixty times by every version, over requests of at most 51 ids", async () => {
+    hides.length = 0;
+    const edits = Array.from({ length: 60 }, (_, i) => said(`m${String(i + 2)}`, `edit ${String(i + 2)}`, "m1"));
+    const { keeping } = mounted([said("m1", "first"), ...edits]);
+    await act(async () => {
+      await keeping()?.moderate?.hide("m1");
+    });
+    expect(hides.map(({ ids }) => ids.length)).toEqual([51, 10]);
+    expect(new Set(hides.flatMap(({ ids }) => ids))).toEqual(
+      new Set(Array.from({ length: 61 }, (_, i) => `m${String(i + 1)}`)),
+    );
+  });
+
+  it("stops at the first request the server refused and says so, the rest unsent", async () => {
+    hides.length = 0;
+    refusing.on = true;
+    const edits = Array.from({ length: 60 }, (_, i) => said(`m${String(i + 2)}`, `edit ${String(i + 2)}`, "m1"));
+    const { keeping } = mounted([said("m1", "first"), ...edits]);
+    let done: unknown;
+    await act(async () => {
+      done = await keeping()?.moderate?.hide("m1");
+    });
+    refusing.on = false;
+    expect(hides).toHaveLength(1);
+    expect(done).toEqual({ ok: false, reason: "refused" });
+  });
+
+  it("hides a line that was never edited by its own id alone", async () => {
+    hides.length = 0;
+    const { keeping } = mounted([said("m1", "plain")]);
+    await act(async () => {
+      await keeping()?.moderate?.hide("m1");
+    });
+    expect(hides.map(({ ids }) => ids)).toEqual([["m1"]]);
   });
 });

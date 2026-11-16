@@ -36,6 +36,8 @@ interface Shown {
 interface Start {
   readonly container: WorkerContainer | undefined;
   readonly document: Shown;
+  /** The page's window, as far as its network goes. */
+  readonly online: { addEventListener(type: "online", listener: () => void, options: Listening): void };
   readonly search: string;
   readonly production: boolean;
   readonly signal: AbortSignal;
@@ -46,6 +48,9 @@ interface Start {
   readonly reachable: () => Promise<boolean>;
   readonly onUpdate: (apply: () => void) => void;
 }
+
+// A tab always in view never fires visibilitychange, so the check is also made hourly.
+const CHECK_EVERY_MS = 60 * 60 * 1000;
 
 /** Whether the host answers for the worker's script: any response is one, an error status included. */
 export const hostAnswers = () =>
@@ -102,20 +107,27 @@ export async function startServiceWorker(start: Start): Promise<void> {
       { signal },
     );
   };
-  // The browser looks for a new worker when a page loads; one kept open for days moves in place,
-  // so it asks each time it is shown again. The notice closes on its click: a page whose click took
-  // nothing over (the message lost) is offered the update again, for its next click to send it again.
+  // The browser looks for a new worker when a page loads; one kept open for days asks again when shown, when the network
+  // comes back (a laptop that slept) and every hour (a tab always in view). A click that took nothing over (its message
+  // lost) is offered the update again, for the next click to send it again.
+  const check = () => {
+    if (clicked && registration.waiting !== null) offer();
+    registration.update().catch(async (error: unknown) => {
+      if (await start.reachable()) start.report(error);
+    });
+  };
   start.document.addEventListener(
     "visibilitychange",
     () => {
-      if (start.document.visibilityState !== "visible") return;
-      if (clicked && registration.waiting !== null) offer();
-      registration.update().catch(async (error: unknown) => {
-        if (await start.reachable()) start.report(error);
-      });
+      if (start.document.visibilityState === "visible") check();
     },
     { signal },
   );
+  start.online.addEventListener("online", check, { signal });
+  const hourly = setInterval(check, CHECK_EVERY_MS);
+  signal.addEventListener("abort", () => {
+    clearInterval(hourly);
+  });
   if (registration.waiting !== null) offer();
   if (registration.installing !== null) watch(registration.installing);
   registration.addEventListener(

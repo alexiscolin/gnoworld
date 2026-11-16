@@ -3,8 +3,8 @@ import { page, type PageBlock } from "@gnoworld/core";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { SignedIn } from "../../../tests/grabStore.tsx";
-import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
+import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
+import { all, button, click, drawer, follows, mount, one } from "../../../tests/mount.tsx";
 import {
   after,
   calling,
@@ -18,6 +18,7 @@ import {
   warnsMembers,
 } from "../../../tests/callFixtures.ts";
 import { drawing } from "../chat/index.ts";
+import { callsIn } from "../calls/index.ts";
 import { CallableForm } from "./CallableForm.tsx";
 import { DRAW_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
@@ -53,6 +54,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(source)}
+          page={REALM}
           call={{ realm: REALM, chain: CHAIN, options: { fetch: under } }}
         />
       </div>
@@ -61,6 +63,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("SetProfile", input("name")))}
+          page={REALM}
           call={{ realm: REALM, chain: SIBLING_CHAIN, options: { fetch: sibling } }}
         />
       </div>
@@ -229,6 +232,7 @@ describe("a form whose drawing left fields out", () => {
     const sibling = vi.fn<ChainFetch>(() => after(under, answer));
     const at = (fetch: ChainFetch, left: number, chain: typeof CHAIN) => (
       <CallableForm
+        cardId="t1"
         exec="SetProfile"
         path=""
         left={left}
@@ -284,6 +288,7 @@ describe("a GovDAO page's vote form", () => {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("MustVoteOnProposalSimple", input("pid"), input("option")))}
+          page="gno.land/r/gov/dao"
           call={{
             realm: "gno.land/r/gov/dao",
             chain: CHAIN,
@@ -294,5 +299,92 @@ describe("a GovDAO page's vote form", () => {
     );
     click(await calling(box, "Call MustVoteOnProposalSimple"));
     warnsMembers(one(box, CARD));
+  });
+});
+
+// The card is the one the caller names (`cardId`): a form that mounts again finds its card, still waiting for its block.
+describe("a page form's card across a remount", () => {
+  const input = (name: string) => ({
+    tag: "input" as const,
+    name,
+    inputType: "",
+    value: "",
+    placeholder: "",
+    description: "",
+    flags: "",
+  });
+  const show = (shown: boolean) => (
+    <StoreProvider>
+      <Grab />
+      <SignedIn />
+      {shown ? (
+        <CallableForm
+          cardId="form-1"
+          exec="SetProfile"
+          path=""
+          left={0}
+          fields={[input("name"), input("times")]}
+          call={{ realm: REALM, chain: CHAIN, options: { fetch: vi.fn<ChainFetch>(answer) } }}
+        />
+      ) : null}
+    </StoreProvider>
+  );
+
+  it("finds its card, waiting for the block, when the form is unmounted and mounted again", async () => {
+    const draw = drawer();
+    draw(show(true));
+    const host = document.body.lastElementChild as HTMLElement;
+    click(await calling(host, "Call SetProfile"));
+    const [id] = Object.keys(callsIn(state())?.calls ?? {});
+    if (id === undefined) throw new Error("no card opened");
+    callsIn(state())?.callsActions.signing(id);
+    draw(show(false));
+    draw(show(true));
+    await calling(host, "Call SetProfile");
+    expect(all(host, "article")).toHaveLength(1);
+    expect(host.textContent).toContain("Waiting for your signature in Adena");
+  });
+});
+
+// The caller's side of the same rule: RealmBlocks names each form's card by its place on the page, so two forms of one
+// function have a card each, and a page drawn again finds the card each opened.
+describe("a page's two forms of one function, across a remount of the page", () => {
+  const source = [gnoForm("SetProfile", input("name")), gnoForm("SetProfile", input("name"))].join("\n\n");
+  const show = (shown: boolean) => (
+    <StoreProvider>
+      <Grab />
+      <SignedIn />
+      {shown ? (
+        <RealmBlocks
+          via={via}
+          origin={CHAIN.gnoweb}
+          blocks={blocksOf(source)}
+          call={{ realm: REALM, chain: CHAIN, options: { fetch: vi.fn<ChainFetch>(answer) } }}
+          page="https://gno.land/r/demo/profile"
+        />
+      ) : null}
+    </StoreProvider>
+  );
+  const callers = (host: HTMLElement) =>
+    all(host, "button").filter((each) => /^Call\s+SetProfile/.test(each.textContent));
+
+  // Both forms' Call pressed once they are drawn: two cards, one each.
+  const openBoth = async (host: HTMLElement) => {
+    await vi.waitFor(() => {
+      expect(callers(host)).toHaveLength(2);
+    });
+    for (const each of callers(host)) click(each);
+    expect(Object.keys(callsIn(state())?.calls ?? {})).toHaveLength(2);
+  };
+
+  it("opens a card for each, and finds each one's card again when the page mounts again", async () => {
+    const draw = drawer();
+    draw(show(true));
+    const host = document.body.lastElementChild as HTMLElement;
+    await openBoth(host);
+    expect(all(host, "article > article, figure + article")).toHaveLength(2);
+    draw(show(false));
+    draw(show(true));
+    await openBoth(host);
   });
 });

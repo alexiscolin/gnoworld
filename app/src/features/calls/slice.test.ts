@@ -1,3 +1,4 @@
+import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { callsIn, ensureCalls, type CallsStore } from "./slice.ts";
@@ -226,5 +227,48 @@ describe("the calls slice: no way back from a call that may have been sent (F572
     failed("SetBio", { reason: "declined-maybe-sent" });
     retry("SetBio");
     expect(card(store)?.state).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
+  });
+});
+
+// On a shared browser the next person must not meet the last one's cards: a "signed" card of A's, or a preview filled with
+// A's arguments. A card has no account, so one waiting for its block (signing, landing) stays, as its transaction is in flight
+// and dropping it would lose track of it; the idle ones (preview, failed, done) go, as the link cards go (cardsSlice).
+describe("a change of account", () => {
+  const A = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+  const B = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+  const idle = (store: CallsStore) => {
+    const { open, edit, signing, landing, done, failed } = store.getState().callsActions;
+    for (const id of ["preview", "failed", "done", "signing", "landing"]) open({ ...NEW, id });
+    edit("preview", 0, "A's private words");
+    failed("failed", { reason: "unseen" });
+    for (const id of ["done", "signing", "landing"]) signing(id);
+    landing("done", HASH);
+    landing("landing", HASH);
+    done("done", { height: 7, value: "" });
+  };
+
+  it("drops A's idle cards when B signs in: a preview, a failure and a signed card", () => {
+    const store = made();
+    store.getState().loginActions.signedIn(A);
+    idle(store);
+    store.getState().loginActions.signedIn(B);
+    expect(Object.keys(store.getState().calls).sort()).toEqual(["landing", "signing"]);
+  });
+
+  it("drops A's idle cards when A signs out, for the guest who follows on a shared browser", () => {
+    const store = made();
+    store.getState().loginActions.signedIn(A);
+    idle(store);
+    store.getState().loginActions.signedOut();
+    expect(Object.keys(store.getState().calls).sort()).toEqual(["landing", "signing"]);
+  });
+
+  it("keeps the cards of the same account signing in again, and of the first session from none", () => {
+    const store = made();
+    idle(store);
+    store.getState().loginActions.signedIn(A);
+    expect(Object.keys(store.getState().calls)).toHaveLength(5);
+    store.getState().loginActions.signedIn(A);
+    expect(Object.keys(store.getState().calls)).toHaveLength(5);
   });
 });

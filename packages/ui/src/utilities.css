@@ -303,6 +303,20 @@
     border-radius: var(--radius-pill);
   }
 
+  /* A control and its sibling controls in one pill: the box's line is drawn here, so the button first in it draws none of its own (its
+     transparent edge keeps the pill's height); the header's way in or account, with the network's menu after a divider. */
+  .pill-group {
+    /* layout: the controls on a line, sharing a middle */
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+  }
+
+  .pill-group > button:first-child {
+    border-color: transparent;
+  }
+
   /* A link that draws no underline of its own: a pill that is a link. */
   .no-underline {
     text-decoration: none;

@@ -94,6 +94,18 @@ function shown() {
   };
 }
 
+// The page's window, as far as its network goes: a test brings the network back.
+function networked() {
+  const changes = listeners("online");
+  return {
+    listening: changes.count,
+    addEventListener: (type: "online", listener: () => void, options?: Options) => {
+      changes.add(type, listener, options);
+    },
+    comesBack: changes.fire,
+  };
+}
+
 function start(
   page: WorkerContainer | undefined,
   { search = "", production = true, signal = new AbortController().signal, reachable = true } = {},
@@ -102,9 +114,11 @@ function start(
   const reload = vi.fn();
   const report = vi.fn();
   const document = shown();
+  const online = networked();
   const started = startServiceWorker({
     container: page,
     document,
+    online,
     search,
     production,
     signal,
@@ -113,7 +127,7 @@ function start(
     reachable: () => Promise.resolve(reachable),
     onUpdate: (apply) => updates.push(apply),
   });
-  return { started, updates, reload, report, document };
+  return { started, updates, reload, report, document, online };
 }
 
 test("?nosw unregisters every worker and registers none, in production as in development", async () => {
@@ -492,4 +506,98 @@ test("once the page has gone, being shown asks for nothing", async () => {
   leaving.abort();
   document.becomes("visible");
   expect(registration.update).not.toHaveBeenCalled();
+});
+
+// A tab always in view never fires visibilitychange: the update is also looked for when the network comes back (a laptop that
+// slept) and every hour, each torn down with the page.
+const HOUR = 60 * 60 * 1000;
+
+test("the network coming back asks for the new worker", async () => {
+  const { page, registration } = container();
+  const { started, online } = start(page);
+  await started;
+  online.comesBack();
+  expect(registration.update).toHaveBeenCalledOnce();
+});
+
+test("an hour in a tab always in view asks for the new worker, and each hour after", async () => {
+  vi.useFakeTimers();
+  try {
+    const { page, registration } = container();
+    const { started } = start(page);
+    await started;
+    vi.advanceTimersByTime(HOUR - 1);
+    expect(registration.update).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(registration.update).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(HOUR);
+    expect(registration.update).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("once the page has gone, neither the network coming back nor an hour asks for anything", async () => {
+  vi.useFakeTimers();
+  try {
+    const leaving = new AbortController();
+    const { page, registration } = container();
+    const { started, online } = start(page, { signal: leaving.signal });
+    await started;
+    leaving.abort();
+    online.comesBack();
+    vi.advanceTimersByTime(3 * HOUR);
+    expect(registration.update).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("a check that fails while the host is unreachable is no report, as the shown page's is none", async () => {
+  const { page, registration } = container();
+  registration.update.mockRejectedValue(new Error("offline"));
+  const { started, online, report } = start(page, { reachable: false });
+  await started;
+  online.comesBack();
+  await vi.waitFor(() => {
+    expect(registration.update).toHaveBeenCalledOnce();
+  });
+  expect(report).not.toHaveBeenCalled();
+});
+
+test("a check on the network coming back, or on the hour, that fails while the host answers is reported", async () => {
+  vi.useFakeTimers();
+  try {
+    const { page, registration } = container();
+    const failure = new Error("the host answered 503");
+    registration.update.mockRejectedValue(failure);
+    const { started, online, report } = start(page, { reachable: true });
+    await started;
+    online.comesBack();
+    await vi.waitFor(() => {
+      expect(report).toHaveBeenCalledTimes(1);
+    });
+    vi.advanceTimersByTime(HOUR);
+    await vi.waitFor(() => {
+      expect(report).toHaveBeenCalledTimes(2);
+    });
+    expect(report).toHaveBeenNthCalledWith(1, failure);
+    expect(report).toHaveBeenNthCalledWith(2, failure);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("in development the network coming back and the hour start nothing", async () => {
+  vi.useFakeTimers();
+  try {
+    const { page, registration } = container();
+    const { started, online } = start(page, { production: false });
+    await started;
+    expect(online.listening()).toBe(0);
+    vi.advanceTimersByTime(HOUR);
+    expect(registration.update).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });

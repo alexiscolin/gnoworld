@@ -3,7 +3,7 @@
 // kept out of store/, whose files vite.config.ts puts in the first screen's chunk: the first screen's budget has no room for it.
 import type { StoreApi } from "zustand/vanilla";
 import type { CallCard, CallsSlice, CardState } from "../../lib/calls.ts";
-import type { AppState } from "../../store/index.ts";
+import { sessionChanged, type AppState } from "../../store/index.ts";
 import { without } from "../../store/record.ts";
 
 /** A store that has the calls' slice. */
@@ -82,6 +82,17 @@ function addCalls({ setState: set, getState: get }: CallsStore): void {
 export function ensureCalls(store: StoreApi<AppState>): CallsStore {
   // The slice is added right here, so this is the one place that holds the store as having it.
   const calls = store as CallsStore;
-  if (callsIn(store.getState()) === undefined) addCalls(calls);
+  if (callsIn(store.getState()) === undefined) {
+    addCalls(calls);
+    // A session that follows another leaves no idle card of the last one's: a preview with its arguments, a failure, a signed card.
+    // One in flight (signing, landing) stays, as its transaction is out and a card gone would lose track of it.
+    calls.subscribe((state, before) => {
+      if (!sessionChanged(state, before)) return;
+      const inFlight = Object.entries(state.calls).filter(
+        ([, { state: card }]) => card.kind === "signing" || card.kind === "landing",
+      );
+      calls.setState({ calls: Object.fromEntries(inFlight) });
+    });
+  }
   return calls;
 }

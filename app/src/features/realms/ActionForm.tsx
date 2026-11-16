@@ -3,7 +3,7 @@
 // A confirmed one shows its why and a "Call" that opens the call card prefilled, every field editable; anything else shows nothing.
 // In the chat (`viewHref`), a call of more than two fields is only a compact card with its way to the realm view (ADR-0002 section 4).
 // In the chat's quick actions bar (`bar`) it is one pill that opens the bar's own card, or a link to the realm view.
-import { useId, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "react-router";
 import { HIDDEN, type FormField } from "@gnoworld/core";
 import { Button, Cluster, Stack } from "@gnoworld/ui";
@@ -55,8 +55,16 @@ function BarPill({ href, onClick, children }: { href: string | undefined; onClic
   );
 }
 
+const CallName = ({ of }: { of: string }) => (
+  <>
+    Call
+    <span className="visually-hidden"> {of}</span>
+  </>
+);
+
 /** The action for the chain `place` names (its realm is the action's own). */
 export function ActionForm({
+  cardId,
   action,
   label,
   chain,
@@ -65,6 +73,8 @@ export function ActionForm({
   bar,
   exact = false,
 }: {
+  /** What names this form's card, from the caller: the same at each mount of the same form, another for another form. */
+  cardId: string;
   action: ProposedCall;
   label?: string;
   chain: CallPlace["chain"];
@@ -78,7 +88,7 @@ export function ActionForm({
   const store = useAppStore();
   const place: CallPlace = { realm: action.realm, chain, options };
   const listing = useCallable(chain.rpc, action.realm, options);
-  const id = `${chain.chainId} ${action.realm}.${action.function}#${useId()}`;
+  const id = `${chain.chainId} ${action.realm}.${action.function}#${cardId}`;
   const checked = confirmed(listing, action, exact);
   if (checked === undefined) return null;
   const { write, texts, fields } = checked;
@@ -86,12 +96,7 @@ export function ActionForm({
   const open = (card: string) => {
     openCard(store, { id: card, place, write: write.function, texts });
   };
-  const name = label ?? (
-    <>
-      Call
-      <span className="visually-hidden"> {write.function.name}</span>
-    </>
-  );
+  const name = label ?? <CallName of={write.function.name} />;
   if (bar !== undefined)
     return (
       <BarPill

@@ -1,4 +1,4 @@
-/* The network's name and its testnet's caution, in the header's row or in the account's pill (Network.tsx). */
+/* The network's name and its testnet's caution, in the header's row or at the end of the way in's and the account's pill (Network.tsx). */
 @layer components {
   .network,
   .inPill {
@@ -10,20 +10,37 @@
     font: var(--font-ui);
   }
 
+  /* The name is a quiet menu trigger in the muted ink: no box but its hover, and the row's text starts and ends at its edge. */
+  .network button,
+  .inPill button {
+    color: var(--color-text-muted);
+  }
+
+  .network button {
+    padding-inline: 0;
+  }
+
   /* On a phone the header's row names the network: the pill keeps the name alone. */
   .inPill {
     display: none;
-    /* layout: a line off the account's name, as the views' pill's divider */
-    margin-inline-start: var(--space-2xs);
-    padding-inline-start: var(--space-xs);
-    /* raw: a hairline, the views' pill's 1 px divider */
-    border-inline-start: 1px solid var(--color-line-strong);
   }
 
   @media (width >= 900px) {
     .inPill {
       /* layout: the name, the icon and the chip on a line */
       display: inline-flex;
+    }
+
+    /* The thin divider the pill's control and the network share. */
+    .inPill::before {
+      content: "";
+      /* layout: as high as the chip beside the name */
+      block-size: 1lh;
+      border-inline-start: var(--line-width) solid var(--color-line-strong);
+    }
+
+    .inPill button {
+      padding-inline: var(--space-xs) 0;
     }
   }
 
@@ -32,5 +49,10 @@
     /* layout: the arrangement the prototype and the frames draw */
     margin-inline-start: var(--space-2xs);
     color: var(--color-warm);
+  }
+
+  .inPill .caution {
+    /* layout: the pill's end, as the button's own padding */
+    margin-inline-end: var(--space-s);
   }
 }
