@@ -1,5 +1,4 @@
-// The world's rooms once listed: the switcher, the conversation in view (a room, or a direct message) and what
-// writes in it.
+// The world's rooms once listed: the switcher, the conversation in view (a room, or a direct message) and what writes in it.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Chip } from "@gnoworld/ui";
@@ -25,7 +24,8 @@ import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
 import { RoomsMenu } from "./RoomsMenu.tsx";
 import { unreadOf } from "./unread.ts";
 import { useOpened, useWhoIsHere } from "./whoIsHere.tsx";
-import { NoRoomYet, RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
+import type { RoomViewProps } from "./RoomView.tsx";
+import { LoadedRoom } from "./LoadedRoom.tsx";
 import { shownOf } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
 import type { Shown } from "./roomShown.ts";
@@ -98,12 +98,10 @@ function Rail({
   );
 }
 
-/** The conversation in view and what names it: the room (none while a direct message or its problem is in view), the
- * reader, who is here and what each part of the conversation is told. */
+/** The conversation in view and what names it: the room (none for a direct message), the reader, who is here, what each part is told. */
 function useConversation(props: LoadedProps) {
   const { sections, current, state, chat, session, link, dismissed, dmDismissed, sayTo, dms, noticing } = props;
-  // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
-  // none while a direct message is in view.
+  // One conversation in view: the direct message ?dm= names, else the room (Alt+Up and Alt+Down move between rooms).
   const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   useRoomKeys(roomIds(sections), room);
   const acts = roomActs(link, room ?? "", dismissed);
@@ -121,27 +119,6 @@ function useConversation(props: LoadedProps) {
   return { room, acts, me, people, shown, lines, noteId, members: state?.members ?? NO_MEMBERS };
 }
 
-/** The conversation in view: a direct message's problem, said in the room's place, then the room with its composer. */
-function LoadedRoom({
-  problem,
-  shown,
-  view,
-  composer,
-}: {
-  problem: ReactNode;
-  shown: Shown | undefined;
-  view: RoomViewOver;
-  composer: ReactNode;
-}) {
-  const room = shown && <RoomView key={shown.key} {...shown.view} {...view} composer={composer} />;
-  return (
-    <>
-      {problem === undefined ? null : <p role="status">{problem}</p>}
-      {room ?? (problem === undefined ? <NoRoomYet /> : null)}
-    </>
-  );
-}
-
 // What the composer's description points at: the header shows a direct message's mark, a screen reader hears its note.
 function DmNote({ shown, id }: { shown: Shown | undefined; id: string }) {
   return shown?.kind === "dm" ? (
@@ -152,8 +129,10 @@ function DmNote({ shown, id }: { shown: Shown | undefined; id: string }) {
 }
 
 export function Loaded(props: LoadedProps) {
-  const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
+  const { sections, verdicts, saving, chat, session, link, dms, noticing, place } = props;
   const { room, acts, me, people, shown, lines, members, noteId } = useConversation(props);
+  // The rooms that could not load: said in the conversation's place, and in the rooms' list only beside a direct message.
+  const failed = shown === undefined ? undefined : props.failed;
   const now = useNow();
   // The owner of the place's world wears a mark beside the room's name; the server's list says who owns what.
   const owner = ownsRoom(useLinks(me)?.worlds, room);
@@ -206,6 +185,7 @@ export function Loaded(props: LoadedProps) {
     >
       <JarvisTold place={place} shown={shown} account={me} />
       <LoadedRoom
+        failed={props.failed}
         problem={dms.problem}
         shown={shown}
         view={{
