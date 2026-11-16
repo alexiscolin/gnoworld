@@ -316,7 +316,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   room it re-entered by SAJOIN after a restart, where it is a plain member.
 - **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
-- **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
+- **`GET /api/stream`** is public: 25 rooms a stream, 32 streams a visitor (nginx's `limit_conn`), 2,000 in all (the online target), a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
   and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it. A HEAD is
   refused with 405 and takes no place.

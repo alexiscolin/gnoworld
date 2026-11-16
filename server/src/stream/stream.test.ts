@@ -171,21 +171,13 @@ describe("the verdicts' stream", () => {
     for (const list of [many, `#${"a".repeat(63)}`, "#a,#a"]) expect((await rooms(list)).response.status).toBe(200);
   });
 
-  it("holds 4 streams per visitor and a total, refusing more with 429", async () => {
-    const { rooms } = setup({ total: 6 });
+  it("holds a budget per visitor and a total, refusing more with 429", async () => {
+    const { rooms } = setup({ perVisitor: 4, total: 6 });
     for (let n = 0; n < 4; n += 1) expect((await rooms("#bubble")).response.status).toBe(200);
     expect(await refusal((await rooms("#bubble")).response)).toEqual([429, '{"error":"too_many"}']);
     expect((await rooms("#bubble", { peer: "198.51.100.1" })).response.status).toBe(200);
     expect((await rooms("#bubble", { peer: "198.51.100.1" })).response.status).toBe(200);
     expect((await rooms("#bubble", { peer: "198.51.100.2" })).response.status).toBe(429);
-  });
-
-  it("holds 1,000 streams in all by default", async () => {
-    const { rooms } = setup();
-    for (let n = 0; n < 1000; n += 1) {
-      expect((await rooms("#bubble", { peer: `198.51.100.${String(Math.floor(n / 4))}` })).response.status).toBe(200);
-    }
-    expect((await rooms("#bubble", { peer: "192.0.2.1" })).response.status).toBe(429);
   });
 
   it("gives a stream of the Earth's room alone a budget of its own, so the landing page never takes a chat's place (F5775)", async () => {
@@ -209,17 +201,17 @@ describe("the verdicts' stream", () => {
   });
 
   it("counts a visitor by the proxy's X-Real-IP only from the proxy, and an IPv6 visitor by its /64", async () => {
-    const forged = setup();
+    const forged = setup({ perVisitor: 4 });
     for (let n = 0; n < 4; n += 1) await forged.rooms("#bubble", { realIp: `192.0.2.${String(n)}` });
     expect((await forged.rooms("#bubble", { realIp: "192.0.2.9" })).response.status).toBe(429);
-    const proxied = setup({}, PROXY);
+    const proxied = setup({ perVisitor: 4 }, PROXY);
     for (const realIp of ["192.0.2.1", "192.0.2.2"]) {
       for (let n = 0; n < 4; n += 1) {
         expect((await proxied.rooms("#bubble", { peer: PROXY, realIp })).response.status).toBe(200);
       }
     }
     expect((await proxied.rooms("#bubble", { peer: PROXY, realIp: "192.0.2.1" })).response.status).toBe(429);
-    const six = setup();
+    const six = setup({ perVisitor: 4 });
     for (let n = 0; n < 4; n += 1) await six.rooms("#bubble", { peer: `2001:db8:1:2::${String(n + 1)}` });
     expect((await six.rooms("#bubble", { peer: "2001:db8:1:2:ffff::1" })).response.status).toBe(429);
     expect((await six.rooms("#bubble", { peer: "2001:db8:1:3::1" })).response.status).toBe(200);
@@ -329,7 +321,7 @@ describe("the verdicts' stream, its green pass (3j)", () => {
   });
 
   it("keeps a visitor's other streams counted when one of them ends", async () => {
-    const { rooms } = setup();
+    const { rooms } = setup({ perVisitor: 4 });
     const own = [];
     for (let n = 0; n < 4; n += 1) own.push(await rooms("#bubble"));
     await own[0]?.cancel();
@@ -839,5 +831,26 @@ describe("the stream's card events", () => {
     for (let n = 0; n < 50; n += 1) stream.card({ msgid: `m${String(n)}`, room: "#bubble", key: KEY });
     await client.cancel();
     expect(stream.size().clients).toBeLessThanOrEqual(1);
+  });
+});
+
+// F13502: 4 streams an address turned a shared Wi-Fi's fifth person away; nginx's own limit is 32 an address
+// (deploy/web/nginx.conf, `limit_conn open 32`), and the total was half the 2,000 online of the load test.
+describe("the stream's admission (F13502)", () => {
+  it("admits the 32nd stream of one address, as nginx does, and refuses the 33rd with 429", async () => {
+    const { rooms } = setup({ total: 100 });
+    for (let n = 0; n < 32; n += 1) expect((await rooms("#bubble")).response.status).toBe(200);
+    expect(await refusal((await rooms("#bubble")).response)).toEqual([429, '{"error":"too_many"}']);
+    expect((await rooms("#bubble", { peer: "198.51.100.1" })).response.status).toBe(200);
+  });
+
+  it("holds 2,000 streams in all by default, the online target, and refuses the 2,001st", async () => {
+    const { rooms } = setup();
+    for (let n = 0; n < 2000; n += 1) {
+      expect(
+        (await rooms("#bubble", { peer: `198.51.${String(Math.floor(n / 32))}.${String(n % 32)}` })).response.status,
+      ).toBe(200);
+    }
+    expect((await rooms("#bubble", { peer: "192.0.2.1" })).response.status).toBe(429);
   });
 });
