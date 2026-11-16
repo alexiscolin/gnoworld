@@ -89,9 +89,14 @@ async function pageOf(
 // The height of the first transaction with a token event above `above`, read alone.
 async function heightAfter(reading: Reading, above: number | undefined): Promise<number> {
   const found = z
-    .object({ data: z.object({ getTransactions: z.nullable(z.array(z.object({ block_height: ChainCount }))) }) })
+    .object({
+      data: z.object({ getTransactions: z.nullable(z.array(z.object({ block_height: ChainCount }))) }),
+      // As the other reads: an answer carrying errors is no answer, never "no transaction here".
+      errors: z.optional(z.never()),
+    })
     .safeParse(await request(reading, tokenHeightAbove(TOKEN_PACKAGE, above)));
-  const height = found.success ? found.data.data.getTransactions?.[0]?.block_height : undefined;
+  if (!found.success) throw new Failure("shape");
+  const height = found.data.data.getTransactions?.[0]?.block_height;
   if (height === undefined || height <= (above ?? -1)) throw new Failure("too_large");
   return height;
 }
