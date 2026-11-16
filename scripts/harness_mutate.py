@@ -426,6 +426,13 @@ def mutants():
     yield from each(sl, ' and not any(part.startswith(".") for part in p.split("/"))', "", "hooks", "stryker_lines.py leaves a hidden file out, as minimatch does")
     yield from each(sl, '    for path in git("ls-files", "--others", "--exclude-standard", "--", *specs).splitlines():\n', "    for path in []:\n", "hooks", "stryker_lines.py mutates a new file whole")
     yield from each(sl, "        sys.exit(3)\n", "        sys.exit(0)\n", "hooks", "stryker_lines.py says it has no line by exit 3")
+    yield from each(sl, "    if total > CAP:\n", "    if False:\n", "hooks", "stryker_lines.py refuses a change past its cap")
+    yield from each(sl, '    config["thresholds"] = {**thresholds, "break": share}\n', "", "hooks", "stryker_lines.py gives the config its break threshold (F13184)")
+    yield from each(sl, "    if not all(type(v) in (int, float) and 1 <= v <= 100 for v in (low, share)):\n", "    if False:\n", "hooks", "stryker_lines.py refuses a share that is no number from 1 to 100")
+    yield from each(sl, "and 1 <= v <= 100 for v", "for v", "hooks", "stryker_lines.py refuses a share past 100 or under 1")
+    yield from each(sl, 'share = thresholds.get("break", low)', "share = low", "hooks", "stryker_lines.py keeps the config's own break")
+    yield from each("scripts/check_regressions.py", ' or shares.get("low") or 0', " or 0", "hooks", "check_regressions reads risk's low share as the mutation floor")
+    yield from each("scripts/check_regressions.py", '    out["stryker.config.json"] = hashlib.sha256(json.dumps(stryker, sort_keys=True).encode()).hexdigest()[:12]\n', "", "hooks", "check_regressions reads a change of risk's config, any key")
     yield from each(sl, '    config["mutate"] = [', '    config = {}\n    config["mutate"] = [', "hooks", "stryker_lines.py keeps every other key of the config")
     yield from each(sl, "{n for first, last in spans[p] if any(first <= at <= last for at in found) for n in range(first, last + 1)}", "found", "hooks", "stryker_lines.py widens a changed line to its top-level statement (F4857)")
     yield from each(sl, "if not isinstance(patterns, list) or not patterns or not all(isinstance(p, str) for p in patterns):", "if not patterns:", "hooks", "stryker_lines.py refuses a mutate that is no list of patterns")
@@ -1362,6 +1369,11 @@ def mutants():
         ("except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:", "except OSError as e:", "ci_annotate refuses a list that is no JSON in one line"),
     ):
         yield from each(a, find, replace, "hooks", label)
+    yield from each(ci, "--concurrency 2 --incrementalFile", '--concurrency "$(nproc)" --incrementalFile', "hooks", "risk runs two workers (F13243)")
+    yield from each(ci, '"; exit 1 ;;\n          esac\n          pnpm exec stryker run', '";;\n          esac\n          pnpm exec stryker run', "hooks", "risk fails when stryker_lines.py ends otherwise than 0 or 3")
+    yield from each(ci, "    timeout-minutes: 30\n", "    timeout-minutes: 120\n", "hooks", "risk holds its 30 minutes")
+    yield from each(ci, "NODE_OPTIONS: --max-old-space-size=3072", "NODE_HEAP: --max-old-space-size=3072", "hooks", "risk's processes have a 3 GB heap each (F13243)")
+    yield from each(ci, "          0) ;;\n          3) echo", "          0) exit 0 ;;\n          3) echo", "hooks", "risk runs StrykerJS when the script gives it the lines")
     for find, replace, label in (
         ("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7", "the CI pins its actions"),
         ("permissions:\n  contents: read\n", "permissions:\n  contents: write\n", "the CI only reads"),

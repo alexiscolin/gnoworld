@@ -3433,14 +3433,18 @@ if part stryker_lines; then
 # keeps its mutants), as `path:from-to`, in the files the config's own `mutate` selects (braces and negations read as git's glob pathspecs,
 # a hidden part left out as minimatch leaves it), a new file whole, committed or not; a deletion or a comment touches no statement, even
 # one inside a function, whose change would otherwise put the whole function under mutation. Every
-# other key is kept. No line: exit 3, nothing written; a config it cannot read or an odd pattern: exit 2; any other failure is no 0 nor 3.
+# other key is kept, and its `thresholds.break` is the config's `thresholds.low`, so the job fails when too many mutants survive (F13184).
+# No line: exit 3, nothing written; more lines than its cap, 300 (StrykerJS makes about one mutant a line, which two workers judge in
+# GitHub's 30 minutes): exit 4, nothing written, saying to split the pull request; a config it cannot read, with no thresholds.low, or
+# an odd pattern: exit 2; any other failure is no 0 nor 3 nor 4.
 sl="$t/stryker_lines" && mkdir -p "$sl/scripts" "$sl/app/src/.cache" "$sl/server/src/testing" "$sl/docs"
 cp "$here/stryker_lines.py" "$here/repo_files.py" "$sl/scripts/" && ln -s "$(cd "$here/../node_modules" && pwd -P)" "$sl/node_modules"
 cat >"$sl/stryker.config.json" <<'JSON'
 {
   "testRunner": "vitest",
   "mutate": ["app/src/**/*.{ts,tsx}", "!app/src/**/*.test.{ts,tsx}", "server/src/**/*.ts", "!server/src/testing/**"],
-  "incremental": true
+  "incremental": true,
+  "thresholds": { "high": 95, "low": 85 }
 }
 JSON
 printf 'node_modules\n' >"$sl/.gitignore"
@@ -3472,14 +3476,32 @@ import json, sys
 out, config = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
 want = ["app/src/a.ts:2-3", "app/src/a.ts:6-6", "app/src/added.ts:1-2", "app/src/m.ts:1-9", "app/src/n.tsx:1-2", "app/src/r2.ts:1-1", "server/src/s.ts:1-1"]
 assert out["mutate"] == want, out["mutate"]
-assert {k: v for k, v in out.items() if k != "mutate"} == {k: v for k, v in config.items() if k != "mutate"}, out
+assert out["thresholds"] == {"high": 95, "low": 85, "break": 85}, out["thresholds"]
+assert {k: v for k, v in out.items() if k not in ("mutate", "thresholds")} == {k: v for k, v in config.items() if k not in ("mutate", "thresholds")}, out
 PY
+# The cap: 300 lines pass (18 above and 282 in a new file), 301 refuse, naming both counts, nothing written.
+i=0 && while [ $i -lt 283 ]; do i=$((i + 1)) && printf 'export const b%s = %s;\n' "$i" "$i"; done >"$sl/app/src/big.ts"
+exits 4 "$base" "$sl/out.json"
+printf '%s\n' "$out" | grep -qx "stryker_lines: 301 tier-1 lines to mutate (the statements a change touches, whole), cap 300: split the pull request" || fail "stryker_lines.py did not name the lines and its cap: $out"
+sed '$d' "$sl/app/src/big.ts" >"$sl/big" && mv "$sl/big" "$sl/app/src/big.ts"
+out=$(lines "$base" "$sl/out.json") || fail "stryker_lines.py refused 300 lines, its cap: $out"
+printf '%s\n' "$out" | grep -qx "stryker_lines: 300 lines in 7 files changed since $base" || fail "stryker_lines.py did not keep 300 lines: $out"
+rm "$sl/app/src/big.ts" "$sl/out.json"
+# A break the config names is kept, a stricter one than its low share included.
+cp "$sl/stryker.config.json" "$t/stryker.low" && sed 's/"low": 85 }/"low": 85, "break": 90 }/' "$t/stryker.low" >"$sl/stryker.config.json"
+out=$(lines "$base" "$sl/out.json") || fail "stryker_lines.py refused a config with its own break: $out"
+python3 -I -c 'import json, sys; t = json.load(open(sys.argv[1]))["thresholds"]; assert t == {"high": 95, "low": 85, "break": 90}, t' "$sl/out.json" ||
+	fail "stryker_lines.py did not keep the config's own break: $(cat "$sl/out.json")"
+cp "$t/stryker.low" "$sl/stryker.config.json" && rm "$sl/out.json"
 # What it cannot read is no green check: an unknown base, an output it cannot write, a config absent, not JSON, or whose mutate is no list.
 exits 1 0000000000000000000000000000000000000000 "$sl/out.json"
 code=0 && lines "$base" "$sl/nowhere/out.json" >/dev/null 2>&1 || code=$?
 [ "$code" != 0 ] && [ "$code" != 3 ] && [ ! -e "$sl/nowhere" ] || fail "stryker_lines.py exited $code with an output it cannot write"
 cp "$sl/stryker.config.json" "$t/stryker.good"
-for bad in none 'not json' '{"mutate": "app/src/**/*.ts"}' '{"mutate": []}' '[]'; do
+for bad in none 'not json' '{"mutate": "app/src/**/*.ts"}' '{"mutate": []}' '[]' '{"mutate": ["app/src/**/*.ts"]}' \
+	'{"mutate": ["app/src/**/*.ts"], "thresholds": {"high": 95, "low": "85"}}' '{"mutate": ["app/src/**/*.ts"], "thresholds": {"low": true}}' \
+	'{"mutate": ["app/src/**/*.ts"], "thresholds": {"low": 0}}' '{"mutate": ["app/src/**/*.ts"], "thresholds": {"low": 101}}' \
+	'{"mutate": ["app/src/**/*.ts"], "thresholds": {"low": 85, "break": null}}' '{"mutate": ["app/src/**/*.ts"], "thresholds": {"low": 85, "break": 0}}'; do
 	if [ "$bad" = none ]; then rm "$sl/stryker.config.json"; else printf '%s' "$bad" >"$sl/stryker.config.json"; fi
 	exits 2 "$base" "$sl/out.json"
 	cp "$t/stryker.good" "$sl/stryker.config.json"
@@ -7574,7 +7596,7 @@ for name in names:
     for job, text in jobs(ci).items():
         assert re.search(r"^    runs-on: ubuntu-24\.04$", text, re.M), f"{name}: {job} runs on a machine it does not name"
         t = re.search(r"^    timeout-minutes: (\d+)$", text, re.M)
-        budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 120 if job == "risk" else 15
+        budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 30 if job == "risk" else 15
         assert t and int(t.group(1)) <= budget, f"{name}: {job} has no time limit, or one past its {budget} min"
 gate = strip((wf / "gate.yml").read_text())
 J = jobs(gate)
@@ -7604,6 +7626,16 @@ assert re.search(r"^          GH_TOKEN: \$\{\{ github\.token \}\}$", last, re.M)
 assert not any("github.token" in step for step in steps_ok[:-1]), "the token reaches gate-ok's job or another of its steps"
 assert re.search(r'^          env -u GH_TOKEN python3 -I "\$RUNNER_TEMP/base/scripts/ci_annotate\.py" "\$out"$', last, re.M), "gate-ok's last step does not annotate with the base's script, the token kept from it"
 assert len(re.findall(r'env -u GH_TOKEN python3 -I "\$RUNNER_TEMP/base/scripts/ci_annotate\.py"', last)) == len(re.findall(r"ci_annotate\.py", last)) == 2, "a call of the annotating script in gate-ok's last step gets the token"
+# F13184, F13243: risk mutates the changed tier-1 lines alone, through the config stryker_lines.py writes with its break threshold, with
+# two workers and a 3 GB heap for each of the three processes; any other end of the script (its cap, a config it cannot read) fails
+# the job, saying why, and never runs the whole of tier 1.
+rk = J["risk"]
+assert re.search(r'^        run: \|\n          set -eu\n          rc=0\n          python3 -I "\$RUNNER_TEMP/base/scripts/stryker_lines\.py" "\$BASE" "\$RUNNER_TEMP/stryker\.json" 2>"\$RUNNER_TEMP/stryker_lines\.err" \|\| rc=\$\?\n'
+                 r'          case \$rc in\n          0\) ;;\n          3\) echo "[^"\n]*"; exit 0 ;;\n          \*\) echo "::error title=risk::[^\n]*"; exit 1 ;;\n          esac\n          pnpm exec stryker run ', rk, re.M), "risk passes, or runs StrykerJS, when stryker_lines.py ends otherwise than 0 or 3"
+assert "stryker.config.json" not in rk and rk.count("stryker run") == 1, "risk can run StrykerJS on the whole config"
+assert """$(tr '\\r\\n' '  ' <"$RUNNER_TEMP/stryker_lines.err" | sed 's/%/%25/g')""" in rk, "risk's ::error line takes the script's text unescaped (a % or a carriage return)"
+assert re.search(r'^          pnpm exec stryker run "\$RUNNER_TEMP/stryker\.json" --concurrency 2 --incrementalFile "\$RUNNER_TEMP/stryker-incremental\.json"$', rk, re.M), "risk runs StrykerJS on another config, or with more than two workers (F13243)"
+assert re.search(r"^          NODE_OPTIONS: --max-old-space-size=3072$", rk, re.M), "risk's processes keep check.sh's 8 GB heap, four workers of which lost the runner (F13243)"
 # A block list, one job a line (Prettier rewraps a long flow list).
 needs = re.search(r"^    needs:\n((?:      - [a-z0-9-]+\n)+)", ok, re.M)
 waits = re.findall(r"- ([a-z0-9-]+)", needs.group(1)) if needs else []
@@ -7757,6 +7789,15 @@ CASES = [
     (G, "    permissions:\n      contents: read\n      actions: read\n", "", "gate-ok without the right to read its run"),
     (G, "        if: failure()\n        env:\n          GH_TOKEN", "        env:\n          GH_TOKEN", "the annotating step run on success too"),
     (G, "  zizmor:\n", "  zizmor:\n    permissions:\n      contents: read\n", "a second job with rights of its own"),
+    (G, "--concurrency 2 --incrementalFile", '--concurrency "$(nproc)" --incrementalFile', "risk on every core"),
+    (G, '"; exit 1 ;;\n          esac\n          pnpm exec stryker run', '";;\n          esac\n          pnpm exec stryker run', "risk going on when stryker_lines.py failed"),
+    (G, '          *) echo "::error title=risk::', '          4) exit 0 ;;\n          *) echo "::error title=risk::', "risk passing a change past the cap"),
+    (G, "          NODE_OPTIONS: --max-old-space-size=3072", "          NODE_HEAP: --max-old-space-size=3072", "risk with check.sh's heap"),
+    (G, "          0) ;;\n          3) echo", "          0) exit 0 ;;\n          3) echo", "risk passing without StrykerJS when the script gave it the lines"),
+    (G, "          set -eu\n          rc=0\n", "          rc=0\n", "risk's script going on past a failed line"),
+    (G, "  lint:\n", "  lint:\n    permissions: {contents: write}\n", "a write right in flow form"),
+    (G, "  zizmor:\n", "  zizmor:\n    permissions: { actions: write, contents: read }\n", "rights in a spaced flow form"),
+    (G, "  unit:\n", "  unit:\n    'permissions':\n      checks: write\n", "rights under a quoted key"),
     (G, "  lint:\n", "  lint:\n    permissions: {contents: write}\n", "a write right in flow form"),
     (G, "  zizmor:\n", "  zizmor:\n    permissions: { actions: write, contents: read }\n", "rights in a spaced flow form"),
     (G, "  unit:\n", "  unit:\n    'permissions':\n      checks: write\n", "rights under a quoted key"),

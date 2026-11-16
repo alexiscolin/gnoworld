@@ -6,9 +6,10 @@ changed line widens to the top-level statements it lies in, as TypeScript's own 
 whole), in the files stryker.config.json's own `mutate` selects: its patterns, braces expanded, read as git's glob pathspecs, a negation as an
 exclusion, a path with a hidden part left out as minimatch leaves it. A new file, committed or not, counts whole; a line removed, or one
 that holds no code (a comment, a blank), touches none, so a comment inside a function puts no function under mutation. Every other key of
-the config is kept.
+the config is kept, and `thresholds.break` is its own or else its `thresholds.low`: past that share of survivors StrykerJS fails the job (F13184).
 Usage, from the repository's root: stryker_lines.py <base> <out.json>. It writes the config and says what it kept; with no such line it
-writes nothing and exits 3; a config it cannot read, or a pattern git does not read as minimatch does (`?`, a class, an extglob), exit 2."""
+writes nothing and exits 3; past CAP lines it writes nothing and exits 4, saying to split the pull request; a config it cannot read, one
+whose thresholds.low or break is no number from 1 to 100, or a pattern git does not read as minimatch does (`?`, a class, an extglob), exit 2."""
 import json
 import pathlib
 import re
@@ -19,6 +20,9 @@ sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no _
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
 from repo_files import changed_lines, git
 
+# StrykerJS makes about one mutant a line it keeps (PR #12: 250 lines, 163 mutants), which GitHub's risk job judges with two workers in
+# its 30 minutes: a change past that is split.
+CAP = 300
 # A pattern git's glob pathspecs read as minimatch does: names, `*` within a part, `**` across them.
 PLAIN = re.compile(r"[\w./*-]+")
 BRACES = re.compile(r"\{([^{}]*)\}")
@@ -107,7 +111,13 @@ def main():
     except (OSError, ValueError) as e:
         print(f"stryker_lines: stryker.config.json cannot be read ({e})", file=sys.stderr)
         sys.exit(2)
-    specs = pathspecs(config.get("mutate") if isinstance(config, dict) else None)
+    thresholds = config.get("thresholds") if isinstance(config, dict) else None
+    low = thresholds.get("low") if isinstance(thresholds, dict) else None
+    share = thresholds.get("break", low) if isinstance(thresholds, dict) else None
+    if not all(type(v) in (int, float) and 1 <= v <= 100 for v in (low, share)):
+        print("stryker_lines: stryker.config.json's thresholds.low, and its break if any, are no number from 1 to 100", file=sys.stderr)
+        sys.exit(2)
+    specs = pathspecs(config.get("mutate"))
     if specs is None:
         print("stryker_lines: stryker.config.json's mutate is no list of patterns git reads as minimatch does", file=sys.stderr)
         sys.exit(2)
@@ -115,9 +125,13 @@ def main():
     if not kept:
         print(f"stryker_lines: no line StrykerJS mutates changed since {base}")
         sys.exit(3)
-    config["mutate"] = [f"{path}:{start}-{end}" for path in sorted(kept) for start, end in kept[path]]
-    pathlib.Path(out).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     total = sum(end - start + 1 for found in kept.values() for start, end in found)
+    if total > CAP:
+        print(f"stryker_lines: {total} tier-1 lines to mutate (the statements a change touches, whole), cap {CAP}: split the pull request", file=sys.stderr)
+        sys.exit(4)
+    config["mutate"] = [f"{path}:{start}-{end}" for path in sorted(kept) for start, end in kept[path]]
+    config["thresholds"] = {**thresholds, "break": share}
+    pathlib.Path(out).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     print(f"stryker_lines: {total} lines in {len(kept)} files changed since {base}")
 
 

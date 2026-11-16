@@ -354,13 +354,15 @@ jobs:
           BASE: ${{ needs.changes.outputs.base }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/patch_coverage.py" "$BASE"
 
-  # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate); a cap
-  # reached fails the job. 120 minutes: a branch of many changed tier-1 lines runs past an hour on GitHub's four cores (D13206).
+  # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate), failing when
+  # more than the config's low share of mutants survive (F13184). Past stryker_lines.py's cap of lines, or with a config it cannot read,
+  # the job fails, saying why: split the pull request. Two workers in 30 minutes, each process with a 3 GB heap (F13243: four workers
+  # with 8 GB each lost the runner).
   risk:
     needs: [changes]
     if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - *checkout-history
       - *go
@@ -371,16 +373,17 @@ jobs:
       - name: The mutants of the changed lines
         env:
           BASE: ${{ needs.changes.outputs.base }}
+          NODE_OPTIONS: --max-old-space-size=3072 # the run and its two workers, on the runner's 16 GB
         run: |
           set -eu
           rc=0
-          python3 -I "$RUNNER_TEMP/base/scripts/stryker_lines.py" "$BASE" "$RUNNER_TEMP/stryker.json" || rc=$?
+          python3 -I "$RUNNER_TEMP/base/scripts/stryker_lines.py" "$BASE" "$RUNNER_TEMP/stryker.json" 2>"$RUNNER_TEMP/stryker_lines.err" || rc=$?
           case $rc in
-          0) config="$RUNNER_TEMP/stryker.json" ;;
+          0) ;;
           3) echo "no tier-1 line StrykerJS mutates changed since $BASE"; exit 0 ;;
-          *) echo "stryker_lines.py failed: StrykerJS mutates the whole of tier 1"; config=stryker.config.json ;;
+          *) echo "::error title=risk::stryker_lines.py ended with $rc, so no mutant is judged: $(tr '\r\n' '  ' <"$RUNNER_TEMP/stryker_lines.err" | sed 's/%/%25/g')"; exit 1 ;;
           esac
-          pnpm exec stryker run "$config" --concurrency "$(nproc)" --incrementalFile "$RUNNER_TEMP/stryker-incremental.json"
+          pnpm exec stryker run "$RUNNER_TEMP/stryker.json" --concurrency 2 --incrementalFile "$RUNNER_TEMP/stryker-incremental.json"
 
   # The net never shrinks: check_regressions.py and check_migrations.py taken from the base, with every script they import.
   regressions:
