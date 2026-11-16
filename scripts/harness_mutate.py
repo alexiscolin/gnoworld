@@ -1262,6 +1262,10 @@ def mutants():
     yield from each("scripts/repo_files.py", "        return False\n    except OSError:", "        return True\n    except OSError:", "hooks", "a gone pid is a dead run")
     yield from each("scripts/repo_files.py", 'os.path.join(where, "tree-" + os.path.basename(where))', 'os.path.join(where, "tree")', "hooks", "a copy never takes the name tree, one per run")
     yield from each("scripts/worktree.sh", 'case $arg in -*)', 'case $arg in -zzz)', "hooks", "worktree.sh refuses an argument that starts with a dash (CR6)")
+    yield from each("scripts/worktree.sh", 'base=$(git rev-parse --verify "$base^{commit}")\n', "", "hooks", "worktree.sh reads its base once, as its commit")
+    yield from each("scripts/worktree.sh", '[ "$(git rev-parse --verify "$base^{commit}")" = "$served" ]', "true", "hooks", "worktree.sh lets a harness differ only for main as GitHub serves it")
+    yield from each("scripts/worktree.sh", "(^|/)(package\\.json|", "(^|/)(packagex\\.json|", "hooks", "worktree.sh still compares the served main's package files")
+    yield from each("scripts/worktree.sh", "	case $url in git@github.com:*) url=https://github.com/${url#git@github.com:} ;; esac\n", "", "hooks", "worktree.sh reads GitHub's ssh address over https")
     for find, replace, label in (('for arg in "$dir" ', "for arg in ", "the folder"), ('"$dir" "$branch" "$base"; do', '"$dir" "$base"; do', "the branch"),
                                  ('"$dir" "$branch" "$base"; do', '"$dir" "$branch"; do', "the base")):
         yield from each("scripts/worktree.sh", find, replace, "hooks", f"worktree.sh refuses {label} that starts with a dash (CR6)")

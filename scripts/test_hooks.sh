@@ -6042,6 +6042,45 @@ for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc p
 	[ ! -e "$wr/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
 	git -C "$ws/src" reset -q --hard "$installed"
 done
+# A base equal to main as GitHub serves it (git ls-remote of origin) is no session's plumbing, as no session pushes main: its harness
+# may differ from this tree's (a worktree whose branch was merged), its package files never. A base past or behind the served main, or
+# a remote that does not answer, is refused as before.
+git init -q --bare "$ws/origin.git" && git -C "$ws/src" remote add origin "$ws/origin.git"
+mkdir -p "$ws/src/scripts" && for f in scripts/guard.py CLAUDE.md; do echo merged >>"$ws/src/$f"; done
+git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "main moved on" && served=$(git -C "$ws/src" rev-parse HEAD) && git -C "$ws/src" push -q origin HEAD:main
+git -C "$ws/src" reset -q --hard "$installed"
+out=$(wt "$wr/merged" merged "$served" 2>&1) || fail "worktree.sh refused main as GitHub serves it, whose harness alone differs: $out"
+[ "$(git -C "$wr/merged" rev-parse HEAD)" = "$served" ] || fail "worktree.sh's tree of the served main is not at it"
+out=$(wt remove "$wr/merged" 2>&1) || fail "worktree.sh could not remove the served main's tree: $out"
+git -C "$ws/src" reset -q --hard "$served" && git -C "$ws/src" commit -q --allow-empty -m "past main" && past=$(git -C "$ws/src" rev-parse HEAD) && git -C "$ws/src" reset -q --hard "$installed"
+git -C "$ws/src" checkout -q "$served" -- scripts/guard.py && git -C "$ws/src" commit -qm "a session's plumbing" && forged=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q --hard "$installed"
+for case in "past:$past" "forged:$forged"; do
+	out=$(wt "$wr/${case%%:*}" "${case%%:*}" "${case#*:}" 2>&1) && fail "worktree.sh made a tree of a base that is not the served main, its harness not this tree's (${case%%:*}): $out"
+	printf '%s\n' "$out" | grep -qF scripts/guard.py || fail "worktree.sh refused a base that is not the served main without naming its harness file: $out"
+done
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+	git -C "$ws/src" checkout -q "$served" -- scripts/guard.py CLAUDE.md && echo merged >>"$ws/src/$f"
+	git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "main's $f moved" && moved=$(git -C "$ws/src" rev-parse HEAD)
+	git -C "$ws/src" push -q -f origin HEAD:main && git -C "$ws/src" reset -q --hard "$installed"
+	out=$(wt "$wr/pkgs" pkgs "$moved" 2>&1) && fail "worktree.sh made a tree of the served main whose $f is not this tree's: $out"
+	printf '%s\n' "$out" | grep -qF "$f" && ! printf '%s\n' "$out" | grep -qF scripts/guard.py || fail "worktree.sh did not name the served main's $f alone: $out"
+done
+# GitHub's ssh address is read over https, which needs no key: here https://github.com/test/gnoworld.git leads to the test's remote, and
+# ssh to nothing.
+git -C "$ws/src" push -q -f origin "$served:main" && git -C "$ws/src" remote set-url origin git@github.com:test/gnoworld.git
+git -C "$ws/src" config "url.$ws/origin.git.insteadOf" https://github.com/test/gnoworld.git
+out=$(GIT_SSH_COMMAND=false wt "$wr/https" https "$served" 2>&1) || fail "worktree.sh did not read GitHub's ssh address over https: $out"
+out=$(wt remove "$wr/https" 2>&1) || fail "worktree.sh could not remove the tree read over https: $out"
+git -C "$ws/src" config --unset "url.$ws/origin.git.insteadOf" && git -C "$ws/src" remote set-url origin "$ws/origin.git" && git -C "$ws/src" push -q -f origin "$served:main" && git -C "$ws/src" branch -q -f flip "$served"
+mkdir -p "$ws/racebin" && printf '#!/bin/sh\ncase " $* " in *" worktree add "*" flip "*) "%s" -C "%s" update-ref refs/heads/flip %s ;; esac\nexec "%s" "$@"\n' \
+	"$(command -v git)" "$ws/src" "$forged" "$(command -v git)" >"$ws/racebin/git" && chmod +x "$ws/racebin/git"
+out=$(PATH="$ws/racebin:$PATH" wt "$wr/raced" raced flip 2>&1) || fail "worktree.sh refused the served main named by a branch: $out"
+[ "$(git -C "$wr/raced" rev-parse HEAD)" = "$served" ] || fail "worktree.sh checked out what a branch led to after its checks, not the base it checked"
+out=$(wt remove "$wr/raced" 2>&1) || fail "worktree.sh could not remove the raced tree: $out"
+git -C "$ws/src" remote set-url origin "$ws/nowhere.git"
+out=$(wt "$wr/lost" lost "$served" 2>&1) && fail "worktree.sh took a base for the served main with no remote answering: $out"
+git -C "$ws/src" remote remove origin
 echo changed >>"$ws/src/app/package.json"
 out=$(wt "$wr/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
 git -C "$ws/src" checkout -q -- app/package.json
