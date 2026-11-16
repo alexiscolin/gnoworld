@@ -578,6 +578,10 @@ try:
             ("space/__probe__/scene_dynamic_react.ts", 'export async function load(): Promise<unknown> {\n  return import("react");\n}\n', "no-restricted-syntax: The scene loads"),
             ("space/__probe__/scene_dynamic_ui.ts", 'export async function load(): Promise<unknown> {\n  return import("@gnoworld/ui");\n}\n', "no-restricted-syntax: The scene loads"),
             ("space/__probe__/scene_dynamic_lib.ts", 'export async function load(): Promise<unknown> {\n  return import("../../lib/newTab.ts");\n}\n', "no-restricted-syntax: The scene loads"),
+            # A bare import of the design system loads it too, by its name or a path; and an import() by a path.
+            ("space/__probe__/scene_ui_bare.ts", 'import "@gnoworld/ui";\n\nexport const x = 1;\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_ui_bare_path.ts", 'import "../../../../packages/ui/src/index.ts";\n\nexport const x = 1;\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_ui_path.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../packages/ui/src/index.ts");\n}\n', "no-restricted-syntax: The scene loads"),
             ("space/__probe__/scene_dynamic_own.ts", 'export async function load(): Promise<unknown> {\n  return import("./globe.ts");\n}\n', None),
             ("space/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
             ("space/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),

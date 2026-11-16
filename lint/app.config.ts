@@ -34,11 +34,11 @@ const STORE =
   "The store holds the state: core, lib, zustand/vanilla; never React, the design system, a feature, the scene or a route.";
 const SCENE =
   "The scene is three, core, the store and lib's saveData: never React, the design system's components, a feature, a route or the rest of lib.";
-// Nor at run time: an import() of React, the design system, zustand or lib (the scene's own chunks load).
+// Nor by a bare import or at run time: React, the design system (by its name or a path), zustand or lib (its own chunks load).
 const SCENE_LOADS = {
   selector:
-    "ImportExpression[source.value=/^(react|react-dom|react-router|zustand|@gnoworld\\/ui)(\\/|$)|^(\\.\\.\\/)+lib\\//]",
-  message: `The scene loads no React, design system, zustand or lib at run time either. ${SCENE}`,
+    ":matches(ImportExpression, ImportDeclaration[specifiers.length=0])[source.value=/^(react|react-dom|react-router|zustand|@gnoworld\\/ui)(\\/|$)|^(\\.\\.\\/)+(lib|packages\\/ui)\\//]",
+  message: `The scene loads no React, design system, zustand or lib by a bare import or at run time either. ${SCENE}`,
 };
 // The design system's helpers that touch no React (typedIn, holdsEscape, iconNode: built for the scene's DOM, ui/src/escape.ts): the one door the scene has to ui.
 const SCENE_UI = ["typedIn", "holdsEscape", "iconNode"];
