@@ -55,7 +55,7 @@ export interface PlateModel {
   figures: Figures;
   /** The chat's messages an hour (the chart of a place with no calls to count). */
   hours?: Hours | undefined;
-  /** What only this kind has, between the chart and the page: a hub's proposals, the Earth's latest on X. */
+  /** What only this kind has, between the chart and the page: a hub's proposals, the Earth's latest on gno.land. */
   extras?: ReactNode;
   realm?: RealmPart | undefined;
   /** What stands around it, once the worlds' file has come. */

@@ -1,8 +1,8 @@
 // The Earth's plate: the adapter that gives the model what the chat knows of a universe's general room, who is here, from
-// how many countries, the messages an hour and the latest on X, with no block of the chain.
+// how many countries, the messages an hour and the latest on gno.land, with no block of the chain.
 import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { EARTH_CHAT as EARTH } from "../../features/chat/index.ts";
-import { LatestOnX } from "../../features/home/LatestOnX.tsx";
+import { LatestOnGnoland } from "../../features/home/LatestOnGnoland.tsx";
 import { useHours } from "../../features/world/useHours.ts";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { useQuery } from "@tanstack/react-query";
@@ -46,7 +46,7 @@ function useEarthPlate(universe: UniverseView): PlateModel {
     },
     figures: { figures: chatFigures({ here, countries, hours }) },
     hours,
-    extras: <LatestOnX />,
+    extras: <LatestOnGnoland />,
     links: earthLinks(universe.id),
     widgets: [...hourWidgets(hours), ...roomsWidget(rooms), ...countriesWidget(lines ?? [], hours?.from)],
   };

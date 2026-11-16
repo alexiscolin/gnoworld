@@ -245,7 +245,8 @@ alone, asking the room's right again on every page; a members or hidden room is 
 
 **An owner moderates.** The owner of a world is the account (or one linked to it) that holds its
 namespace on the default chain (`roles/owners.ts`, read by the server and kept 60 s). `roles/mayModerate.ts` is the one place that gives
-the right; `POST /api/moderation/hide` and `/mute` and the pins ask it, then use the bot's own means. Accounts join one identity through
+the right; `POST /api/moderation/hide` and `/mute` and the pins ask it, then use the bot's own means (a hide first reads each id
+in the named room from Ergo, `lineOf` and `isLineOf`, and refuses a line of another room, F13332). Accounts join one identity through
 `/api/links` (a code, then the other account's proof, from Adena or by a command-line signature rebuilt server-side, `login/cliProof.ts`);
 a key linked by phishing is released by its own file (`login/release.ts`).
 

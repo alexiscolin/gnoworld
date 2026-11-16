@@ -1,4 +1,4 @@
-// The Earth's "Latest on" card (frame 40, the proposal's cardLatest; gno.land's blog for now, X later): the two last posts of gno.land's
+// The Earth's "Latest on gno.land" card (frame 40, the proposal's cardLatest): the two last posts of gno.land's
 // blog realm, side by side, read on chain (one vm/qrender of the mainnet, where the posts are: onyx-1's blog is empty), its title, its day and its page on
 // gnoweb. A read that fails or finds no post draws no card, never an error. The card is a late chunk: the first screen holds none of it.
 import { Card, Grid } from "@gnoworld/ui";
@@ -7,7 +7,7 @@ import universes from "../../../data/universes.json" with { type: "json" };
 import { BLOG_REALM, latestPosts } from "../../lib/chain/blog.ts";
 import { utcShortDay } from "../../lib/days.ts";
 import { OutLinks } from "../../OutLinks.tsx";
-import styles from "./LatestOnX.module.css";
+import styles from "./LatestOnGnoland.module.css";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { readPage } from "../../lib/chain/rpc.ts";
 import { queryClient, Unread } from "../../lib/query/client.ts";
@@ -31,7 +31,7 @@ const blogOptions = (rpc: string) =>
 // The blog posts are dated in UTC on chain: the day stays UTC.
 const dayOf = (date: string) => utcShortDay(new Date(date), new Date());
 
-export function LatestOnX() {
+export function LatestOnGnoland() {
   const rpc = chain?.rpc ?? "";
   const { data: posts } = useQuery({ ...blogOptions(rpc), enabled: chain !== undefined }, queryClient);
   const link = chain === undefined || posts === undefined ? undefined : gnowebLink(chain.gnoweb, BLOG_REALM);

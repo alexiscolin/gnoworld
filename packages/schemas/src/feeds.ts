@@ -4,7 +4,7 @@ import { byId, DATA_CAPS, Key, Link, text } from "./data.ts";
 import { hasHidden } from "./hidden.ts";
 import { z } from "./zod.ts";
 
-/** A post of gno.land's blog as its realm's page lists it (the Earth's "Latest on X" card): the title, which holds no hidden character
+/** A post of gno.land's blog as its realm's page lists it (the Earth's "Latest on gno.land" card): the title, which holds no hidden character
  * (hidden.ts), its slug in the realm's address and its day. The page is the chain's, so every field is checked. */
 export const BlogPost = z.strictObject({
   title: text(DATA_CAPS.title).check(z.refine((title) => !hasHidden(title), "hidden characters")),

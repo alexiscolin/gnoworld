@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
-import { LatestOnX } from "./LatestOnX.tsx";
+import { LatestOnGnoland } from "./LatestOnGnoland.tsx";
 
 // The Earth's latest card: the blog's last post read on chain, with its day and its page on gno.land's gnoweb; a read that fails or
 // holds no post draws nothing, not even its heading.
@@ -24,7 +24,7 @@ describe("the latest post of the blog", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(now));
     read.mockResolvedValue({ ok: true, value: page, source });
-    const box = mount(<LatestOnX />);
+    const box = mount(<LatestOnGnoland />);
     await settled(() => box.textContent !== "");
     expect(box.querySelector("time")?.textContent).toBe(day);
   });
@@ -33,7 +33,7 @@ describe("the latest post of the blog", () => {
     read.mockResolvedValue({ ok: true, value: page, source });
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-11T10:00:00Z"));
-    const box = mount(<LatestOnX />);
+    const box = mount(<LatestOnGnoland />);
     await settled(() => box.textContent !== "");
     expect(box.textContent).toContain("Gno.land Mainnet Upgraded to v1.7.0");
     expect(box.querySelector("time")?.textContent).toBe("30 Oct");
@@ -52,7 +52,7 @@ describe("the latest post of the blog", () => {
       { ok: true, value: "No posts.", source },
     ]) {
       read.mockResolvedValue(answer);
-      const box = mount(<LatestOnX />);
+      const box = mount(<LatestOnGnoland />);
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(box.textContent).toBe("");
     }

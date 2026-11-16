@@ -1,5 +1,7 @@
 # The harness overhaul (slice 13)
 
+**Status:** phases 0 to 3 done; phase 4 under way (/pose, then the hygiene slice, merged as PR #12). The registers named in "Done when" (docs/decisions/, docs/findings/open/, docs/log/) were not split: docs/decisions.md and docs/review/findings.md stay one file each.
+
 The design: the final page (claude.ai/artifact/AkkvNY33kRnmB4fhNDR38V, v24) and Alexis's decisions D13137-D13153
 (`docs/decisions.md`); background in `.claude/tmp/slice-13/reports/` (plan-review-2.md: the 23 attack tests) and `overnight/`.
 

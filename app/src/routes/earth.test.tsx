@@ -112,7 +112,7 @@ describe("the Earth's plate", () => {
     const { box } = drawn();
     const plate = await plateOf(box);
     expect(plate?.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in #general");
-    // The latest on X is the blog's card, drawn only once a read of the chain has found posts: LatestOnX.test.tsx's.
+    // The latest on gno.land is the blog's card, drawn only once a read of the chain has found posts: LatestOnGnoland.test.tsx's.
     for (const [label, href] of [
       ["View on gnoweb", "https://onyx.testnets.gno.land"],
       ["Explorer", "https://gnoscan.io/?chainId=onyx-1"],

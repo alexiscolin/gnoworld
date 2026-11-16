@@ -1,5 +1,7 @@
 # The hygiene slice
 
+**Status:** merged, PR #12 (D13198 to D13207, F13215 to F13243).
+
 From D13170 (no backlog row: the decision is the row), with D13169, D13171, D13192 and D13194. 3,460 tracked files today.
 
 ## 1. Done when

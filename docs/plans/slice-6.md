@@ -1,5 +1,7 @@
 # Slice 6: bubbles on the Earth, the rule (pure logic, no 3D)
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Draft of 2026-10-31, for Alexis's approval (nothing is built). Sources: backlog row 6, ADR-0001 §7 ("Who speaks from where"), ADR-0002 §3 (the far side, reduced motion), `docs/design/video-screens.md` (frames 43 to 55), `docs/ARCHITECTURE.md` ("The scene"). It runs beside slice 7 and meets it at one seam: slice 7's branch 7f draws what this slice picks.
 
 ## 1. Done when

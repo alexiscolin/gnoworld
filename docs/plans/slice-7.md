@@ -1,5 +1,7 @@
 # Slice 7: the 3D space, built to the video
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Approved by Alexis question by question on 2026-11-01 (section 9); nothing is built. Sources: backlog row 7 and "From the video's audit", ADR-0001 §7 and §12, ADR-0002 §3, §7 ("Scale") and §9 ("Rendering", "Memory"), `docs/ARCHITECTURE.md` ("The scene"), `docs/DESIGN-SYSTEM.md` (regions, breakpoints, credits), `docs/design/video-screens.md`, the frames (`~/.cache/gnoworld-tools/video-frames/`), decisions of 2026-10-31. Row 7 is cut in two: this slice is the video's look; what the video does not show waits in "7-after" (section 2, question 1).
 Plainly: this does not fit a week (section 7). The demo's floor is 7a to 7h, by Alexis. The mock-up of the look and the rules: https://claude.ai/artifact/5Z3eZVFLLYkGAHZEuKcre4; it shows the idea and is no code to reuse.
 

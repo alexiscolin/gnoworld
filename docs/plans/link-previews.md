@@ -1,5 +1,7 @@
 # Link previews: a card under a chat line (D13906)
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Draft of 2026-11-11, for Alexis's approval; nothing is built. Written by a planning agent (read-only), saved by the chief.
 
 Sources read: D13906 and the 2026-10-21 rows (verdicts reach pages two ways; an answer of unknown shape counts as unchecked; a preview

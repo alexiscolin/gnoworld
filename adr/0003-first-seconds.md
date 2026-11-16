@@ -74,7 +74,7 @@ Where am I? What is a planet? Where do I start? What can I do? Why come here at 
 | Live badges | "AMA in 11 h", "noor is here", "Uncharted signal" | Heat, rising and "Uncharted" (7h) | Events have no dates; friends come later |
 | The rail of worlds | Eight worlds on the right | The rail (7i) | Filled from the worlds' file and presence |
 | Header | Jarvis, Chat, passport 0/18, bell | Log in only | Bell 7k, passport slice 8, Jarvis slice 10 |
-| Stations | Three, "Built and curated by the gno.land team" | None | `app/data/stations.json` is empty, and their bodies are outside slice 7 |
+| Stations | Three, "Built and curated by the gno.land team" | None | `app/data/stations.json` was empty that day (gone since 748f3570; the stations are in `app/data/earthOrbit.json` now), and their bodies are outside slice 7 |
 | Hero | 671 online, people in 31 countries, across 18 worlds | 534 worlds | No total of people (`presence.ts:22`) |
 | Prices | GNOT, ATONE, BTC with sparklines | "No price to show" | CoinGecko gives nothing here; cause not checked |
 | Ticker | "TRENDING DeFi +34% this hour", an AMA | "Event … date to be confirmed" | `events.json` and `news.json` are placeholders |
