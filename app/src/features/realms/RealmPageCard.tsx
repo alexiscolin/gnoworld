@@ -5,7 +5,6 @@
 import { Button, Card, grouped, Skeleton, Stack, useAlone } from "@gnoworld/ui";
 import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useRef, useState } from "react";
-import { bigLine } from "./RealmCard.tsx";
 import type { CallPlace } from "./InlineCard.tsx";
 import { utcMoment } from "../../lib/days.ts";
 import { Swap } from "./Swap.tsx";
@@ -13,6 +12,9 @@ import { RealmBlocks } from "./RealmBlocks.tsx";
 import styles from "./RealmView.module.css";
 import { shortPath } from "../../lib/shortPath.ts";
 import { isHeight, type Height, type Realm } from "./useRealm.ts";
+
+// What the card says of a page past the cap.
+const bigLine = (cap: number): string => `This page is too large to show here (over ${String(cap / 1024)} KB).`;
 
 // A block's time as a reader says it: the day and the minute, UTC (the node's own is nanoseconds of ISO).
 const when = (time: string): string => utcMoment(new Date(time), new Date());
