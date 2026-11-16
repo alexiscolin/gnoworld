@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
-import type { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";
+import { AnswerButton, type Digest, type ProposedAction } from "@gnoworld/schemas";
 import type { FunctionList } from "@gnoworld/schemas/functions";
 import fc from "fast-check";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -386,7 +388,7 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
 
   it.each([
     ["a proposal", () => propose(vote())],
-    ["an action's button", () => button({ type: "action", label: "Vote", action: vote() })],
+    ["an action's button", () => button({ type: "action", label: "Vote", action: vote(), chainId: "onyx-1" })],
   ])(
     "refuses %s when the universe's node is another chain, asking it nothing more than its status",
     async (...[, call]) => {
@@ -773,6 +775,7 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
       type: "action",
       label: "Vote on 37",
       action: vote({ args: { id: "37", answer: "maybe" } }),
+      chainId: "onyx-1",
     };
     expect(await tools.run(button(act), asked)).toMatchObject({ ok: true, isError: false });
     expect(cards.cards().buttons).toEqual([{ button: act, read: readAt() }]);
@@ -786,14 +789,14 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
   ])("refuses an action's button whose label states %s no read holds, naming it", async (_case, label, named) => {
     const { tools } = setup();
     const { asked, cards } = askedOf("vote yes on 99");
-    const ran = await tools.run(button({ type: "action", label, action: vote() }), asked);
+    const ran = await tools.run(button({ type: "action", label, action: vote(), chainId: "onyx-1" }), asked);
     expect(ran.ok && ran.text).toContain(named);
     expect(cards.cards()).toEqual(none());
   });
 
   it("tells the model which button it kept, and keeps none once its call's time is up", async () => {
     const { tools } = setup();
-    const act: AnswerButton = { type: "action", label: "Vote", action: vote() };
+    const act: AnswerButton = { type: "action", label: "Vote", action: vote(), chainId: "onyx-1" };
     expect(await tools.run(button(fly("/w/bubble"), null), askedOf().asked)).toEqual({
       ok: true,
       isError: false,
@@ -820,7 +823,12 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
   it("refuses an action's button with no chain profile, or on a realm gnomcp cannot render, saying which", async () => {
     const { tools } = setup();
     const { asked, cards } = askedOf();
-    const act = (realm: string): AnswerButton => ({ type: "action", label: "Do it", action: vote({ realm }) });
+    const act = (realm: string): AnswerButton => ({
+      type: "action",
+      label: "Do it",
+      action: vote({ realm }),
+      chainId: "onyx-1",
+    });
     expect(await tools.run(button(act(REALM), null), asked)).toEqual({
       ok: true,
       isError: true,
@@ -837,13 +845,61 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
   it("refuses an action's button with no chain profile, or one its realm's functions cannot make", async () => {
     const { tools } = setup();
     const { asked, cards } = askedOf();
-    const act = (action: ProposedAction): AnswerButton => ({ type: "action", label: "Do it", action });
+    const act = (action: ProposedAction): AnswerButton => ({
+      type: "action",
+      label: "Do it",
+      action,
+      chainId: "onyx-1",
+    });
     expect(await tools.run(button(act(vote()), null), asked)).toMatchObject({ ok: true, isError: true });
     expect(await tools.run(button(act(vote({ function: "Results", args: { id: "37" } }))), asked)).toMatchObject({
       ok: true,
       isError: true,
     });
     expect(cards.cards()).toEqual(none());
+  });
+
+  // D13508, F13581: a button carries the chain it was checked on, and Jarvis checked it on its profile's universe: the model's
+  // chain id is refused when it differs (not stamped over), so a call checked on Onyx never opens on gno.land.
+  it("refuses an action's button whose chain is not its profile's universe's, reading nothing and keeping nothing", async () => {
+    const { tools, read: reads, node } = setup();
+    const { asked, cards } = askedOf();
+    const act: AnswerButton = { type: "action", label: "Vote", action: vote(), chainId: "gnoland-1" };
+    const ran = await tools.run(button(act, "onyx"), asked);
+    expect(ran).toMatchObject({ ok: true, isError: true });
+    expect(ran.ok && ran.text).toContain("gnoland-1");
+    expect(ran.ok && ran.text).toContain("onyx-1");
+    expect(cards.cards()).toEqual(none());
+    expect(reads).not.toHaveBeenCalled();
+    expect(node).not.toHaveBeenCalled();
+  });
+
+  it("keeps an action's button whose chain is its profile's universe's, whichever the universe, carrying that chain", async () => {
+    const tower = "gno.land/r/demo/tower";
+    const { tools } = setup({ pages: { [tower]: "# Tower\n\n12 floors." }, lists: { [tower]: pollFunctions() } });
+    const { asked, cards } = askedOf("vote floors on 12");
+    const act: AnswerButton = {
+      type: "action",
+      label: "Vote",
+      action: vote({ realm: tower, args: { id: "12", answer: "floors" }, why: "It has 12 floors." }),
+      chainId: "gnoland-1",
+    };
+    expect(await tools.run(button(act, "gnoland"), asked)).toMatchObject({ ok: true, isError: false });
+    expect(cards.cards().buttons).toEqual([{ button: act, read: readAt("gnoland") }]);
+  });
+
+  it("names the universes' chain ids and no others in the button's schema", () => {
+    const universes = z
+      .array(z.object({ chainId: z.string() }))
+      .parse(
+        JSON.parse(readFileSync(fileURLToPath(new URL("../../../app/data/universes.json", import.meta.url)), "utf8")),
+      );
+    const ids = universes.map(({ chainId }) => chainId).sort();
+    const onChain = (chainId: string) =>
+      AnswerButton.safeParse({ type: "action", label: "Vote", action: vote(), chainId }).success;
+    expect(ids.map(onChain)).toEqual(ids.map(() => true));
+    expect(onChain(`${ids.join("")}-x`)).toBe(false);
+    expect(ids).toEqual(["gnoland-1", "onyx-1"]);
   });
 
   it("keeps three buttons a question at most", async () => {
@@ -867,7 +923,7 @@ describe("the cards of one turn's calls at once", () => {
     [
       "action buttons",
       4,
-      () => button({ type: "action", label: "Vote", action: vote() }),
+      () => button({ type: "action", label: "Vote", action: vote(), chainId: "onyx-1" }),
       "its call's time is up, or the answer holds its buttons.",
     ],
   ])("keeps no more %s than an answer holds when %i ask at once", async (...[, count, call, why]) => {

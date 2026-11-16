@@ -6,6 +6,7 @@
 import {
   DOOR_CAPS,
   EXPLAIN_VERSION,
+  flightsAlone,
   JARVIS_PATHS,
   REALM_EXPLAIN_VERSION,
   JarvisAsk,
@@ -42,7 +43,7 @@ interface Parts {
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
-  readonly budget: Pick<Budget, "caps" | "change" | "state">;
+  readonly budget: Pick<Budget, "change" | "state">;
   readonly log: Log;
 }
 
@@ -51,13 +52,12 @@ const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answ
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
 export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
-    const caps = budget.caps();
     const [ask, translate] = [budget.state("ask"), budget.state("translate")];
     return {
       status: 200,
       body: {
-        ask: caps.ask / DOLLAR,
-        translate: caps.translate / DOLLAR,
+        ask: ask.cap / DOLLAR,
+        translate: translate.cap / DOLLAR,
         spent: { ask: ask.spent / DOLLAR, translate: translate.spent / DOLLAR },
         reserved: { ask: ask.reserved / DOLLAR, translate: translate.reserved / DOLLAR },
       } satisfies JarvisBudgets,
@@ -83,7 +83,7 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
               ? catchUp
               : ask;
         if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
-        return replyOf(await asking(question, signal), log);
+        return replyOf(await asking(question, signal), log, !("question" in asked.data));
       },
     },
     [JARVIS_PATHS.explain]: {
@@ -154,7 +154,8 @@ function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast
 const lineOf = ({ speaker, time, text }: { speaker: number; time?: string | undefined; text: string }): string =>
   JSON.stringify({ who: speaker === 0 ? "asker" : `#${String(speaker)}`, time, text });
 
-function replyOf(result: Result, log: Log): Reply {
+// A fixed ask's answer is shared by everyone who asks the same, so it keeps its flights alone (D13508).
+function replyOf(result: Result, log: Log, shared: boolean): Reply {
   if (result.kind === "answer") {
     const markdown = cut(result.text, log);
     // A text that draws nothing is no answer the wire can carry, but it was paid for.
@@ -162,7 +163,7 @@ function replyOf(result: Result, log: Log): Reply {
       log("jarvis_answer_empty");
       return answered({ status: "failed", cost: result.cost });
     }
-    const buttons = result.cards.buttons.map(({ button }) => button);
+    const buttons = result.cards.buttons.map(({ button }) => (shared ? flightsAlone([button]) : [button])).flat();
     return answered({
       status: "answered",
       markdown,

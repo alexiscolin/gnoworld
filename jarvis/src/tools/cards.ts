@@ -49,7 +49,7 @@ function definitionsOf([first, ...rest]: readonly string[]) {
     },
     {
       name: "give_button" as const,
-      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain).${read}`,
+      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain profile, and its chainId: the profile's chain's id).${read}`,
       args: z.strictObject({ profile: profile.optional(), button: AnswerButton }),
     },
   ] as const;
@@ -191,6 +191,12 @@ async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ra
   const { button, profile } = args;
   if (button.type === "fly") return flyCard(setup, button, asked);
   if (profile === undefined) return refused("an action's button names its realm's chain profile.");
+  // The button runs on the chain it carries (D13508), and the check ran on the profile's universe: the two must be one.
+  const checkedOn = setup.places.universes.get(profile)?.chainId;
+  if (checkedOn !== undefined && button.chainId !== checkedOn)
+    return refused(
+      `its chainId is ${button.chainId}, but its profile ${profile} is ${checkedOn}: name the chain it was checked on.`,
+    );
   const sourced = await readRealm(setup, { profile, realm: button.action.realm, forms: true, signal: asked.signal });
   if (!sourced.ok) return refused(sourced.why);
   const checked = groundedButton(button, sourcesOf(withQuestion(sourced.read, asked)));

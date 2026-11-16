@@ -167,6 +167,25 @@ describe("POST /ask: a question to the loop", () => {
     });
   });
 
+  // D13508, F13582: Jarvis's own door too: a fixed ask's answer carries its flights alone, an own question's both.
+  it("drops an action button from the answer to a fixed ask, and keeps it on an own question", async () => {
+    const action = {
+      type: "action",
+      label: "Vote",
+      action: { realm: "gno.land/r/gov/dao", function: "Vote", args: {}, why: "to vote" },
+      chainId: "onyx-1",
+    } as AnswerButton;
+    const kept = cards([fly, action]);
+    const { post } = await served({ ask: asking({ kind: "answer", cost: 7, text: "Here.", cards: kept }) });
+    const typesOf = async (body: unknown) =>
+      ((await (await post(JARVIS_PATHS.ask, body)).json()) as { buttons: { type: string }[] }).buttons.map(
+        (b) => b.type,
+      );
+    expect(await typesOf({ ask: "here", room: ROOM, lines: [] })).toEqual(["fly"]);
+    expect(await typesOf({ ask: "catch-up", room: ROOM, lines: [] })).toEqual(["fly"]);
+    expect(await typesOf(question())).toEqual(["fly", "action"]);
+  });
+
   it("sends no digest and no proposal an answer holds, which the wire has no place for", async () => {
     const digest = { realm: "gno.land/r/gov/dao", read: { profile: "onyx", height: 7 }, digest: { blocks: [] } };
     const proposal = {

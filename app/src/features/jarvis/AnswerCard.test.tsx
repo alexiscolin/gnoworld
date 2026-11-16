@@ -37,7 +37,11 @@ beforeAll(async () => {
   drawn = drawerOf(await drawing());
 });
 
-function draw(markdown: string, buttons: Answered["buttons"] = [], fetch: ChainFetch = () => listing(FUNCTIONS)) {
+function draw(
+  markdown: string,
+  buttons: Answered["buttons"] = [],
+  { fetch = () => listing(FUNCTIONS), chain = CHAIN }: { fetch?: ChainFetch; chain?: typeof CHAIN } = {},
+) {
   const onFly = vi.fn<(place: string) => void>();
   const box = mount(
     <MemoryRouter>
@@ -46,9 +50,9 @@ function draw(markdown: string, buttons: Answered["buttons"] = [], fetch: ChainF
         <AnswerCard
           id="answer-1"
           answer={{ status: "answered", markdown, buttons }}
-          chain={CHAIN}
+          chain={chain}
           options={{ fetch }}
-          gnoweb={CHAIN.gnoweb}
+          gnoweb={chain.gnoweb}
           own={OWN}
           draw={drawn}
           onFly={onFly}
@@ -247,7 +251,7 @@ describe("an answer's buttons", () => {
     const touched = vi.fn(() => undefined);
     Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
     try {
-      const { box } = draw("Vote.", [{ type: "action", label: "Vote yes", action: VOTE }]);
+      const { box } = draw("Vote.", [{ type: "action", label: "Vote yes", action: VOTE, chainId: "onyx-1" }]);
       const call = await calling(box, "Vote yes");
       expect(box.textContent).toContain("It closes tomorrow.");
       click(call);
@@ -265,7 +269,11 @@ describe("an answer's buttons", () => {
       <div data-test={id}>
         <AnswerCard
           id={id}
-          answer={{ status: "answered", markdown: id, buttons: [{ type: "action", label: "Vote yes", action: VOTE }] }}
+          answer={{
+            status: "answered",
+            markdown: id,
+            buttons: [{ type: "action", label: "Vote yes", action: VOTE, chainId: "onyx-1" }],
+          }}
           chain={CHAIN}
           options={{ fetch: () => listing(FUNCTIONS) }}
           gnoweb={CHAIN.gnoweb}
@@ -293,8 +301,32 @@ describe("an answer's buttons", () => {
     expect(all(box, "article")).toHaveLength(4);
   });
 
+  // D13508, F13581: a button runs on the chain it was checked on, and on no other: the card never opens on another network.
+  const checked = { type: "action", label: "Vote yes", action: VOTE, chainId: "onyx-1" } as const;
+  const mainnet = { ...CHAIN, name: "gno.land", chainId: "gnoland-1" };
+
+  it("opens the card of an action checked on this chain", async () => {
+    const { box } = draw("Vote.", [checked]);
+    click(await calling(box, "Vote yes"));
+    await vi.waitFor(() => {
+      expect(all(box, "article")).toHaveLength(2);
+    });
+  });
+
+  it("refuses an action checked on another chain with a short line naming both, and opens no card", async () => {
+    const { box } = draw("Vote.", [checked], { chain: mainnet });
+    await vi.waitFor(() => {
+      expect(box.textContent).toContain("onyx-1");
+    });
+    expect(box.textContent).toContain("gnoland-1");
+    expect(button(box, "Vote yes")).toBeUndefined();
+    expect(all(box, "article")).toHaveLength(1);
+  });
+
   it("gives a function that takes nothing but the realm a button when its arguments are none: exactly its parameters", async () => {
-    const { box } = draw("x", [{ type: "action", label: "Ping", action: { ...VOTE, function: "Ping", args: {} } }]);
+    const { box } = draw("x", [
+      { type: "action", label: "Ping", action: { ...VOTE, function: "Ping", args: {} }, chainId: "onyx-1" },
+    ]);
     expect(await calling(box, "Ping")).toBeDefined();
   });
 
@@ -303,7 +335,9 @@ describe("an answer's buttons", () => {
     const held = new Promise<Response>((resolve) => {
       answer = resolve;
     });
-    const { box } = draw("x", [{ type: "action", label: "Vote yes", action: VOTE }], () => held);
+    const { box } = draw("x", [{ type: "action", label: "Vote yes", action: VOTE, chainId: "onyx-1" }], {
+      fetch: () => held,
+    });
     // One task: the held read has been asked and has not answered.
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(button(box, "Vote yes")).toBeUndefined();
@@ -347,7 +381,11 @@ describe("an answer's buttons", () => {
           <SignedIn />
           <AnswerCard
             id="answer-1"
-            answer={{ status: "answered", markdown: "x", buttons: [{ type: "action", label: "Do it", action }] }}
+            answer={{
+              status: "answered",
+              markdown: "x",
+              buttons: [{ type: "action", label: "Do it", action, chainId: "onyx-1" }],
+            }}
             chain={CHAIN}
             options={{ fetch: under }}
             gnoweb={CHAIN.gnoweb}
@@ -358,7 +396,11 @@ describe("an answer's buttons", () => {
           <div data-test="sibling">
             <AnswerCard
               id="answer-2"
-              answer={{ status: "answered", markdown: "y", buttons: [{ type: "action", label: "Ok", action: VOTE }] }}
+              answer={{
+                status: "answered",
+                markdown: "y",
+                buttons: [{ type: "action", label: "Ok", action: VOTE, chainId: "onyx-1" }],
+              }}
               chain={{ ...CHAIN, rpc: "https://rpc.sibling.example:443" }}
               options={{ fetch: sibling }}
               gnoweb={CHAIN.gnoweb}
@@ -377,7 +419,7 @@ describe("an answer's buttons", () => {
 
   it.each([
     ["a fly label", { type: "fly", label: "Go \u202eon sey\u202c", place: "/w/bubble" }],
-    ["an action label", { type: "action", label: "Vote \u202eon sey\u202c", action: VOTE }],
+    ["an action label", { type: "action", label: "Vote \u202eon sey\u202c", action: VOTE, chainId: "onyx-1" }],
     ["a label with a zero-width mark", { type: "fly", label: "Go\u200b there", place: "/w/bubble" }],
     ["a label with a line separator", { type: "fly", label: "Go\u2028 there", place: "/w/bubble" }],
     ["a label with a paragraph separator", { type: "fly", label: "Go\u2029 there", place: "/w/bubble" }],

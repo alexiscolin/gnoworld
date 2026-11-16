@@ -106,6 +106,7 @@ describe("a question to Jarvis, through the door", () => {
             type: "action",
             label: "Go",
             action: { realm: "gno.land/r/a", function: "F", args: {}, why: "w", coins: "5ugnot" },
+            chainId: "onyx-1",
           },
         ],
       },
@@ -137,7 +138,14 @@ describe("a question to Jarvis, through the door", () => {
       {
         status: "answered",
         markdown: "x",
-        buttons: [{ type: "action", label: "Go", action: { realm: "gno.land/r/a", function: "F", args: {} } }],
+        buttons: [
+          {
+            type: "action",
+            label: "Go",
+            action: { realm: "gno.land/r/a", function: "F", args: {} },
+            chainId: "onyx-1",
+          },
+        ],
       },
     ],
     ["an answer of 8001 code points", 200, { status: "answered", markdown: "a".repeat(8001), buttons: [] }],

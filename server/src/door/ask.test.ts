@@ -6,7 +6,7 @@ import {
   toAddress,
   type JarvisAnswer,
   type JarvisAsk,
-  type JarvisPaidAnswer,
+  JarvisPaidAnswer,
 } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { BODY_LIMIT, makeApp } from "../app.ts";
@@ -1381,3 +1381,52 @@ const ask1 = (
     },
     { incoming: { socket: { remoteAddress: PEER } } },
   );
+
+// D13508, F13582: an answer to a fixed ask is served to everyone who asks the same at the same place, built from anyone's
+// lines: it keeps its flight buttons alone. A person's own question keeps both.
+describe("an answer's action buttons", () => {
+  const FLY = { type: "fly", label: "Fly to GovDAO", place: "/w/govdao" } as const;
+  const ACTION = {
+    type: "action",
+    label: "Vote yes",
+    action: { realm: "gno.land/r/gov/dao", function: "Vote", args: { option: "YES" }, why: "It closes tomorrow." },
+    chainId: "gnoland-1",
+  } as const;
+  // Built through the schema, so the fixture follows it.
+  const both = (): Asked => ({
+    ok: true,
+    answer: JarvisPaidAnswer.parse({ ...PAID(), buttons: [FLY, ACTION] }),
+  });
+  const buttonsOf = async (response: Response) =>
+    ((await response.json()) as JarvisAnswer & { buttons: { type: string }[] }).buttons.map((b) => b.type);
+
+  it.each([
+    ["what to do here", HERE],
+    ["a room caught up", CATCH_UP],
+    ["a function explained", EXPLAIN],
+  ])("serves %s with its flights alone, to the asker and to the next one", async (_, body) => {
+    const { ask } = setup({ answer: () => Promise.resolve(both()) });
+    expect(await buttonsOf(await ask({ body }))).toEqual(["fly"]);
+    expect(await buttonsOf(await ask({ body, token: BEN_TOKEN }))).toEqual(["fly"]);
+  });
+
+  it("keeps both kinds of button on a person's own question", async () => {
+    const { ask } = setup({ answer: () => Promise.resolve(both()) });
+    expect(await buttonsOf(await ask())).toEqual(["fly", "action"]);
+  });
+
+  // The reader who joins a call in flight is a third path, neither the one that relayed it nor the one served from the cache.
+  it.each([
+    ["what to do here", HERE],
+    ["a room caught up", CATCH_UP],
+  ])("serves %s with its flights alone to a reader who joins the call in flight", async (_, body) => {
+    const gate = deferred<undefined>();
+    const { ask, sent } = setup({ perMinute: 100, answer: () => gate.promise.then(both) });
+    const asked = [ask({ body }), ask({ body, token: BEN_TOKEN })];
+    await expect.poll(() => sent.length).toBe(1);
+    await idle();
+    gate.resolve(undefined);
+    expect(await Promise.all(asked.map(async (response) => buttonsOf(await response)))).toEqual([["fly"], ["fly"]]);
+    expect(sent).toHaveLength(1);
+  });
+});

@@ -19,6 +19,7 @@ const voteYes: AnswerButton = {
     args: { pid: "", option: "YES" },
     why: "Casts your vote on the proposal whose number you type in the call card.",
   },
+  chainId: "onyx-1",
 };
 
 // The first rule whose words match the question answers it; the last has none and is the fallback.
