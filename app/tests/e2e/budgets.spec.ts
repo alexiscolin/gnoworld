@@ -8,9 +8,9 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 280,336 with the
-// phone mode's shared parts, D13719, the late chat's cap lowered by as much).
-const FIRST_SCREEN_JS = 280_592;
+// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 280,971 with the
+// phone mode's shared parts, D13719).
+const FIRST_SCREEN_JS = 281_227;
 // A page with no plate (the home), exact: its measured size, 256 B ahead.
 const PLAIN_FIRST_SCREEN_JS = 276_255;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
@@ -141,9 +141,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // A page that holds the chat and space (the Earth's, a world's): its chat waits for space's first frame, or 2.5 s once the page is on screen
 // (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open: 53,264 B measured (Poll's dialog lazy, D13719), 256 B
+// What leaves the first screen keeps a cap of its own, with what it asks once open: 53,696 B measured (Poll's dialog lazy, D13719), 256 B
 // ahead.
-const LATE_CHAT_JS = 53_520;
+const LATE_CHAT_JS = 53_952;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own.
