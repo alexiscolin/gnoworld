@@ -200,7 +200,7 @@ the brightest planet behind the header's pills.
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-s` / `-m` / `-l` | 32 / 52 / 64 px: a row's lead / a card / the rail |
 | `--dir` | 1; -1 under `[dir="rtl"]`, 1 again under a `[dir="ltr"]` inside it: the inline axis's sign (CSS rules, "Direction"; the token page's "Direction" group) |
-| Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400), plate 808 at the video's 1728 with its fade, narrowing with the window to 560 (`--plate-w`), dialog 490 and wide 760, popover 300 px and wide 440; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
+| Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400), plate 808 at the video's 1728 with its fade, narrowing with the window to 608 (`--plate-w`: 38rem, so the plate never takes its narrow layout from 1280 up), dialog 490 and wide 760, popover 300 px and wide 440; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
@@ -495,7 +495,7 @@ a person or Jarvis wrote is drawn as text with its source.
 | Top centre | Under the header, centred in the scene's free area (between the plate and the dock) | One slot: the flight panel, the expedition pill, the flash |
 | Hero | Bottom left of the cosmos, 48 px from the left and 32 from the bottom | The kicker, the number in mono with its line at the right (the network line: the chain's day, `features/home/NetworkLine.tsx`), two actions, and the tags that light space (`app/src/Lenses.tsx`); the scene keeps it clear (a safe area) |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |
-| Plate | Left of a world's frame | 808 px at the video's 1728 with its fade, narrowing with the window to 560 (`--plate-w`); its background fades into space over its last 64 px, with no border, so the planet keeps the frame's free area; the dot grid and the vertical atlas caption; a scroll cue when its content is cut |
+| Plate | Left of a world's frame | 808 px at the video's 1728 with its fade, narrowing with the window to 608 (`--plate-w`: 38rem, so the plate never takes its narrow layout from 1280 up); its background fades into space over its last 64 px, with no border, so the planet keeps the frame's free area; the dot grid and the vertical atlas caption; a scroll cue when its content is cut |
 | Chat dock | Right | 420 px, 380 px under 1400 px, on the surface colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Credits | A fixed corner, wherever textures show, on phones too | One 11 px "Credits" link in the muted grey, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link) |
 

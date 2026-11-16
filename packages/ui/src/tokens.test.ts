@@ -262,7 +262,9 @@ describe("the tokens", () => {
     expect(at(1491)).toBeLessThan(808);
     expect(at(1280)).toBeLessThan(at(1491));
     expect(at(900)).toBe(Number(floor));
-    expect(Number(floor)).toBeGreaterThanOrEqual(480);
+    // The plate's blocks go narrow at a container of 37.5rem (600 px), the plate less its two 1 px edges: the floor keeps it wider.
+    expect(Number(floor) - 2).toBeGreaterThan(37.5 * 16);
+    expect(at(1280)).toBeGreaterThan(37.5 * 16 + 2);
   });
 
   // The video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.
