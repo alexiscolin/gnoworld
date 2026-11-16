@@ -3,7 +3,7 @@ import { buttonsOf, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
-import { marks, sentBefore, tags } from "./scriptedRoom.ts";
+import { BARRIER, marks, sentBefore, tags } from "./scriptedRoom.ts";
 import { asAccount, barOf, field, GUEST, OTHER, ROOM, T, tabsTo, tagged, tagmsg } from "./talk.ts";
 import { chipOf, closeButton, inThread, panel, threadField, threadOf } from "./thread.ts";
 import { axeOf } from "./axe.ts";
@@ -470,7 +470,7 @@ test.describe("threads", () => {
     await panel(page).hover();
     // The barrier again: the field going back to done is told behind every line sent before it, on the same socket.
     await field(page).fill("");
-    await expect.poll(() => tags(heard).length).toBe(2);
+    await expect.poll(() => tags(heard).length, BARRIER).toBe(2);
     expect(marks(heard)).toEqual(before);
   });
 

@@ -7302,6 +7302,27 @@ for case in "1:read 1" "2:read 2" "3:read 3" "4:failed: timeout 3 3"; do
 	got=$(CALLS="$dc/calls" OK_AT=${case%%:*} sh "$dc/f13163.sh" reads 2>&1)
 	[ "$got" = "${case#*:}" ] || fail "deploy/test-jarvis.sh's indexer_read, the read answering at try ${case%%:*}, gave [$got], not [${case#*:}]"
 done
+# D13702: gno.land's indexer down on all three tries is a warning and a skip, counted for nothing; any other wrong answer, on any try,
+# still fails, and a read on a later try still passes.
+{ sed -n '/^indexer_read() {/,/^}$/p' "$dj"; sed -n '/^indexer_check() {/,/^}$/p' "$dj"
+	printf '%s\n' 'sleep() { :; }' 'pass() { echo "ok    $1"; }' 'fail() { echo "FAIL  $1"; }' \
+		'expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1: wanted [$3], got [$2]"; fi; }' \
+		'gnomcp_read() { n=$(($(cat "$CALLS") + 1)) && echo "$n" >"$CALLS" && printf "%s\n" "$ANSWERS" | cut -d "|" -f "$n"; }' \
+		'echo 0 >"$CALLS" && indexer_check'; } >"$dc/d13702.sh"
+down='failed: [{"type":"text","text":"gno_history: error_unavailable: indexer unreachable: Post \"https://indexer.gno.land/graphql/query\": context deadline exceeded"}]'
+out=$(CALLS="$dc/calls" ANSWERS="$down|$down|$down" sh "$dc/d13702.sh" 2>&1)
+case $out in *"::warning"*"indexer"*) ;; *) fail "deploy/test-jarvis.sh's indexer_check gave no warning for an indexer down on three tries: $out" ;; esac
+case $out in *"skip  "*) ;; *) fail "deploy/test-jarvis.sh's indexer_check did not skip an indexer down on three tries: $out" ;; esac
+case $out in *"FAIL  "* | *"ok    "*) fail "deploy/test-jarvis.sh's indexer_check counted an indexer down on three tries: $out" ;; esac
+other='failed: [{"type":"text","text":"gno_history: error_unavailable: time filtering not supported by current indexer schema"}]'
+bare='failed: [{"type":"text","text":"gno_history: indexer unreachable"}]'
+for answers in "$down|failed: refused|$down" "$down|$down|failed: [{\"type\":\"text\",\"text\":\"wrong shape\"}]" "refused|refused|refused" \
+	"$other|$other|$other" "$bare|$bare|$bare"; do
+	out=$(CALLS="$dc/calls" ANSWERS="$answers" sh "$dc/d13702.sh" 2>&1)
+	case $out in "FAIL  "*) ;; *) fail "deploy/test-jarvis.sh's indexer_check let a wrong answer of ours pass or skip [$answers]: $out" ;; esac
+done
+out=$(CALLS="$dc/calls" ANSWERS="$down|read" sh "$dc/d13702.sh" 2>&1)
+case $out in "ok    "*) ;; *) fail "deploy/test-jarvis.sh's indexer_check did not pass a read on the second try: $out" ;; esac
 # The run's last line names each failed check, their wanted and got left out, so GitHub's annotation of it says what failed with no login.
 { sed -n '/^pass() {/,/^# --- What the host offers/p' "$ds" | sed '$d'; printf 'failed=0\nfailed_checks=\n'
 	printf 'expect "the reader resolves guard." 0 some\npass "a check that held"\nfail "gnomcp reads the indexer: timeout"\n'
