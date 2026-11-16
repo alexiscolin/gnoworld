@@ -1958,6 +1958,33 @@ done
 printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
 out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
 printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
+# Both ledgers merge by union (.gitattributes, D13408): two branches appending rows to each merge clean, every row kept. A row
+# both sides change is kept twice, and check_docs refuses it in either ledger: union never hides a collision.
+u="$t/union" && mkdir -p "$u/docs/review" && git -C "$u" init -q -b base && cp "$here/../.gitattributes" "$u/.gitattributes" && : >"$u/CLAUDE.md" && good_rules "$u"
+ug() { git -C "$u" -c user.name=t -c user.email=t@t "$@"; }
+row_d() { printf '| 2026-11-16 | %s | why | where |\n' "$1" >>"$u/docs/decisions.md"; }
+row_f() { printf '| %s | 2026-11-16 | r | `x` | %s | %s | %s |\n' "$1" "$2" "$3" "$4" >>"$u/docs/review/findings.md"; }
+printf '| Date | Decision | Why | Where it lives |\n|---|---|---|---|\n' >"$u/docs/decisions.md" && row_d "D9000: the base" && row_d "D9000, amended after the review: kept"
+printf '| Id | Date | By | Where | What | Status | Evidence |\n|---|---|---|---|---|---|---|\n' >"$u/docs/review/findings.md" && row_f F9000 "the base" claimed —
+ug add -A && ug commit -qm base && ug branch -q two && ug branch -q edit1 && ug branch -q edit2
+row_d "D9001: one" && row_f F9001 one claimed — && ug commit -qam one
+ug switch -q two && row_d "D9002: two" && row_f F9002 two claimed — && ug commit -qam two
+out=$(ug merge -q --no-edit base 2>&1) || fail "two branches appending to both ledgers did not merge clean by union: $out"
+[ "$(grep -c '^| 2026-11-16 | D900' "$u/docs/decisions.md")" = 4 ] && [ "$(grep -c '^| F900' "$u/docs/review/findings.md")" = 3 ] ||
+	fail "the union merge of both ledgers lost a row: $(cat "$u/docs/decisions.md" "$u/docs/review/findings.md")"
+out=$(python3 -I "$docs" "$u" 2>&1) || fail "check_docs refused two ledgers merged by union, every row once: $out"
+for side in 1 2; do
+	ug switch -q "edit$side" && sed -i.bak "s/^| F9000 .*/| F9000 | 2026-11-16 | r | \`x\` | the base | rejected | side $side |/; s/^| 2026-11-16 | D9000: the base .*/| 2026-11-16 | D9000: the base, side $side | why | where |/; s/^| 2026-11-16 | D9000, amended after the review: kept .*/| 2026-11-16 | D9000, amended after the review: kept, side $side | why | where |/" "$u/docs/review/findings.md" "$u/docs/decisions.md" &&
+		rm "$u/docs/review/findings.md.bak" "$u/docs/decisions.md.bak" && ug commit -qam "side $side"
+done
+out=$(ug merge -q --no-edit edit1 2>&1) || fail "a row both sides changed did not merge by union: $out"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a union merge that kept a row both sides changed twice: $out"
+printf '%s\n' "$out" | grep -qF "  F9000: the id is used twice" || fail "check_docs did not name the finding a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000: written twice" || fail "check_docs did not name the decision a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000 amended: written twice" || fail "check_docs did not name the amended row a union merge kept twice: $out"
+[ "$(printf '%s\n' "$out" | grep -c '  D9000')" = 2 ] || fail "check_docs named the decision's rows other than once each: $out"
+grep -v '^| F9000 .* side 1 |$' "$u/docs/review/findings.md" >"$u/f.md" && mv "$u/f.md" "$u/docs/review/findings.md"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a decision a union merge kept twice, the findings clean: $out"
 fi
 
 if part instructions; then

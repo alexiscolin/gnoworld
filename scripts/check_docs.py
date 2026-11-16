@@ -185,7 +185,7 @@ def ledger_problems(root):
     real = commits(root, [sha for *_, shas in rows for sha in shas])
     for fid, status, evidence, shas in rows:
         if fid in seen:
-            out.append(f"{fid}: the id is used twice")
+            out.append(f"{fid}: the id is used twice (a union merge keeps a row both sides changed twice: keep the newer)")
         seen.add(fid)
         if status not in STATUSES:
             out.append(f"{fid}: status {status!r} is none of {', '.join(sorted(STATUSES))}")
@@ -194,6 +194,24 @@ def ledger_problems(root):
         elif status in ("rejected", "intended", "moot", "reproduced", "asked") and evidence in ("", "—", "-"):
             out.append(f"{fid}: {status}, with no evidence or reason")
         out += [f"{fid}: cites {sha}, no commit of this repository" for sha in shas if sha not in real]
+    return out
+
+
+def decision_problems(root):
+    """A decision's id written again says why, once (`D172, amended after the review`, `D40 confirmed`): a row both sides of a
+    merge changed, which the ledger's union merge keeps twice (.gitattributes, D13408), is refused where it starts with its id."""
+    ledger, seen, out = root / "docs/decisions.md", set(), []
+    if not ledger.is_file():
+        return out
+    for line in ledger.read_text().splitlines():
+        m = re.match(r"\|[^|]*\| (D\d+)\b(.{0,12})", line)
+        if not m:
+            continue
+        did, after = m.groups()
+        kind = (re.match(r",? (amended|confirmed)", after) or [None, ""])[1]
+        if (did, kind) in seen:
+            out.append(f"{did}{' ' + kind if kind else ''}: written twice (a row both sides of a merge changed? keep the newer)")
+        seen.add((did, kind))
     return out
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
@@ -218,6 +236,9 @@ if rules:
     report("check_docs", "check_docs: a rule the review depends on is gone:", rules)
 if problems:
     report("check_docs", "check_docs: the findings ledger (docs/review/findings.md):", problems)
+decisions = decision_problems(root)
+if decisions:
+    report("check_docs", "check_docs: the decisions (docs/decisions.md):", decisions)
 # No instruction file below the root reaches a commit: every commit runs this, prose alone included.
 stray = stray_instructions(root)
 if stray:
@@ -289,7 +310,7 @@ if hidden_chars:
     report("check_docs", "check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
            " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
            " bytes, IMAGES):", hidden_chars)
-if hidden_chars or missing or problems or orphans or unnamed or lost or rules or drift or globs:
+if hidden_chars or missing or problems or decisions or orphans or unnamed or lost or rules or drift or globs:
     sys.exit(1)
 if stray:
     sys.exit(1)

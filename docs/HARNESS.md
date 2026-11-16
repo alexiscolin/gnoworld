@@ -205,7 +205,10 @@ goes into `docs/review/findings.md` with its status (`claimed`, `reproduced`, `f
 `rejected`, `intended`, `moot`, `asked`) and its evidence; a fixed one names its commit. Reviews
 grep the ledger for their diff's paths and ids, never read it whole, so a rejected claim is not
 raised again and a fixed one that comes back is a regression. A flaky test that passed on its second
-run is no row; nothing records one that GitHub's retry passed (D13168).
+run is no row; nothing records one that GitHub's retry passed (D13168). Both ledgers merge by union (`.gitattributes`, D13408), so
+two tracks' appended rows never conflict; a row both sides changed is kept twice, and check_docs refuses it where it starts with
+its id (a finding's id used twice, a decision's id written twice with the same `amended`, `confirmed` or neither). A decision row with
+no id, and a row one side deleted while the other changed it, pass unseen.
 
 | Who | When | Model |
 |---|---|---|

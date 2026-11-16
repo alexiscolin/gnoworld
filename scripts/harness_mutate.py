@@ -55,7 +55,7 @@ SECTIONS = {
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", ".gitattributes": "check_docs", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
@@ -912,7 +912,7 @@ def mutants():
     yield from each(cd, 'for p in sorted(OWN - entries) if named and tier1]', "for p in [] if named and tier1]", "hooks", "check_docs wants the harness's folders in TIER1 (lot 2, S2-9)")
     yield from each(cd, 'speeds.rows(str(root))["1"]', '[p for line in review.read_text().splitlines() if line.startswith("| 1 |") for p in re.findall(r"`([^`]*)`", line)]', "hooks", "check_docs reads the table as speeds.py does (lot 2, S2-10)")
     yield from each(cd, 're.sub(r"/\\*.*?\\*/|//[^\\n]*", "", block, flags=re.S)', "block", "hooks", "check_docs leaves TIER1's comments out (lot 2, S2-12)")
-    yield from each("scripts/check_docs.py", "problems or orphans or", "problems or", "hooks", "check_docs wants each test beside its file")
+    yield from each("scripts/check_docs.py", "decisions or orphans or", "decisions or", "hooks", "check_docs wants each test beside its file")
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or rules or drift or globs:", "hooks", "check_docs wants the runbook's known limits")
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or lost or drift or globs:", "hooks", "check_docs fails a lost review rule (G12)")
     yield from each("scripts/check_docs.py", 'limit not in " ".join(said.split())', "limit not in said", "hooks", "check_docs reads a limit wrapped anyhow")
@@ -1836,6 +1836,12 @@ def design_mutants():
     yield from each("scripts/ci_changes.sh", "line in a commit: %s\\n' \\\n", "line in a commit:\\n%s\\n' \\\n", "hooks", "ci_changes.sh names the undeclared files on its one line (F13435)")
     yield from each("scripts/repo_files.py", r'str(i).replace("\r", "\\r").replace("\n", "\\n")', "str(i)", "hooks", "repo_files.report writes an item's newline as \\n")
     yield from each("scripts/test_hooks.sh", "unset GITHUB_" "ACTIONS\n", "", "hooks", "test_hooks runs its cases off GitHub's marker (killed where GitHub sets it)")
+    # D13408: both ledgers merge by union, and check_docs refuses a row the union kept twice.
+    yield from each(".gitattributes", "docs/decisions.md merge=union\n", "", "hooks", "the decisions merge by union (D13408)")
+    yield from each(".gitattributes", "docs/review/findings.md merge=union\n", "", "hooks", "the findings merge by union (D13408)")
+    yield from each("scripts/check_docs.py", "if (did, kind) in seen:", "if False:", "hooks", "check_docs refuses a decision written twice")
+    yield from each("scripts/check_docs.py", "seen.add((did, kind))", "seen.add((did, ''))", "hooks", "check_docs reads an amended row apart from the decision")
+    yield from each("scripts/check_docs.py", "problems or decisions or orphans", "problems or orphans", "hooks", "check_docs fails on a decision written twice")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
         ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
