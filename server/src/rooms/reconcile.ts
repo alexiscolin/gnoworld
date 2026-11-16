@@ -112,8 +112,16 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
       }
     }
   };
+  // The rooms the last full pass walked: one that left the list since (past the window, D13675) is left, once.
+  let walked = new Set<string>();
   const ask = (room?: string): void => {
-    for (const name of room === undefined ? rooms() : [room]) waiting.add(name);
+    const names = room === undefined ? rooms() : [room];
+    if (room === undefined) {
+      const now = new Set(names);
+      for (const gone of walked) if (!now.has(gone)) send("PART", [gone]);
+      walked = now;
+    }
+    for (const name of names) waiting.add(name);
     // Cleared once the pass has settled, never inside it: a pass that found no room ends too.
     running ??= drain().finally(() => {
       running = undefined;
