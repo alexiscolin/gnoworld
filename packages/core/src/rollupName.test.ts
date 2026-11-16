@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rollupName } from "./rollupName.ts";
 
-// A realm's rollup file (slice 13a) is named by its path's hash, the same on the server that writes it and in the browser that reads it.
+// A realm's rollup file is named by its path's hash, the same on the server that writes it and in the browser that reads it.
 describe("rollupName", () => {
   it("is the first 32 hex characters of the path's SHA-256", () => {
     // printf '%s' gno.land/r/gnops/valopers | shasum -a 256

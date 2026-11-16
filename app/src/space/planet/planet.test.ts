@@ -167,10 +167,10 @@ describe("a world's parts, on either program", () => {
     expect(read(planet.surface, "spin")).toEqual(wanted);
   });
 
-  // 7d6, Alexis's depth: a far world softer and a little dimmer, as frame 4's, its light the approved one; up close, nothing changes.
+  // A far world softer and a little dimmer, as frame 4's, its light the approved one; up close, nothing changes.
   it("starts every part of a world crisp, and dims and softens it all by how far it stands", () => {
     for (const planet of [generated("gas giant"), createPlanet(EARTH, fixed(), sphere)]) {
-      // Every part but the air's glare, a quad drawn only up close (D482), where nothing is far.
+      // Every part but the air's glare, a quad drawn only up close, where nothing is far.
       const parts = meshes(planet)
         .filter((part) => !(part.geometry instanceof PlaneGeometry))
         .map((part) => part.material as ShaderMaterial);
@@ -254,7 +254,7 @@ describe("the surface programs", () => {
     expect(AIR_FRAGMENT).toContain(
       "float lit = smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, dot(at, sun) < 0.0 ? across : 2.0);",
     );
-    // The limb's strength is the Earth's limbLight, or a page's close framing (D458): a generated world far out has neither, so is not softened.
+    // The limb's strength is the Earth's limbLight, or a page's close framing: a generated world far out has neither, so is not softened.
     expect(AIR_FRAGMENT).toContain("float limb = max(limbLight, close * CLOSE_LIMB);");
     expect(AIR_FRAGMENT).toMatch(/if \(limb > 0\.0\) lit = /);
   });

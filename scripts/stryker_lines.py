@@ -1,12 +1,12 @@
-"""stryker_lines.py: GitHub's risk job's StrykerJS config, its `mutate` the code the branch changed since its base alone (Alexis, 2026-11-04:
-"Lignes de la tranche"), so a survivor in code it did not touch goes unseen, as those of the files it did not change do.
+"""stryker_lines.py: GitHub's risk job's StrykerJS config, its `mutate` the code the branch changed since its base alone, so a survivor in code it did not touch goes unseen, as those of the files it did not change do.
 
 StrykerJS 10.0.0 mutates a node only when its whole span lies inside one range (instrumenter syntax-helpers.js, locationIncluded), so a
 changed line widens to the top-level statements it lies in, as TypeScript's own parser reads them: a function, a class, a declaration, an
 `if (a &&\n b)` whose one line changed included. Each run is `path:from-to` (core's project-reader.js, MUTATION_RANGE_REGEX, from 1, lines
 whole), in the files stryker.config.json's own `mutate` selects: its patterns, braces expanded, read as git's glob pathspecs, a negation as an
-exclusion, a path with a hidden part left out as minimatch leaves it. A new file, committed or not, counts whole; a line removed, or a
-comment's, touches none. Every other key of the config is kept.
+exclusion, a path with a hidden part left out as minimatch leaves it. A new file, committed or not, counts whole; a line removed, or one
+that holds no code (a comment, a blank), touches none, so a comment inside a function puts no function under mutation. Every other key of
+the config is kept.
 Usage, from the repository's root: stryker_lines.py <base> <out.json>. It writes the config and says what it kept; with no such line it
 writes nothing and exits 3; a config it cannot read, or a pattern git does not read as minimatch does (`?`, a class, an extglob), exit 2."""
 import json
@@ -22,13 +22,22 @@ from repo_files import changed_lines, git
 # A pattern git's glob pathspecs read as minimatch does: names, `*` within a part, `**` across them.
 PLAIN = re.compile(r"[\w./*-]+")
 BRACES = re.compile(r"\{([^{}]*)\}")
-# Each top-level statement's first and last line, by TypeScript's parser (a statement's leading comments are no part of it).
+# Each top-level statement's first and last line, by TypeScript's parser (a statement's leading comments are no part of it), and the
+# lines that hold a token of code: a comment or a blank holds none.
 SPANS = """import ts from "typescript";
 import { readFileSync } from "node:fs";
 for (const path of process.argv.slice(1)) {
   const file = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
   const line = (at) => file.getLineAndCharacterOfPosition(at).line + 1;
   for (const statement of file.statements) console.log(`${path}\\t${line(statement.getStart(file))}\\t${line(statement.end)}`);
+  const code = new Set();
+  const visit = (node) => {
+    if (node.getChildCount(file) > 0) return node.getChildren(file).forEach(visit);
+    if (node.kind === ts.SyntaxKind.EndOfFileToken) return;
+    for (let at = line(node.getStart(file)); at <= line(node.end); at += 1) code.add(at);
+  };
+  visit(file);
+  console.log(`${path}\\tcode\\t${[...code].join(",")}`);
 }
 """
 
@@ -56,13 +65,17 @@ def pathspecs(patterns):
 
 
 def statements(paths):
-    """{path: [(first, last)]}, the top-level statements of each file."""
+    """({path: [(first, last)]}, {path: the lines that hold code}): the top-level statements of each file, and its code's lines."""
     found = {path: [] for path in paths}
+    code = {path: set() for path in paths}
     out = subprocess.run(["node", "--input-type=module", "-e", SPANS, *paths], capture_output=True, text=True, check=True).stdout
     for row in out.splitlines():
         path, first, last = row.rsplit("\t", 2)
-        found[path].append((int(first), int(last)))
-    return found
+        if first == "code":
+            code[path] = {int(n) for n in last.split(",") if n}
+        else:
+            found[path].append((int(first), int(last)))
+    return found, code
 
 
 def runs(lines):
@@ -82,7 +95,8 @@ def selected(base, specs):
     for path in git("ls-files", "--others", "--exclude-standard", "--", *specs).splitlines():
         lines[path] = set(range(1, len(pathlib.Path(path).read_text(encoding="utf-8").splitlines()) + 1))
     lines = {p: found for p, found in lines.items() if found and not any(part.startswith(".") for part in p.split("/"))}
-    spans = statements(sorted(lines))
+    spans, code = statements(sorted(lines))
+    lines = {p: found & code[p] for p, found in lines.items()}
     return {p: {n for first, last in spans[p] if any(first <= at <= last for at in found) for n in range(first, last + 1)} for p, found in lines.items()}
 
 

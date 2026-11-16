@@ -29,7 +29,7 @@ const TONE = 1;
 const HAZE = 2;
 const DENSITY = 3;
 const HEIGHT = 4;
-// The noise is no longer cubed, so the clusters stand clear of the plane (Alexis, 2026-11-02, "l'espace n'est pas en 2D"): the slope
+// The noise is not cubed, so the clusters stand clear of the plane: the slope
 // is at most MAX_HEIGHT * (2 * 1.875 * sqrt(2)) / HEIGHT_SCALE = 0.16, under the 0.5 the tests hold.
 const HEIGHT_SCALE = 260;
 // prettier-ignore

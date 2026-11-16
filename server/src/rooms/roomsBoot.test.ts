@@ -14,7 +14,7 @@ import { EARTH_TABLES, makeRooms, REALM_PATH, REALM_TABLES, ROOM_STATE } from ".
 import { roomsBoot } from "./roomsBoot.ts";
 import { ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 
-// How the process wires D413: the worlds file's rooms made ahead on a timer, the unlisted path's chain read on the universe's own RPC.
+// How the process wires the realm rooms: the worlds file's rooms made ahead on a timer, the unlisted path's chain read on the universe's own RPC.
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-boot-"));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });

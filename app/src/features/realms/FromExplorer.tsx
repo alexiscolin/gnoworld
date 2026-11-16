@@ -1,5 +1,5 @@
-// A world's realm card (8g, frame 93): "REALM · FROM THE EXPLORER", its path, who deployed it and since which block, as the public indexer
-// read its deploy (F4875), and the block of its last call as the worlds' file holds it (its calls are the plate's figure), with the read's source and time; then "EXPLORER ↗" and "DOCS ↗".
+// A world's realm card: "REALM · FROM THE EXPLORER", its path, who deployed it and since which block, as the public indexer
+// read its deploy, and the block of its last call as the worlds' file holds it (its calls are the plate's figure), with the read's source and time; then "EXPLORER ↗" and "DOCS ↗".
 // A fact the indexer or the file did not give is left out, never a zero.
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { Card, Grid, grouped, Stack } from "@gnoworld/ui";
@@ -58,7 +58,7 @@ function RealmCard({ found, worlds }: { found: RealmAt; worlds: Worlds["worlds"]
         <Card.Header icon="satellite" title={realm} hint="from the explorer" level={2} />
         <Card.Body>
           <Facts deployer={facts.deployer ?? held?.deployer ?? undefined} held={held} firstBlock={facts.firstBlock} />
-          {/* A read that failed says nothing here: the page's one error line is the Render card's (D534). */}
+          {/* A read that failed says nothing here: the page's one error line is the Render card's. */}
           {read?.ok === true ? <ReadSource source={read.source} /> : null}
         </Card.Body>
       </Card>

@@ -23,7 +23,7 @@ export const nameOf = (id: string): string => {
   return labelName(id) ?? id.split("/").at(-1) ?? id;
 };
 
-/** A system's name: its namespace's; a namespace named by an address alone, by its busiest world and how many more it holds ("shoal +9", P1):
+/** A system's name: its namespace's; a namespace named by an address alone, by its busiest world and how many more it holds ("shoal +9"):
  * space's labels and its map say it alike. */
 export function systemName(
   system: { readonly id: string; readonly planets: readonly { readonly id: string; readonly use: number }[] },

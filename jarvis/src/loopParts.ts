@@ -58,7 +58,7 @@ export const unanswered = (
   return { kind: "failed", reason: reason === "timeout" ? "timeout" : "error", cost };
 };
 
-/** The reads of a question with a `finds`: whether one failed and whether one held the word (a function's name, D13920). */
+/** The reads of a question with a `finds`: whether one failed and whether one held the word (a function's name). */
 export interface Reads {
   readonly finds: { readonly realm: string; readonly name: string } | undefined;
   failed: boolean;

@@ -1,4 +1,4 @@
-// A bounded choice of the nearest (F3568): candidates come in a grid's order, the nearest go out first, ties by index, so a cap that binds
+// A bounded choice of the nearest: candidates come in a grid's order, the nearest go out first, ties by index, so a cap that binds
 // drops the far and faint and never the near. It runs on a look, off the frame: one sort of what was offered.
 
 export class Nearest {

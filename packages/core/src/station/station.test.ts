@@ -52,7 +52,7 @@ describe("stationOf", () => {
     expect(stationOf("Adena", -1)).toEqual({ ...stationOf("Adena", 0), size: 0 });
   });
 
-  // The repetition golden (7x): no two of the shipped names, nor of a fixed set of names at sizes across the range, build alike.
+  // No two of the shipped names, nor of a fixed set of names at sizes across the range, build alike.
   it("builds no two of the shipped stations alike, nor two of eighty names", () => {
     const looks = SHIPPED.map(([seed, size]) => ({ seed, look: lookOf(stationOf(seed, size)) }));
     for (const [at, a] of looks.entries())
@@ -70,7 +70,7 @@ describe("stationOf", () => {
     expect(alike).toEqual([]);
   });
 
-  // 7x: past 0.7 a station is an artificial world, its great wheel or shell far past its hub: it holds many more parts, and its hub stands
+  // Past 0.7 a station is an artificial world, its great wheel or shell far past its hub: it holds many more parts, and its hub stands
   // within half its reach.
   it("builds an artificial world's great parts from 0.7 alone", () => {
     const seeds = Array.from({ length: 100 }, (_, n) => `project ${String(n)}`);
@@ -135,7 +135,7 @@ describe("stationsRound", () => {
     }
   });
 
-  // 7x: whole on the video's screens with its label's room over it, off the rail's band, the page's text, the Moon's whole path, the
+  // Whole on the video's screens with its label's room over it, off the rail's band, the page's text, the Moon's whole path, the
   // scenery's planets and each other; on a phone whole with its label or off it.
   it("stands every body clear of all that stands round the Earth, on every screen and a phone", () => {
     const many = [
@@ -173,7 +173,7 @@ describe("stationsRound", () => {
   });
 });
 
-// 7x2: the eye glides between the Earth's two views; a station or a planet near that way would cross the eye.
+// The eye glides between the Earth's two views; a station or a planet near that way would cross the eye.
 describe("the way between the Earth's views", () => {
   it("reads nothing off it at either eye or between them, and a point's distance square to it past its ends", () => {
     const [rest, top] = [earthEye(), earthTopEye()];
@@ -195,7 +195,7 @@ describe("the way between the Earth's views", () => {
   });
 });
 
-// 8r: what stationOf joins, counted through its calls (8n's StrykerJS run, 2026-11-05): the real parts, each call recorded. Shares are read on
+// What stationOf joins, counted through its calls: the real parts, each call noted. Shares are read on
 // 600 names: each bound stands three standard deviations or more off its draw's odds, and a tenth off them fails.
 vi.mock(import("./around.ts"), async (original) => {
   const real = await original();

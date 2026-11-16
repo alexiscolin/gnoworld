@@ -1,8 +1,8 @@
-// A world's chat on its page (slice 4's 4b): its rooms from the server, asked once the session is known and again
+// A world's chat on its page: its rooms from the server, asked once the session is known and again
 // when it changes (a member's rooms are not a guest's), the page's link to Ergo in them, and the room the address names
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
-// link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link
-// (4c); a guest reads, a room letting accounts alone speak.
+// link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link;
+// a guest reads, a room letting accounts alone speak.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { EmptyState } from "@gnoworld/ui";
@@ -82,7 +82,7 @@ function useLinkAt(
   useEffect(() => {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
   }, [linkRef, sections]);
-  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
+  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's.
   useLayoutEffect(() => {
     linkRef.current?.show(current);
   }, [linkRef, current]);
@@ -103,7 +103,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   const asked = useRoomsAsked(store, world, query);
   const { shown, loaded } = useDrawn(asked, { world, place, room: room ?? params.get("room") });
   const { sections, current } = shown;
-  // The page hidden: the reading places waiting their 2 s go at once (F940).
+  // The page hidden: the reading places waiting their 2 s go at once.
   useOnHide(() => {
     linkRef.current?.flush();
   });

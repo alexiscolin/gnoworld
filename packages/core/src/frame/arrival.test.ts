@@ -24,8 +24,8 @@ import { REST_SCREENS, STAR_HEART } from "./rest.ts";
 import { rocksAt } from "./rocks.ts";
 import { away, DEGREE, dot, focalOf, minus, type Seen } from "./restLook.ts";
 
-// A system's arrival, its dynamic view (7v; 7d3's before, ADR-0002 §10): where the eye rests at a system, looking at its star, read through a
-// camera of their own, the map's up kept up Alexis, 2026-11-03: centred on its sun, its worlds at many depths,
+// A system's arrival, its dynamic view (ADR-0002 §10): where the eye rests at a system, looking at its star, read through a
+// camera of their own, the map's up kept up: centred on its sun, its worlds at many depths,
 // the near one cut by the frame, held still so it stays so.
 
 // Namespaces of one to six worlds, their uses spread: rich and plain systems, belted or not, near the centre and far out.
@@ -48,13 +48,13 @@ const SETS = {
     systemsOf([...mixed(20), ...crowd("busy", 172), ...crowd("test", 127), ...crowd("mid", 30)]),
 } as const;
 type SetName = keyof typeof SETS;
-// A world of Onyx's recorded file, as the dynamic view's count reads it (7v's design review, F4468): its use, its realms and callers.
+// A world of Onyx's recorded file, as the dynamic view's count reads it: its use, its realms and callers.
 interface Recorded {
   readonly id: string;
   readonly namespace: string;
   readonly realms: readonly { readonly callers: number | null }[];
 }
-// Onyx's recorded systems, each world's use its realms' callers and its realms (F4468), as the dynamic view's tests read them.
+// Onyx's recorded systems, each world's use its realms' callers and its realms, as the dynamic view's tests read them.
 const onyxSystems = () =>
   systemsOf(
     (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
@@ -111,7 +111,7 @@ function cameraOf({ eye, look }: Arrival, { width, height }: { readonly width: n
   };
 }
 
-// The postcard's worlds where they stand, in its plane as drawn, at their drawn size: they hold still (7v).
+// The postcard's worlds where they stand, in its plane as drawn, at their drawn size: they hold still.
 const placesOf = ({ postcard: { system, worlds, depth } }: Arrival) =>
   worlds.map((world, at) => {
     const out = { x: NaN, y: NaN, z: NaN };
@@ -147,8 +147,8 @@ const normalOf = ({ tilt, node }: StarSystem) => ({
   z: Math.cos(node) * Math.sin(tilt),
 });
 
-// Each runs every case's whole search two or three times: 2.5 s alone at load 60, past 5 s in the gate's parallel run (7v), past 20 s
-// at a load of 80 (lot 2's R2). Their own time is no cost bound; `holds in a file of 10,000 worlds` is.
+// Each runs every case's whole search two or three times: 2.5 s alone at load 60, past 5 s in the gate's parallel run, past 20 s
+// at a load of 80. Their own time is no cost bound; `holds in a file of 10,000 worlds` is.
 const WHOLE_SEARCHES = 60_000;
 
 describe("a system's arrival: the same address, the same postcard", () => {
@@ -183,7 +183,7 @@ describe("a system's arrival: the same address, the same postcard", () => {
         expect(postcard.worlds.length).toBeLessThanOrEqual(PLAN_MOST);
         // Fewer than the postcard's own, the same rules choose them again: never a cut of a larger one's spread.
         expect(postcard.worlds).toEqual(postcardWorldsWith(system, postcard.worlds.length, undefined));
-        // Each at its own size, its crowd's cap one scale on all (7v's design review, F4468).
+        // Each at its own size, its crowd's cap one scale on all.
         const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
         const scale =
           Math.max(...bodies.map(({ radius }) => radius)) / Math.max(...bodies.map(({ radius, own }) => own ?? radius));
@@ -213,7 +213,7 @@ describe("a system's arrival: the same address, the same postcard", () => {
   });
 });
 
-// 7v (Alexis, 2026-11-03): the arrival is the system's dynamic view, its star centred, its worlds held still, the nearest cut by the frame.
+// The arrival is the system's dynamic view, its star centred, its worlds held still, the nearest cut by the frame.
 describe("a system's arrival: a good angle", () => {
   it.each(ROWS)("on %s, centres %s's star on both screens", (name, id) => {
     const { system, systems } = caseOf(name, id);
@@ -232,8 +232,8 @@ describe("a system's arrival: a good angle", () => {
     expect(arrivalOf(system, systems).postcard.system.spin).toBe(0);
   });
 
-  // The near world, as the mock-up Alexis approved draws it (2026-11-03, 14:09): cut by the frame, large, its head never under the header,
-  // two others whole beside it at the least (the chief, after the design review's second pass); else every world whole round the star.
+  // The near world, as the approved mock-up draws it: cut by the frame, large, its head never under the header,
+  // two others whole beside it at the least; else every world whole round the star.
   it.each(ROWS)(
     "on %s, cuts %s's nearest world by the frame, 1.5 times every other's size or more, or stands it whole as the others",
     (name, id) => {
@@ -300,7 +300,7 @@ describe("a system's arrival: a good angle", () => {
     }
   });
 
-  // Every system with a world of a body's size comes to a view with one or more (7d3's guarantee), every one whose postcard can draw two with
+  // Every system with a world of a body's size comes to a view with one or more (the postcard's guarantee), every one whose postcard can draw two with
   // two or more, and nine in ten with every world their postcard can draw.
   it.each(Object.keys(SETS) as SetName[])(
     "on %s, draws every system with a world of a body's size, two of it where its postcard can, nine in ten the home's postcard's or more",
@@ -354,7 +354,7 @@ describe("a system's arrival: a good angle", () => {
     }
   });
 
-  // What gives a planetarium away (part-pipeline.md, Alexis 2026-11-02), as 7d6's `composed` reads it: a crowd, one on another, a row, the
+  // What gives a planetarium away (part-pipeline.md), as `composed` reads it: a crowd, one on another, a row, the
   // star among the marks; a near world may cover a farther one by half at most, which is depth.
   it.each(ROWS)(
     "on %s, reads %s as the view at rest's rules would, its star with its worlds: no crowd, pile or row",
@@ -498,8 +498,8 @@ describe("a system's arrival: a good angle", () => {
     expect(star.y).toBeCloseTo(screen.height / 2, 6);
   });
 
-  // 7v's design review (F4468; the chief: as the mock-up Alexis approved, the views page at 14:09, about six worlds): a dynamic view drew
-  // three of gnoswap's thirteen bodies, bound by the home's four and by the room its worlds keep to turn apart. Held still, they need only
+  // A dynamic view is not bound by the home's four bodies nor by the room its worlds keep to turn apart: gnoswap's thirteen
+  // are held still, so they need only
   // stand apart in space, each at its own size under its crowd's cap, the nearest 1.5 times every other's at rest.
   it(
     "draws up to twelve of a system's worlds in its dynamic view, gnoswap's five or more on Onyx, while the home's postcards keep four",
@@ -507,7 +507,7 @@ describe("a system's arrival: a good angle", () => {
       const systems = onyxSystems();
       const counts = systems.map((system) => arrivalOf(system, systems).postcard.worlds.length);
       expect(Math.max(...counts)).toBeLessThanOrEqual(PLAN_MOST);
-      expect(Math.max(...counts)).toBe(8); // past the six the mock-up had: the Plan's twelve (D415 era), the most Onyx's file lets stand
+      expect(Math.max(...counts)).toBe(8); // past the mock-up's six: the Plan's twelve, the most Onyx's file lets stand
       expect(counts.filter((count) => count >= 5).length).toBeGreaterThanOrEqual(5);
       const gnoswap = systems.find(({ id }) => id === "gnoswap");
       expect(gnoswap === undefined ? 0 : arrivalOf(gnoswap, systems).postcard.worlds.length).toBeGreaterThanOrEqual(5);
@@ -516,8 +516,8 @@ describe("a system's arrival: a good angle", () => {
     WHOLE_SEARCHES,
   );
 
-  // The system's card at the top left (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
-  // screen): g1magld5's ringed giant stood over it. No world of a dynamic view stands in its room, a fourth across and a fifth down.
+  // The system's card at the top left (the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
+  // screen): g1magld5's ringed giant would stand over it. No world of a dynamic view stands in its room, a fourth across and a fifth down.
   it(
     "keeps the system's card's room at the top left clear of every world it draws, on both screens, Onyx's too",
     () => {
@@ -548,8 +548,8 @@ describe("a system's arrival: a good angle", () => {
   });
 });
 
-// Alexis, 2026-11-03, option B (part 7p): a system's arrival reads in depth as the view at rest's postcards do, the nearer of its bodies
-// drawn larger, 1.5 times its neighbour or more, none at one height, none dropped to a dot; its worlds hold still (7v).
+// A system's arrival reads in depth as the view at rest's postcards do, the nearer of its bodies
+// drawn larger, 1.5 times its neighbour or more, none at one height, none dropped to a dot; its worlds hold still.
 describe("a system's arrival in depth (7p)", () => {
   // Each body at its drawn share of its size, where it stands `seconds` on, seen from the arrival's eye on the video's screen.
   const seenAt = (arrival: Arrival, seconds: number) => {
@@ -594,8 +594,8 @@ describe("a system's arrival in depth (7p)", () => {
     }
   });
 
-  // The review of 7p (R2): the arrival judges its worlds at their drawn size, their own at the least: none of them, so drawn, stands on its
-  // star's heart on arrival, on either screen (7d3 judges the heart there; through the turn a world may pass before its star).
+  // The arrival judges its worlds at their drawn size, their own at the least: none of them, so drawn, stands on its
+  // star's heart on arrival, on either screen (the postcard judges the heart there; through the turn a world may pass before its star).
   it.each(ROWS)(
     "on %s, keeps %s's star's heart clear of its bodies at their drawn size, own at the least, on arrival",
     (name, id) => {
@@ -623,8 +623,8 @@ describe("a system's arrival in depth (7p)", () => {
     for (const { radius } of seen) expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
   });
 
-  // The bodies each arrival drew before the dynamic view (7p's, measured on cd7e9729), by its system's id: one in ten at most draws fewer,
-  // where no angle stands a near world beside all 7d3 drew whole (7v: 5 of 80 and 2 of 23; most draw more, 2 where 7d3 drew 1).
+  // The bodies each arrival draws by the postcard's rule, by its system's id: one in ten at most draws fewer,
+  // where no angle stands a near world beside all the postcard drew whole (5 of 80 and 2 of 23; most draw more, 2 where it drew 1).
   const BEFORE: Record<SetName, string> = {
     "80 mixed systems":
       "n0:1 n1:1 n10:1 n11:2 n12:1 n13:1 n14:1 n15:2 n16:2 n17:1 n18:1 n19:1 n2:1 n20:1 n21:1 n22:2 n23:2 n24:1 n25:1 n26:1 n27:2 " +
@@ -674,7 +674,7 @@ describe("a system's arrival: no debris near a planet", () => {
   });
 });
 
-// Alexis, 2026-11-03 (7v): the ambient rocks are a depth cue of a system's dynamic view, as of the home's (7p): decor in front, from the
+// The ambient rocks are a depth cue of a system's dynamic view, as of the home's: decor in front, from the
 // view's own seed, off every world it draws, its label's room, and its star's heart.
 describe("a system's dynamic view's rocks (7v)", () => {
   // In front: nearer the eye than any world it draws; off a world's label's room (core's settle.ts PLACE, as rocks.ts keeps it); clear of
@@ -711,7 +711,7 @@ describe("a system's dynamic view's rocks (7v)", () => {
     expect(laid).toBeGreaterThanOrEqual(0.8 * cases.length);
   });
 
-  // The design review's second pass (F4468, the planetarium's tell): g1magld5's view stood blog, streak and agents in a column on one side,
+  // The planetarium's tell: g1magld5's view would stand blog, streak and agents in a column on one side,
   // 112 px across over 340 up at 1,728. Three worlds or more spread across no less than 40 degrees off the upright, as the home's columns.
   it(
     "stands no three of a dynamic view's worlds in a column at rest, their spread across within 40 degrees of the upright, Onyx's too",
@@ -737,8 +737,8 @@ describe("a system's dynamic view's rocks (7v)", () => {
     WHOLE_SEARCHES,
   );
 
-  // The chief, after the design review's second pass (F4468, the mock-up wins): the nearest is cut where two others stand whole beside it;
-  // a view of two stands both whole rather than one cut beside one (14 of the mixed set's views and 2 of Onyx's cut so before).
+  // The nearest is cut where two others stand whole beside it;
+  // a view of two stands both whole rather than one cut beside one.
   it(
     "never cuts the nearest beside a single other: a view of two stands both whole, Onyx's too",
     () => {
@@ -754,8 +754,8 @@ describe("a system's dynamic view's rocks (7v)", () => {
     WHOLE_SEARCHES,
   );
 
-  // The design review's second pass (F4468, the mock-up's rocks in front): at a system the hero gives way and its card stands at the top left,
-  // yet the rocks kept the hero's room and stood on the card; gnoswap's seven were all pebbles there, no near one in front.
+  // At a system the hero gives way and its card stands at the top left,
+  // so the rocks keep off the card, not the hero's room; gnoswap's seven are not all pebbles there, one near stands in front.
   it(
     "lays a dynamic view's rocks off the system's card, not the hero's room, and a near one in front of gnoswap",
     { timeout: WHOLE_SEARCHES },

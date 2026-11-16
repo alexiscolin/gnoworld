@@ -1,4 +1,4 @@
-// A link of the page that its router follows on a plain click (F259: the page changes, never reloads), drawn outside the router's tree: the
+// A link of the page that its router follows on a plain click (the page changes, never reloads), drawn outside the router's tree: the
 // Earth's pins, the rail. A click with a key held, or with another button, is the browser's: a new tab stays a new tab, Alt saves; one
 // another handler took is its own. React Router's links read a click the same way.
 

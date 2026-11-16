@@ -1,4 +1,4 @@
-// The page's link (F259): ui imports no router, so the app hands it its own once, at its root, and
+// The page's link: ui imports no router, so the app hands it its own once, at its root, and
 // an internal link then changes the page without reloading it. Without one, a plain anchor.
 import { createContext, use, type AnchorHTMLAttributes, type ReactNode } from "react";
 
@@ -9,7 +9,7 @@ export type PageLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: st
 type DrawLink = (props: PageLinkProps) => ReactNode;
 
 const PageLinkContext = createContext<DrawLink | null>(null);
-// Which of the site's own paths the app routes (F326): one it does not, a file of the site, stays a plain anchor.
+// Which of the site's own paths the app routes: one it does not, a file of the site, stays a plain anchor.
 const everyPath = () => true;
 const PagesContext = createContext<(href: string) => boolean>(everyPath);
 
@@ -44,7 +44,7 @@ export function LinkProvider({
 }
 
 /** An anchor: the page's link for a path from the site's root, a plain one for anything else, or
- * when it must `reload` the document, as an error page's way out does (F325). */
+ * when it must `reload` the document, as an error page's way out does. */
 export function Anchor({ reload = false, ...props }: PageLinkProps & { reload?: boolean }) {
   const link = use(PageLinkContext);
   const pages = use(PagesContext);

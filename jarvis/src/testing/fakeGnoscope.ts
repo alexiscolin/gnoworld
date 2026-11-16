@@ -1,6 +1,6 @@
 // A fake gnoscope for the client's tests: a real HTTP server on the loopback speaking MCP's streamable HTTP as gnoscope
-// did live on 2026-11-04 (no session, protocol 2025-06-18, a GET answered 405, a notification 202, JSON answers), its
-// tools those recorded that day unless a test gives others or pages of them; each request kept, and what a test
+// did live (no session, protocol 2025-06-18, a GET answered 405, a notification 202, JSON answers), its
+// tools those recorded live unless a test gives others or pages of them; each request kept, and what a test
 // asks of each answer.
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -9,7 +9,7 @@ import { bodyOf, onLoopback } from "./loopback.ts";
 
 const Recorded = z.object({ tools: z.array(z.record(z.string(), z.unknown())) });
 
-/** gnoscope's tools as its tools/list gave them on 2026-11-04. */
+/** gnoscope's tools as its tools/list gave them live. */
 export const recordedTools = () =>
   Recorded.parse(JSON.parse(readFileSync(new URL("./gnoscopeTools.json", import.meta.url), "utf8"))).tools;
 

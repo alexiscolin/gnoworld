@@ -1,4 +1,4 @@
-// The login's slice of the store (slice 4's merge 4a): who is logged in, where a login under way stands, why
+// The login's slice of the store: who is logged in, where a login under way stands, why
 // the last one stopped, and the link to Ergo. Its actions change only what changed, so a subscriber hears a
 // change once and nothing else.
 import type { Address } from "@gnoworld/schemas";

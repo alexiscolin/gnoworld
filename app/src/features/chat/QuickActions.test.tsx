@@ -19,8 +19,8 @@ import { PinnedBar } from "../world/Pinned.tsx";
 import { Dock } from "./Dock.tsx";
 import { QuickActions } from "./QuickActions.tsx";
 
-// The quick actions behind the composer's + (Alexis, 2026-11-08): a menu named "Add to the conversation", an image first, then the
-// conversation's own; what a later slice brings is greyed and says "coming soon" (ui's Menu).
+// The quick actions behind the composer's +: a menu named "Add to the conversation", an image first, then the
+// conversation's own; what is not built yet is greyed and says "coming soon" (ui's Menu).
 describe("the quick actions", () => {
   const draw = (element: ReactElement) => mount(<MemoryRouter>{element}</MemoryRouter>);
   const items = (box: HTMLElement) =>
@@ -98,7 +98,7 @@ describe("the quick actions", () => {
   });
 });
 
-// 9e-1 (Alexis, 2026-11-06): the world's pinned actions are pills of their own bar, each shown once vm/qfuncs confirms it;
+// The world's pinned actions are pills of their own bar, each shown once vm/qfuncs confirms it;
 // its card opens over the bar, prefilled, naming the realm and function the data says. NOT recorded: qfuncs' shape.
 describe("the quick actions of a world with pinned actions", () => {
   const DAO = "gno.land/r/gov/dao";

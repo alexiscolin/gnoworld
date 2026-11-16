@@ -1,4 +1,4 @@
-// What the hero counts (slice 7d6): the worlds the cosmos draws from a file, each once in its namespace as `systemsOf` holds them, and the
+// What the hero counts: the worlds the cosmos draws from a file, each once in its namespace as `systemsOf` holds them, and the
 // Earth beside them. Alone in its module, so the page that reads the file pays for nothing else of the cosmos.
 
 /** The worlds the cosmos draws from a file, and the Earth. */

@@ -1,4 +1,4 @@
-// The rooms on a phone (slice 5's 5b, U3): from 900 px down (the design system's one breakpoint, ChatScreen's) the room list and the
+// The rooms on a phone: from 900 px down (the design system's one breakpoint, ChatScreen's) the room list and the
 // direct messages sit behind one control in the chat's header, a drawer built on ui's Dialog (its focus trap, Escape,
 // and the focus given back to the control). The control says the unseen count in its name while the drawer is closed.
 import { Button, Chip, Dialog } from "@gnoworld/ui";

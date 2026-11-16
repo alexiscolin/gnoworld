@@ -1,4 +1,4 @@
-// Every planet of the universe in one draw (D401): a quad each, on its orbit by the GPU's clock, in its generated look's colours. A
+// Every planet of the universe in one draw: a quad each, on its orbit by the GPU's clock, in its generated look's colours. A
 // planet drawn as itself (near.ts) is hidden here, by its `aShown`, written only when that set changes.
 import { worldRecipe } from "@gnoworld/core";
 import {
@@ -88,7 +88,7 @@ export class Planets {
     this.mesh.frustumCulled = false;
   }
 
-  /** Lights the planets `lit` says by their index (none: every one), the rest dimmed as the frame's lens comes (D425). */
+  /** Lights the planets `lit` says by their index (none: every one), the rest dimmed as the frame's lens comes. */
   light(lit: ((index: number) => boolean) | undefined): void {
     lightEach(this.#lit, lit);
   }

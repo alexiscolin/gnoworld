@@ -5,7 +5,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { SITE } from "./sites.ts";
 
-// 4d's pins, through the real server and Ergo: the moderators (wallets moderator0 to 7, a worker's each, and moderator8
+// Pins, through the real server and Ergo: the moderators (wallets moderator0 to 7, a worker's each, and moderator8
 // for the cap's test alone, so none passes 30 requests a minute) pin a line, every reader sees it. Workers share the
 // rooms and so their pins: each test looks for its own by its words.
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;

@@ -22,8 +22,8 @@ vi.mock("@gnoworld/service/net", async (original) => ({
   send: (...args: Parameters<Send>) => (chainSend.now ?? (() => Promise.reject(new Error("no chain"))))(...args),
 }));
 
-// Part 4's wiring, on a real database and the real routes: which pool of owner reads each route uses (the display pool for what a page shows,
-// the action pool for every act), and what judging a mute's target tells (rights and privacy reviews).
+// The wiring, on a real database and the real routes: which pool of owner reads each route uses (the display pool for what a page shows,
+// the action pool for every act), and what judging a mute's target tells (rights and privacy).
 const ORIGIN = "https://gnoworld.test";
 const ROOM = "#acme-feed";
 const [OWNER, MOD, FREE, LINKED, MAKER] = [

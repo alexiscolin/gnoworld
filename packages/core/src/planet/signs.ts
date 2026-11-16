@@ -1,7 +1,7 @@
 // A world's stage and the signs that show it (ADR-0002 §10), pure: a stage reads the same on every class, and each class shows it in
 // its own form. Fixed per sign: what it means, where it shows, how it grows, its colour family. Free per world, from its seed: its pattern.
-// Vitality is matter and the people present are light, nothing else (F4110): a world at rest with nobody here carries no sign at all, so it
-// stays the render Alexis approved. Every sign means real data (§10). Only + - * / reach a form. Tier 1 (docs/REVIEW.md).
+// Vitality is matter and the people present are light, nothing else: a world at rest with nobody here carries no sign at all, so it
+// stays the approved render. Every sign means real data (§10). Only + - * / reach a form. Tier 1 (docs/REVIEW.md).
 import type { Anchor, Rgb } from "./anchors.ts";
 import { moreSeed } from "./choice.ts";
 import { share } from "./gauges.ts";
@@ -23,7 +23,7 @@ export interface WorldState {
 }
 
 interface LightSign {
-  /** How much of its surface is lit, 0 to 1: the share of people here now, and nothing else (F4110). None draws no light. */
+  /** How much of its surface is lit, 0 to 1: the share of people here now, and nothing else. None draws no light. */
   readonly extent: number;
   /** How lit it is, by the people here: a vitality never brightens a world. */
   readonly level: number;

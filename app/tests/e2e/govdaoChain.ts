@@ -1,5 +1,5 @@
 // GovDAO's chain as the journeys read it: its realm's page RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own
-// comment), and, for its pinned Vote (D271), the realm's functions, NOT recorded, written in the shape of vm/qfuncs.
+// comment), and, for its pinned Vote, the realm's functions, NOT recorded, written in the shape of vm/qfuncs.
 import { readFileSync } from "node:fs";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { realmType } from "@gnoworld/core";

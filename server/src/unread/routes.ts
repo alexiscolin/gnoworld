@@ -11,7 +11,7 @@ import type { Unread } from "./store.ts";
 /** An account's calls a minute: its counts, and its places (a page posts one every 5 s, so 12 a minute; 30 leaves room for reloads). */
 const COUNTS_PER_MINUTE = 60;
 const PLACES_PER_MINUTE = 30;
-/** Place writes a second across every account: the index is one synchronous connection, so per-account limits do not bound its load (F13770). */
+/** Place writes a second across every account: the index is one synchronous connection, so per-account limits do not bound its load. */
 const PLACES_PER_SECOND = 20;
 /** How long an account's count is kept before it is made again. */
 const KEPT_MS = 5_000;

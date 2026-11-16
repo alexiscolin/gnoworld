@@ -4,7 +4,7 @@ import { MEMBER } from "./scripted.ts";
 import { asAccount, OTHER, T, tagged } from "./talk.ts";
 import { chipOf, inThread, panel, threadField } from "./thread.ts";
 
-// How a thread looks (slice 4's 4d threads), on a computer's screen and a phone's: its chip under the root, and its panel
+// How a thread looks on a computer's screen and a phone's: its chip under the root, and its panel
 // beside the room (or in its place) with a long root, a reply with a mention and a reply to a reply. A scripted Ergo
 // (scripted.ts); the header, which names the test wallet, is masked.
 const SCREENS = [

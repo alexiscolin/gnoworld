@@ -134,7 +134,7 @@ describe("each allowed call, run by its own runner", () => {
       const question = asked();
       expect(await tools.run(call, question)).toEqual(said(`gnomcp ${name}`));
       expect(gnomcp.call.mock.calls.map((made) => made.slice(0, 2))).toEqual([[name, call.args]]);
-      // The call's own signal, which the question's leaving and the tool's time fire (F5290).
+      // The call's own signal, which the question's leaving and the tool's time fire.
       expect(gnomcp.call.mock.calls[0]?.[2]).toBe(question.signal);
       expect(cardRun).not.toHaveBeenCalled();
       expect(scope.call).not.toHaveBeenCalled();
@@ -214,7 +214,7 @@ describe("each allowed call, run by its own runner", () => {
   });
 });
 
-// D13920: a function's explanation reads the code alone, on one chain's profile.
+// A function's explanation reads the code alone, on one chain's profile.
 describe("the tools a function's explanation is offered", () => {
   const REALM = "gno.land/r/gov/dao";
   const READ = { profile: "gnoland", path: REALM, symbols: ["Vote"] };

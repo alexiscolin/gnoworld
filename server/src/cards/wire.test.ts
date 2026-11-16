@@ -14,7 +14,7 @@ import { makeStream } from "../stream/stream.ts";
 import { KEEP_MS, MAX_BYTES, MAX_ROWS } from "./expire.ts";
 import { cardsBoot, cardsFlow } from "./wire.ts";
 
-// L3 (docs/plans/link-previews.md §3, §7): the wiring, through startChat as main calls it: cards off do nothing; on, a line that passed
+// The wiring, through startChat as main calls it: cards off do nothing; on, a line that passed
 // moderation asks the reader once, a REDACT and an edit each take the card and tell it, and nothing reaches the reader before the pass.
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
@@ -161,7 +161,7 @@ describe("the cards in the chat", () => {
   });
 });
 
-// L3: the boot refuses cards without OpenAI's key (a card is checked or never shown), and the retention defaults are what the plan says.
+// The boot refuses cards without OpenAI's key (a card is checked or never shown), and the retention defaults hold.
 const CARDS_OFF = { enabled: false, readerUrl: undefined, thresholds: {} };
 const CARDS_ON = { enabled: true, readerUrl: "http://link_reader:8084", thresholds: {} };
 const MODERATION = {

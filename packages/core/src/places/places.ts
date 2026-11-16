@@ -1,4 +1,4 @@
-// The places of the data files and their addresses (slice 5's 5c; docs/decisions.md, 2026-10-29): in every universe the
+// The places of the data files and their addresses: in every universe the
 // cosmos and the Earth, then its worlds (the hubs) and its ecosystems. A place has the path its page lives at,
 // the default universe's unprefixed, and one canonical address, always under /net/<universe>.
 import { worldRoute } from "./route.ts";
@@ -70,7 +70,7 @@ export function placesOf(source: PlaceSource): Place[] {
   return places;
 }
 
-// The index sits on the list itself, under a symbol: no state of the module's own outlives the list (F412).
+// The index sits on the list itself, under a symbol: no state of the module's own outlives the list.
 const INDEX = Symbol("placeAt's index");
 type Indexed = readonly Place[] & { [INDEX]?: Map<string, Place> };
 

@@ -1,4 +1,4 @@
-// Tier 1 (docs/REVIEW.md). What follows `$help` in a realm page's link to its own function (slice 13, D13300), as gno's txlink writes it
+// Tier 1 (docs/REVIEW.md). What follows `$help` in a realm page's link to its own function, as gno's txlink writes it
 // (gno.land/p/moul/txlink/v0: `$help&func=<Name>` then Go's url.Values encoding), read into a call by name: a card shows it and signs
 // nothing alone, and no send amount ever comes from a link (`send`, and any `.` key, txlink's `.send` among them, is dropped).
 import { isExportedName } from "../chain/exportedName.ts";

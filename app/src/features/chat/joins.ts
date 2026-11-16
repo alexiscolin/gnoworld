@@ -1,4 +1,4 @@
-// Where the rooms this page follows stand on a connection (slice 4's 4b, moved out of link.ts): a JOIN went for a room,
+// Where the rooms this page follows stand on a connection: a JOIN went for a room,
 // its history went; and the rooms Ergo said, live, I am in.
 import type { IrcMessage } from "@gnoworld/core";
 import { groupsOf } from "./groups.ts";

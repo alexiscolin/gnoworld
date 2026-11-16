@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { migrations } from "../migrations.ts";
 import { makeRetention } from "../retention/retention.ts";
 
-// L3 (docs/plans/link-previews.md §4 "Storage growth"): the retention tick takes the cards' expiry in what the verdicts leave of its budget,
-// as it does the search index's, and a cards expiry that throws never stops the tick (the guard of search/guard.ts).
+// The retention tick takes the cards' expiry in what the verdicts leave of its budget, as it does
+// the search index's, and a cards expiry that throws never stops the tick (the guard of search/guard.ts).
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 
 describe("the retention tick and the cards", () => {

@@ -1,7 +1,7 @@
 import { build } from "vite";
 import { expect, test } from "./fixtures.ts";
 
-// The relief's shadows do not jump as the sun turns (D13012): the real planet code and maps, fixed world, camera, time and sun steps, on the
+// The relief's shadows do not jump as the sun turns: the real planet code and maps, fixed world, camera, time and sun steps, on the
 // software GPU (`reliefShadowsPage.ts`); the shader's output is the sun's share the shadows leave, and pixels changing over 50/255 are counted.
 // Sharp march: Moon 2132, rocky 10755; blurred: 32 and 1600. The limits sit far under the sharp ones, with room for rounding and a seed.
 const LIMITS = { moon: 400, rocky: 5000 } as const;

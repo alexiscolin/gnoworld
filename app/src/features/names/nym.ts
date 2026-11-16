@@ -1,4 +1,4 @@
-// What r/sys/namereg/v0's Register checks first of a name, read live on onyx-1 and gnoland-1 (recordings README): the form
+// What r/sys/namereg/v0's Register checks first of a name, read live on onyx-1 and gnoland-1: the form
 // `nym-[a-z]{5,13}\d{3}`, and a stem that does not start with a reserved prefix. The person types what follows `nym-`.
 // The reserved role names and the canonical collisions are the chain's answer, shown as its error, never guessed here.
 // Each pattern is built inside its function (typescript.md).

@@ -1,4 +1,4 @@
-"""Each failed job's end as an annotation of gate-ok, which Claude reads through the public check-runs API with no login (D13177).
+"""Each failed job's end as an annotation of gate-ok, which Claude reads through the public check-runs API with no login.
 Usage: ci_annotate.py [--ids] <folder>, the folder holding jobs.json (GitHub's list of the run's jobs) and <id>.log a failed job's
 log: --ids prints the failed jobs' ids, one a line; without it, one ::error line a failed job, ten at most."""
 import json

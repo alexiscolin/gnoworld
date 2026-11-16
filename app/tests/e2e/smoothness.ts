@@ -1,7 +1,7 @@
 import { installFramePump } from "./earthStage.ts";
 import type { Page } from "./fixtures.ts";
 
-// Smoothness, measured frame by frame (the 11-11 question: no lag, bounce, jump or jank). `record` runs in the page and samples at every
+// Smoothness, measured frame by frame (no lag, bounce, jump or jank). `record` runs in the page and samples at every
 // animation frame what moves; `analyse` reads the samples in Node. Absolute times are those of the journeys' software GPU: compare two
 // trees on one machine, the same flows, the same counts.
 

@@ -1,4 +1,4 @@
-// A question's cards (ADR-0002 §4, §5; D103): what its tools kept once 10d's checks passed, bounded by kind, handed
+// A question's cards (ADR-0002 §4, §5): what its tools kept once their checks passed, bounded by kind, handed
 // back with its answer. The loop makes one a question and gives each call a view of it that its own time ends, so a
 // card handed in past it is never kept.
 import type { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";

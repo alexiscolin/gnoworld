@@ -23,7 +23,7 @@ describe("StreamEvent", () => {
   });
 });
 
-// 4g: GET /api/verdicts's answer, the lines asked that hold a verdict, for a history older than the stream's replay.
+// GET /api/verdicts's answer, the lines asked that hold a verdict, for a history older than the stream's replay.
 describe("LineVerdicts", () => {
   const verdict = (msgid: string, state = "checked") => ({ msgid, state });
 

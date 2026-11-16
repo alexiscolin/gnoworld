@@ -1,4 +1,4 @@
-// The settings take effect at once (slice 8): each one marked on the page's root, where the stylesheets read reduced motion and the scene,
+// The settings take effect at once: each one marked on the page's root, where the stylesheets read reduced motion and the scene,
 // in its own chunk, reads the quality, the motion and the 3D on a phone, with no module shared between the first screen and the scene.
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";

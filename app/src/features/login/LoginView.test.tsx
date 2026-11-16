@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LoginView, type LoginViewProps } from "./LoginView.tsx";
 
-// The first screen has bytes to spare for no one: the name of the account (9f) is a chunk of its own, reached only by `import()`.
+// The first screen has bytes to spare for no one: the name of the account is a chunk of its own, reached only by `import()`.
 const FIRST_SCREEN = import.meta.glob<string>(
   ["./Login{View,Control}.tsx", "../account/AccountMenu.tsx", "../../shellHeader.tsx", "../../store/*.ts"],
   {
@@ -12,7 +12,7 @@ const FIRST_SCREEN = import.meta.glob<string>(
     eager: true,
   },
 );
-// Every source of the app, to follow the static imports of the first screen's files through the files they reach (F5847).
+// Every source of the app, to follow the static imports of the first screen's files through the files they reach.
 const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.test.{ts,tsx}"], {
   query: "?raw",
   import: "default",
@@ -104,8 +104,8 @@ describe("LoginView", () => {
     );
   });
 
-  // Alexis, 2026-11-07: the login's error stood beside the button; it is the button's own words now, short, the whole sentence its
-  // description and its status region's, which shows nothing on its own (D377).
+  // The login's error is the button's own words, short, the whole sentence its description and its status region's, which shows
+  // nothing on its own.
   it.each([
     [{ reason: "too_many" } as const, "Wait a minute", "Too many tries: wait a minute, then try again."],
     [{ reason: "locked" } as const, "Unlock Adena", "Unlock Adena, then try again."],

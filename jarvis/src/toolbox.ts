@@ -1,7 +1,7 @@
-// The tools Jarvis is offered in /ask (ADR-0002 §5; 10f's wiring) and the run that sends each call the allowlist let
+// The tools Jarvis is offered in /ask (ADR-0002 §5) and the run that sends each call the allowlist let
 // through to its own runner: gnomcp's reads, a skill's text, a place, an answer's button, and gnoscope's reads when it
-// is on. Only what reaches the person: give_digest and propose_action wait for 10k, where their cards have a place
-// (Alexis, 10i-1, D170).
+// is on. Only what reaches the person: give_digest and propose_action are offered by the digest route alone, where their
+// cards have a place.
 import type { Log } from "@gnoworld/service/log";
 import { z } from "zod";
 import { allowlist } from "./allowlist.ts";
@@ -40,7 +40,7 @@ export function toolbox(box: Box) {
     [...reads, box.skills.tool, box.places.definition, ...button, ...box.gnoscope.definitions],
     box.log,
   );
-  // Each told when its call's time is up or its asker left (D177, F5290).
+  // Each told when its call's time is up or its asker left.
   const read: Runner = (call, asked) => box.gnomcp.call(call.name, call.args, asked.signal);
   const scope: Runner = (call, asked) => box.gnoscope.call(call.name, call.args, asked.signal);
   const runners = new Map<string, Runner>([
@@ -51,7 +51,7 @@ export function toolbox(box: Box) {
     ...box.gnoscope.definitions.map(({ name }) => [name, scope] as const),
   ]);
   const run = (call: Call, asked: Asked) => runners.get(call.name)?.(call, asked) ?? refused();
-  // A function's explanation reads the code alone (D13920): gno_read on the one profile it is given, the skills, the places
+  // A function's explanation reads the code alone: gno_read on the one profile it is given, the skills, the places
   // and the button; no render, eval, history, activity, packages nor gnoscope, which read live state.
   const explain = (profile: string) => {
     const source = gnomcpTools({ chains: [profile], indexed: [] }).filter(({ name }) => name === "gno_read");

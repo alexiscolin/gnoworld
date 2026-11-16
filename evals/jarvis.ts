@@ -1,7 +1,7 @@
 // jarvis's real entry for an eval run (provider.ts), started as the image starts it, switched on, with the test
 // preload that moves the universes' nodes to the run's recorded node (jarvis/src/testing/outbound.ts), and gnomcp
 // given profiles of that node, which the preload cannot move; on a spent day's file, its budgets used up. Its stop waits
-// for it to exit, then removes its folder (10j's review, V6).
+// for it to exit, then removes its folder.
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

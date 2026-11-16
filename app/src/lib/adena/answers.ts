@@ -1,4 +1,4 @@
-// Adena's answers read as outside data (slice 9's plan, 9b): by their type, as the SDK tables them (bin/index.js:785-985),
+// Adena's answers read as outside data: by their type, as the SDK tables them (bin/index.js:785-985),
 // each ending a call as a success or a failure with its reason. Nothing here asks Adena anything but the call it is given.
 import { AnyChainId } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
@@ -23,8 +23,8 @@ const MAX_LOG = 2048;
 export const SITE = "gnoworld";
 
 /**
- * Each Adena method's success types, once, for the login and for a call. Adena answers GET_NETWORK
- * (app/recording/adena-recording.json, entry 1), so GET_NETWORK_SUCCESS is not taken (D230).
+ * Each Adena method's success types, once, for the login and for a call. The extension answers GET_NETWORK, whatever
+ * the SDK's table says, so GET_NETWORK_SUCCESS is not taken.
  */
 export const SUCCESSES = {
   AddEstablish: ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"],
@@ -119,13 +119,13 @@ export async function ask(run: () => unknown, method: Method): Promise<Answered>
   // "Already connected" is a failure in the SDK's table, and the SDK reads it as connected.
   if (named && (status === "success" || type === "ALREADY_CONNECTED")) return { ok: true, data };
   // A success type of any method, typed as a failure or by another method, has no business there: malformed, and it keeps
-  // no type, so a caller that branches on one must not read it as a real failure (F5666).
+  // no type, so a caller that branches on one must not read it as a real failure.
   const anySuccess = Object.values(SUCCESSES).some((types) => (types as readonly string[]).includes(type));
   if (status === "success" || anySuccess) return refusal("malformed");
   const failed = failure(type, code, message);
   const detail = detailOf(data);
   if (detail === undefined) return failed;
-  // With a hash, the reason is the chain's, never Adena's generic message (F5749); only a plain failure has one.
+  // With a hash, the reason is the chain's, never Adena's generic message; only a plain failure has one.
   const { hash, why } = detail;
   return failed.reason === "failed" ? { ...refusal("failed", type, why), hash } : { ...failed, hash };
 }

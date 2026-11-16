@@ -1,16 +1,16 @@
 import { expect, hydrated, scriptsAsked, test, type Page } from "./fixtures.ts";
 import { flightOf, goInPage, opened } from "./sceneStage.ts";
 
-// A station's page (8l): its world stands where a planet's does, goes with the page, and the page loads none of a station's code (the
-// engine draws none, D400); its crumb says "Station" and its project's site is a link out. On the gate's software GPU.
+// A station's page: its world stands where a planet's does, goes with the page, and the page loads none of a station's code (the
+// engine draws none); its crumb says "Station" and its project's site is a link out. On the gate's software GPU.
 const SLOW = { timeout: 90_000 };
 const STATION_VIEW = /\/assets\/stationView-[\w-]+\.js$/;
 
 test.describe.configure({ timeout: 180_000 });
 test.use({ viewport: { width: 1728, height: 1080 } });
 
-// The world the engine stands at: what a page's place asks of it. A station is a world like another to the engine (D400: none drawn round
-// the Earth for now), so its page is read as the place the camera goes to.
+// The world the engine stands at: what a page's place asks of it. A station is a world like another to the engine (none drawn round
+// the Earth), so its page is read as the place the camera goes to.
 const placed = async (page: Page) => {
   const { kind, id } = await flightOf(page);
   return kind === "world" ? id : undefined;

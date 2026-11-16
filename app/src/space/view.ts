@@ -48,14 +48,14 @@ export const stateOf = (space: Space): State => ({
   numbers: { eye: [0, 0, 0, 0, 0, 0, 1], shown: [] },
 });
 
-// Where the frames miss their beat unevenly the ratio steps down; where they have kept up long after, it steps back up (P106).
+// Where the frames miss their beat unevenly the ratio steps down; where they have kept up long after, it steps back up.
 function slow(space: Space, verdict: Verdict): void {
   const { keep, renderer } = space;
   if (verdict === "down") keep.ratioCap = lowered(renderer.getPixelRatio());
   else if (verdict === "up") keep.ratioCap = raised(renderer.getPixelRatio());
 }
 
-// The frames' pace (P106): each frame the screen gave is timed, and where the median cannot keep up the ratio steps down, for good.
+// The frames' pace: each frame the screen gave is timed, and where the median cannot keep up the ratio steps down, for good.
 // Not under automation, whose software GL is slow by nature.
 export function pace(space: Space, state: State, now: number): void {
   const { place, universe } = space;

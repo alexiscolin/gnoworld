@@ -1,4 +1,4 @@
-// A station's parts (part 7x; Alexis, 2026-11-04, "Avant la démo"): what the generator joins, each a plain shape the scene draws instanced,
+// A station's parts: what the generator joins, each a plain shape the scene draws instanced,
 // one draw a kind for every station at once. A part stands in the station's own frame, its spine up (+y), in the station's reach.
 import type { Point } from "../space/cell.ts";
 

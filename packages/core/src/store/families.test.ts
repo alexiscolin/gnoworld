@@ -28,7 +28,7 @@ describe("nameOf", () => {
   });
 });
 
-// Moved from app/src/features/realms/realmName.test.ts (the reviewer's M3: one short name for the page and Discover's card), its rows kept.
+// One short name for the page and Discover's card.
 describe("realmName", () => {
   it.each([
     ["gno.land/r/gnops/valopers", "gnops", "valopers"],

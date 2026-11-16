@@ -5,7 +5,7 @@ import { eachStory } from "../testing.tsx";
 import { ChatLayout } from "./ChatLayout.tsx";
 import * as stories from "./ChatLayout.stories.tsx";
 
-// 5q: the full-screen chat's frame (docs/DESIGN-SYSTEM.md, "Chat dock"; the video's frame 23.58.01): a header across,
+// The full-screen chat's frame (docs/DESIGN-SYSTEM.md, "Chat dock"; the video's frame 23.58.01): a header across,
 // then the column of worlds, the room sidebar, the conversation and the info panel. It places; the app fills the slots.
 const full = (
   <ChatLayout header={<div>head</div>} worlds={<div>worlds</div>} rooms={<div>rooms</div>} info={<div>info</div>}>
@@ -81,7 +81,7 @@ describe("ChatLayout", () => {
   });
 });
 
-// The app's full chat put its header over the columns from outside, by the regions' attributes (lot E, E4).
+// The app's full chat puts its header over the columns from outside, by the regions' attributes.
 describe("ChatLayout's band", () => {
   it("marks its frame when its header is a band over the columns, and leaves it unmarked otherwise", () => {
     const { container, rerender } = render(full);

@@ -376,7 +376,7 @@ got=$(printf 'protocol=https\nhost=evil.example\npath=alexis/proj.git\n\n' | env
 case $got in *"$TOKEN"*) fail "the credential helper gave the token to another host than github.com" ;; esac
 
 # 13. Two pushes at once (a slow gitleaks widens the window): each pushes the commit it scanned; a secret never rides on the
-# other's scan (the security review's race: a shared ref, pushed by name).
+# other's scan.
 mkdir -p "$t/glslow" && printf '#!/bin/sh\n/opt/homebrew/bin/gitleaks "$@"; rc=$?; sleep 3; exit $rc\n' >"$t/glslow/gitleaks" && chmod +x "$t/glslow/gitleaks"
 make "$t/agent-pr-slow" "$t/glslow:$t/bin:/opt/homebrew/bin:/usr/bin:/bin"
 g -C "$t/s" checkout -q -b race-clean origin/main && echo clean >"$t/s/r.txt" && g -C "$t/s" add r.txt && g -C "$t/s" commit -qm clean

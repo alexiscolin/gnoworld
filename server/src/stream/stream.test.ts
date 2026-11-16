@@ -86,7 +86,7 @@ describe("the verdicts' stream", () => {
     ]);
   });
 
-  // F890: the page reads which lines the stream will answer from the server's clock, which Ergo's server-time
+  // The page reads which lines the stream will answer from the server's clock, which Ergo's server-time
   // shares, never from its own.
   it("tells each connection the time it began following, after the events it replays", async () => {
     let clock = Date.parse("2026-10-26T12:00:00.000Z");
@@ -371,7 +371,7 @@ describe("the verdicts' stream, its green pass (3j)", () => {
 });
 
 describe("who has the stream open (D352)", () => {
-  // The batch's review (2026-11-07): a guest's page opens two streams, the Earth's and its chat's, and counted as two people.
+  // A guest's page opens two streams, the Earth's and its chat's, and counted as two people.
   it("tells the guests by their count, one visitor once whatever its streams, and the signed-in by their account alone, one account once, gone when closed", async () => {
     const stream = makeStream();
     streams.push(stream);
@@ -720,9 +720,9 @@ describe("the verdicts' stream, the max review", () => {
   });
 });
 
-// Link cards (slice 13, L3): their events go on the verdicts' stream, in its sequence of ids and its rings.
+// Link cards: their events go on the verdicts' stream, in its sequence of ids and its rings.
 const KEY = "a".repeat(64);
-// L3 (docs/plans/link-previews.md §3 step 4 and 5, §7 "stream/stream.ts"): a card's event goes on the verdicts' stream, in the verdicts' own
+// A card's event goes on the verdicts' stream, in the verdicts' own
 // sequence of ids, so a client that comes back after a drop is told the cards it missed, and a card of a room it cannot read never.
 
 const cardsSetup = (

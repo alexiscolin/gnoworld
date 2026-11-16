@@ -7,8 +7,8 @@ import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
 import { plug } from "../../slots.tsx";
 import { Arrival } from "./Arrival.tsx";
 
-// A place's arrival (slice 8; frames 23, 93): its first visit stamps the passport once, with the UTC day, and says so in one pill;
-// a world already stamped says only 8b's line, if any; a world this visit charted first says "First to chart", with its Share. Nothing is
+// A place's arrival (frames 23, 93): its first visit stamps the passport once, with the UTC day, and says so in one pill;
+// a world already stamped says only the expedition's line, if any; a world this visit charted first says "First to chart", with its Share. Nothing is
 // written before the device is read, and nothing over a device that could not be.
 vi.mock("../../topPill.tsx", () => import("../../../tests/pills.ts"));
 

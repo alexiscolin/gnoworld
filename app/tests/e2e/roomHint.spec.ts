@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, room } from "./scriptedRoom.ts";
 
-// 4f-n (docs/decisions.md, 2026-10-27, N3): @room notifies in an announcement or members room alone; the composer says,
+// @room notifies in an announcement or members room alone; the composer says,
 // as @room is typed or completed, whether it does here and why not. A scripted Ergo, an account in #games (open),
 // #news (announcement) a link away.
 test.describe("the composer's word on @room", () => {

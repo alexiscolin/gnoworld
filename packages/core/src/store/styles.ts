@@ -1,4 +1,4 @@
-// What a realm is for, read from its path, its functions and its imports (D373): ten styles, each a few readable rules. A realm may have
+// What a realm is for, read from its path, its functions and its imports: ten styles, each a few readable rules. A realm may have
 // several, or none; Lab is the counters and the tests, which Discover hides unless asked.
 import { nameOf } from "./families.ts";
 

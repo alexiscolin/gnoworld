@@ -1,4 +1,4 @@
-// The reads the server makes of a universe's public indexer over HTTP (slice 9g): the tip, the transactions after a place (the
+// The reads the server makes of a universe's public indexer over HTTP: the tip, the transactions after a place (the
 // poll's catch-up, a page at a time) and the realms deployed in the last 24 h (the Earth's count at start). The answer is outside
 // data: every call has its timeout and no redirect (service/net), an answer is read up to a size, goes through Zod, and a row that
 // fails is dropped and said. Every loop has its cap; a count that would stand on a capped history is no count (it fails).
@@ -14,7 +14,7 @@ import type { Watched } from "./message.ts";
 export type IndexerLog =
   "chain_catch_up_row_bad" | "chain_catch_up_page_halved" | "chain_catch_up_row_skipped" | "chain_history_row_bad";
 
-export interface IndexerOptions {
+interface IndexerOptions {
   url: string;
   watch: ReadonlyMap<string, Watched>;
   log: (what: IndexerLog) => void;

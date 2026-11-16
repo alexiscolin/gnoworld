@@ -43,7 +43,7 @@
     margin-block: 0;
   }
 
-  /* Where one is and how one looks (D424), side by side, a bar over the page's foot on a phone. */
+  /* Where one is and how one looks, side by side, a bar over the page's foot on a phone. */
   .bars {
     /* layout: the two pills side by side */
     display: flex;
@@ -78,7 +78,7 @@
 
     /* layout: the box the fill stands in */
     position: relative;
-    /* layout: the fill's own stacking, so its -1 stays over the pill's glass, cream (D369) */
+    /* layout: the fill's own stacking, so its -1 stays over the pill's glass, cream */
     isolation: isolate;
     /* layout: the phone's bar but for the ways' pill */
     flex: 1;
@@ -106,7 +106,7 @@
   }
 
   /* A step at each side of a view's name: the prototype's 16 px on a screen 390 px wide or more, a pixel less each 10 px narrower, 12 at the
-     least, so a bar 320 px wide holds its three names on one line (F4691). */
+     least, so a bar 320 px wide holds its three names on one line. */
   :is(.views, .ways) .view {
     /* raw: 16 px at 390 px wide, 12 at 350 and under */
     padding-inline: clamp(var(--space-xs), calc(var(--space-s) - (390px - 100vi) / 10), var(--space-s));
@@ -121,7 +121,7 @@
     gap: 6px;
   }
 
-  /* A level's mark, its word and its name's pill on one line (D444); on a narrow bar the name gives way, cut shorter. */
+  /* A level's mark, its word and its name's pill on one line; on a narrow bar the name gives way, cut shorter. */
   .view:has(.mark),
   .named {
     /* layout: the mark and the words, or the word and the name, on one line */
@@ -142,7 +142,7 @@
     transition: gap calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
-  /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it (D503). */
+  /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it. */
   .view[data-bare] .named {
     /* layout: no step left where the name stood */
     gap: 0;
@@ -183,7 +183,7 @@
     font-weight: 600;
   }
 
-  /* Each level's mark, colourless (D444): three stars for the galaxy, a sun in its ring for a system, a planet for a world. */
+  /* Each level's mark, colourless: three stars for the galaxy, a sun in its ring for a system, a planet for a world. */
   .mark {
     inline-size: var(--icon-s);
     aspect-ratio: 1;
@@ -294,7 +294,7 @@
     background: var(--color-primary);
   }
 
-  /* A world's page has no Map yet, and the full chat leaves space a level away (Alexis, 2026-11-09): the ways fade out there, their room
+  /* A world's page has no Map, and the full chat leaves space a level away: the ways fade out there, their room
      kept so the levels beside them stand still. */
   .ways {
     transition:
@@ -317,7 +317,7 @@
     transition: var(--transition-tint);
   }
 
-  /* One cream in the header, where one is (D444): the way one looks wears a faint fill. */
+  /* One cream in the header, where one is: the way one looks wears a faint fill. */
   .ways .view:is([aria-current="page"], [aria-pressed="true"]) {
     background: var(--color-fill-hover);
     color: var(--color-text);
@@ -392,7 +392,7 @@
     }
   }
 
-  /* The ways where the bar cannot hold them (F4691): a pill of their own at the scene's top right, under the header; a phone's bar at the
+  /* The ways where the bar cannot hold them: a pill of their own at the scene's top right, under the header; a phone's bar at the
      foot keeps its one row, a computer's levels the room. */
   @media (width < 1140px) {
     .ways {
@@ -413,7 +413,7 @@
     }
   }
 
-  /* The pill's one fill (D369): under the current view, sliding and resizing to the next one's words; behind the links, in the pill's own
+  /* The pill's one fill: under the current view, sliding and resizing to the next one's words; behind the links, in the pill's own
      stacking. */
   .fill {
     position: absolute;
@@ -463,7 +463,7 @@
       position: sticky;
       inset-block-start: 0;
       /* raw: above the page, the fixed plate and the full chat's 3, which runs under it to the window's top as it opens, stands and
-         shrinks back to its dock (D445), until the layers' tokens come with the scene */
+         shrinks back to its dock, until the layers' tokens come with the scene */
       z-index: 4;
       pointer-events: none;
     }
@@ -485,12 +485,12 @@
 
     .network {
       /* layout: the network is one cell of the end's row, not a row of its own: last, at the right, where the account's pill names it once
-         the session is known, so it never jumps sides (Alexis, 2026-11-07) */
+         the session is known, so it never jumps sides */
       grid-column: auto;
       order: 1;
     }
 
-    /* Logged in, the account's pill names the network (Network.tsx, D330). */
+    /* Logged in, the account's pill names the network (Network.tsx). */
     .pilled {
       display: none;
     }

@@ -20,7 +20,7 @@ import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gn
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds } from "./job.ts";
 import { migrations } from "../migrations.ts";
 
-// The worlds job (slice 7, 7c), one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
+// The worlds job, one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
 // names, and a capped file written beside and renamed over. Every fault leaves the last file whole and is logged by its kind.
 const A = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
 const B = "g1kfj7rq3cjqkael8rslpw4y6rlelhev4h0fswcx";
@@ -54,7 +54,7 @@ const doc = (path: string, imports: string[] = ["gno.land/p/nt/avl/v0"]): string
     types: [],
     funcs: [{ type: "", name: "Swap", crossing: true, signature: "", doc: "", params: [], results: [] }],
   });
-// The chain's calls, paged as onyx-1's indexer pages them (7k3): each realm's calls are transactions at heights from 100, sent by A and B
+// The chain's calls, paged as onyx-1's indexer pages them: each realm's calls are transactions at heights from 100, sent by A and B
 // in turn.
 const callsOf = (counts: Record<string, number>) =>
   pagedCalls(
@@ -209,7 +209,7 @@ describe("runWorlds", () => {
     expect(written(file).worlds[0]?.realms[0]?.deployerName).toBeNull();
   });
 
-  // Recorded through gnomcp on onyx-1, 2026-11-01: ResolveAddress of an address with no name, then .Name(), is refused by the chain
+  // Recorded through gnomcp on onyx-1: ResolveAddress of an address with no name, then .Name(), is refused by the chain
   // ("value method ...UserData.Name called using nil *UserData pointer"), an error of the query and no typed value.
   it("takes the chain's refusal for an address with no registered name as no name", async () => {
     const { file, outcome } = await run(chainRoutes([POOL], { eval: () => abciRefused("/std.UnauthorizedError") }));
@@ -338,8 +338,8 @@ describe("runWorlds", () => {
     });
   });
 
-  // F4109 (Alexis, 2026-11-02): a nature leans a world's class, so it is read once, from every realm's own names, and kept with the
-  // world as its first-seen time is: a stranger filling the file, whose lists the job then sheds, can no longer move another's class.
+  // A nature leans a world's class, so it is read once, from every realm's own names, and kept with the
+  // world as its first-seen time is: a stranger filling the file, whose lists the job then sheds, cannot move another's class.
   describe("a world's nature, read once", () => {
     const VICTIM = "gno.land/r/victim/game";
     // A cap the file passes only once the stranger's lists and then the quiet victim's are shed, found by trying.
@@ -686,7 +686,7 @@ describe("runWorlds", () => {
       expect(logged.filter(({ error }) => error === "list")).toEqual([{ event: "worlds_shed", error: "list" }]);
     }, 60_000);
 
-    // D346: of the recorded list's 743 realms, the chain's own 10 (r/sys) are no world's.
+    // Of the recorded list's 743 realms, the chain's own 10 (r/sys) are no world's.
     it("writes a file for the recorded list of 743 realms, the chain's own left out, under the default cap, with room to spare", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
         .split("\n")
@@ -697,7 +697,7 @@ describe("runWorlds", () => {
       expect(readFileSync(file).byteLength).toBeLessThan(WORLDS_MAX_BYTES / 4);
     });
 
-    // 7k3: the per-realm reads 7c wrote made 2,231 calls of this list, the indexer's 743 at 1.2 to 1.5 s each on onyx-1 (2026-11-04).
+    // Per-realm reads would make 2,231 calls of this list, the indexer's 743 at 1.2 to 1.5 s each on onyx-1.
     it("reads the recorded chain's 743 realms, 733 of them worlds', in 1,472 calls: the list, two reads a package, the one deployer's name, four of the indexer", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
         .split("\n")
@@ -818,7 +818,7 @@ describe("runWorlds", () => {
   });
 });
 
-// The count beside the file (7n2): the home's hero reads a few bytes for its number, so a phone asks nothing of the cosmos before View in
+// The count beside the file: the home's hero reads a few bytes for its number, so a phone asks nothing of the cosmos before View in
 // space. It is core's count of the file the pass writes, the one the scene's count uses, written with it or not at all.
 describe("the worlds' count, beside their file", () => {
   // Written out, so the job is pinned to the name nginx serves (deploy/web/nginx.conf) and not to a helper it calls.
@@ -951,7 +951,7 @@ describe("startWorlds", () => {
     expect(() => startWorlds({ ...base, file: fresh(), universe: bad })).toThrow(/worlds/);
   });
 
-  // Polls for a condition with a deadline far past what the gate's load needs, instead of one fixed wait (F3374).
+  // Polls for a condition with a deadline far past what the gate's load needs, instead of one fixed wait.
   const until = async (done: () => boolean): Promise<void> => {
     for (let waited = 0; !done() && waited < 10_000; waited += 10) await new Promise((r) => setTimeout(r, 10));
     expect(done()).toBe(true);
@@ -1169,7 +1169,7 @@ describe("the behaviours the pass states", () => {
   });
 });
 
-// Each realm's rollup (slice 13a), read and written after worlds.json in the same pass, from the job's own sqlite state.
+// Each realm's rollup, read and written after worlds.json in the same pass, from the job's own sqlite state.
 describe("the rollups, beside the worlds' file", () => {
   const timed = (
     calls: Parameters<typeof withBlocks>[0],

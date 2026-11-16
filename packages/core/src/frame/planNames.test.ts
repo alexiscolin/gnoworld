@@ -4,7 +4,7 @@ import { planOf } from "./plan.ts";
 import { boxOf, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, looksFrom, placeOf } from "./restLook.ts";
 
-// A Plan's names, pinned where StrykerJS found planNames.ts loose (8r, 2026-11-05): plan.test.ts reads them through planOf; these call
+// A Plan's names, pinned where StrykerJS found planNames.ts loose: plan.test.ts reads them through planOf; these call
 // namesOf on the Plans of systems named crowd<n>, found again by a search over crowd0 to crowd299 for the Plan seen straight over (and the eye turned aside by up to 0.6
 // of its distance) where each rule decides.
 describe("a name's box", () => {
@@ -63,7 +63,7 @@ describe("namesOf", () => {
     expect(host).toBeUndefined();
   });
 
-  // Found again for the Plan seen straight over (D415): crowd80's smallest is w10 (0.049); its largest unnamed, w2 (0.078), has no room; w12
+  // For the Plan seen straight over: crowd80's smallest is w10 (0.049); its largest unnamed, w2 (0.078), has no room; w12
   // and w1 (0.079) and w3 (0.077) are named.
   it("names the largest first, and gives the +N the place of the smallest named world that must go", () => {
     const { system, worlds, camera, lens } = crowdPlan(80);

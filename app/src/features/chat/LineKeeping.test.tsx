@@ -5,9 +5,8 @@ import { LineActions, type LineActionsProps } from "./LineActions.tsx";
 import { lineKeeping } from "./LineKeeping.tsx";
 import type { RoomKeeping } from "./RoomKeeping.ts";
 
-// 4d's part of a line's bar (docs/decisions.md, 2026-10-26: the bar holds Pin beside Reply and Thread; ⋯ holds Save,
-// Mark unread, Copy and, on one's own line, Edit and Delete). Apart from LineActions.test.tsx, which is 4c's: the
-// items a reader gets by what it is, an account or a guest, and by the right it holds, a moderator's to pin.
+// What a line's bar holds for keeping (Pin beside Reply and Thread; ⋯ holds Save, Mark unread, Copy and, on one's own
+// line, Edit and Delete), apart from LineActions.test.tsx: the items a reader gets by what it is, an account or a guest, and by the right it holds, a moderator's to pin.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const LINE: Line = {
@@ -43,12 +42,12 @@ const items = (markup: string) =>
   Array.from(markup.matchAll(/role="menuitem"[^>]*>(.*?)<\/button>/g), ([, inner = ""]) =>
     inner.replace(/<[^>]*>/g, ""),
   );
-// Another merge's items (Edit, Reply...) may join the menu: 4d's own are read in their order, after the copies and before a
-// delete, never as the whole list (4d's R17).
+// Other items (Edit, Reply...) may join the menu: these are read in their order, after the copies and before a
+// delete, never as the whole list.
 const own = (markup: string) =>
   items(markup).filter((item) => ["Save message", "Remove from saved", "Mark unread"].includes(item));
 // The toolbar's own buttons, apart from the menu's: each opening tag's aria-label. The quick reactions and Reply are
-// 4d's other half, held by LineActions.test.tsx, not read here.
+// held by LineActions.test.tsx, not read here.
 const barButtons = (markup: string) =>
   [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*aria-label="([^"]*)"/g)]
     .map((found) => found[1])
@@ -108,7 +107,7 @@ describe("a line's Pin", () => {
 });
 
 // What the server and the device take: a plain message of an account is pinned; a plain message is saved; any line may be
-// marked unread (4d's R9, R12).
+// marked unread.
 describe("what a line of another kind is offered", () => {
   const pin = { pinned: false, onPin: none, onUnpin: none };
   const guest: Line = { id: "G1", time: LINE.time, from: "guest-ab12cd", text: "hi", kind: "message" };
@@ -129,7 +128,7 @@ describe("what a line of another kind is offered", () => {
   });
 });
 
-// The acts a line's bar calls, each saying in the room's flash why it did not happen (4d's R9).
+// The acts a line's bar calls, each saying in the room's flash why it did not happen.
 describe("a line's keeping, bound to the room's", () => {
   const room = (over: Partial<RoomKeeping> = {}): RoomKeeping => ({
     unread: undefined,

@@ -1,8 +1,8 @@
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 
-// Slice 9g (frames 20 to 35 and 90 to 97): a line in the GovDAO room with its block and none before its event. The page is handed the stream's frames a server would send and waits on the stream's own response.
-// Guests only: no journey but arrival.spec.ts may open /w/govdao logged in (D210).
+// Frames 20 to 35 and 90 to 97: a line in the GovDAO room with its block and none before its event. The page is handed the stream's frames a server would send and waits on the stream's own response.
+// Guests only: no journey but arrival.spec.ts may open /w/govdao logged in.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const SINCE = `event: since\ndata: ${JSON.stringify({ time: "2026-11-05T12:00:00.000Z" })}\n\n`;
 const frame = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;

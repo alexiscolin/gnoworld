@@ -4,7 +4,7 @@ import { mount, one } from "../../../tests/mount.tsx";
 import { NoticeModes } from "./NoticeModes.tsx";
 import { hasNote, RoomMenu, visitorMenu } from "./RoomMenu.tsx";
 
-// 5q: what the room's name opens (the video's chevron): what once stood above the lines and in the rooms' column.
+// What the room's name opens (the video's chevron).
 
 describe("the room's menu", () => {
   it("says the room's note under the id the composer points at (a direct message's, 4e's U6)", () => {

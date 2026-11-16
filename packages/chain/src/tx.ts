@@ -1,4 +1,4 @@
-// One transaction by its hash (9d): what the call card follows after Adena signs, until the transaction is in a block. The
+// One transaction by its hash: what the call card follows after Adena signs, until the transaction is in a block. The
 // block's height, the call's returned value and its log come from the node's `tx`, never from the wallet's word. What the
 // realm wrote is text, cut at a size the card can hold, and never read as anything else.
 import { hexOf } from "@gnoworld/core";

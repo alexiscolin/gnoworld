@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Proposal, PROPOSAL_CAPS } from "./proposal.ts";
 
-// 5k: the rules every view of a proposal trusts, so they are proved here and nowhere else (F2963).
+// The rules every view of a proposal trusts, so they are proved here and nowhere else.
 const ok = { id: 15, title: "Raise the storage deposit cap", state: "active", yes: 33, threshold: 66.66 };
 const valid = (over: Record<string, unknown>) => Proposal.safeParse({ ...ok, ...over }).success;
 

@@ -4,9 +4,9 @@ import { indexer } from "../chain/indexerRoute.ts";
 import { violations } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// 5i's journey (plan §1, ADR-0002 §4): a realm's read functions are buttons; a click reads one call through vm/qeval, free, and
+// A realm's read functions are buttons; a click reads one call through vm/qeval (ADR-0002 §4), free, and
 // nothing opens Adena. The RPC is answered here as a browser would get it, from the recorded answers; whether a real RPC
-// answers a browser at all is F2841, so a refused read is a state, never a blocker.
+// answers a browser at all is not known, so a refused read is a state, never a blocker.
 const RPC = "https://rpc.onyx.testnets.gno.land/**";
 const REALM = "gno.land/r/gnoland/wugnot";
 const SUPPLY = EVALS.find((row) => row.chain === "onyx-1" && row.expr === "TotalSupply()")?.body ?? "";
@@ -23,7 +23,7 @@ interface Seen {
 interface Answers {
   functions?: unknown;
   evals?: Record<string, string>;
-  /** Every read but the height is cut off, as a browser whose RPC sends no CORS header sees it (F2841). */
+  /** Every read but the height is cut off, as a browser whose RPC sends no CORS header sees it */
   fail?: boolean;
 }
 
@@ -174,7 +174,7 @@ test.describe("a realm's read functions", () => {
     await chain(page, { fail: true });
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    // The read is tried again twice, with a backoff (D13973), before it is a state: about 3 s, said in words.
+    // The read is tried again twice, with a backoff, before it is a state: about 3 s, said in words.
     await expect(reads(page)).toContainText("Trying again…");
     await expect(reads(page).getByRole("status")).toContainText(/Try again/, { timeout: 15_000 });
     await expect(reads(page).getByRole("link", { name: "Open on gnoweb" })).toBeVisible();

@@ -45,7 +45,7 @@ void main() {
   float inside = 1.0 - 0.7 * smoothstep(${DISC.toFixed(1)}, ${(DISC * 6).toFixed(1)}, length(cameraPosition));
   vec3 lit = ${clouds} * uGain * inside;
   float dither = (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
-  // Through the flight's blur the frame is graded anew: written ungraded then, it shows the same in flight and at rest (D497).
+  // Through the flight's blur the frame is graded anew: written ungraded then, it shows the same in flight and at rest.
   gl_FragColor = vec4(max((uThrough > 0.5 ? ungrade(lit) : lit) + dither, 0.0), 1.0);
 }`;
 

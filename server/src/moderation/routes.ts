@@ -1,4 +1,4 @@
-// An owner's moderation over HTTP (owners' moderation, part 4b, D13936): POST /api/moderation/hide takes a line out of a room and /mute mutes an
+// An owner's moderation over HTTP: POST /api/moderation/hide takes a line out of a room and /mute mutes an
 // account in the room's world, with the bot's own means (the link's REDACT, the mutes' table and SAMODE): no table, schema or Ergo right is new.
 // Each comes from a listed Origin in JSON (guard.ts) with the login's session; the right (mayModerate), a mute's scope and its target are checked
 // before the link is asked anything; an account makes 30 requests a minute; each act is logged with the acting account, the owner and `as`.

@@ -1,4 +1,4 @@
-// Cells in rings (ADR-0002 §10; F3520). Ring r holds 6r cells, and each system a ray from the centre, a turn in [0, 1) that never changes.
+// Cells in rings (ADR-0002 §10). Ring r holds 6r cells, and each system a ray from the centre, a turn in [0, 1) that never changes.
 // By rank, each takes the first free cell along its ray, so an arrival only pushes others outward along their own rays and nothing piles
 // up. A ring at a time, each cell the best rank left among the rays through it, gives the same seats: every cell looked at seats a system,
 // so n seats cost n log n, whatever the rays, where walking each ray costs n^1.5, and n^2 if they are one ray.

@@ -21,7 +21,7 @@ import {
   type PreviewsOptions,
 } from "./job.ts";
 
-// The preview job (8f, slice 7's 7l): every six hours it reads the home page of each realm the team's data lists, through the chain's
+// The preview job: every six hours it reads the home page of each realm the team's data lists, through the chain's
 // RPC (the way out's host already), keeps its first part, has the moderation check read that part, and writes previews.json beside and
 // renamed over. One call at a time, each capped in time and size. No check, no capture; a page the check hides is never written.
 const GOVDAO = "gno.land/r/gov/dao";
@@ -507,7 +507,7 @@ describe("checkOf, the moderation's word on a capture", () => {
     expect(await checkOf(() => Promise.reject(new Error("down")), {})("a")).toBe("unchecked");
   });
 
-  // What main.ts builds from the server's settings: OpenAI's key and the thresholds of MODERATION_THRESHOLDS (R10).
+  // What main.ts builds from the server's settings: OpenAI's key and the thresholds of MODERATION_THRESHOLDS.
   it("asks OpenAI with the key the settings hold and decides by their thresholds", async () => {
     const asked: { url: string; init: RequestInit }[] = [];
     const openai =

@@ -1,4 +1,4 @@
-// Discover (D373): the palette's empty field. The shelves at the left, the cards in the middle (Today's rows, or a shelf's grid), and the
+// Discover: the palette's empty field. The shelves at the left, the cards in the middle (Today's rows, or a shelf's grid), and the
 // chosen realm's detail at the right. Loaded when the palette opens, in a chunk of its own.
 import type { StoreRow } from "@gnoworld/core";
 import { EmptyState, Stack } from "@gnoworld/ui";
@@ -11,7 +11,7 @@ import { Shelves } from "./Shelves.tsx";
 import type { SearchItem } from "../types.ts";
 import type { Discovery } from "./useDiscover.ts";
 
-export interface DiscoverProps {
+interface DiscoverProps {
   discovery: Discovery;
   universe: string;
   fly: (row: StoreRow) => void;

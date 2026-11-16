@@ -1,15 +1,12 @@
-// jarvis's reader (10u-g2, D13987): gnomcp in a container of its own. gnomcp speaks over stdio and ignores HTTPS_PROXY,
-// so this does two things with the standard library alone:
-//   - the bridge: one TCP port, and for each connection one gnomcp whose stdio is that connection, with an environment of
-//     its own making (a home in memory and nothing else: no inherited secret), ended with the connection; gnomcp's audit
-//     is filtered to tool, result and duration before it reaches the log;
-//   - the relay: every chain host gnomcp reads is named, in /etc/hosts, to one loopback address (127.0.0.2); the relay
-//     listens there on 443, reads the TLS ClientHello's server name (never the rest), refuses a name not on READER_HOSTS,
-//     and opens a CONNECT tunnel to that name through the way out, the ClientHello replayed first. The TLS stays between
-//     gnomcp and the host; the way out's list is what lets a host out.
+// jarvis's reader: gnomcp in a container of its own. gnomcp speaks over stdio and ignores HTTPS_PROXY, so this does two
+// things with the standard library alone:
+//   - the bridge: one TCP port, and a gnomcp per connection whose stdio is that connection, with an environment of its
+//     own making (a home in memory, no inherited secret); gnomcp's audit is filtered before it reaches the log;
+//   - the relay: every chain host is named, in /etc/hosts, to 127.0.0.2, where the relay reads the TLS ClientHello's server
+//     name (never the rest), refuses a name not on READER_HOSTS and opens a CONNECT tunnel to it through the way out. The
+//     TLS stays between gnomcp and the host; the way out's list is what lets a host out.
 //
-// Settings (compose.yaml): READER_LISTEN host:port, READER_GNOMCP and READER_CONFIG paths, READER_PROXY host:port,
-// READER_HOSTS comma-separated, READER_MAX connections at once.
+// Settings (compose.yaml): READER_LISTEN, READER_GNOMCP, READER_CONFIG, READER_PROXY, READER_HOSTS, READER_MAX.
 package main
 
 import (
@@ -93,8 +90,8 @@ func serve(ln net.Listener, cfg config) {
 	}
 }
 
-// bridge runs one gnomcp for one connection, as jarvis's own spawn did (jarvis/src/gnomcp.ts): the same flags, a home of
-// its own, its audit on stderr. Its environment is these two names alone.
+// bridge runs one gnomcp for one connection, with the flags of jarvis/src/gnomcp.ts, a home of its own and its audit on
+// stderr. Its environment is these two names alone.
 func bridge(conn net.Conn, cfg config) {
 	defer conn.Close()
 	home, err := os.MkdirTemp("", "reader-")
@@ -234,27 +231,27 @@ func shown(text string, max int) string {
 	return b.String()
 }
 
-// recorded keeps every byte read from the connection, so a hello read to learn its name can be replayed.
-type recorded struct {
+// helloBuffer keeps every byte read from the connection, so a hello read to learn its name can be replayed.
+type helloBuffer struct {
 	net.Conn
 	read bytes.Buffer
 }
 
-func (c *recorded) Read(p []byte) (int, error) {
+func (c *helloBuffer) Read(p []byte) (int, error) {
 	n, err := c.Conn.Read(p)
 	c.read.Write(p[:n])
 	return n, err
 }
 
 // Write drops what crypto/tls would answer a hello with (an alert): nothing is said to the client before the tunnel is.
-func (c *recorded) Write(p []byte) (int, error) { return len(p), nil }
+func (c *helloBuffer) Write(p []byte) (int, error) { return len(p), nil }
 
 var errNamed = errors.New("named")
 
 // serverName reads a TLS ClientHello from conn, by crypto/tls itself stopped at the hello, and answers its server name
 // and the bytes read; "" when there is none or it is no hello.
 func serverName(conn net.Conn) (string, []byte) {
-	rec := &recorded{Conn: conn}
+	rec := &helloBuffer{Conn: conn}
 	name := ""
 	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	_ = tls.Server(rec, &tls.Config{GetConfigForClient: func(h *tls.ClientHelloInfo) (*tls.Config, error) {

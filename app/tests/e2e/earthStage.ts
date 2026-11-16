@@ -97,7 +97,7 @@ async function scripted(
   return () => socket;
 }
 
-// Every frame the scene draws, from now on, kept in the page for `frames`: the camera, the ground's spin and lean, what faces the eye, the bubbles.
+// Every frame the scene draws, kept in the page for `frames`: the camera, the ground's spin and lean, what faces the eye, the bubbles.
 export interface Frame {
   ms: number;
   seconds: number;

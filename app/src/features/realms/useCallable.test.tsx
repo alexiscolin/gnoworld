@@ -5,7 +5,7 @@ import { mount } from "../../../tests/mount.tsx";
 import { CHAIN } from "../../../tests/callFixtures.ts";
 import { useCallable } from "./useCallable.ts";
 
-// 9e: what a reader of a realm's functions holds while the read is out. NOT recorded: the answer is never given.
+// What a reader of a realm's functions holds while the read is out. NOT recorded: the answer is never given.
 function Probe({ fetch }: { fetch: ChainFetch }) {
   const listing = useCallable(CHAIN.rpc, "gno.land/r/demo/profile", { fetch });
   return <output>{JSON.stringify(listing)}</output>;

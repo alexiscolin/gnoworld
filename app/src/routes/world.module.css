@@ -1,5 +1,5 @@
-/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26). The
-   plate's sections, its figures and its actions among them, are spaced by the plate itself (Panel.module.css, D470). */
+/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height. The
+   plate's sections, its figures and its actions among them, are spaced by the plate itself (Panel.module.css). */
 @layer components {
   .chat {
     /* layout: the chat's skeleton stands over it while it comes (features/chat/DockCover.tsx) */

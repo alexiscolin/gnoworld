@@ -1,8 +1,8 @@
-// POST /api/jarvis/digest (10k; ADR-0002 §4, "What a realm shows: a digest"): a realm's digest, the same for every
-// reader. Each check before any work, in this order: a listed site in JSON, the session (D195), the switch, the
+// POST /api/jarvis/digest (ADR-0002 §4, "What a realm shows: a digest"): a realm's digest, the same for every
+// reader. Each check before any work, in this order: a listed site in JSON, the session, the switch, the
 // account's rate, the body (a universe and a realm's path), a question of the account's quota taken; then jarvis, which
 // reads the realm on its universe's node, its answer passed on once the client's schema parsed it. The question is
-// given back when jarvis made nothing for it: its cache, its budget spent, its refusal (10k-1, D195).
+// given back when jarvis made nothing for it: its cache, its budget spent, its refusal.
 import type { Hono } from "hono";
 import type { Jarvis } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
@@ -25,7 +25,7 @@ export function digestRoutes(options: Options): Hono<Guarded> {
     const body = JarvisDigestRequest.safeParse(await json(c));
     if (!body.success) return refuse(c, "body", { account: who });
     // Taken before jarvis is asked, in the one statement that refuses it: a page that leaves, or asks many at once, pays.
-    // Given back to the day it was taken, whenever jarvis answers (U1).
+    // Given back to the day it was taken, whenever jarvis answers.
     const started = now();
     if (!quota.take(who, await named(who), started)) return refuse(c, "quota", { account: who });
     const called = await jarvis.digest(body.data, c.req.raw.signal);
@@ -36,7 +36,7 @@ export function digestRoutes(options: Options): Hono<Guarded> {
 }
 
 // The page never learns whether the model made its digest, which tells that someone read the realm lately: `made` is the
-// door's, for the quota (the second round's T3).
+// door's, for the quota.
 function shown(answer: JarvisMadeDigest): JarvisDigest {
   if (answer.status === "digest") {
     return { status: "digest", digest: answer.digest, proposal: answer.proposal, height: answer.height };

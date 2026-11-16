@@ -2,7 +2,7 @@ import { adena } from "./adena.ts";
 import { calls, callWallet, connect, done, openCall, openRealm, openRow, sound, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
-// 9e's journeys at 390 and 1280 px: a write of three fields opens its card under its row and signs its three texts; a page's
+// Journeys at 390 and 1280 px: a write of three fields opens its card under its row and signs its three texts; a page's
 // form calls (callCard.ts holds the stand-in chain's list, SetThree and Upload, and the page).
 const card = (page: Page) => calls(page).getByRole("article");
 const sent = (page: Page) => page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));

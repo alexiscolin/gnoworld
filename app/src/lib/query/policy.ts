@@ -1,4 +1,4 @@
-// How every source is asked (slice 13, D13973), the one way: the chain's RPC and indexer, the site's own files and the server's reads all pass
+// How every source is asked, the one way: the chain's RPC and indexer, the site's own files and the server's reads all pass
 // the per-host cap below, and the transport under them (packages/chain's fetchBytes) already holds the rest: one time limit and the query's
 // own signal (withinTime), a size cap, no redirect, an answer that is a kind and never a throw. Retries and what is never retried: client.ts.
 // No second endpoint exists to fall back to: app/data/universes.json lists one RPC and one indexer a chain.

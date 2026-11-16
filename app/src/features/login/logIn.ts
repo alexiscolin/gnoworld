@@ -1,4 +1,4 @@
-// The login's course in the page (slice 4's 4a): Adena read, the server's challenge for its chain, its text
+// The login's course in the page: Adena read, the server's challenge for its chain, its text
 // signed unchanged, the proof posted; each step in the store, each stop with its reason. Its parts come in,
 // so the tests give their own: lib's in the page.
 import type { connect, signLogin } from "../../lib/adena/adena.ts";
@@ -54,7 +54,7 @@ export async function readSession({ api, store }: SessionDeps): Promise<void> {
 
 const FIRST_WAIT_MS = 1000;
 const LONGEST_WAIT_MS = 30_000;
-// One round's asks: the first, five doublings and ten 30 s waits, some five minutes (O3B, D13978); a later round, after a rest, asks at
+// One round's asks: the first, five doublings and ten 30 s waits, some five minutes; a later round, after a rest, asks at
 // once and then every 30 s: a gesture just after a round's last ask asks again at once, about one ask in 26 s at most.
 const TRIES = 16;
 

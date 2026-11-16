@@ -1,4 +1,4 @@
-// The camera's one pose (D401, docs/plans/dive.md): what it looks at on the stage, how far, from which way, its up and its field of
+// The camera's one pose: what it looks at on the stage, how far, from which way, its up and its field of
 // view. Every view the cosmos knows and every page's body gives one; a flight and the reader's hand only ever change this.
 import type { Point } from "@gnoworld/core";
 

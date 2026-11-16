@@ -1,5 +1,5 @@
-// The demo's lights (D401): the suns as additive glows on quads turned to the eye, never under a few pixels, a sun seen near wearing a wide
-// warm bloom and a soft limb (D495); the dust and the stars as round points; orbits as faint lines; the page's plate drawn behind the planet.
+// The lights: the suns as additive glows on quads turned to the eye, never under a few pixels, a sun seen near wearing a wide
+// warm bloom and a soft limb; the dust and the stars as round points; orbits as faint lines; the page's plate drawn behind the planet.
 // Their colours are what the screen shows, added.
 import { INTRO_SHARE, LENS_DIM, NOISE } from "./planets.ts";
 
@@ -26,8 +26,8 @@ void main() {
   float core = max(aSun.w, floorPx * uPxK * d) * (0.35 + 0.65 * vIntro);
   vNear = smoothstep(2.0, 14.0, aSun.w / (uPxK * d));
   float halo = core * mix(11.0, 20.0, vNear);
-  // The quad stands square to the screen (never to the sun's own direction, whose disc the off-axis frustum stretches at the frame's edge,
-  // D516), its size kept to the same angle as the distance gives.
+  // The quad stands square to the screen (never to the sun's own direction, whose disc the off-axis frustum stretches at the frame's edge),
+  // its size kept to the same angle as the distance gives.
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
   float depth = max(-(viewMatrix * vec4(aPlace, 1.0)).z, 1e-3);
@@ -139,7 +139,7 @@ void main() {
 }`;
 
 export const LINE_VERTEX = "void main() { gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }";
-/** A line placed by its mesh (the orbit round a planet framed close, D458). */
+/** A line placed by its mesh (the orbit round a planet framed close). */
 export const RING_VERTEX = "void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 export const LINE_FRAGMENT =
   "uniform vec3 uColour; uniform float uGain; void main() { gl_FragColor = vec4(uColour * uGain, 1.0); }";

@@ -23,7 +23,7 @@ export function roomsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
       rememberRealms(value.sections);
       return result;
     },
-    /** A room anyone signed in makes on the Earth (POST /api/rooms, D394): the server's refusal comes back as the reason. */
+    /** A room anyone signed in makes on the Earth (POST /api/rooms): the server's refusal comes back as the reason. */
     make: (name: string): Promise<Result<MadeRoom>> =>
       call({ path: "/api/rooms", body: { world: "earth", name }, schema: MadeRoom }),
     /** A realm's room, made if the server has none yet (POST /api/rooms/realm); the room it answers is the one asked for. */

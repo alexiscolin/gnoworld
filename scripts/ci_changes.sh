@@ -1,7 +1,7 @@
 #!/bin/sh
 # ci_changes.sh: what a change calls for on GitHub (gate.yml's `changes` job). The job runs the copy of this script, of
 # records.sh's harness list, of docs/REVIEW.md's tiers and of the scripts below taken from the commit the change is judged
-# against, so a change cannot rewrite the detector that judges it (the red team's tests 9 and 10). It writes nothing.
+# against, so a change cannot rewrite the detector that judges it. It writes nothing.
 # Usage, from the checked-out change: ci_changes.sh <event> <base commit> <the base commit's tree>
 # It prints name=value lines: base, then each flag, true or false. What it cannot read calls for the job.
 set -eu
@@ -14,23 +14,18 @@ esac
 # Each path whole, NUL-separated: git quotes a name holding a tab, a quote or a backslash, which a prefix would then miss.
 git cat-file -e "$base^{commit}" || { echo "ci_changes.sh: no commit $base to judge against" >&2; exit 1; }
 changed=$(git diff -z --no-renames --name-only "$base" HEAD | tr '\0' '\n')
-# What reaches main by GitHub's merge met no hook of a clone (D13173), so the change is refused, whatever the event, when the tree
-# holds a path this disk may read as another, as pre-commit refuses one from the sandbox: a byte outside ASCII (F164), or a folder or
-# file name equal but for case to another (F151: Packages/evil/package.json lands as packages/evil/, a workspace pnpm installs).
-folded=$(git ls-tree -r -z --name-only HEAD | python3 -I -c '
-import sys
-seen = {}
-for p in [p for p in sys.stdin.buffer.read().split(b"\0") if p]:
-    if any(b > 0x7e for b in p):
-        print("a byte outside ASCII: " + p.decode("utf-8", "backslashreplace"))
-    parts = p.split(b"/")
-    for i in range(1, len(parts) + 1):
-        seen.setdefault(b"/".join(parts[:i]).lower(), set()).add(b"/".join(parts[:i]))
-for names in seen.values():
-    if len(names) > 1:
-        print("names equal but for case: " + " and ".join(sorted(n.decode("utf-8", "backslashreplace") for n in names)))
-') || { echo "ci_changes.sh: the tree's paths could not be read" >&2; exit 1; }
-[ -z "$folded" ] || { printf 'ci_changes.sh: a path this disk may read as another (F151, F164):\n%s\n' "$folded" >&2; exit 1; }
+# What reaches main by GitHub's merge met no hook of a clone, so the change is refused, whatever the event, when the tree
+# holds a path this disk may read as another, as pre-commit refuses one from the sandbox (the base's records.sh, whose `folded` it is).
+rc=0
+folded=$(. "$root/.githooks/records.sh" && folded ls-tree -r -z --name-only HEAD) || rc=$?
+if [ "$rc" != 0 ]; then
+	if [ "$rc" = 1 ] && [ -n "$folded" ]; then # a finding: folded prints one and exits 1; a records.sh that is missing or fails prints none
+		printf 'ci_changes.sh: a path this disk may read as another (F151, F164):\n%s\n' "$folded" >&2
+	else
+		echo "ci_changes.sh: the base's harness list (.githooks/records.sh) cannot check the tree's paths" >&2
+	fi
+	exit 1
+fi
 has() { [ "$all" = true ] || printf '%s\n' "$changed" | grep -Eq "$1"; }
 flag() { if "$@"; then echo true; else echo false; fi; }
 # Code: anything but prose, the harness and the linters' configs; a page under the sources is code.
@@ -49,7 +44,7 @@ tier1() {
 	[ "$(printf '%s\n' "$changed" | python3 -I "$root/scripts/speeds.py" --tier1 "$root" 2>/dev/null || :)" != other ]
 }
 # Each harness file of the base's list the change touches is declared on a line of a commit, `Harness-changed: <path> - why`, which
-# Alexis reads (F089, F5717), as the local merge check and pre-push's push of main asked before D13173; a list that cannot be read
+# a reviewer reads; a list that cannot be read
 # refuses.
 declared() { # $1: the path; stdin: the commit messages
 	while IFS= read -r line; do
@@ -75,7 +70,9 @@ echo "product=$(flag code)"
 echo "ts=$(flag has '^(app|server|jarvis|link-reader|packages)/|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|tsconfig[^/]*\.json|vitest\.config\.ts|eslint\.config\.ts)$')"
 echo "app=$(flag has '^(app|packages)/|^(package\.json|pnpm-lock\.yaml)$')"
 echo "gno=$(flag has '^gno/')"
-echo "deploy=$(flag has '^deploy/')"
+# The services' images build from deploy/ and from what their Dockerfiles copy that can change their isolation (the web image is static
+# files: app/src, packages/ui and packages/core, which holds no I/O, are not it).
+echo "deploy=$(flag has '^(deploy/|server/|jarvis/|link-reader/|packages/(service|chain|schemas)/|app/data/)|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$')"
 echo "ui=$(flag has '^packages/ui/')"
 echo "nginx=$(flag has '^(deploy/web/|app/|packages/)|^(scripts/check_nginx\.py|scripts/nginx\.sha256|pnpm-lock\.yaml)$')"
 echo "migrations=$(flag has '^server/src/|^scripts/check_migrations\.py$')"

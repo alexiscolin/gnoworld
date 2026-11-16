@@ -1,4 +1,4 @@
-// The answers Jarvis gave, kept 10 minutes and served again with no model call (D13985): a fixed ask to anyone who asks the
+// The answers Jarvis gave, kept 10 minutes and served again with no model call: a fixed ask to anyone who asks the
 // same at the same place, a person's own question to the same account in the same room with the same last line (an answer
 // may speak of its asker). Only an `answered` is kept. A room's answers go when a line of it is taken or edited. Memory
 // alone, 1,000 answers (8,000 code points each at most), the oldest forgotten first.

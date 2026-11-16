@@ -1,4 +1,4 @@
-// What the door's routes share (10g, 10k): the guard on a route's own path (a listed site in JSON, guard.ts), its refusals
+// What the door's routes share: the guard on a route's own path (a listed site in JSON, guard.ts), its refusals
 // typed and logged by route, then the first steps of a POST in order, the session, the switch and the account's rate a
 // minute; and jarvis's answer passed on, or its failure answered, each logged with what took how long. Logs name the
 // account by its HMAC alone (log.ts) and never what was asked.
@@ -49,7 +49,7 @@ interface Asked {
   readonly account: string;
 }
 
-/** Whether jarvis made nothing for a question, which is then given back (V4, Alexis; D195): its budget spent, switched
+/** Whether jarvis made nothing for a question, which is then given back: its budget spent, switched
  * off, its refusal, or a digest from its cache. */
 export function madeNothing<A extends { status: string; made?: boolean }>(called: Called<A>): boolean {
   if (!called.ok) return called.error === "refused";

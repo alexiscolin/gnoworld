@@ -18,7 +18,7 @@ import { planetRecipe, worldRecipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 
-// Which of the 24 a world is (slice 7, 7b2 and 7b4; ADR-0002 §3). All 32 bytes of the seed are taken (F3476), so the choice reads a second
+// Which of the 24 a world is (ADR-0002 §3). All 32 bytes of the seed are taken, so the choice reads a second
 // hash, and the anchor's look stands as the lab showed it: a world is `planetLook` at the anchor its seed chose.
 const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["rocky", 18],
@@ -47,7 +47,7 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["sub-Neptune", 14],
 ];
 const STRANGE: readonly Anchor[] = ["tidally locked", "shattered", "lava world", "two-faced", "hot giant"];
-// Each nature leans to anchors of its own (7b4, Alexis 2026-11-02): an NFT to the jewel-like ices, a token to the giants (ADR-0002 §3), an
+// Each nature leans to anchors of its own: an NFT to the jewel-like ices, a token to the giants (ADR-0002 §3), an
 // exchange to the seas, a DAO to temperate worlds, a game to fire and the strange ones. No name: its rule read 3 of 7 unseen registries.
 const LEANS = {
   nft: ["nitrogen ice", "grooved ice"],
@@ -78,11 +78,11 @@ const seeds = (count: number): Uint8Array[] =>
 const shareOf = (anchors: readonly Anchor[], wanted: readonly Anchor[]) =>
   anchors.filter((anchor) => wanted.includes(anchor)).length / anchors.length;
 
-// Exported names read on onyx-1 with gnomcp's gno_read, 2026-11-02.
+// Exported names read on onyx-1 with gnomcp's gno_read.
 const WUGNOT = ["Deposit", "Withdraw", "Render", "TotalSupply", "BalanceOf", "Allowance", "Transfer", "Approve"];
 const GOV_DAO = ["Render", "MustCreateProposal", "ExecuteProposal", "CreateProposal", "VoteOnProposal", "UpdateImpl"];
 const CONNECT4 = ["Offer", "Accept", "Reveal", "RevealSeed", "Play", "ClaimTimeout", "Resign", "Cancel", "Render"];
-// Read on onyx-1 with gnomcp's gno_read by part 7b4, 2026-11-02, top-level names only (the rules measured in reports/slice-7b4-natures.md):
+// Read on onyx-1 with gnomcp's gno_read, top-level names only:
 // r/g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx/fishnft, a GRC721; r/nym-moultest123/x/amm/v0; r/g1egtnurppfnh7exvzpwu3nrfyw57lmf4d375rl4/ggg_names_v1;
 // r/nt/grc20reg/v0, which registers tokens and is no name.
 const FISHNFT = [
@@ -178,7 +178,7 @@ describe("anchorOf", () => {
   });
 });
 
-// The minor class (7b4; ADR-0002 §3), a colour of gas or rock (Alexis, 2026-11-03, "les retirer"): its dominant's kind, no sea world's,
+// The minor class (ADR-0002 §3), a colour of gas or rock: its dominant's kind, no sea world's,
 // no green past a grey, no saturated blue under a world not blue itself, under a sea world within 25 of its lightness; by those anchors'
 // weights, on the second hash's bytes 26 and 27 as a word.
 const centreOf = (anchor: Anchor, ramp: 0 | 1): Lab => labOf(ROWS[anchor].palettes[ramp][1]);
@@ -190,7 +190,7 @@ const blue = (lab: Lab, margin = 0) =>
   Math.hypot(lab[1], lab[2]) >= 12 && hueOf(lab) >= -160 - margin && hueOf(lab) <= -60 + margin;
 const bluish = (anchor: Anchor) => blue(centreOf(anchor, 0));
 // Under a sea world or a dark giant (its minor matched in light at 0.6 only), a minor keeps near its dominant's light, ramp by ramp:
-// a jump reads as a hole, a pit or a pock (7b7).
+// a jump reads as a hole, a pit or a pock.
 const held = (dominant: Anchor) =>
   ROWS[dominant].sea !== undefined || (ROWS[dominant].banded === true && centreOf(dominant, 0)[0] < 20);
 const fitting = (minor: Anchor, dominant: Anchor) =>
@@ -246,7 +246,7 @@ describe("the minor class", () => {
       expect(Math.abs((counts.get(anchor) ?? 0) / total - (expected.get(anchor) ?? 0)), anchor).toBeLessThan(0.01);
   }, 30_000);
 
-  // The security review's nit: a class with no fitting minor would fall back to rocky, perhaps itself.
+  // A class with no fitting minor would fall back to rocky, perhaps itself.
   it("leaves every class a minor to draw, never itself", () => {
     for (const dominant of ANCHORS) {
       expect(
@@ -259,7 +259,7 @@ describe("the minor class", () => {
   });
 
   // A world of continents (a sea under 0.8, as the program splits them) keeps its own map under its minor: a rock's craters would ring
-  // its continents (7b7's design review); an archipelago's islands keep the minor's map, their only fine detail.
+  // its continents; an archipelago's islands keep the minor's map, their only fine detail.
   it("keeps a world of continents' own map under its minor", () => {
     for (const dominant of ANCHORS)
       for (let at = 0; at < 50; at += 1) {
@@ -269,7 +269,7 @@ describe("the minor class", () => {
       }
   });
 
-  // F4327, F4330 (7b6's design review): olive minors on gas giants read as moss, a bright blue one on a dark world as an ocean.
+  // Olive minors on gas giants read as moss, a bright blue one on a dark world as an ocean.
   it("brings no green to any world, never a sea world's colours, and no saturated blue to a world not blue itself, as drawn", () => {
     for (const [at, dominant] of [...ANCHORS, ...ANCHORS, ...ANCHORS].entries())
       for (let seed = 0; seed < 40; seed += 1) {
@@ -499,7 +499,7 @@ describe("worldLook", () => {
   });
 });
 
-// Alexis 2026-11-06: GovDAO is drawn by hand, sandy as Venus (the video's frames 4 and 16); every other world, Bubble included ("Bubble 100 %
+// GovDAO is drawn by hand, sandy as Venus (the video's frames 4 and 16); every other world, Bubble included ("Bubble 100 %
 // générée"), is what its seed draws.
 describe("the world whose class is fixed by hand", () => {
   it("makes GovDAO a cloud deck, the Venus kind, read from the haze map", () => {

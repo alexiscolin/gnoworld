@@ -3,8 +3,8 @@ import { accountPill, connectButton } from "./account.ts";
 import { axeOf } from "./axe.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// Slice 9h (frames 90 to 97): the arrival banners against the real server. A world is charted once a run, so this file owns
-// the first chart of /w/govdao (D210): no other journey opens it logged in. Serial; it waits on the page's own events.
+// Frames 90 to 97: the arrival banners against the real server. A world is charted once a run, so this file owns
+// the first chart of /w/govdao: no other journey opens it logged in. Serial; it waits on the page's own events.
 test.describe.configure({ mode: "serial" });
 
 const violations = async (page: Page) => (await axeOf(page).analyze()).violations;
@@ -16,7 +16,7 @@ const answered = (page: Page, method: "POST", url: string) =>
   page.waitForResponse((r) => r.url().endsWith(url) && r.request().method() === method);
 
 // The first signals the server tells a reader of the world's main room, read up to the stream's `since`, which follows its
-// replay: the page's own source of who is first (D215).
+// replay: the page's own source of who is first.
 const told = (page: Page, world: string) =>
   page.evaluate(async (slug) => {
     const reader = (await fetch(`/api/stream?rooms=${encodeURIComponent(`#${slug}`)}`)).body?.getReader();
@@ -73,7 +73,7 @@ test("a later account sees who charted it, and no banner", async ({ page }) => {
   await expect(chartBanner(page)).toHaveCount(0);
 });
 
-// D218: the journeys' server charts GovDAO alone (FIRST_TO_CHART_WORLDS, api.mjs), so Bubble, which the other journeys open,
+// The journeys' server charts GovDAO alone (FIRST_TO_CHART_WORLDS, api.mjs), so Bubble, which the other journeys open,
 // is never charted: no banner and no plate's line, whoever logs in first.
 test("the worlds the other journeys open are never charted: no banner and no first, whoever logs in", async ({
   page,

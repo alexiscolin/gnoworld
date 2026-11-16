@@ -99,7 +99,7 @@ describe("IconButton", () => {
     expect(shown.some((b) => b.pressed === "true") && shown.some((b) => b.count === "99+")).toBe(true);
   });
 
-  // The composer's format bar set its tools' look and hid its lists from outside, by their place in its row (lot E, E4).
+  // The composer's format bar sets its tools' look and hides its lists from outside, by their place in its row.
   it("as a bar's tool, wears the tool look, and, dropping, marks its anchor so a narrow bar goes without it", () => {
     const { rerender } = render(<IconButton icon="list-bulleted" label="Bulleted list" />);
     const button = () => screen.getByRole("button", { name: "Bulleted list" });

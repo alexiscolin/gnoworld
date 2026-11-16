@@ -1,4 +1,4 @@
-// The plate's squares fill their last row (Alexis, 2026-11-12): four to a row of twelve columns, two on a narrow plate; the squares of a last
+// The plate's squares fill their last row: four to a row of twelve columns, two on a narrow plate; the squares of a last
 // row that is not full share its width, so a square alone there takes the whole row.
 
 const WIDE_ROW = 4;

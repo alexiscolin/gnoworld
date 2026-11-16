@@ -6,7 +6,7 @@ import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 import { axeOf } from "./axe.ts";
 
-// How a world's rooms look (slice 4's 4b, the composer 4c's), on a computer's screen and a phone's: the page's
+// How a world's rooms look, on a computer's screen and a phone's: the page's
 // socket answered by a scripted Ergo (scripted.ts), so its lines, topic and people are the same each run.
 // The nick Ergo's welcome gives a guest, whatever it drew: the page names itself by it.
 const GUEST = "guest-zzzzzz";
@@ -41,7 +41,7 @@ test.describe("a world's rooms, as they look", () => {
     });
   }
 
-  // Slice 5's 5b: on a phone the rooms sit behind the Rooms control, in a drawer over the conversation.
+  // On a phone the rooms sit behind the Rooms control, in a drawer over the conversation.
   test("with the rooms' drawer open, on a phone's screen", async ({ page }) => {
     await asGuest(page, 390);
     await page.getByRole("button", { name: "Rooms" }).click();
@@ -66,7 +66,7 @@ test.describe("a world's rooms, as they look", () => {
     });
   });
 
-  // 4d: a line that mentions the account, set apart by a word and amber (docs/DESIGN-SYSTEM.md, "about me"); another
+  // A line that mentions the account, set apart by a word and amber (docs/DESIGN-SYSTEM.md, "about me"); another
   // account's mention shown plain, as its short address. The account's own address is drawn at the server's start.
   test("sets a line that mentions the account apart, its mention too, on a computer's screen", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -141,7 +141,7 @@ async function sixtyLines(page: Page): Promise<() => WebSocketRoute> {
   };
 }
 
-// 4b's pre-merge (/code-review): a room opens on its newest line, and keeps the newest in view as lines come.
+// A room opens on its newest line, and keeps the newest in view as lines come.
 test("opens a room on its newest line, and keeps the newest in view as lines come", async ({ page }) => {
   const ergo = await sixtyLines(page);
   ergo().send(
@@ -150,7 +150,7 @@ test("opens a room on its newest line, and keeps the newest in view as lines com
   await expect(page.getByText("A live line")).toBeInViewport();
 });
 
-// 4c's green pass: a reader who scrolled up is left where they are as lines come (4b's useNewestInView).
+// A reader who scrolled up is left where they are as lines come (useNewestInView).
 test("leaves a reader who scrolled up where they are as a line comes", async ({ page }) => {
   const ergo = await sixtyLines(page);
   await page.getByRole("list", { name: "Messages" }).evaluate((list) => {
@@ -166,7 +166,7 @@ test("leaves a reader who scrolled up where they are as a line comes", async ({ 
   await expect(page.getByText("A live line")).not.toBeInViewport();
 });
 
-// /code-review (F783): a quote reads as one, set apart from the sender's own words.
+// A quote reads as one, set apart from the sender's own words.
 test("sets a quoted line apart from the sender's own words", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, GUEST, { history: [["q1", "2026-10-25T10:00:00.000Z", "> what was said before"]] });
@@ -183,7 +183,7 @@ test("sets a quoted line apart from the sender's own words", async ({ page }) =>
   expect(look.padding).not.toBe("0px");
 });
 
-// F812: an address of the right checksum ground to shorten as a member's does holds no key, so joins no room: a
+// An address of the right checksum ground to shorten as a member's does holds no key, so joins no room: a
 // mention of it shows whole, through the store and the page, beside the member it copies, shortened. Ergo's
 // scripted welcome names the page ACCOUNT, whose short form the ground address copies; NAMES lists it.
 test("shows a mention of an account not in the room whole, beside the member it copies shortened", async ({ page }) => {
@@ -201,7 +201,7 @@ test("shows a mention of an account not in the room whole, beside the member it 
   await expect(mentions.nth(1)).toHaveAttribute("title", ACCOUNT);
 });
 
-// F816: the browser's engine reads the mentions as the server counts them. Chromium 156's V8 (14.6) misreads a
+// The browser's engine reads the mentions as the server counts them. Chromium 156's V8 (14.6) misreads a
 // character class just before `$` for a letter past the BMP, which made 𐐀@<address> a mention here alone.
 test("draws no mention after a letter past the BMP, in the browser's own engine", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
@@ -213,7 +213,7 @@ test("draws no mention after a letter past the BMP, in the browser's own engine"
   await expect(lines(page).locator("[data-mention]")).toHaveCount(1);
 });
 
-// F814: a line that is a list holds list items of its own; a room's lines are the Messages list's own items.
+// A line that is a list holds list items of its own; a room's lines are the Messages list's own items.
 test("counts a line that is a list as one line of the room", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, GUEST, {

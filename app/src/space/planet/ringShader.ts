@@ -56,7 +56,7 @@ float spokesAt(float reach, float phi, float small) {
 `;
 
 // Past what a pixel can hold the fine lines go, or they beat against the pixels as they turn: a ring seen small is its smooth mean. The
-// world's shadow dims the ring, never cuts it: the rest is what the ice scatters (a hole in a ring was a bug).
+// world's shadow dims the ring, never cuts it: the rest is what the ice scatters.
 export const RING_FRAGMENT = /* glsl */ `
 uniform sampler2D ringMap;
 uniform vec3 sun;

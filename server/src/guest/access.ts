@@ -1,11 +1,11 @@
-// Where a guest may speak (D430): the server is the only gate, since Ergo delivers a RELAYMSG whatever a room's modes say
+// Where a guest may speak: the server is the only gate, since Ergo delivers a RELAYMSG whatever a room's modes say
 // (+m and an unvoiced bot included). A room the server made, spelt as it made it, of an open type, listed and not archived is
 // written in; an announcement room is read; any other, a room that is not its own, or one that does not exist, is nothing.
 import { listed, roomType, type Typed } from "../rooms/types.ts";
 
 export type Access = "write" | "read" | undefined;
 
-/** What a guest may do in a room. An Earth player room (#earth/<name>, D394) is typed by no file, so it is open: written in. */
+/** What a guest may do in a room. An Earth player room (#earth/<name>) is typed by no file, so it is open: written in. */
 export function guestAccess(
   roles: Typed,
   archived: (room: string) => boolean,

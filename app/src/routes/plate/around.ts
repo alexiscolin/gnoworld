@@ -1,4 +1,4 @@
-// What a place is connected to (D566, "around it"): a realm's imports and what imports it, from the worlds' file and the rollup; a hub's
+// What a place is connected to: a realm's imports and what imports it, from the worlds' file and the rollup; a hub's
 // neighbouring hub worlds and its own live realms. A hub is named and linked as its page; any other world by its id's last segment and its
 // first realm's view. The nodes are the network's dots and its rows; their path is where one leads. Worked out once for a file and a place.
 import { hubWorldOf, labelName, neighboursOf, realmName, REALM_PREFIX, type Neighbour } from "@gnoworld/core";

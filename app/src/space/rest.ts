@@ -1,4 +1,4 @@
-// When the loop may stop asking for frames altogether (P102): the view is still, with nothing easing, flying or fading, and has been for a
+// When the loop may stop asking for frames altogether: the view is still, with nothing easing, flying or fading, and has been for a
 // while. It sleeps till an input or a change wakes it, or a timer: the slowest orbit's half pixel, and a heartbeat for what no wake tells.
 import type { Need } from "./redraw.ts";
 
@@ -7,7 +7,7 @@ export const CALM_MS = 5000;
 /** The longest a sleeping loop goes without looking: data that changes the scene with no call to say so shows within it. */
 export const HEARTBEAT_MS = 2000;
 /**
- * The pace of a view that is still while something on it moves by itself (D13013): 15 frames a second. A planet's turn, clouds and a sun's
+ * The pace of a view that is still while something on it moves by itself: 15 frames a second. A planet's turn, clouds and a sun's
  * face are slow, so a quarter of the 60 Hz cost still shows them smooth (equal steps), where sleeping froze them.
  */
 export const LIVELY_MS = 1000 / 15;

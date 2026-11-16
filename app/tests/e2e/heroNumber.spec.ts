@@ -3,7 +3,7 @@ import { COUNTED, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 import { countShifts, running, shifted, worldsDrawn } from "./sceneStage.ts";
 
-// The hero's number (7n, 7n2): the worlds the cosmos draws, read from the count the job writes beside the worlds' file, so a home whose scene
+// The hero's number: the worlds the cosmos draws, read from the count the job writes beside the worlds' file, so a home whose scene
 // does not run keeps it (no WebGL; this browser's software GPU without `?test-gpu`) and a phone asks nothing of the cosmos before View in space.
 // The host serves neither file (the job writes them): each test serves Onyx's recorded file and its count.
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
@@ -95,7 +95,7 @@ for (const width of [390, 1280]) {
   });
 }
 
-// The phone rule (7n2): a phone gets nothing of the cosmos until View in space, the worlds' file included, and keeps its number all the same.
+// The phone rule: a phone gets nothing of the cosmos until View in space, the worlds' file included, and keeps its number all the same.
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

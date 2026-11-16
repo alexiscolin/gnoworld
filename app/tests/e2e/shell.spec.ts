@@ -5,7 +5,7 @@ import { adena } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { UPDATING } from "./sites.ts";
 
-// The page's shell (slice 5's 5a: U5, F355): a 16 px gutter on every page, the home link and the account (one pill, 8p) on
+// The page's shell: a 16 px gutter on every page, the home link and the account (one pill) on
 // one header row, and an update notice that covers nothing the keyboard reaches.
 const GUTTER = 16;
 const WIDTHS = [390, 1280] as const;
@@ -98,7 +98,7 @@ for (const width of WIDTHS) {
             });
           }),
         );
-        // The search control is the default control, 44 px (F5967).
+        // The search control is the default control, 44 px.
         const search = await page.getByRole("button", { name: "Search", exact: true }).boundingBox();
         expect(search?.width).toBeGreaterThanOrEqual(44);
         expect(search?.height).toBeGreaterThanOrEqual(44);

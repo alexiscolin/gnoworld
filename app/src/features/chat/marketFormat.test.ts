@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { directionOf, dollars, tenthsOf } from "./marketFormat.ts";
 
-// The prices as frame 6 wrote them, restored from the home's old row (its tests, as plain calls).
+// The prices as frame 6 writes them.
 describe("the market card's formats", () => {
   it.each([
     [67123.456, "67,123"],

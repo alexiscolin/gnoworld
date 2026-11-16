@@ -1,4 +1,4 @@
-// A plate's hours (8g): the world's chat hours, asked once the page runs; the read is a chunk of its own (hours.ts).
+// A plate's hours: the world's chat hours, asked once the page runs; the read is a chunk of its own (hours.ts).
 import type { PresenceHours } from "@gnoworld/schemas/indexer";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { queryClient } from "../../lib/query/client.ts";

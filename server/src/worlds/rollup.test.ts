@@ -16,7 +16,7 @@ import { fitted, importersOf, readRollup, writeRollups } from "./rollup.ts";
 import { PEOPLE_TABLES } from "./personTables.ts";
 import { ROLLUP_TABLES, rollupStore } from "./rollupStore.ts";
 
-// A realm's rollup (slice 13a): the worlds job reads the chain's calls above the last height it kept, buckets them by UTC day from the
+// A realm's rollup: the worlds job reads the chain's calls above the last height it kept, buckets them by UTC day from the
 // blocks' own times (never a height-to-date line), keeps its state in sqlite, and writes one capped file per realm beside worlds.json.
 const PATH = "gno.land/r/gnops/valopers";
 const OTHER = "gno.land/r/b/other";
@@ -103,7 +103,7 @@ describe("the indexer's words for the rollup (onyxRollup.json, recorded from ony
     });
   });
 
-  // The worlds file's whole-chain read pays for neither field (F13010): 212 B a transaction with them, 180 B without.
+  // The worlds file's whole-chain read pays for neither field: 212 B a transaction with them, 180 B without.
   it("asks each call's success and function for the rollup alone", () => {
     for (const ask of [callsFirst(2, true), callsAbove(7, 2, true), callsInBlock(9, true)]) {
       expect(ask.query).toMatch(/\bsuccess\b/);
@@ -297,7 +297,7 @@ describe("rollupStore, the rollup's state in sqlite", () => {
     expect(RealmRollup.safeParse(file).error).toBeUndefined();
   });
 
-  // Anyone can send a failed call naming any exported-looking function: only a call that ran names one the realm has (F13003).
+  // Anyone can send a failed call naming any exported-looking function: only a call that ran names one the realm has.
   it("counts the functions of successful calls alone, and shows a failed call's as it was named", () => {
     const { rollups } = store();
     rollups.add(
@@ -388,7 +388,7 @@ describe("rollupStore, the rollup's state in sqlite", () => {
     again.close();
   });
 
-  // The plan's threat: a huge realm exhausting the job. 250,000 calls over 500 days from 5,000 callers (20 of them busy), 300 functions
+  // The threat: a huge realm exhausting the job. 250,000 calls over 500 days from 5,000 callers (20 of them busy), 300 functions
   // (100 of them busy), a seventh with an odd name, fed a page at a time as the read feeds them, and 100 importers of varied names: the
   // file stays under its gzip cap, every list capped and holding the largest, and the state keeps bounded rows.
   it("stays bounded at 250,000 calls: an 8 KB gzip file, every list capped, 100 calls and 400 days kept per realm", () => {
@@ -660,7 +660,7 @@ describe("readRollup, the incremental read", () => {
     expect(rollups.height()).toBe(500);
   });
 
-  // A realm the list did not hold on one pass (a partial list, a shed realm, one deployed meanwhile) keeps its calls (F13007).
+  // A realm the list did not hold on one pass (a partial list, a shed realm, one deployed meanwhile) keeps its calls.
   it("keeps the successful calls of a realm the list does not hold yet, so it counts them all once it does", async () => {
     const { rollups } = store();
     const NEW = "gno.land/r/late/comer";
@@ -781,7 +781,7 @@ describe("importersOf, the realms that import each realm", () => {
 });
 
 describe("writeRollups, the files", () => {
-  // The server's one thread serves the chat and logins while the job writes: every realm's file costs queries and gzips (F13001).
+  // The server's one thread serves the chat and logins while the job writes: every realm's file costs queries and gzips.
   it("lets the server's other work run between realms, never one block over every file", async () => {
     const { rollups } = store();
     const paths = Array.from({ length: 20 }, (_, i) => `gno.land/r/many/r${String(i)}`);
@@ -830,7 +830,7 @@ describe("writeRollups, the files", () => {
     expect(existsSync(join(folder, `${rollupName("gno.land/r/gnops/quiet")}.json`))).toBe(false);
   });
 
-  // A file stays served under its name until removed: after a restarted chain it would show the last chain's counts (F13008).
+  // A file stays served under its name until removed: after a restarted chain it would show the last chain's counts.
   it("removes the files of realms it wrote none for this pass, and leaves any other file of the folder", async () => {
     const { rollups } = store();
     rollups.add([row(5, [call(A)])], dated({ 5: "2026-09-28" }), 5);
@@ -873,7 +873,7 @@ describe("writeRollups, the files", () => {
       JSON.parse(readFileSync(new URL("./onyxValopersRollup.json", import.meta.url), "utf8")),
     );
     expect(gzipSync(JSON.stringify(file), { level: 6 }).length).toBeLessThanOrEqual(ROLLUP_MAX_GZIP);
-    // Counted apart from the job on 2026-11-09, by a scan of every call on onyx-1's indexer (500 a page, deduplicated by hash) up to the
+    // Counted apart from the job, by a scan of every call on onyx-1's indexer (500 a page, deduplicated by hash) up to the
     // file's height: 95 calls from 70 callers, two of them at 4, the first in order g154xep0….
     expect(file).toMatchObject({
       path: PATH,

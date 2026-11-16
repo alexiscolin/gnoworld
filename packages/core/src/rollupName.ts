@@ -1,4 +1,4 @@
-// A realm's rollup file (slice 13a) by its path's hash: the server writes it under this name and a browser asks it, so no path text reaches a
+// A realm's rollup file by its path's hash: the server writes it under this name and a browser asks it, so no path text reaches a
 // file name. Synchronous and pure, as a planet's seed is (planet/sha256.ts).
 import { sha256 } from "./planet/sha256.ts";
 import { asciiBytes, hexOf } from "./text/bytes.ts";

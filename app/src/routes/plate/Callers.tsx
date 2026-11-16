@@ -1,4 +1,4 @@
-// Who calls it (the proposal's cal card, D566): the callers per day as a line, then the rollup's top callers by calls, each with its share as a bar,
+// Who calls it (the proposal's cal card): the callers per day as a line, then the rollup's top callers by calls, each with its share as a bar,
 // named as the worlds' file names them; eight, and all twenty once the card is open.
 import type { CSSProperties } from "react";
 import { Avatar, Card, Cell, Grid, grouped, Sparkline, Stack, useAlone } from "@gnoworld/ui";

@@ -1,4 +1,4 @@
-// A room of a world on the scripted Ergo (scripted.ts) for 4f's journeys, who is typing and the reading place: what the
+// A room of a world on the scripted Ergo (scripted.ts) for the journeys on who is typing and the reading place: what the
 // page sends, the socket to say a live line on, and the words read from them.
 import type { WebSocketRoute } from "@playwright/test";
 import { lines } from "./chat.ts";
@@ -40,7 +40,7 @@ export const live = (id: string, time: string, { room = ROOM, text = id }: { roo
 export const typist = (page: Page) => page.getByText(/(is|are) typing/);
 export const tags = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
-// The places the page set: a MARKREAD with its time, not its ask of Ergo's place (CR7).
+// The places the page set: a MARKREAD with its time, not its ask of Ergo's place.
 export const marks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
 // What the page sent before a word of its own written now: that word's TAGMSG goes out behind all of it, on the same
 // socket, so what is missing before it was never sent.
@@ -68,7 +68,7 @@ export const hiddenTab = (page: Page, hidden: boolean) =>
         document.dispatchEvent(new Event("visibilitychange"));
       });
     }
-    // The page's visibilitychange listeners, counted as they come and go (the green pass's G3).
+    // The page's visibilitychange listeners, counted as they come and go.
     const listeners = new Set<unknown>();
     const add = EventTarget.prototype.addEventListener.bind(document);
     const remove = EventTarget.prototype.removeEventListener.bind(document);

@@ -1,5 +1,5 @@
 // What the page says when a login stops: what happened and what to do, in the person's words, never a code.
-// An address Adena gives that is no gno address says why (F674).
+// An address Adena gives that is no gno address says why.
 import type { AddressProblem } from "@gnoworld/schemas";
 import { transportWords, UNEXPECTED } from "../../lib/api/transportWords.ts";
 import type { LoginProblem } from "../../store/login.ts";
@@ -39,7 +39,7 @@ const SAID: Record<Exclude<LoginProblem["reason"], "address">, string> = {
 export const sayProblem = (problem: LoginProblem): string =>
   problem.reason === "address" ? ADDRESS[problem.problem] : SAID[problem.reason];
 
-// The same, in the few words the login's button holds in place of its own (D377): the whole sentence is its description.
+// The same, in the few words the login's button holds in place of its own: the whole sentence is its description.
 const SHORT: Record<LoginProblem["reason"], string> = {
   address: "Check Adena's address",
   missing: "Install Adena",

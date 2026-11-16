@@ -1,4 +1,4 @@
-// Where an account's lines say it speaks from (ADR-0001 §7, D395), in the room's menu: its time zone's country by default, another it
+// Where an account's lines say it speaks from (ADR-0001 §7), in the room's menu: its time zone's country by default, another it
 // chooses, or none once it hides it. An account's, so the table of countries is never a visitor's first screen.
 import { COUNTRIES, countryName } from "@gnoworld/core/bubbles";
 import type { Address } from "@gnoworld/schemas";
@@ -40,11 +40,11 @@ const wordsOf = (name: string | undefined) =>
 
 function Choice({ account }: { account: Address }) {
   const [country, setCountry] = useState(() => shownCountry(account, COUNTRIES));
-  const [notKept, setNotKept] = useState(false);
+  const [writeFailed, setWriteFailed] = useState(false);
   const choose = (code: string | undefined) => {
-    const kept = keepCountry(account, code);
-    setNotKept(!kept);
-    if (kept) setCountry(code);
+    const stored = keepCountry(account, code);
+    setWriteFailed(!stored);
+    if (stored) setCountry(code);
   };
   return (
     <Setting
@@ -52,7 +52,7 @@ function Choice({ account }: { account: Address }) {
       help={
         <>
           <p role="status">{wordsOf(countryName(country))}</p>
-          {notKept ? <p>Not kept on this device</p> : null}
+          {writeFailed ? <p>Not kept on this device</p> : null}
         </>
       }
     >

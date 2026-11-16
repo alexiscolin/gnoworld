@@ -10,7 +10,7 @@ afterAll(() => {
 });
 const MiB = 1024 * 1024;
 
-// The services' data files (10h's review, V8): Jarvis's places and the server's universes, read the same way.
+// The services' data files: Jarvis's places and the server's universes, read the same way.
 describe("readDataFile", () => {
   it("reads a file of exactly 1 MiB whole, as UTF-8 text", () => {
     const path = join(folder, "exact.json");

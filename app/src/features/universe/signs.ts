@@ -1,5 +1,5 @@
-// What the Earth shows over its globe, from the store to the page: the rules' pick when a line comes and once a second, never on a frame
-// (docs/plans/slice-6.md §4). No React, so the component only reads a snapshot.
+// What the Earth shows over its globe, from the store to the page: the rules' pick when a line comes and once a second, never on a frame.
+// No React, so the component only reads a snapshot.
 import {
   bubbleLines,
   countryTrends,
@@ -39,7 +39,7 @@ export interface SignsDeps {
   readonly rules: Rules;
   /** Where the side rooms stand (app/data/earthRooms.json). */
   readonly places: readonly { readonly room: string; readonly lat: number; readonly lon: number }[];
-  /** On a world with no countries (D565): the lines of the rooms the page follows, its own, are its bubbles, each standing on its speaker's
+  /** On a world with no countries: the lines of the rooms the page follows, its own, are its bubbles, each standing on its speaker's
    * own spot (spot.ts), and none of the Earth's counts, trends, pins or turn to your country. */
   readonly world?: { readonly id: string };
 }
@@ -69,7 +69,7 @@ export class Signs {
   readonly #state = createStore<Snapshot>(() => NOTHING);
   #said = JSON.stringify(NOTHING);
   #shown: readonly Bubble[] = [];
-  // When each message of the last pick was said, by id: a bubble's turn of the planet depends on it (D13001).
+  // When each message of the last pick was said, by id: a bubble's turn of the planet depends on it.
   #at = new Map<string, number>();
 
   constructor(deps: SignsDeps) {

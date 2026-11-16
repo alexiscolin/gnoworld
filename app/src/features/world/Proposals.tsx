@@ -1,6 +1,6 @@
-// A world's proposals on its plate (5k, frames 20 to 35): the realm's home page read once, its newest proposal under the status
+// A world's proposals on its plate (frames 20 to 35): the realm's home page read once, its newest proposal under the status
 // pill, then the newest few as cards, each with the way to read it on gnoweb. Only what the realm's page states: a page that gives no
-// threshold gives no ring and no "of 66.66%". The ring is the scene's tilted orbit (7e), handed to the page. A read that fails says its
+// threshold gives no ring and no "of 66.66%". The ring is the scene's tilted orbit, handed to the page. A read that fails says its
 // state and links to the realm on gnoweb. This file is a chunk of its own, asked only by a world with a realm (world.tsx).
 import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useRef, type ComponentType } from "react";
@@ -19,7 +19,7 @@ import { ringOf, type Ring } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
 import { openOf, Read, SHOWN } from "./ProposalRows.tsx";
 
-// A world's pinned actions (D271), asked only by a world that pins one; code that cannot be fetched leaves the proposals alone (F1763).
+// A world's pinned actions, asked only by a world that pins one; code that cannot be fetched leaves the proposals alone.
 // The chat's bar takes them from this module too, which the world's page imports once for both (the first screen holds a list of
 // what each import preloads).
 const pinnedChunk = () => import("./Pinned.tsx");
@@ -55,7 +55,7 @@ export interface ProposalsProps {
   options?: ReadOptions;
   /** Hands the page the newest proposal's ring once read, none when it gave no tally or the read failed, and none on leaving. */
   onRing?: (ring: Ring | undefined) => void;
-  /** The world's pinned actions (D271), drawn first, under Read the proposals. */
+  /** The world's pinned actions, drawn first, under Read the proposals. */
   pinned?: Pick<PinnedBarProps, "actions" | "universe">;
 }
 
@@ -152,7 +152,7 @@ export default function Proposals({ path, options = NO_OPTIONS, onRing, pinned }
   );
 }
 
-/** A realm's open proposal as its pill alone (D375), and its ring handed to the page: one read, nothing when none is open. */
+/** A realm's open proposal as its pill alone, and its ring handed to the page: one read, nothing when none is open. */
 export function Status({ path, onRing }: Pick<ProposalsProps, "path" | "onRing">) {
   const { read } = useProposals(path, NO_OPTIONS);
   useRing(read, onRing);

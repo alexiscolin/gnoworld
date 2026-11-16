@@ -6,7 +6,7 @@ import { JARVIS_KEY_HEADER } from "@gnoworld/schemas";
 import { Secret } from "@gnoworld/service/settings";
 import { jarvisClient } from "./jarvis.ts";
 
-// 10g (D42, D94): the door's one call to jarvis a question, on the network the two share, tested against a fake jarvis.
+// The door's one call to jarvis a question, on the network the two share, tested against a fake jarvis.
 interface Heard {
   method: string;
   path: string;
@@ -60,7 +60,7 @@ const ANSWERED = () => ({ status: "answered", markdown: "The poll closes today."
 const BUDGETS = () => ({ ask: 45, translate: 5 });
 const live = () => new AbortController().signal;
 
-// 10u-g2: the door proves itself to jarvis with its key, in one header of every request.
+// The door proves itself to jarvis with its key, in one header of every request.
 describe("the door's key", () => {
   const KEY = `door-key-${"k".repeat(40)}`;
   const BUDGET = { budget: "ask" as const, dollars: 3 };

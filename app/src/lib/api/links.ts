@@ -1,4 +1,4 @@
-// The browser's client of the linked accounts (server/src/login/linkRoutes.ts, mounted at /api/links; owners' moderation, part 5), through the one
+// The browser's client of the linked accounts (server/src/login/linkRoutes.ts, mounted at /api/links), through the one
 // JSON call of lib/api/http.ts. The session is the server's cookie; no key is held or sent: a link is proven by Adena's signature or by the file the
 // command-line tool wrote, which the page only passes on. The command line's block is the server's, shown as it came.
 import { Address, AnyChainId, Nonce, Proof } from "@gnoworld/schemas";

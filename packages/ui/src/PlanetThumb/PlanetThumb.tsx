@@ -14,7 +14,7 @@ export interface PlanetThumbProps {
 }
 
 /**
- * Only the site's own pictures are drawn (F336): a path from the site's root (not `//host`, not `/\host`, no control
+ * Only the site's own pictures are drawn: a path from the site's root (not `//host`, not `/\host`, no control
  * character the browser would strip before reading it) or an image data URI. Anything else, whatever the caller or
  * its data file says, asks nobody: the drawn fallback stands in.
  */
@@ -31,7 +31,7 @@ const FALLBACK = `data:image/svg+xml,${encodeURIComponent(
     "<rect width='64' height='64' fill='url(#g)'/></svg>",
 )}`;
 
-/** A place's picture in a disc, its edge by its kind. Slice 7 draws it from the planet's own look. */
+/** A place's picture in a disc, its edge by its kind. */
 export function PlanetThumb({ src, name, kind = "world", size = "m", decorative = false, magnify }: PlanetThumbProps) {
   const own = isOwn(src);
   return (

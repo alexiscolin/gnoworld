@@ -1,8 +1,8 @@
-// Drafts kept on the device (slice 4's 4d; ADR-0002's "Saved messages and drafts: Device"): an account's unsent line
+// Drafts kept on the device (ADR-0002's "Saved messages and drafts: Device"): an account's unsent line
 // in each room, under its address and the room, so a change of room or a reload loses none. What the device gives
 // back is checked: a string within the limit, else no draft, and forgotten; a draft past the limit forgets the one
 // before it, no older text to come back. A device that refuses (blocked, full) keeps none and says so. An account's
-// drafts stay on the device past its logout until the settings clear it (ADR-0002's "this device", a later slice).
+// drafts stay on the device past its logout until the settings clear it (ADR-0002's "this device").
 import type { Address } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 

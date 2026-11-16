@@ -62,7 +62,7 @@ describe("startTracing: where the spans go", () => {
   it("loses the spans, never the question, when the collector cannot be reached", async () => {
     const { url } = await collector();
     await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
-    // An export of 50 ms makes one attempt: the exporter's first retry waits 0.8 s at least, past it (F5112). With its
+    // An export of 50 ms makes one attempt: the exporter's first retry waits 0.8 s at least, past it. With its
     // 5 s, the retries take 2 to 5 s, so the bound sits between the two.
     const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` }, { exportTimeoutMs: 50 });
     traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);

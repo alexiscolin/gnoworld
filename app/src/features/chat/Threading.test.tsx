@@ -17,8 +17,8 @@ import { shownOf, type Shown } from "./shown.tsx";
 import "./Thread.tsx";
 import { useThreads } from "./Threading.tsx";
 
-// 4d's threads, G1: a direct message never offers a thread, whatever the page does to give its lines a bar (4d-dm-bar
-// gives them the message bar). The one place that decides it is what the page hands the view: `useThreads` hands a
+// A direct message never offers a thread, whatever the page does to give its lines a bar. The one place that decides it is
+// what the page hands the view: `useThreads` hands a
 // direct message none, so its lines can show no chip and its bar no Open thread item, however they are drawn.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -208,7 +208,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     vi.unstubAllGlobals();
   });
 
-  // R6: the panel that stands in for the one that comes has its Close, and Escape as well. First of this block: later
+  // The panel that stands in for the one that comes has its Close, and Escape as well. First of this block: later
   // ones find the panel's code already come, with no stand-in to see.
   it("closes with an Escape while its code has not come", async () => {
     draw(room);
@@ -224,13 +224,13 @@ describe("useThreads: the open panel's focus and keys", () => {
     press(standing, { key: "Escape" });
     press(standing, { key: "Escape" });
     expect(thread()).toBeNull();
-    // The code comes, to a page that no longer holds the panel.
+    // The code comes, to a page that does not hold the panel.
     await act(async () => {
       await new Promise((done) => setTimeout(done, 20));
     });
   });
 
-  // CR4 (F1764): the guest's focus goes to Close once, as the panel opens, never again as the session changes.
+  // The guest's focus goes to Close once, as the panel opens, never again as the session changes.
   it("leaves the focus where it is when the reader logs out with the panel open", async () => {
     draw(room);
     act(() => {
@@ -256,7 +256,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(active()).toBe("outside");
   });
 
-  // CR5 (F1765): a room switch takes the panel away with the focus inside it; it goes to the new room's list, not the page.
+  // A room switch takes the panel away with the focus inside it; it goes to the new room's list, not the page.
   it("gives the focus to the room's list when a move to another room takes the panel and its focus away", async () => {
     draw(room);
     act(() => {
@@ -283,7 +283,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(active()).toBe("outside");
   });
 
-  // CR7 (F1767): an Escape that ends an input method's composition belongs to the composition, whichever way the browser
+  // An Escape that ends an input method's composition belongs to the composition, whichever way the browser
   // marks it.
   it("stays open for an Escape that ends a composition, and closes for any other", async () => {
     draw(room);
@@ -297,14 +297,14 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(thread()).not.toBeNull();
     press(box, { key: "a" });
     expect(thread()).not.toBeNull();
-    // Safari's: isComposing false, keyCode 229 (R5).
+    // Safari's: isComposing false, keyCode 229.
     press(box, { key: "Escape", keyCode: 229 });
     expect(thread()).not.toBeNull();
     press(box, { key: "Escape" });
     expect(thread()).toBeNull();
   });
 
-  // R1 (redpass2-4th): the words typed in a thread are the page's memory, and a logout is a fresh start: they are neither
+  // The words typed in a thread are the page's memory, and a logout is a fresh start: they are neither
   // handed to the next account nor kept for the same one.
   const typeIn = async (words: string) => {
     const editor = editorOf();
@@ -336,7 +336,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(held()).toBe("");
   });
 
-  // R3: the words sit under the line that opened the thread, so a chain that grows (a new root) leaves them where they were.
+  // The words sit under the line that opened the thread, so a chain that grows (a new root) leaves them where they were.
   it("keeps the words typed while the chain was short, once the chain has grown and the panel is opened again", async () => {
     const at = (id: string, reply?: string): Line => ({
       id,

@@ -1,4 +1,4 @@
-// A room anyone signed in makes on the Earth (D394): a button, and a small dialog with the room's name, where the server's
+// A room anyone signed in makes on the Earth: a button, and a small dialog with the room's name, where the server's
 // refusal is said. The name is typed as words and sent as the slug the server takes (core's rule: a-z, 0-9, single hyphens).
 import { RoomName, type RoomList } from "@gnoworld/schemas";
 import { Button, Dialog, Field, IconButton, Stack } from "@gnoworld/ui";

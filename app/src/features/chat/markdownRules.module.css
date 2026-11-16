@@ -1,5 +1,5 @@
-/* What the sent line and the composer's field both draw of the chat's Markdown: a quote set apart by a rule and a muted colour (F783),
-   code kept as written (F783); `quote` is the same set-apart look for the line a reply answers. A container composes `rules`; code and mentions wear the design system's base look. */
+/* What the sent line and the composer's field both draw of the chat's Markdown: a quote set apart by a rule and a muted colour,
+   code kept as written; `quote` is the same set-apart look for the line a reply answers. A container composes `rules`; code and mentions wear the design system's base look. */
 @layer components {
   .quote,
   .rules blockquote {

@@ -65,7 +65,7 @@ describe("the tags of a page", () => {
     expect(page.get("og:title")).toBe("Bubble · gno.world");
     expect(page.get("description")).toBe(bubble.description);
     expect(page.get("og:description")).toBe(page.get("description"));
-    // Bubble is in Onyx, a testnet (app/data/universes.json): noindex. Was undefined before 5e.
+    // Bubble is in Onyx, a testnet (app/data/universes.json): noindex.
     expect(page.get("robots")).toBe("noindex");
   });
 
@@ -81,7 +81,7 @@ describe("the tags of a page", () => {
     expect(page.has("og:url")).toBe(false);
   });
 
-  // 5d: the canonical of every page is under /net/<universe>, where core/places puts it (decisions, 2026-10-29), and
+  // The canonical of every page is under /net/<universe>, where core/places puts it, and
   // every page at that address exists: a canonical to a missing page would drop the page from search.
   test("a world's page names its canonical address, not the path it is served at", () => {
     expect(bubble.path).toBe("/w/bubble");
@@ -131,7 +131,7 @@ describe("the tags of a page", () => {
   });
 });
 
-// Slice 5's 5e: what a search engine and a share read of each place's page. The fixture's Onyx is a testnet, as the
+// What a search engine and a share read of each place's page. The fixture's Onyx is a testnet, as the
 // data's is (app/data/universes.json); its gno.land is the mainnet. Walked with each universe the default: a mainnet
 // place's path is its canonical address only when it is not.
 const fixture = (defaultId: string) =>

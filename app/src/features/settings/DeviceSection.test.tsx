@@ -8,7 +8,7 @@ import { passportFile } from "../../lib/keep/device.ts";
 import { keep } from "../../lib/keep/keep.ts";
 import { DeviceSection } from "./DeviceSection.tsx";
 
-// The settings' "this device" (slice 8; plan §6: "clear removes what it names and nothing else"; the threat model's "an import is size-capped,
+// The settings' "this device" ("clear removes what it names and nothing else"; "an import is size-capped,
 // parsed, never merged field by field"): the passport cleared or replaced whole, an account's saved messages and drafts cleared apart.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -179,7 +179,7 @@ describe("this device's settings", () => {
 
   it("offer no clear of saved messages or drafts to a guest", async () => {
     const box = await section();
-    // The passport's file is exported or read back through a button of its own (the ping-pong's batch, f7a31433), then cleared.
+    // The passport's file is exported or read back through a button of its own, then cleared.
     expect(all(box, "button").map((each) => each.textContent)).toEqual([
       "Export the passport",
       "Import a passport",

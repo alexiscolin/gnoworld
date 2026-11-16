@@ -29,8 +29,7 @@ export function Controls({ discovery }: { discovery: Discovery }) {
   return (
     <div role="group" aria-label="Styles and filters">
       <Stack space="2xs">
-        {/* The styles' chips are a phone's way to the styles' shelves, which the column at the left offers on a computer (Alexis,
-            2026-11-08: "une répétition de la colonne"). */}
+        {/* The styles' chips are a phone's way to the styles' shelves, which the column at the left offers on a computer. */}
         <div className={styles["styleChips"]}>
           <div className="scroll-row">
             {STYLES.filter(({ id }) => id !== "lab").map(({ id, label }) => (

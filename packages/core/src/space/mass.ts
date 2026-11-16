@@ -1,10 +1,10 @@
-// The whole cosmos as one mass round the Earth (7u; Alexis, 2026-11-04 night, the second study): every world and realm a particle, each
+// The whole cosmos as one mass round the Earth: every world and realm a particle, each
 // namespace a clump in volume with seeded dust for its matter. A clump's direction comes from its id and its distance from the volume of
 // the clumps more used than it, then neighbours that overlap are pushed apart; so a new world grows its clump, the clumps after it move
 // out a little, no direction changes, and the same data always gives the same mass. Sized so the whole fills the dive's first view.
 import { distanceOf, nextState, textHash, unitOf, type Point } from "./cell.ts";
 
-/** The mass's sizes, in the units its layout is drawn in before it is fitted to `reach`, the dive's first view filled (7d7's 760). */
+/** The mass's sizes, in the units its layout is drawn in before it is fitted to `reach`, the dive's first view filled. */
 export const MASS = {
   reach: 300,
   size: 1.5,

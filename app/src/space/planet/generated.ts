@@ -27,7 +27,7 @@ const NO_COLOUR: Rgb = [0, 0, 0];
 // The real map's warp never stretches it by more than a fifth, whatever its frequency: no streaks.
 const MAX_STRETCH = 0.2;
 const linear = ([red, green, blue]: Rgb) => new Color().setRGB(red, green, blue);
-// A volcanic world's style (Alexis, 2026-11-03: several, each from a real reference): its seed's byte 18, read back from the minor's
+// A volcanic world's style: its seed's byte 18, read back from the minor's
 // offset (core gives byte / 255 * 16). Io's sulfur crust, dark orange to pale yellow, set by eye from its description, no image sampled.
 const STYLES = 3;
 const SULFUR: readonly [Rgb, Rgb, Rgb] = [
@@ -40,7 +40,7 @@ const SULFUR: readonly [Rgb, Rgb, Rgb] = [
 export const styleOf = ({ look }: World): number =>
   look.anchor === "volcanic" ? Math.round((look.minorOffset[0] * 255) / 16) % STYLES : 0;
 
-/** The maps a generated world reads: its minor's only where its program reads it (F4586), by the rule its `minorRead` takes. */
+/** The maps a generated world reads: its minor's only where its program reads it, by the rule its `minorRead` takes. */
 export const mapNamesOf = ({ look, recipe }: World): string[] => [
   look.map,
   ...(readsMinorMap(recipe) ? [recipe.minorMap] : []),

@@ -77,7 +77,7 @@ describe("what a room needs to be as its type says", () => {
       p.nick !== target ? p : { ...p, powers: mode.startsWith("+") ? p.powers + power : p.powers.replace(power, "") },
     );
   };
-  // The state a room has once Ergo applied the changes, as 3b's table says it does.
+  // The state a room has once Ergo applied the changes, as Ergo does.
   const apply = (before: RoomState, sent: readonly string[][]): RoomState => {
     let { flags, invites, present } = before;
     for (const [command, , mode = "", target = ""] of sent) {

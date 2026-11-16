@@ -1,5 +1,5 @@
-// The worlds' file as the store's realms (D373), and the store built from it once per file: Discover and a realm's page (its version family)
-// share it, so a page view costs a lookup, never a pass over every realm. The phase-2 columns the file does not give yet stay null.
+// The worlds' file as the store's realms, and the store built from it once per file: Discover and a realm's page (its version family)
+// share it, so a page view costs a lookup, never a pass over every realm. The columns the file does not give stay null.
 import { storeOf, type Store, type StoreRealm } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 

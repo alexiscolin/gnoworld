@@ -18,6 +18,7 @@ import {
   QUOTE,
   STRIKETHROUGH,
   UNORDERED_LIST,
+  type ElementTransformer,
   type TextFormatTransformer,
   type TextMatchTransformer,
   type Transformer,
@@ -80,13 +81,28 @@ const PLAIN: TextMatchTransformer = {
   },
 };
 
+// The reader takes an empty `1. ` for words, but the editor numbers its list items by place: two of them would come back as `1.`
+// and `2.`. A draft's empty ordered item stays the words typed (a typed `1. ` still opens a list).
+const ORDERED: ElementTransformer = {
+  ...ORDERED_LIST,
+  replace: (...args: Parameters<ElementTransformer["replace"]>) => {
+    const [, children, match, isImport] = args;
+    const [only] = children;
+    if (isImport && children.length === 1 && $isTextNode(only) && only.getTextContent().trim() === "") {
+      only.setTextContent(match[0] ?? "");
+      return false;
+    }
+    return ORDERED_LIST.replace(...args);
+  },
+};
+
 const UNDERLINE: TextFormatTransformer = { type: "text-format", format: ["underline"], tag: "++" };
 
 /** The marks the chat's reader knows, in the order the editor tries them (the first of a format is the one it writes). */
 export const TRANSFORMERS: Transformer[] = [
   QUOTE,
   UNORDERED_LIST,
-  ORDERED_LIST,
+  ORDERED,
   CODE,
   INLINE_CODE,
   BOLD_ITALIC_STAR,

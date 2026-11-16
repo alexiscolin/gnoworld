@@ -9,8 +9,8 @@ interface Parts {
   link: () => Link | undefined;
 }
 
-/** What the chat does with the index: the recent lines' two entries now also feed it, and the link's join asks Ergo again. Each
- * step is guarded, so a failing index (a full disk, a locked file) is logged and never stops a line reaching the stream (T8). */
+/** What the chat does with the index: the recent lines' two entries also feed it, and the link's join asks Ergo again. Each
+ * step is guarded, so a failing index (a full disk, a locked file) is logged and never stops a line reaching the stream. */
 export function indexing(search: Search | undefined, log: Log, { recent, link }: Parts) {
   const guard = guarded(log);
   const safe = (step: string, work: (search: Search) => void): void => {
@@ -24,10 +24,10 @@ export function indexing(search: Search | undefined, log: Log, { recent, link }:
       );
   };
   const fetch = lineOf(link);
-  // The joins' reconciles one after the other: each asks the link a question a line, and the link holds 1,000 at once (F13702).
+  // The joins' reconciles one after the other: each asks the link a question a line, and the link holds 1,000 at once.
   let asking = Promise.resolve();
   return {
-    /** The one entry of every line the bot passed, a guest's relayed one too (F13700), and the REDACT's. */
+    /** The one entry of every line the bot passed, a guest's relayed one too, and the REDACT's. */
     recent: {
       passed: (said: Said): void => {
         recent.passed(said);
@@ -43,7 +43,7 @@ export function indexing(search: Search | undefined, log: Log, { recent, link }:
         });
       },
     },
-    /** The pins' hooks, and on the link's join the room's lines asked of Ergo again, for a delete heard while it was down (Q6). */
+    /** The pins' hooks, and on the link's join the room's lines asked of Ergo again, for a delete heard while it was down. */
     kept: <K extends { hooks: { onIn: (room: string) => void } }>(kept: K): K => ({
       ...kept,
       hooks: {

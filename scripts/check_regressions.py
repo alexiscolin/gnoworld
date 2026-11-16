@@ -1,7 +1,7 @@
 """check_regressions.py: the safety net never shrinks quietly (CLAUDE.md, "No regression").
 
 Against the base (where the branch left main), it refuses, unless a commit of the branch says
-so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
+so on a line of its own, `Key: <item> - why`, which a reviewer reads:
 - a test gone (Vitest, gno, Go; a rename included), or switched to `.fails`: `Removed-test:`;
 - a floor lowered (coverage thresholds, StrykerJS's break), a known gap added to a mutation
   check's GAPS, an ignore added to a tool's ignore list, or a bench gone or given a longer budget
@@ -30,16 +30,16 @@ IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.confi
 
 def declared(lines, key):
     """The items a commit names on a `Key: <item> - why` line, one a line; a line without its reason names nothing. The item runs
-    to the line's last ` - ` that a reason follows: it may hold ` - ` itself (a gap on `a - b`, F5000), its reason may not, and
-    the line never also names the shorter item its text starts with (F5023). A character no commit message may hold
-    (scripts/hidden.py's) is written `<U+XXXX>`, four to six hex digits, as a test may be named with one (10h, D117)."""
+    to the line's last ` - ` that a reason follows: it may hold ` - ` itself (a gap on `a - b`), its reason may not, and
+    the line never also names the shorter item its text starts with. A character no commit message may hold
+    (scripts/hidden.py's) is written `<U+XXXX>`, four to six hex digits, as a test may be named with one."""
     items = {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \S.*", line.strip()))}
     return {re.sub(r"<U\+([0-9A-F]{4,6})>", unescaped, item) for item in items}
 
 
 def unescaped(match):
     """The character a `<U+XXXX>` names when scripts/hidden.py hides it; any other escape stays as written, so it excuses
-    nothing the character itself would not, and a number past Unicode is text (D125, F5280)."""
+    nothing the character itself would not, and a number past Unicode is text."""
     n = int(match.group(1), 16)
     return chr(n) if n <= 0x10FFFF and HIDDEN.fullmatch(chr(n)) else match.group(0)
 
@@ -51,7 +51,7 @@ def removed_tests(before, after, excused):
 
 def floors(vitest_config, stryker_config):
     """Each floor by name: the coverage thresholds per scope, and StrykerJS's break. A scope's braces may start on the line after its
-    key, and a floor may hold decimals (F5538): the text is read whole, each scope's block first, the rest as everywhere's."""
+    key, and a floor may hold decimals: the text is read whole, each scope's block first, the rest as everywhere's."""
     found, number = {}, r"\b(lines|functions|branches|statements):\s*(\d+(?:\.\d+)?)"
     scoped = re.compile(r'"([^"]+)":\s*\{([^}]*)\}')
     for scope, block in [(m.group(1), m.group(2)) for m in scoped.finditer(vitest_config)] + [("everywhere", scoped.sub("", vitest_config))]:
@@ -74,7 +74,7 @@ def weakened(before, after, excused, kind):
 
 
 def looser_benches(before, after, excused):
-    """Benches gone, or given a longer budget, less those named `bench <name>`: the budgets are the slice plan's."""
+    """Benches gone, or given a longer budget, less those named `bench <name>`."""
     return sorted(f"{name} {old:g} ms -> {f'{after[name]:g} ms' if name in after else 'gone'}" for name, old in before.items()
                   if after.get(name, float("inf")) > old and f"bench {name}" not in excused)
 
@@ -99,7 +99,7 @@ def settings(read):
         data = json.loads(read(name) or "{}")
         out |= {f"{name} {key}": data.get(key) for key in keys}
     # pnpm reads keys in more forms than a pattern can follow (quoted, spaced, nested): every
-    # change outside the packages list counts, as a fingerprint of the rest (F088).
+    # change outside the packages list counts, as a fingerprint of the rest.
     rest = re.sub(r"^packages:\n(?:[ \t]*(?:-.*|#.*)?\n)*", "", read("pnpm-workspace.yaml") or "", flags=re.M)
     out["pnpm-workspace.yaml outside packages"] = hashlib.sha256(rest.encode()).hexdigest()[:12]
     return out
@@ -122,8 +122,8 @@ SEP = " := "  # `<name> := <value>`: what a name held, an entry of its own; a li
 
 def list_entries(text, at, consts=None):
     """The entries of the list that starts at text[at]: a quoted string is read; a name, a template, a spread of anything but the tool's
-    own defaults, or what follows the list (`.concat(...)`) is an entry that cannot be read, named as written (F2523). A name or spread
-    of a const the file holds is also read as its value, `<name> := <value>`, so a changed value shows (F2622). Comments are skipped (F2623)."""
+    own defaults, or what follows the list (`.concat(...)`) is an entry that cannot be read, named as written. A name or spread
+    of a const the file holds is also read as its value, `<name> := <value>`, so a changed value shows. Comments are skipped."""
     entries, pos = [], at
     consts = consts or {}
     if text[at] != "[":  # a list passed by name, or an expression: unread
@@ -172,7 +172,7 @@ def ignores(read):
     for name in IGNORE_FILES:
         text = read(name) or ""
         if name.endswith(".json") and text:
-            # Nested too: knip takes an ignore list per workspace (F101).
+            # Nested too: knip takes an ignore list per workspace.
             pending, found = [json.loads(text)], []
             while pending:
                 for key, value in pending.pop().items():
@@ -294,23 +294,23 @@ def self_test():
     log = ["docs: explain why the mutation break follows the score", "Removed-test: a > xy - another test",
            "Removed-test: a > z", "Lowered-floor: mutation break - see the plan", "Removed-test: a > y - merged into x"]
     assert declared(log, "Lowered-floor") == {"mutation break"} and declared(log, "Removed-test") == {"a > xy", "a > y"}
-    # An item may hold ` - ` itself (F5000): a gap on `a - b`, a test so named. A line without its reason still names nothing.
+    # An item may hold ` - ` itself: a gap on `a - b`, a test so named. A line without its reason still names nothing.
     spaced = ["Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - equivalent: d is never read", "Removed-test: a > a - b - merged"]
     assert "gap scripts/mutate.py r/x.gno: d := a - b [- -> +]" in declared(spaced, "Lowered-floor")
     assert removed_tests({"a > a - b"}, set(), declared(spaced, "Removed-test")) == [], "a test named with ` - ` could not be declared"
     assert "gap scripts/mutate.py r/x.gno: d := a - b [- -> +]" not in declared(["Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +]"], "Lowered-floor")
-    # One line names one item, never also the shorter one its text starts with (F5023).
+    # One line names one item, never also the shorter one its text starts with.
     both = {"app/a.test.ts > renders", "app/a.test.ts > renders - with a signature"}
     one = declared(["Removed-test: app/a.test.ts > renders - with a signature - merged into b"], "Removed-test")
     assert removed_tests(both, set(), one) == ["app/a.test.ts > renders"], "one line excused two tests"
     assert removed_tests({"a > x", "a > y", "a > z"}, set(), declared(log, "Removed-test")) == ["a > x", "a > z"]
-    # A test named with a character no commit message may hold (scripts/hidden.py's) is declared with it as `<U+XXXX>` (10h, D117).
+    # A test named with a character no commit message may hold (scripts/hidden.py's) is declared with it as `<U+XXXX>`.
     hidden = "a > breaks " + chr(0x2028) + " and turns " + chr(0x202E) + chr(0xE0067)
     escaped = ["Removed-test: a > breaks <U+2028> and turns <U+202E><U+E0067> - moved to b"]
     assert removed_tests({hidden}, set(), declared(escaped, "Removed-test")) == [], "a test named with a hidden character could not be declared"
-    # A hidden character, U+00AD, so only the count of digits keeps it text (since D125 a shown one stays text anyway).
+    # A hidden character, U+00AD, so only the count of digits keeps it text (a shown one stays text anyway).
     assert declared(["Removed-test: a > <U+AD> - moved"], "Removed-test") == {"a > <U+AD>"}, "a code point of fewer than four digits read"
-    # Only what a message may not hold is written so (S6, F5280): a letter stays its escape, so `<U+0061>pp/**` excuses no
+    # Only what a message may not hold is written so: a letter stays its escape, so `<U+0061>pp/**` excuses no
     # `app/**` unread, and a number past the last code point stays text, never a crash.
     assert declared(["Lowered-floor: ignore <U+0061>pp/** - x"], "Lowered-floor") == {"ignore <U+0061>pp/**"}, "an escape of a letter read"
     assert declared(["Removed-test: a > <U+110000> - x"], "Removed-test") == {"a > <U+110000>"}, "a number past Unicode read"
@@ -321,7 +321,7 @@ def self_test():
     assert lowered_floors(before, after, set()) == ["coverage packages/core/** branches 95 -> 90", "mutation break 80 -> 0"]
     assert lowered_floors(before, after, declared(log[:1], "Lowered-floor")) == lowered_floors(before, after, set()), "a sentence excused a floor"
     assert lowered_floors(before, after, {"mutation break", "coverage packages/core/** branches"}) == []
-    # A key whose braces start on the next line, and a decimal floor (a7de4dc9's shape, F5538): read whole, each under its own glob.
+    # A key whose braces start on the next line, and a decimal floor: read whole, each under its own glob.
     wrapped = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 99.9, branches: 92.3 },\n  "{a,b}/**":\n    { lines: 100,\n      branches: 97.2 },\n}'
     seen = floors(wrapped, "")
     assert seen == {"coverage everywhere lines": 85, "coverage packages/core/** lines": 99.9, "coverage packages/core/** branches": 92.3,
@@ -348,7 +348,7 @@ def self_test():
     assert ignores(named.get) == {"vitest.config.ts STRYKER_TMP", "vitest.config.ts c/**", "vitest.config.ts a,b/**"}, "a name is an entry, a spread of the defaults is not, quotes either way"
     assert ignores({"vitest.config.ts": "exclude: LIST,\n"}.get) == {"vitest.config.ts LIST"}, "a list passed by name"
     assert ignores({"vitest.config.ts": 'exclude: ["a"].concat(X)'}.get) == {"vitest.config.ts a", "vitest.config.ts .concat(X)"}, "a list with a method"
-    # A name stands for its value (F2622), a comment is no entry (F2623), and the other forms of the key are read (F2627).
+    # A name stands for its value, a comment is no entry, and the other forms of the key are read.
     held = 'const T = "x/**";\nconst L = ["l/**"];\nexport default { test: { exclude: [...configDefaults.exclude, T, ...L] } };\n'
     assert ignores({"vitest.config.ts": held}.get) == {"vitest.config.ts T", "vitest.config.ts T := x/**", "vitest.config.ts ...L", "vitest.config.ts ...L := l/**"}
     wider = held.replace("x/**", "**/*.test.ts")
@@ -362,7 +362,7 @@ def self_test():
     assert ignores({"eslint.config.ts": 'globalIgnores(\n  ["a/"],\n  "n",\n)'}.get) == {"eslint.config.ts a/"}, "a list on the next line"
     assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
     # pnpm's supply-chain file: any change outside its packages list is read in review, whatever
-    # its form (F079, F088): quoted or spaced keys, a pnpmfile, builds, overrides, a lower age.
+    # its form: quoted or spaced keys, a pnpmfile, builds, overrides, a lower age.
     strict = "packages:\n  - app\nminimumReleaseAge: 1440\ntrustPolicy: no-downgrade\n"
     workspace = lambda text: settings({"pnpm-workspace.yaml": text}.get)
     for loose in ['"minimumReleaseAgeExclude":\n  - left-pad\n', "minimumReleaseAgeExclude :\n  - left-pad\n", "pnpmfile: app/x.cjs\n",
@@ -372,7 +372,7 @@ def self_test():
         assert len(changed) == 1 and changed[0].startswith("pnpm-workspace.yaml outside packages "), loose
         assert changed_settings(workspace(strict), workspace(strict + loose), {"setting pnpm-workspace.yaml outside packages"}) == []
     assert changed_settings(workspace(strict), workspace(strict.replace("  - app\n", "  - app\n  - admin\n")), set()) == []
-    # A list with a comment, a blank line or items flush with its key is still the list (F123).
+    # A list with a comment, a blank line or items flush with its key is still the list.
     for listed, more in (("  # the client\n  - app\n\n", "  # the client\n  - app\n\n  - admin\n"), ("- app\n", "- app\n- admin\n")):
         before, after = (f"packages:\n{items}minimumReleaseAge: 1440\n" for items in (listed, more))
         assert changed_settings(workspace(before), workspace(after), set()) == [], listed
@@ -414,7 +414,7 @@ def self_test():
 if sys.argv[1:] == ["--self-test"]:
     self_test()
     sys.exit(0)
-if len(sys.argv) != 2 or sys.argv[1].startswith("-"):  # a base is a commit; --quick left with its one caller (D13173)
+if len(sys.argv) != 2 or sys.argv[1].startswith("-"):  # a base is a commit
     sys.exit("usage: check_regressions.py <base> | --self-test")
 base = sys.argv[1]
 log = git("log", "--format=%B", f"{base}..HEAD").splitlines()
@@ -433,7 +433,7 @@ problems += [f"a bench is gone or its budget longer: {b}" for b in looser_benche
 problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
 problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
 problems += [f"a check's setting changed: {s}" for s in changed_settings(settings(lambda p: show(base, p)), settings(here), floors_ok)]
-# The tree, not base..HEAD: pre-commit runs this before the commit exists (F2574), as the line for the tests above.
+# The tree, not base..HEAD: pre-commit runs this before the commit exists, as the line for the tests above.
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"

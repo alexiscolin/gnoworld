@@ -1,5 +1,5 @@
-# deploy/test-jarvis.sh: jarvis's proofs (10j, 10u-g2; ADR-0002 §5, §7), sourced by deploy/test.sh with its helpers: in
-# --mutants, its faults; else, once the demo is proven without it, it starts jarvis under its own profile (10j-4), with its
+# deploy/test-jarvis.sh: jarvis's proofs (ADR-0002 §5, §7), sourced by deploy/test.sh with its helpers: in
+# --mutants, its faults; else, once the default services are proven without it, it starts jarvis under its own profile, with its
 # reader (gnomcp in a container of its own) and their two ways out, and proves them. jarvis starts off (JARVIS unset):
 # it serves its budgets and answers off, reads no key and reaches no gnomcp. The door's key is asked of every request on or
 # off, and the made-up key files here (test.sh) are no keys: nothing here asks Anthropic's model. The proofs with jarvis
@@ -35,12 +35,12 @@ if [ "${1:-}" = --mutants ]; then
 		printf 'services: {}\n'
 	}
 	# Its list widened or emptied, its proxy open to the internal network, its replies dropped, itself on a network others
-	# share, its root writable, its key given to the server, its stop cut short, itself back in the demo's profile.
+	# share, its root writable, its key given to the server, its stop cut short, itself back among the default services.
 	mutant "a host added to jarvis's way out" "jarvis's way out lets four hosts out" jarvis_acl awk '{ print } /- api.anthropic.com/ { print "    - api.openai.com" }'
-	# An indexer back in jarvis's list, which only gnomcp needed (10u-g2).
+	# An indexer back in jarvis's list, which only gnomcp needed.
 	mutant "an indexer back in jarvis's way out" "jarvis's way out lets four hosts out" jarvis_acl awk '{ print } /- rpc.gno.land/ { print "    - indexer.gno.land" }'
 	# Their check's failure says "jarvis does not reach Anthropic's API through its way out": the words both its pass and its fail
-	# hold, so the mutant is credited to it (its first --mutants run, 2026-11-05, read "killed by other checks" for want of them).
+	# hold, so the mutant is credited to it.
 	mutant "Anthropic's API dropped from jarvis's way out" "reach Anthropic's API through its way out" jarvis_acl sed '/- api.anthropic.com/d'
 	mutant "jarvis's way out open to the internal network" "the guard's rules refuse 4751 but from jarvis's network" guard sed '/--dport 4751 -j REJECT/d'
 	mutant "the guard drops jarvis's replies" "reach Anthropic's API through its way out" guard sed '/--sport 4751/d'
@@ -49,10 +49,11 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
 	mutant "jarvis killed before its drain ends" "jarvis waits 35 s for its drain" compose 'services: { jarvis: { stop_grace_period: 10s } }'
 	mutant "jarvis listening on all its networks" "jarvis's way out's network reaches no listener of jarvis's" compose 'services: { jarvis: { environment: { JARVIS_HOST: 0.0.0.0 } } }'
-	# Compose appends an override's list to the file's: jarvis's profiles become [jarvis, demo].
-	mutant "jarvis back in the demo" "the demo profile holds no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis: { profiles: [demo] } }'
-	mutant "the reader back in the demo" "the demo profile holds no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis_reader: { profiles: [demo] } }'
-	# The reader (10u-g2): its list widened to Anthropic or cut, its proxy open to others, its replies dropped, itself on the
+	# `!reset []` empties the file's list: with no profile the service starts with the default ones. A service and the way out it
+	# depends on go together: Compose refuses a project where one is left in a profile the other does not share.
+	mutant "jarvis back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis: { profiles: !reset [] }, egress_jarvis: { profiles: !reset [] }, jarvis_reader: { profiles: !reset [] }, egress_reader: { profiles: !reset [] } }'
+	mutant "the reader back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis_reader: { profiles: !reset [] }, egress_reader: { profiles: !reset [] } }'
+	# The reader: its list widened to Anthropic or cut, its proxy open to others, its replies dropped, itself on the
 	# internal network, given a secret or a volume, root, writable, with jarvis's user, published on the host.
 	mutant "Anthropic's API let out by the reader" "the reader's way out lets four hosts out" reader_acl awk '{ print } /- rpc.gno.land/ { print "    - api.anthropic.com" }'
 	mutant "a whole domain let out by the reader" "the reader's way out lets four hosts out" reader_acl awk '{ print } /- rpc.gno.land/ { print "    - \"*.gno.land\"" }'
@@ -94,7 +95,7 @@ if [ "${1:-}" = --mutants ]; then
 	return 0
 fi
 
-# --- The evals gate's own proofs: result files made here (promptfoo's shape, evals/tests.ts), no Docker. ---------------
+# The evals gate's own proofs: result files made here (promptfoo's shape, evals/tests.ts), no Docker.
 # synth <dir> <on-topic answered of 10> <injection ok 1|0> <a decline ok 1|0> <a case dropped 1|0> [<stamp> [<a case seen twice 1|0>]]: a cases folder
 # (an injection, an allowlist and a ground suite, which holds ten on-topic cases and two declines, and a budget suite that
 # fails whatever happens: outside the gate) and a result of them, as results/<stamp>.json.
@@ -171,7 +172,7 @@ printf '{"results": []}' >"$tmp/gate/garbage/results/2026-11-11T000000Z.json"
 printf '%s\n' "$fingerprint" >"$tmp/gate/garbage/results/2026-11-11T000000Z.fingerprint"
 gate_refuses "the evals gate refuses a result it cannot read" "$tmp/gate/garbage"
 
-# --no-deps: the demo's services, proven already, are neither rebuilt nor recreated under the checks (F5302).
+# --no-deps: the default services, proven already, are neither rebuilt nor recreated under the checks.
 if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis jarvis_reader egress_reader; then
 	echo "test-jarvis.sh: jarvis did not start: $(docker compose -p "$project" $files --profile jarvis logs --no-log-prefix --tail 1 jarvis egress_jarvis jarvis_reader egress_reader 2>&1 | tr '\n' ' ')" >&2
 	exit 3
@@ -184,6 +185,17 @@ hardened "$jarvis" jarvis
 hardened "$egress_jarvis" egress_jarvis network
 hardened "$reader" jarvis_reader
 hardened "$egress_reader" egress_reader network
+# The four together, within their own caps (656 MiB and 0.7 core), apart from the default services' 2 cores and 2 GB.
+jarvis_memory=0 jarvis_cpus=0
+for id in $jarvis $egress_jarvis $reader $egress_reader; do
+	jarvis_memory=$((jarvis_memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
+	jarvis_cpus=$((jarvis_cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
+done
+if [ "$jarvis_memory" -le 687865856 ] && [ "$jarvis_cpus" -le 700000000 ]; then
+	pass "jarvis, its reader and their ways out stay under 656 MiB and 0.7 core"
+else
+	fail "jarvis, its reader and their ways out: $jarvis_memory bytes, $jarvis_cpus nano-cpus"
+fi
 jarvis_net=${project}_jarvis
 jarvis_out=${project}_jarvis_out
 reader_net=${project}_reader
@@ -233,26 +245,26 @@ expect "the reader holds its address on its network, the one jarvis is told" \
 expect "the server holds the admin API's address on its network" \
 	"$(docker inspect --format "{{(index .NetworkSettings.Networks \"$admin_net\").IPAddress}}" "$server")" "$ADMIN_ADDRESS"
 
-# Who reaches jarvis: the server by its name, with the door's key; nothing on the internal network, nor the guard's network
-# (Tailscale's), where jarvis's way out's address is no listener of its own.
+# Who reaches jarvis: the server by its name, with the door's key; nothing on the internal network, nor the guard's network,
+# where jarvis's way out's address is no listener of its own.
 expect "the server reads jarvis's budgets by its name, not through its way out" "$(door right GET /budgets)" '200 {"ask":3,"translate":1}'
 expect "jarvis, off by default, answers a question off" "$(door right POST /ask "$ask_body")" '200 {"status":"off"}'
 expect "nothing on the internal network reaches jarvis" "$(answering "$inside" "$JARVIS_ADDRESS:8081" jarvis:8081)" ""
 out_address=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$jarvis_out\").IPAddress}}" "$jarvis")
 # From a container on jarvis's way out's network, not the guard's own namespace, whose rules refuse every private address
-# first (10j's review, V9, S5): its proxy answers there (the control), jarvis's port never.
+# first: its proxy answers there (the control), jarvis's port never.
 expect "jarvis's way out's network reaches no listener of jarvis's" "$(answering "$jarvis_out" "$out_address:8081")" ""
 expect "and reaches its proxy (the control)" "$(answering "$jarvis_out" guard:4751)" guard:4751
 expect "the admin API answers on its own network" "$(answering "$admin_net" "$ADMIN_ADDRESS:8082")" "$ADMIN_ADDRESS:8082"
 expect "and on no other" "$(answering "$inside" server:8082) $(answering "$jarvis_net" server:8082)" " "
 expect "jarvis's network reaches no port of the server's" "$(answering "$jarvis_net" server:8080 server:8082)" ""
-# Neither network reaches the host, its LAN or the internet, but jarvis's own port as its control (10j's review, V11).
+# Neither network reaches the host, its LAN or the internet, but jarvis's own port as its control.
 expect "jarvis's way out's network reaches no address of the host or the internet" \
 	"$(answering "$jarvis_out" "$hostip:$canary" 1.1.1.1:443 "$(default_gateway):80")" ""
 expect "jarvis reaches no address of the host or the internet but through its way out" \
 	"$(answering "container:$jarvis" "$hostip:$canary" 1.1.1.1:443 "$JARVIS_ADDRESS:8081")" "$JARVIS_ADDRESS:8081"
 # Nor Ergo, the server, web or their addresses inside, nor a private address: jarvis's own namespace has the server's network
-# and no other of the demo's, and its way out's rules refuse private addresses, so each of these answers nothing but its own port.
+# and no other of the stack's, and its way out's rules refuse private addresses, so each of these answers nothing but its own port.
 expect "jarvis reaches no Ergo, no server, no web and no private address" \
 	"$(answering "container:$jarvis" ergo:6667 server:8080 web:8080 "$SERVER_ADDRESS:8080" "$WEB_ADDRESS:8080" 10.0.0.1:80 192.168.1.1:80 169.254.169.254:80 "$JARVIS_ADDRESS:8081")" "$JARVIS_ADDRESS:8081"
 expect "jarvis's names: a request naming another host reaches no route" "$(door right GET /budgets "" "http://$JARVIS_ADDRESS:8081" | cut -c1-3)" 404

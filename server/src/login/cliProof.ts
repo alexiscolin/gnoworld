@@ -1,4 +1,4 @@
-// The command-line proof of a link (owners' moderation, part 3): the account signs a transaction to itself, offline, for
+// The command-line proof of a link: the account signs a transaction to itself, offline, for
 // a chain id that exists nowhere. The server rebuilds the signed bytes from its own constants and checks the signature
 // over those, never over the paste; every field of the paste but the key and the signature is ignored.
 // Sources, gnolang/gno at the chain/onyx tag: tm2/pkg/std/doc.go:96-129 (the bytes), tm2/pkg/sdk/bank/msgs.go:14-18,
@@ -16,7 +16,7 @@ const MAX_MEMO = 2000;
 const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 export type CliRefusal = "size" | "shape" | "key" | "signature" | "address";
-export type CliResult = { ok: true } | { ok: false; reason: CliRefusal };
+type CliResult = { ok: true } | { ok: false; reason: CliRefusal };
 
 export interface SignedDoc {
   chainId: string;

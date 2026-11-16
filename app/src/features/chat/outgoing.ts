@@ -1,4 +1,4 @@
-// The page's side of draft/multiline (docs/decisions.md row 255): what the link hears of a batch, and what it sends.
+// The page's side of draft/multiline: what the link hears of a batch, and what it sends.
 import { foldMultiline, MULTILINE, type Batch, type Composed, type IrcMessage } from "@gnoworld/core";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 
@@ -17,7 +17,7 @@ export function send(
   return lines?.every((line) => ergo.send(line)) === true;
 }
 
-// The lines of a message of several lines (decisions row 255): one draft/multiline batch, or, to an Ergo without it, a
+// The lines of a message of several lines: one draft/multiline batch, or, to an Ergo without it, a
 // line at a time, the blank ones left out (Ergo refuses a PRIVMSG with no text). None when a line is not the room's or
 // one the connection would refuse (a lone surrogate).
 function outgoing(

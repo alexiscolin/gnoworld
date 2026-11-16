@@ -2,7 +2,7 @@ import { Address, type Signal } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "./index.ts";
 
-// Slice 9h: the signals' slice, the stream's signals alone, each world's first of each kind. Who may see a banner is the
+// The signals' slice, the stream's signals alone, each world's first of each kind. Who may see a banner is the
 // banner's to say (Banners.tsx), by the account the signal names.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

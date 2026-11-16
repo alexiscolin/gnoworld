@@ -1,5 +1,5 @@
-// The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
-// room, or a direct message, 4e) and what writes in it.
+// The world's rooms once listed: the switcher, the conversation in view (a room, or a direct message) and what
+// writes in it.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Chip } from "@gnoworld/ui";
@@ -53,26 +53,26 @@ export interface LoadedProps {
   saving: boolean;
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  /** The page's link to Ergo, which says and deletes the room in view's lines (4c), tells the account's typing and
-   * marks the room read (4f). */
+  /** The page's link to Ergo, which says and deletes the room in view's lines, tells the account's typing and
+   * marks the room read. */
   link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
-  /** The conversation's refused delete or reaction, said (4d's DM bar). */
+  /** The conversation's refused delete or reaction, said. */
   dmDismissed: (partner: string) => void;
-  /** Sends what the composer composed to another account (4e), answering a line or correcting one when it says so. */
+  /** Sends what the composer composed to another account, answering a line or correcting one when it says so. */
   sayTo: (partner: string, say: Say, tags?: { reply?: string; edit?: string }) => boolean;
   dms: Dms;
-  /** What the account was told and has not seen (4f-n). */
+  /** What the account was told and has not seen. */
   noticing: Noticing;
-  /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
+  /** What says the rooms could not load, in their place, while a direct message shows. */
   failed?: ReactNode;
   /** The world the chat is in, for its header, its column of worlds and its info panel. */
   place: ChatPlace;
 }
 
-// The rooms' column: the rooms, and for an account its saved messages, a button between them and the conversations until slice 8's menu (4d).
-// On a phone it sits in the rooms' drawer instead (5b), without the column's width.
+// The rooms' column: the rooms, and for an account its saved messages, a button between them and the conversations.
+// On a phone it sits in the rooms' drawer instead, without the column's width.
 function Rail({
   signedIn,
   sections,
@@ -103,7 +103,7 @@ function Rail({
 function useConversation(props: LoadedProps) {
   const { sections, current, state, chat, session, link, dismissed, dmDismissed, sayTo, dms, noticing } = props;
   // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
-  // none while a direct message is in view (U15).
+  // none while a direct message is in view.
   const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   useRoomKeys(roomIds(sections), room);
   const acts = roomActs(link, room ?? "", dismissed);
@@ -155,7 +155,7 @@ export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
   const { room, acts, me, people, shown, lines, members, noteId } = useConversation(props);
   const now = useNow();
-  // The owner of the place's world wears a mark beside the room's name (owners' moderation, part 5); the server's list says who owns what.
+  // The owner of the place's world wears a mark beside the room's name; the server's list says who owns what.
   const owner = ownsRoom(useLinks(me)?.worlds, room);
   const ids = roomIds(sections);
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
@@ -175,7 +175,7 @@ export function Loaded(props: LoadedProps) {
         {...composing.writer}
       />
     );
-  // The room's name opens the place's rooms under a search (D487); the room's settings wait for their own place.
+  // The room's name opens the place's rooms under a search.
   const menu = (
     <RoomsList sections={sections} current={room} failed={failed} badge={(id) => badged(noticing.badges?.[id])} />
   );

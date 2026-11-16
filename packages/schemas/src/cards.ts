@@ -1,4 +1,4 @@
-// The link cards' shapes (docs/plans/link-previews.md §7): what the link reader answers (untrusted), what the stream tells, what the
+// The link cards' shapes: what the link reader answers (untrusted), what the stream tells, what the
 // routes answer and take. Every text is plain: no control or format character, never markup read; the card never carries a link of its
 // own (the line's URL is the card's link), and a picture travels as bytes at its own route, never in a JSON the page keeps.
 import { hasHidden } from "./hidden.ts";

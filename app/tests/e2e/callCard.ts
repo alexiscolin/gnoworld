@@ -1,22 +1,22 @@
 import { realmType } from "@gnoworld/core";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
-import recording from "../../recording/adena-recording.json" with { type: "json" };
+import { ANSWERS } from "../fakeAdena.ts";
 import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
 import { accountPill, connectButton } from "./account.ts";
 import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 
-// The call card's journeys' world (9d): Adena's stand-in (adena.ts) given the calls a signature needs, with the recorded
-// answers (app/recording/adena-recording.json, onyx-1), and the chain's RPC answering as a browser would get it.
+// The call card's journeys' world: Adena's stand-in (adena.ts) given the calls a signature needs, with the answers of
+// ../fakeAdena.ts, and the chain's RPC answering as a browser would get it.
 export const REALM = "gno.land/r/gnoland/wugnot";
-export const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+export const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const RPC = "https://rpc.onyx.testnets.gno.land/**";
 const INDEXER = "https://indexer.onyx.testnets.gno.land/**";
 const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
 // The transaction's hash as the node writes it, base64 of the 32 bytes.
-const BASE64_HASH = "eFwYnlgr7KfDvMsmr6ntZ5vCoe/JcHLddE0pzi+D0Fg=";
+const BASE64_HASH = "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=";
 const CUR = { Name: "cur", Type: realmType(), Value: "" };
 const field = (Name: string, Type: string) => ({ Name, Type, Value: "" });
 // NOT recorded: written in the shape of vm/qfuncs.
@@ -42,7 +42,7 @@ const PAGE = `## Profile
 export interface Wallet {
   /** Whether a switch to onyx-1 moves Adena there; `setNetwork(page, id)` puts it on another chain. */
   moves?: boolean;
-  /** DoContract answers the recorded refusal. */
+  /** DoContract answers a refusal. */
   declines?: boolean;
   /** DoContract waits for `signNow(page)`, the person's click in Adena's popup. */
   hold?: boolean;
@@ -62,8 +62,7 @@ export const setNetwork = (page: Page, id: string) =>
 
 /** Gives the page's Adena (installed first by adena.ts) the methods of a call; what DoContract was given is `__done`. */
 export async function callWallet(page: Page, wallet: Wallet = {}): Promise<void> {
-  const signed = (recording[3]?.answer ?? {}) as Record<string, unknown>;
-  const refused = (recording[5]?.answer ?? {}) as Record<string, unknown>;
+  const { signed, refused } = ANSWERS;
   await page.addInitScript(
     ([{ moves = true, declines = false, hold = false }, signedAnswer, refusedAnswer]) => {
       const done: unknown[] = [];
@@ -135,7 +134,7 @@ export async function writeChain(
   await indexer(page);
   await page.route(INDEXER, (route) => {
     const asked = decodeURIComponent(route.request().url());
-    // The fee read asks the tip first, then the calls above a window under it (F5724).
+    // The fee read asks the tip first, then the calls above a window under it .
     if (fees === "rows" && asked.includes("latestBlockHeight") && !asked.includes("getTransactions"))
       return route.fulfill({ headers: CORS, body: JSON.stringify({ data: { latestBlockHeight: 110 } }) });
     if (!asked.includes("getTransactions")) return route.fallback();
@@ -156,7 +155,7 @@ export async function writeChain(
         id: "",
         result: {
           hash: BASE64_HASH,
-          height: "55414",
+          height: "4242",
           index: 0,
           tx_result: {
             ResponseBase: { Error: null, Data: btoa("(42 int)"), Events: null, Log: "ok", Info: "" },
@@ -203,7 +202,7 @@ export async function callAndSign(page: Page): Promise<void> {
   await calls(page).getByRole("article").getByRole("button", { name: "Sign in Adena" }).click();
 }
 
-// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
+// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once, so the
 // transitions and finite animations (a panel's fade-in) running end first (a cancelled one too); the spinner's endless one is left.
 export async function violations(page: Page) {
   await page.evaluate(async () => {

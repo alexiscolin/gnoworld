@@ -1,7 +1,7 @@
 // Adena as the page finds it (window.adena, read as outside data): present or not, and its version. The sign of
 // an extension is its AddEstablish; anything else, a getter that throws included, is a result, never a throw.
 
-/** The extension's first version with SignArbitrary, which the login needs (slice 9's plan, 9b). */
+/** The extension's first version with SignArbitrary, which the login needs. */
 export const MIN_SIGN_IN = "1.22.2";
 // The version is drawn later, so its length is bounded; cut, it no longer reads as one and asks for an update.
 const VERSION_CHARS = 32;

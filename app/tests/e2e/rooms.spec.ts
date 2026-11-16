@@ -5,7 +5,7 @@ import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
 import { axeOf } from "./axe.ts";
 
-// A world's rooms (slice 4's 4b) on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
+// A world's rooms on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
 // says the lines over a socket of the page's: a guest cannot, open rooms being +M.
 
@@ -258,7 +258,7 @@ test("reads the rooms, a long unbroken line and a long link at a phone's width, 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
-  // At a phone's width the rooms sit behind the Rooms control (slice 5's 5b): its drawer is opened to see them.
+  // At a phone's width the rooms sit behind the Rooms control: its drawer is opened to see them.
   await page.getByRole("button", { name: /^Rooms\b/ }).click();
   for (const link of await roomsNav(page).getByRole("link").all()) await expect(link).toBeVisible();
   await page.keyboard.press("Escape");

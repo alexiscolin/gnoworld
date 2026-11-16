@@ -21,7 +21,7 @@ import { drawing } from "../chat/index.ts";
 import { CallableForm } from "./CallableForm.tsx";
 import { DRAW_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
-// 9e: a page's `<gno-form exec="Func">` is a Form block whose "Call" opens the call card prefilled from the form, every field
+// A page's `<gno-form exec="Func">` is a Form block whose "Call" opens the call card prefilled from the form, every field
 // visible and editable, a hidden one too (it shows as the form says it is). A function or a type vm/qfuncs does not confirm, or a
 // field the function has no parameter for, leaves the read-only form and no Call. NOT recorded: qfuncs' shape.
 const via = await drawing();
@@ -71,7 +71,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
   });
   return one(box, '[data-test="under"]');
 }
-// The call card is the form's next sibling; the page's blocks sit in an article of their own now (RealmBlocks).
+// The call card is the form's next sibling; the page's blocks sit in an article of their own (RealmBlocks).
 const CARD = "figure + article";
 const gnoForm = (exec: string, ...fields: string[]) => `<gno-form exec="${exec}">\n${fields.join("\n")}\n</gno-form>`;
 const input = (name: string, extra = "", type = "text") => `<gno-input name="${name}" type="${type}" ${extra}/>`;
@@ -267,7 +267,7 @@ describe("a form's card among a page's headings", () => {
   );
 });
 
-// Alexis (D272): a page's form that votes on GovDAO opens the vote's card, which says before Adena opens that only its members can vote.
+// A page's form that votes on GovDAO opens the vote's card, which says before Adena opens that only its members can vote.
 describe("a GovDAO page's vote form", () => {
   it("opens the vote's card saying that only GovDAO's members can vote, before Sign in Adena", async () => {
     const vote = [

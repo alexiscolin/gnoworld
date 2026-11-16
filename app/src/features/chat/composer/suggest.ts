@@ -1,4 +1,4 @@
-// What the field suggests as one types (D13904): the commands at its start, the rooms after `#`, the members after `@`, each
+// What the field suggests as one types: the commands at its start, the rooms after `#`, the members after `@`, each
 // narrowed by the letters typed. The word is complete.ts's (the draft's last); a member goes by name when it has one.
 import { shortAddress } from "@gnoworld/schemas";
 import { lastWord, SHOWN, type Choices } from "../complete.ts";

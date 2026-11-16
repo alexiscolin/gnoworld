@@ -1,6 +1,6 @@
-// The verdicts' stream (ADR-0002 §6 and §7; slice 3's plan, 3j): server-sent events a page follows, so a
+// The verdicts' stream (ADR-0002 §6 and §7): server-sent events a page follows, so a
 // link's preview shows only once its message is checked. Public, as guests read, but for the rooms a
-// reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
+// reader may not read; bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
 import type {
   ApiError,
@@ -35,29 +35,29 @@ export function stateOf(action: string): StreamEvent["state"] | undefined {
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
-  // A link card's event (slice 13, L3), in the verdicts' sequence and ring.
+  // A link card's event, in the verdicts' sequence and ring.
   card: (event: CardEvent) => void;
   // A line's translation, to the streams of its room that asked its language, in the verdicts' sequence of ids, in a ring of its own a room and language.
   translation: (event: TranslationEvent) => void;
   // The languages signed-in streams read a world in, open now or closed in the last 15 minutes, the latest first.
   languages: (world: string, except?: string) => readonly Language[];
-  // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
+  // A first signal to the readers of any room of its world they may read, in the verdicts' sequence of ids.
   signal: (signal: Signal) => void;
-  // The chain's events (slice 9g): a call to the readers of its world, a deploy to the Earth's, live only.
+  // The chain's events: a call to the readers of its world, a deploy to the Earth's, live only.
   chain: (event: ChainEvent) => void;
   // A universe's realms deployed in 24 h, to the Earth's readers, the last of each universe replayed to one who comes after.
   realms: (count: RealmsDeployed) => void;
-  // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
+  // visible and session as activity/routes.ts's: a room the reader may not see sends it nothing.
   routes: (options: {
     proxy: string | undefined;
     visible: Seeing["visible"];
     session?: Seeing["session"] | undefined;
   }) => Hono;
   close: () => void;
-  // Who has a stream open (D352), for the home's people online: each guest's stream one, a signed-in account once, by its name in lower
+  // Who has a stream open, for the home's people online: each guest's stream one, a signed-in account once, by its name in lower
   // case as the relay's nick. Nothing is kept of a stream once it closes.
   watching: () => { guests: number; accounts: ReadonlySet<string> };
-  // Who has each world open (D374): the accounts once and the guests as distinct visitors, over the streams that follow it; a world
+  // Who has each world open: the accounts once and the guests as distinct visitors, over the streams that follow it; a world
   // none follows is absent. Nothing is kept of a stream once it closes.
   watchingIn: () => ReadonlyMap<string, { guests: number; accounts: ReadonlySet<string> }>;
   // What it holds, for the tests of its bounds: events kept, rooms kept, clients and visitors.
@@ -73,7 +73,7 @@ interface Options {
   perVisitor?: number;
   total?: number;
   // The places of the streams that follow the Earth's room alone (the landing page's ticker and count): they carry no chat, so
-  // they have a budget of their own and cannot fill the chat's (F5775).
+  // they have a budget of their own and cannot fill the chat's.
   earthTotal?: number;
   heartbeatMs?: number;
   // How long a language stays in use after its last stream (15 minutes).
@@ -87,7 +87,7 @@ interface Client {
   rooms: ReadonlySet<string>;
   /** The worlds of its rooms, found once when its stream opens: an event is matched by a lookup, not by splitting every room. */
   worlds: ReadonlySet<string>;
-  /** The worlds it counts on in "here" (D374): those of the rooms a guest may see, none for a page that follows a room for its
+  /** The worlds it counts on in "here": those of the rooms a guest may see, none for a page that follows a room for its
    * events alone (presence=0, the home's ticker); a members-only room is never told by a count. */
   counted: ReadonlySet<string>;
   /** The session's account in lower case, none for a guest. */
@@ -116,7 +116,7 @@ const writer =
     client.stream.write(text).then(sent, sent);
   };
 
-// The time a connection began following (F890), taken in the same turn as it joins the clients, no event between: a
+// The time a connection began following, taken in the same turn as it joins the clients, no event between: a
 // line said from then on has its verdict on this stream. Said after its replay, so the page asks the server only of lines the replay did not answer;
 // with no id, so a reconnection still names the last verdict; outside the unread count, which a full replay fills.
 function tellSince(stream: SSEStreamingApi, time: number): void {
@@ -209,7 +209,7 @@ export function makeStream(options: Options = {}): Stream {
     realms: side.realms,
     routes: ({ proxy, visible, session = () => undefined }) => {
       return new Hono().get("/", (c) => {
-        // Hono runs a HEAD through this handler: refused before any slot is taken, a stream no HEAD can read (F709).
+        // Hono runs a HEAD through this handler: refused before any slot is taken, a stream no HEAD can read.
         if (c.req.method !== "GET") return c.json({ error: "refused" } satisfies ApiError, 405, { allow: "GET" });
         const asked = askedOf(c.req);
         if (asked === undefined) return c.json({ error: "refused" } satisfies ApiError, 400);
@@ -217,9 +217,9 @@ export function makeStream(options: Options = {}): Stream {
         const place = places.of(asked.rooms);
         if (!place.free(who)) return c.json({ error: "too_many" } satisfies ApiError, 429);
         // Read before a slot is taken: a session that fails (its renewal writes) is the app's 500, and inside
-        // the stream it would end the stream with its slot held for good (F653).
+        // the stream it would end the stream with its slot held for good.
         const reader = session(getCookie(c, "__Host-session"));
-        // The rooms a reader may see (3m: live events and replay alike) and those a guest may, its count's (D374), read once here.
+        // The rooms a reader may see (live events and replay alike) and those a guest may, its count's, read once here.
         const seen = new Set([...asked.rooms].filter((room) => visible(room, reader)));
         const counted = asked.hidden ? [] : [...asked.rooms].filter((room) => visible(room, undefined));
         place.take(who);

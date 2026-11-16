@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as core from "./index.ts";
 import { trimOldest } from "./trim.ts";
 
-// What the page remembers is bounded from its oldest end: the newest stay, a key refused stays, each key dropped is told.
+// What the page holds is bounded from its oldest end: the newest stay, a key refused stays, each key dropped is told.
 describe("trimOldest", () => {
   it("drops the oldest keys of a Set down to the bound, and nothing under it", () => {
     const held = new Set(["a", "b", "c", "d"]);

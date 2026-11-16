@@ -1,4 +1,4 @@
-/* The room read around a found message (slice 13, C): the band over its lines, and the found message marked among them. */
+/* The room read around a found message: the band over its lines, and the found message marked among them. */
 @layer components {
   .banner {
     padding: var(--space-xs) var(--chat-panel-inset);

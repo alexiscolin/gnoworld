@@ -8,8 +8,8 @@ import { createAppStore, type AppState } from "./store/index.ts";
 type AppStore = ReturnType<typeof createAppStore>;
 const StoreContext = createContext<AppStore | undefined>(undefined);
 
-// What the device keeps for every visitor (slice 8), read once the page runs, and again when another tab changes it, until `leaving`.
-function keepDevice(store: AppStore, leaving: AbortSignal): void {
+// What the device keeps for every visitor, read once the page runs, and again when another tab changes it, until `leaving`.
+function loadDevice(store: AppStore, leaving: AbortSignal): void {
   const device = pageDevice();
   const { load } = store.getState().deviceActions;
   load(device);
@@ -26,7 +26,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createAppStore);
   useEffect(() => {
     const leaving = new AbortController();
-    keepDevice(store, leaving.signal);
+    loadDevice(store, leaving.signal);
     return () => {
       leaving.abort();
     };

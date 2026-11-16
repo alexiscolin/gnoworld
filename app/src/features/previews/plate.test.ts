@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { site } from "../../places.ts";
 import { platePreview } from "./plate.ts";
 
-// The plate's wiring (R22): a world shows its first realm's capture, in the default universe alone, whose pages the job captures.
+// The plate's wiring: a world shows its first realm's capture, in the default universe alone, whose pages the job captures.
 describe("platePreview", () => {
   it("names GovDAO's realm, a world of the default universe with a realm", () => {
     const govdao = site.world(new Request("https://gno.world/w/govdao"));

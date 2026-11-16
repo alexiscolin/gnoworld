@@ -6,7 +6,7 @@ import { all, button, click, mount as bare, one } from "../../../tests/mount.tsx
 import { ChatHeader } from "./ChatHeader.tsx";
 import { FullProvider } from "./full.ts";
 
-// 5q: the full-screen chat's header (frame 23.58.01, top): the room's name, the close control.
+// The full-screen chat's header (frame 23.58.01, top): the room's name, the close control.
 const none = () => undefined;
 // The header reads the address (its name's menu, its full-chat button).
 const mount = (element: ReactElement) => bare(<MemoryRouter>{element}</MemoryRouter>);
@@ -23,7 +23,7 @@ describe("the chat's header", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // D441, D445 (Alexis, 2026-11-07): a chat with a dock is never closed, it opens full from the dock's arrows; one with none is closed.
+  // A chat with a dock is never closed, it opens full from the dock's arrows; one with none is closed.
   it("draws Close alone for a chat with no dock, and the full chat's button alone for one with a dock", () => {
     const labels = (box: HTMLElement) => all(box, "button").map((each) => each.getAttribute("aria-label"));
     expect(labels(mount(<ChatHeader title="t" onClose={none} />))).toEqual(["Close the chat"]);
@@ -54,7 +54,7 @@ describe("the chat's header", () => {
 
   it("puts the control to the rooms before the kicker, where a phone's header has it", () => {
     const box = mount(<ChatHeader title="t" onClose={none} rooms={<button type="button">Rooms</button>} />);
-    // The control and the place share the header's first box, its first row on a narrow chat (7e changed this test: one level deeper).
+    // The control and the place share the header's first box, its first row on a narrow chat.
     expect(box.firstElementChild?.firstElementChild?.firstElementChild?.textContent).toBe("Rooms");
   });
 

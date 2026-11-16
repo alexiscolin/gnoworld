@@ -1,4 +1,4 @@
-// jarvis's settings (ADR-0002 §5, §7; D44, D45, D47, D65 to D67, D106, D171, D172), from its environment, checked at
+// jarvis's settings (ADR-0002 §5, §7), from its environment, checked at
 // start as the server's are (settings.ts): what it reads on or off (its switch, where it listens, its file, the day's
 // budgets, its stop's wait), then, on alone, Anthropic's key only from its file, the caps on a question and a call,
 // the models, gnoscope's switch and server, the places' and skills' folders, gnomcp and the chain profiles it may read.
@@ -40,30 +40,30 @@ export interface JarvisConfig {
   // The folder of the places' data files (app/data's).
   places: string;
   skills: string;
-  // A child it spawns, or, with an address, the gnomcp a container of its own serves over TCP (10u-g2).
+  // A child it spawns, or, with an address, the gnomcp a container of its own serves over TCP.
   gnomcp: { command: string; config: string } | { address: { host: string; port: number } };
   // The chain profiles gnomcp may read for jarvis, and those of them with an indexer.
   profiles: { read: string[]; indexed: string[] };
 }
 
-/** What jarvis reads on or off: off, it reads nothing more (D171). */
+/** What jarvis reads on or off: off, it reads nothing more. */
 export interface Served {
   on: boolean;
   // Where it listens, and the names a request's Host may give it, so a page another site's DNS steers to jarvis is
-  // refused (F5288).
+  // refused.
   listen: { host: string; port: number; names: string[] };
   database: string;
-  // What the door proves itself with, in a header of every request; required once jarvis is on (10u-g2).
+  // What the door proves itself with, in a header of every request; required once jarvis is on.
   doorKey: Secret | undefined;
-  // A UTC day's caps in nano-dollars, prices.ts's unit: the questions', and the translations' apart (D47).
+  // A UTC day's caps in nano-dollars, prices.ts's unit: the questions', and the translations' apart.
   budgets: { ask: number; translate: number };
-  // How long a stop waits for the questions in flight before it cuts them (D178).
+  // How long a stop waits for the questions in flight before it cuts them.
   drainMs: number;
 }
 
-// The settings read on or off; their schemas built at each read (F412).
+// The settings read on or off; their schemas built at each read.
 const servedShape = () => ({
-  // Exactly `on`, anything else or nothing off, never an error (Alexis, "Coupé par défaut").
+  // Exactly `on`, anything else or nothing off, never an error.
   JARVIS: z.string().optional(),
   JARVIS_HOST: host(),
   JARVIS_PORT: port().default(8081),
@@ -72,7 +72,7 @@ const servedShape = () => ({
     .default("127.0.0.1,localhost")
     .transform((list) => list.split(","))
     .pipe(z.array(z.string().regex(/^(?:[a-z0-9][a-z0-9.-]{0,252}|\[[0-9a-f:.]{2,45}\])$/))),
-  // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
+  // A file's absolute path, never ":memory:": a restart would open the day again at zero.
   JARVIS_DATABASE: databasePath.pipe(absolute),
   JARVIS_DOOR_KEY_FILE: z.string().min(1).optional(),
   JARVIS_BUDGET_USD: whole(500, 3),
@@ -124,7 +124,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       JARVIS_GNOSCOPE: z.enum(["on", "off"]).optional(),
       JARVIS_GNOSCOPE_URL: z.string().max(2048).refine(isHttps).default("https://gnoscope.com/mcp"),
       JARVIS_GNOSCOPE_TIMEOUT_S: whole(60, 10),
-      // The networks gnoscope's freshness block named on 2026-11-04 (D104).
+      // The networks gnoscope's freshness block names.
       JARVIS_GNOSCOPE_NETWORKS: z
         .string()
         .default("mainnet,onyx")

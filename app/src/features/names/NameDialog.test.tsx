@@ -6,13 +6,13 @@ import { all, button, click, faceOf, follows, mount, one } from "../../../tests/
 import { NameDialog, type NameDialogProps } from "./NameDialog.tsx";
 import { NYM_PREFIX } from "./nym.ts";
 
-// 9f, frames 9 to 15 ("Pick a name and a face"), the person's nebula as the face (ADR-0002 section 1, decision 7 of
+// "Pick a name and a face", the person's nebula as the face (ADR-0002 section 1, decision 7 of
 // docs/design/coherence.md). The dialog holds no state of the chain: its `phase` is the card's course, and a name shows as
 // registered only in the phase `done`.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ONYX = { name: "Onyx", chainId: "onyx-1", real: false };
 const MAINNET = { name: "gno.land", chainId: "gnoland-1", real: true };
-const FEE = "≈ 0.048 GNOT, an estimate from calls up to block 55,414";
+const FEE = "≈ 0.048 GNOT, an estimate from calls up to block 4,242";
 
 const said = (box: Element) => box.textContent.replaceAll(/\s+/g, " ").trim();
 function view(over: Partial<NameDialogProps> = {}) {
@@ -117,7 +117,7 @@ describe("NameDialog: the frames' parts", () => {
   });
 });
 
-// 9k (answer 9f-1): the design system's five changes, as frames 9 to 15 draw the dialog.
+// The design system's five changes, as the frames draw the dialog.
 describe("NameDialog: the design system's own parts", () => {
   it("draws the kicker once, above the title through Dialog's kicker slot, not beside the face, and describes the dialog with it", () => {
     const { box } = view();
@@ -132,14 +132,14 @@ describe("NameDialog: the design system's own parts", () => {
     expect(dialog.getAttribute("aria-describedby")).toContain(kicker?.id ?? "no id");
   });
 
-  // F5970: the line under the title is the frames' reading size, the other notes stay small.
+  // The line under the title is the frames' reading size, the other notes stay small.
   it("sets the line naming the registry in the reading size, and no other note", () => {
     const sized = all(view().box, "dialog p[data-size]");
     expect(sized).toHaveLength(1);
     expect(sized[0]?.querySelector("code")).not.toBeNull();
   });
 
-  // F5964: frames 9 to 15 put the line naming the registry first, then the face, then the field.
+  // The frames put the line naming the registry first, then the face, then the field.
   it("says the line naming r/sys/namereg before the face, and the face before the field", () => {
     const { box } = view();
     const line = one(box, "dialog code").closest("p");
@@ -153,7 +153,7 @@ describe("NameDialog: the design system's own parts", () => {
     ["working", { kind: "working", text: "Waiting for Adena" }],
     ["failed, the form stays", { kind: "failed", text: "Refused", again: true }],
     ["failed, no second try", { kind: "failed", text: "Refused", again: false }],
-    ["done", { kind: "done", name: "nym-alex042", height: 55414 }],
+    ["done", { kind: "done", name: "nym-alex042", height: 4242 }],
   ])("draws no Close button while %s: Later or Done is the way out", (_, phase) => {
     const { box } = view({ phase });
     expect(button(box, "Close")).toBeUndefined();
@@ -218,13 +218,13 @@ describe("NameDialog: nothing is registered until the chain says so", () => {
   });
 
   it("says the name registered, with its block, once the chain gave its answer, and the dialog's way out is then Done", () => {
-    const { box, onClose } = view({ phase: { kind: "done", name: "nym-alexis042", height: 55414 } });
+    const { box, onClose } = view({ phase: { kind: "done", name: "nym-alexis042", height: 4242 } });
     expect(button(box, "Later")).toBeUndefined();
     click(button(box, "Done"));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(said(one(box, "dialog"))).toContain("nym-alexis042");
     expect(said(one(box, "dialog"))).toMatch(/registered/i);
-    expect(said(one(box, "dialog"))).toContain("55,414");
+    expect(said(one(box, "dialog"))).toContain("4,242");
   });
 
   it("says why it failed and offers Register again when nothing was sent", () => {

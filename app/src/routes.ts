@@ -1,13 +1,12 @@
 import { index, route, type RouteConfig } from "@react-router/dev/routes";
 
 // A realm's view is a client route, with no page written ahead: the host's fallback serves it, as it serves the catch-all.
-// Each place's page is in the default universe at its plain path, and in every universe under /net/<id> (docs/decisions.md,
-// 2026-10-29). Two paths to one file take an id each.
+// Each place's page is in the default universe at its plain path, and in every universe under /net/<id>. Two paths to one file take an id each.
 export default [
   index("routes/home.tsx"),
   route("earth", "routes/earth.tsx"),
   route("list", "routes/list.tsx"),
-  // The cosmos's other views are its page too: the whole cosmos far out, and a namespace's system (D344).
+  // The cosmos's other views are its page too: the whole cosmos far out, and a namespace's system.
   route("universe", "routes/cosmos.tsx", { id: "cosmos-universe" }),
   route("s/:system", "routes/cosmos.tsx", { id: "cosmos-system" }),
   route("w/:world", "routes/world.tsx"),

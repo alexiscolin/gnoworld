@@ -1,7 +1,7 @@
-// The first signals over HTTP (slice 9h, D210 to D218): POST /api/signals/chart is a logged-in account opening a world; who
-// is first is told on the stream alone (D215). A POST comes from a listed site in JSON (guard.ts); the
+// The first signals over HTTP: POST /api/signals/chart is a logged-in account opening a world; who
+// is first is told on the stream alone. A POST comes from a listed site in JSON (guard.ts); the
 // order is the origin, the session, the account's count, then the body and the world, so authorization stands before any
-// work and every call of an account is counted, a refused one too (D211, D216): 20 an hour. The winner's signal is told
+// work and every call of an account is counted, a refused one too: 20 an hour. The winner's signal is told
 // once on the stream, never the answer's word alone.
 import { ChartRequest, type Address, type ChartAnswer, type Signal } from "@gnoworld/schemas";
 import { Hono } from "hono";
@@ -11,7 +11,7 @@ import type { Roles } from "../roles/roles.ts";
 import { limiter } from "../limit.ts";
 import type { Signals } from "./signals.ts";
 
-// An account's chart calls an hour (docs/decisions.md, D211).
+// An account's chart calls an hour.
 const CALLS_PER_HOUR = 20;
 
 interface Options {
@@ -25,7 +25,7 @@ interface Options {
   now: () => number;
   // Tells a signal on the stream.
   publish: (signal: Signal) => void;
-  // The worlds that can be charted (FIRST_TO_CHART_WORLDS, D218); every listed world when none.
+  // The worlds that can be charted (FIRST_TO_CHART_WORLDS); every listed world when none.
   chartable?: ReadonlySet<string> | undefined;
 }
 

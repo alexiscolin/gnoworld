@@ -95,7 +95,7 @@ export function useEditorField(
   return caret;
 }
 
-/** The editor's root, set once for its element: a ref new at each render gave Lexical a new root each time, the caret back at the start. */
+/** The editor's root, set once for its element: a ref new at each render would give Lexical a new root each time, the caret back at the start. */
 export function useRoot(editor: LexicalEditor) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

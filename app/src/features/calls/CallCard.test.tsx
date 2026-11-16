@@ -6,7 +6,7 @@ import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, follows, markup, mount } from "../../../tests/mount.tsx";
 import { MEMBERS_ONLY, warnsMembers } from "../../../tests/callFixtures.ts";
-import { recordedAdena } from "../../../tests/recordedAdena.ts";
+import { fakeAdena } from "../../../tests/fakeAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import type { CallCard as Card } from "../../lib/calls.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -14,10 +14,10 @@ import { CallCard, type CallCardProps } from "./CallCard.tsx";
 import { signCall } from "./signCall.ts";
 import { ensureCalls } from "./slice.ts";
 
-// 9d: the card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
+// The card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
 // REALM / FUNCTION / ARGUMENTS / NETWORK / FEE block, the warnings, then "Sign in Adena" and "Cancel" and, once signed, the
-// wait and the result (a hash short as an address is: six, "…", five, D13015). Every state is words, and the result says done only from the chain's answer.
-const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+// wait and the result (a hash short as an address is: six, "…", five). Every state is words, and the result says done only from the chain's answer.
+const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const REALM = "gno.land/r/demo/profile";
 const PARAMS = [
   { Name: "cur", Type: realmType() },
@@ -48,7 +48,7 @@ const view = (over: Partial<CallCardProps> = {}) =>
     />,
   );
 const buttons = (box: HTMLElement) => all(box, "button").map((b) => said(b));
-// The wait's look: Sign in Adena kept, pressed, with no Cancel, and the ring before the words (F5736, F5737).
+// The wait's look: Sign in Adena kept, pressed, with no Cancel, and thering before the words.
 function expectWaiting(box: HTMLElement) {
   expect(buttons(box)).toEqual(["Sign in Adena"]);
   expect(all(box, "button")[0]?.getAttribute("aria-busy")).toBe("true");
@@ -96,7 +96,7 @@ describe("CallCard, the preview", () => {
     expect(inputs.map((input) => input.labels?.[0]?.textContent)).toEqual(["bio", "times"]);
   });
 
-  // F5966: the frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
+  // The frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
   it("draws each argument's name in its own case, aside the caps label, which its field keeps for assistive technology", () => {
     const box = view();
     const names = all(box, "[class*='name']");
@@ -198,23 +198,23 @@ describe("CallCard, the states after the click", () => {
   it("says it is landing in a block, with the hash, once it is sent: nothing yet says done", () => {
     const box = withState({ kind: "landing", hash: HASH });
     expect(said(box)).toMatch(/landing in a block/i);
-    expect(said(box)).toContain("tx 785c18…3d058");
+    expect(said(box)).toContain("tx 012345…bcdef");
     expect(said(box)).not.toMatch(/signed ·|done/i);
     expectWaiting(box);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
   });
 
   it("is done, 'Signed · tx …', with the block's height and the returned value, only from the chain's answer", () => {
-    const box = withState({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
-    expect(said(box)).toMatch(/Signed · tx 785c18…3d058/);
-    expect(said(box)).toContain("55,414");
+    const box = withState({ kind: "done", hash: HASH, height: 4242, value: "(42 int)" });
+    expect(said(box)).toMatch(/Signed · tx 012345…bcdef/);
+    expect(said(box)).toContain("4,242");
     expect(said(box)).toContain("(42 int)");
     expect(buttons(box)).toEqual(["Close"]);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
   });
 
   it("is done with no value line for a call that returned nothing", () => {
-    const box = withState({ kind: "done", hash: HASH, height: 55414, value: "" });
+    const box = withState({ kind: "done", hash: HASH, height: 4242, value: "" });
     expect(said(box)).toContain("Signed · tx");
     expect(said(box)).not.toMatch(/returned/i);
   });
@@ -240,7 +240,7 @@ describe("CallCard, the states after the click", () => {
   it("says a failure after the hash with the hash and the chain's log, and only 'Close'", () => {
     const box = withState({ kind: "failed", reason: "chain", log: "panic: name taken", hash: HASH });
     expect(said(box)).toContain("panic: name taken");
-    expect(said(box)).toContain("tx 785c18…3d058");
+    expect(said(box)).toContain("tx 012345…bcdef");
     expect(said(box)).not.toMatch(/Signed · tx/);
     expect(buttons(box)).toEqual(["Close"]);
   });
@@ -342,8 +342,8 @@ describe("CallCard, its buttons and fields call their handlers", () => {
   });
 });
 
-// F5723: what the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
-// card is signed through signCall with the recording's stand-in for Adena: the drawn fields and network are compared with
+// What the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
+// card is signed through signCall with a stand-in for Adena: the drawn fields and network are compared with
 // DoContract's message, not with a helper only a test calls.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
@@ -373,7 +373,7 @@ async function drawnAndSent(texts: string[]) {
     edit("a", index, text);
   });
   const box = mount(<CallCard card={store.getState().calls["a"] ?? preview} network={ONYX} fee="x" {...NOTHING} />);
-  const wallet = recordedAdena({ account: CALLER });
+  const wallet = fakeAdena({ account: CALLER });
   await signCall("a", {
     store,
     adena: wallet.adena,
@@ -428,7 +428,7 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
     expect(block.className).toContain("block");
   });
 
-  // F5953: the block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
+  // The block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
   it("wears the shared edge on its block", () => {
     const classes = (all(view(), "dl")[0] ?? document.body).className.split(" ");
     expect(classes).toEqual([expect.stringContaining("edge"), expect.stringContaining("block")]);
@@ -441,7 +441,7 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
   });
 });
 
-// Alexis (D272): a GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
+// A GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
 // the fee is lost: one line, in the card every vote opens (the realm view, a pinned action, a page's form). r/gov/dao's votes are
 // MustVoteOnProposalSimple and the two of a struct no call carries (read on onyx with gnomcp).
 describe("CallCard, a GovDAO vote", () => {
@@ -471,7 +471,7 @@ describe("CallCard, a GovDAO vote", () => {
 });
 
 // The video's card is named after the action ("Boop the pot", f0110), its function in its own row: a pinned action's card is titled
-// by its label (design review of 9e-1); a card with no name is titled by its function, as before.
+// by its label; a card with no name is titled by its function.
 describe("CallCard, its title", () => {
   it("is the name it is given, the function staying in its FUNCTION row", () => {
     const box = view({ title: "Vote" });

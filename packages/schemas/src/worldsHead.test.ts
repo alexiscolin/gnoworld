@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WORLDS_CAPS, WORLDS_COUNT_MAX_BYTES, WorldsCount } from "./worldsHead.ts";
 
-// The count beside the file (7n2): what the home's hero reads for its number, a few bytes where the file weighs 11 KB gzip, so a phone asks
+// The count beside the file: what the home's hero reads for its number, a few bytes where the file weighs 11 KB gzip, so a phone asks
 // nothing of the cosmos before View in space. The job writes it from the file it writes, in the same pass: its head and core's count of it.
 describe("WorldsCount", () => {
   const counted = (over: Record<string, unknown> = {}) => ({

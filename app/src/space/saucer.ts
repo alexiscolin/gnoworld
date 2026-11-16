@@ -1,11 +1,11 @@
-// The galaxy's places (D454): a saucer, thick at its heart and flat at its rim, the home at the heart and every other system round it on
-// the sunflower's rule, the heaviest nearest (Alexis, 2026-11-09: "la soucoupe avec un placement math comme en B").
+// The galaxy's places: a saucer, thick at its heart and flat at its rim, the home at the heart and every other system round it on
+// the sunflower's rule, the heaviest nearest.
 import { hashOf } from "./hash.ts";
 import type { Vec } from "./layout.ts";
 
 /** The galaxy's heart, where the home stands. */
 export const HEART: Vec = { x: 0, y: 0, z: 0 };
-// raw: the saucer's height at its heart, a share of its radius, how fast it falls to the rim and what it keeps there (Alexis, 2026-11-09)
+// raw: the saucer's height at its heart, a share of its radius, how fast it falls to the rim and what it keeps there
 const SAUCER = { heart: 0.24, fall: 1.6, rim: 0.012 } as const;
 // raw: the room kept between two systems' outer orbits, and how far a crowded place steps out to find it
 const GAP = 40;

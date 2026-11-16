@@ -1,9 +1,9 @@
 // gnomcp over stdio (ADR-0002 §5): one long-lived child for every question, started read-only in a fresh empty folder,
 // its working directory and its home, so no profile, key or session file of anyone's is read, its keys and sessions
-// kept there, jarvis's configuration named, its audit on stderr into jarvis's log; and checked at each start: 10b's
-// reads there with every field ours allows, and every profile read-only (D86). A call goes only to a read of 10b's
+// kept there, jarvis's configuration named, its audit on stderr into jarvis's log; and checked at each start: our
+// table's reads there with every field ours allows, and every profile read-only. A call goes only to a read of that
 // table with arguments its schema takes, has its timeout, and its result passes Zod; a child that ended starts again
-// at the next call, 3 times in 10 minutes at most (D87).
+// at the next call, 3 times in 10 minutes at most.
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,7 +18,7 @@ import { gnomcpTools } from "./gnomcpTools.ts";
 import { visible } from "./untrusted.ts";
 
 // What gnomcp is: a child this process spawns, or, with an address, one long-lived connection to a gnomcp a container
-// of its own serves (10u-g2), over which the same checks, timeouts, bound and restarts hold.
+// of its own serves, over which the same checks, timeouts, bound and restarts hold.
 type Target = { readonly command: string; readonly config: string } | { readonly address: Address };
 type Setup = Target & {
   readonly profiles: { readonly read: readonly string[]; readonly indexed: readonly string[] };
@@ -32,7 +32,7 @@ type Setup = Target & {
 type Failed = "timeout" | "down" | "malformed" | "error" | "refused";
 export type Ran = { ok: true; text: string; isError: boolean } | { ok: false; reason: Failed };
 export interface Gnomcp {
-  /** A read, ended by `signal` too: gnomcp is then told it is cancelled, and the call answers `timeout` (F5290). */
+  /** A read, ended by `signal` too: gnomcp is then told it is cancelled, and the call answers `timeout`. */
   call(name: string, args: unknown, signal?: AbortSignal): Promise<Ran>;
   close(): Promise<void>;
 }
@@ -93,7 +93,7 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   };
   return {
     async call(name, args, signal) {
-      // ponytail: a find over 10b's table of seven reads.
+      // ponytail: a find over the table of seven reads.
       const parsed = tools.find((tool) => tool.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       const current = closed ? undefined : await until(live(), signal);
@@ -120,7 +120,7 @@ type CallTool = Client["callTool"];
 const timedOut = (error: unknown) => error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout;
 
 /** A tool as our own definition hands it to the MCP client, with no output schema: the client compiles and checks
- * none a server listed, which a schema built to backtrack would hold the process with (F5253, F5111). */
+ * none a server listed, which a schema built to backtrack would hold the process with. */
 export const unchecked = (name: string) => ({ name, inputSchema: { type: "object" as const } });
 
 // A call its signal ended, the MCP client sends gnomcp the cancellation and answers as a timeout of its own.
@@ -195,7 +195,7 @@ async function atStart<T>(request: Promise<T>): Promise<T> {
   }
 }
 
-// 10b's reads for Jarvis's profiles, the one source of what a call may name and what gnomcp must list.
+// The reads for Jarvis's profiles, the one source of what a call may name and what gnomcp must list.
 const toolsOf = ({ profiles }: Setup) => gnomcpTools({ chains: profiles.read, indexed: profiles.indexed });
 
 async function checked(client: Client, setup: Setup, timeout: number): Promise<void> {

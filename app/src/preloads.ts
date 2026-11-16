@@ -1,5 +1,5 @@
 // What the home's HTML asks for before its scripts run, on a computer: the cosmos Earth's first-frame maps, the small variants, and
-// worlds.json (D334). They are in the HTML alone, never in a route's `links`: React Router adds those on a client navigation too, and a
+// worlds.json. They are in the HTML alone, never in a route's `links`: React Router adds those on a client navigation too, and a
 // visit that came from the Earth's page, whose scene already read the file, would ask it a second time. Written at build time (entry.server.tsx), so the first screen's script weighs nothing
 // more; a phone's media query leaves them unfetched, as the 3D waits there. The scene's chunk is not preloaded: measured at 10 Mbit/s,
 // it delayed the loader's leave from about 2 s to 4 to 7 s.

@@ -81,7 +81,7 @@ describe("loadConfig", () => {
     });
   });
 
-  // D218: every world can be first charted (D210) unless the setting names the worlds that can; the journeys' server names
+  // Every world can be first charted unless the setting names the worlds that can; the journeys' server names
   // govdao alone, so the worlds the other journeys open are never charted.
   it("reads the worlds that can be first charted: every world when unset, else the slugs named, refusing any other word", () => {
     expect(loadConfig(ENV).firstToChart).toBeUndefined();
@@ -120,11 +120,11 @@ describe("loadConfig", () => {
       ["ERGO_DATA", ""],
       ["ERGO_DATA", "ergo"],
       ["ERGO_DATA", "ergo/data"],
-      // The whole disk, /proc included, walked at each tick (3NB-6).
+      // The whole disk, /proc included, walked at each tick.
       ["ERGO_DATA", "/"],
       ["ERGO_DATA", "/ergo/.."],
       ["ERGO_DATA", "/../"],
-      // The root again, spelled otherwise: empty and "." segments (F636).
+      // The root again, spelled otherwise: empty and "." segments.
       ["ERGO_DATA", "//"],
       ["ERGO_DATA", "///"],
       ["ERGO_DATA", "/."],
@@ -200,7 +200,7 @@ describe("loadConfig", () => {
     }
   });
 
-  // The home's block height (2026-10-31): the universes' data names the RPC the prices timer reads it from.
+  // The home's block height: the universes' data names the RPC the prices timer reads it from.
   it("reads the universes' data file the height's RPC comes from: absolute, none by default", () => {
     expect(loadConfig(ENV).universes).toBeUndefined();
     expect(loadConfig({ ...ENV, UNIVERSES_FILE: "/app/app/data/universes.json" }).universes).toBe(
@@ -317,7 +317,7 @@ describe("loadConfig", () => {
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"new/kind":0.5}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":1.01}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":-0.1}' }],
-    // A threshold of 0 hides every line of its category: a typo would silence the chat (F525).
+    // A threshold of 0 hides every line of its category: a typo would silence the chat.
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":0}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":"0.9"}' }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "0" }],
@@ -451,7 +451,7 @@ describe("loadConfig", () => {
     ["TRUSTED_PROXY", "proxy.local"],
     ["TRUSTED_PROXY", "999.1.1.1"],
     ["ROLES_FILE", ""],
-    // The login refuses every chain with an empty list: it must not boot so (decision 142).
+    // The login refuses every chain with an empty list: it must not boot so.
     ["CHAINS", ""],
     ["CHAINS", "onyx-1,"],
     ["CHAINS", "onyx 1"],
@@ -532,7 +532,7 @@ describe("loadConfig", () => {
   });
 });
 
-// 10g: the door's settings and the admin API's listener, each none by default (D93 to D96).
+// The door's settings and the admin API's listener, each none by default.
 describe("loadConfig, Jarvis's door and the admin API", () => {
   const ANNA = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
   const BEN = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -575,7 +575,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(loadConfig({ ...ENV, JARVIS: "on" }).jarvis).toBeUndefined();
   });
 
-  // 10u-g2: the key the door proves itself to jarvis with, from a file, never printed.
+  // The key the door proves itself to jarvis with, from a file, never printed.
   describe("the door's key", () => {
     const URL = { ...ENV, JARVIS_URL: "http://jarvis:8090" };
     const DOOR = `d${"0".repeat(31)}`;

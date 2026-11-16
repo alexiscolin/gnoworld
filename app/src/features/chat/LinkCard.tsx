@@ -1,4 +1,4 @@
-// A link's card under a chat line (link-previews L4): the page's host, site, title, description and picture, as the server checked them, the
+// A link's card under a chat line: the page's host, site, title, description and picture, as the server checked them, the
 // card linking to the line's own URL. Its text is React's text, never read as markup; its picture is the one route of its key, not for a
 // reader who saves data. Its author and the room's moderators can remove it. A chunk of its own, asked by a line that has a card.
 import { Button, Card, Cluster } from "@gnoworld/ui";
@@ -20,7 +20,7 @@ export interface LinkCardProps {
   href: string;
   saving: boolean;
   removable: boolean;
-  /** Whether its link is a Tab stop: on the list's stop alone (U1). */
+  /** Whether its link is a Tab stop: on the list's stop alone. */
   tabbable: boolean;
 }
 

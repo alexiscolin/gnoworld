@@ -2,9 +2,8 @@ import { lineOf, lines } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import { asAccount, barOf, ROOM } from "./talk.ts";
 
-// F1170's U1 (the UX review): on a phone a line's column is about 168 px wide; the bar's controls wrapped to two rows.
-// Narrow, the bar floats over the line as it does wide, on one row, its three quick reactions behind one React menu, and
-// no line moves as it comes (docs/decisions.md, D376).
+// On a phone a line's column is about 168 px wide: the bar floats over the line as it does wide, on one row, its three quick
+// reactions behind one React menu, and no line moves as it comes.
 test.describe("a line's bar on a phone's screen", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 

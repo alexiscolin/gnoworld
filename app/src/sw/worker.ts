@@ -1,4 +1,4 @@
-// The worker's rules (ADR-0001 §12, nuanced by the 2026-10-18 decision): precache the build's hashed files and
+// The worker's rules (ADR-0001 §12): precache the build's hashed files and
 // its shell into a cache of each version, answer from it, cache nothing else, keep the version before until
 // the next one takes over, and take over only when the page asks. The scope is a parameter, so the same
 // rules run in the tests and in the browser (sw.ts).
@@ -50,13 +50,13 @@ export interface WorkerScope {
   addEventListener(type: "message", listener: (event: WorkerMessage) => void): void;
 }
 
-// Every cache of the worker's starts with this; a cache of anything else (the rooms', later) is not its to drop.
+// Every cache of the worker's starts with this; a cache of anything else is not its to drop.
 const CACHE = "gnoworld-precache";
 
 const ownCache = (name: string) => name === CACHE || name.startsWith(`${CACHE}-`);
 
 /** The cache of a version: its list, digests included, names it, so a version fetches into a cache of its own
- * and the version before keeps its files until the next one takes over (F172). */
+ * and the version before keeps its files until the next one takes over. */
 export async function cacheName(files: readonly Precached[]): Promise<string> {
   const digest = await integrity(new TextEncoder().encode(JSON.stringify(files)));
   return `${CACHE}-${digest

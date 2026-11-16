@@ -1,4 +1,4 @@
-# The demo's way out (slice 3's plan, 3e; decision 151): smokescreen, an HTTP CONNECT proxy that lets out the
+# The demo's way out: smokescreen, an HTTP CONNECT proxy that lets out the
 # hosts its list names and refuses a private address after it resolves one, built from its source at v0.1.0
 # (Go's checksum database holds the module to that version), with the stack's probe for its health check.
 FROM golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1 AS build

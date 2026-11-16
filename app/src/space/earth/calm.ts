@@ -1,4 +1,4 @@
-// The calm of a planet's arrival (D13001): no aim and no ping before it is over, and no aim at all for a message said before the arrival.
+// The calm of a planet's arrival: no aim and no ping before it is over, and no aim at all for a message said before the arrival.
 // It starts when the page's planet first stands at rest on its page, and starts again each time a flight takes it away.
 export class Calm {
   readonly #wait: number;

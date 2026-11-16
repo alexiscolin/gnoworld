@@ -1,5 +1,5 @@
 // What a deployment serves once the server's jobs ran, which the static host of the journeys lacks: the recorded worlds' file, its count
-// as the job counts it (7n2, nginx's /worlds-count.json), the people's count (8i) and the network's line.
+// as the job counts it (nginx's /worlds-count.json), the people's count and the network's line.
 // A page that watches every request meets no 404.
 import { worldsDrawn } from "@gnoworld/core";
 import { WorldsCount } from "@gnoworld/schemas";

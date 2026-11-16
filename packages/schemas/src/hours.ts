@@ -1,4 +1,4 @@
-// A world's last day of messages an hour (slice 8, 8g), as GET /api/presence/hours answers it: counts alone. A file of its own, so a plate's
+// A world's last day of messages an hour, as GET /api/presence/hours answers it: counts alone. A file of its own, so a plate's
 // read carries no other answer's schema.
 import { PER_HOUR_MOST } from "./counts.ts";
 import { z } from "./zod.ts";
@@ -11,7 +11,7 @@ export const PRESENCE_HOURS_MAX_BYTES = 1024;
 
 const Rate = z.number().check(z.gte(0), z.lte(PER_HOUR_MOST));
 
-/** GET /api/presence/hours?world= (slice 8, 8g; a plate's "ACTIVITY · LAST 24 H", frames 26 and 40): a world's messages an hour, its
+/** GET /api/presence/hours?world= (a plate's "ACTIVITY · LAST 24 H"): a world's messages an hour, its
  * busiest sample of each of the last 24 hours, oldest first, from the hour `from` (milliseconds since 1970, on the hour), with its pace now.
  * An hour no sample read is null, never a zero; a world never read has no hours. Counts alone. */
 export const PresenceHours = z.strictObject({

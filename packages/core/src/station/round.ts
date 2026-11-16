@@ -1,7 +1,7 @@
-// Where the stations stand round the Earth (part 7x): the largest first, by the size the team's file gives each, then in the file's order,
+// Where the stations stand round the Earth: the largest first, by the size the team's file gives each, then in the file's order,
 // never by chance. The first twelve each take, of the places on their own orbits that the Earth's view reads clear (whole on the screen,
-// off the page's text, the Earth, the great star, the rail and the Moon's whole path, in no crowd, pile or row: 7p's judge), the one
-// farthest from those standing already (the best candidate, D349), so a list spreads again as it changes; others light a far belt.
+// off the page's text, the Earth, the great star, the rail and the Moon's whole path, in no crowd, pile or row), the one
+// farthest from those standing already, so a list spreads again as it changes; others light a far belt.
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { Draws } from "./draws.ts";

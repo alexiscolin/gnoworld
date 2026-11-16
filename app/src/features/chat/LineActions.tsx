@@ -1,7 +1,6 @@
-// A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
-// reactions, Reply and a Pin button for a reader who may pin, its More menu holding Copy
-// text, Copy link, Open thread, View profile, Save message and Mark unread for an account, Edit and, on the reader's
-// own line, Delete, asked first. More reactions come with their merges; Report waits for slice 12's moderation queue.
+// A line's actions: the prototype's bar, an account's three quick reactions, Reply and a Pin button for a reader who
+// may pin, its More menu holding Copy text, Copy link, Open thread, View profile, Save message and Mark unread for an
+// account, Edit and, on the reader's own line, Delete, asked first.
 import { canEdit, type Line, type Shown } from "@gnoworld/core";
 import { Menu } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -15,7 +14,7 @@ import { menuItems, type MenuItems } from "./menuItems.ts";
 import { useTranslationItem } from "./translationItem.ts";
 import { roomLabel, shortAddress } from "./names.ts";
 
-// A bar that would rise past the top of the list that scrolls comes down inside its line, as it shows (U10).
+// A bar that would rise past the top of the list that scrolls comes down inside its line, as it shows.
 function useInside() {
   const barRef = useRef<HTMLDivElement>(null);
   const [inside, setInside] = useState(false);
@@ -31,7 +30,7 @@ export interface LineActionsProps {
   line: Line;
   /** The room the line is in; none for a direct message's. */
   room?: string | undefined;
-  /** The partner of the direct message the line is in (4d's DM bar); none for a room's. */
+  /** The partner of the direct message the line is in; none for a room's. */
   dm?: string | undefined;
   /** The reader's address; none for a guest. */
   me: string | undefined;
@@ -39,17 +38,17 @@ export interface LineActionsProps {
   onCopy: (what: "text" | "link") => void;
   /** Deletes the line, the reader's own; whether it went out. */
   onDelete: (id: string) => boolean;
-  /** Its delete went out, not answered yet: no second one (U4). */
+  /** Its delete went out, not answered yet: no second one. */
   deleting?: boolean;
-  /** What an account keeps of it (4d); none for a guest, who has no device to keep it on. */
+  /** What an account keeps of it; none for a guest, who has no device to keep it on. */
   keeping?: LineKeeping | undefined;
   /** The line's reactions as shown: the quick reactions the reader gave show pressed. */
   reactions?: readonly Shown[] | undefined;
   /** Reacts to the line with an emoji, or takes the reaction back; whether it went out. */
   onReact: (emoji: string, on: boolean) => boolean;
-  /** Makes the line the one the composer's next answers (4d). */
+  /** Makes the line the one the composer's next answers. */
   onReply: () => void;
-  /** Opens the thread the line is in, or starts one (4d's threads); none: no item. */
+  /** Opens the thread the line is in, or starts one; none: no item. */
   onThread?: ((id: string) => void) | undefined;
   /** Puts the line's words in the composer to correct them; given by a view that has edits. */
   onEdit?: (() => void) | undefined;
@@ -59,7 +58,7 @@ export interface LineActionsProps {
   menuAt?: { x: number; y: number } | undefined;
 }
 
-// Whether Edit is offered: an Edit to ask for, and canEdit's rule, which the composer holds as well (CR5).
+// Whether Edit is offered: an Edit to ask for, and canEdit's rule, which the composer holds as well.
 const asksEdit = (onEdit: (() => void) | undefined, line: Line, me: string | undefined) =>
   onEdit !== undefined && canEdit(line, me);
 
@@ -142,7 +141,7 @@ export function LineActions({
   const { barRef, inside } = useInside();
   // A delete asked, sent after the dialog's close, which gives the focus back to More (Menu hands it there first).
   const deletingRef = useRef(false);
-  // Two missing values are no match: a guest's line has no account tag, a guest no address (M1).
+  // Two missing values are no match: a guest's line has no account tag, a guest no address.
   const own = me !== undefined && line.account === me;
   const given = givenOf(reactions);
   const needs = me === undefined ? onNeed : undefined;

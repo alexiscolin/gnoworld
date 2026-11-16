@@ -17,7 +17,7 @@ const status = (run: () => unknown): unknown => {
 
 const fixtureSite = () => siteOf(FIXTURE);
 
-// F2206: a build at a module's load is a static mutant, which StrykerJS leaves unjudged.
+// A build at a module's load is a static mutant, which StrykerJS leaves unjudged.
 describe("a site", () => {
   test("reads its data only when first asked, never when made", () => {
     let reads = 0;
@@ -169,7 +169,7 @@ describe("a site of several universes, an ecosystem and a world of another unive
   });
 });
 
-// The header's two questions of the data (F3270): which universe a path belongs to, and which view it is.
+// The header's two questions of the data: which universe a path belongs to, and which view it is.
 describe("the site's universe and view of a path", () => {
   const onyx = () => fixtureSite().universes[0];
   const gnoland = () => fixtureSite().universes[1];
@@ -189,7 +189,7 @@ describe("the site's universe and view of a path", () => {
     expect(viewAt(onyx(), "/earth")).toBe("world");
     expect(viewAt(onyx(), "/net/onyx/earth")).toBe("world");
     expect(viewAt(onyx(), "/net/onyx/earth/")).toBe("world");
-    // D501: the default universe's home is the Earth's first screen, no level of its own; another universe's home is its system.
+    // The default universe's home is the Earth's first screen, no level of its own; another universe's home is its system.
     expect(viewAt(onyx(), "/")).toBeUndefined();
     expect(viewAt(onyx(), "/net/onyx/")).toBeUndefined();
     expect(viewAt(onyx(), "/net/onyx")).toBeUndefined();
@@ -198,7 +198,7 @@ describe("the site's universe and view of a path", () => {
     expect(viewAt(onyx(), "/w/bubble")).toBe("world");
   });
 
-  // D344: the cosmos's own addresses are the default universe's: /universe the whole cosmos far out, /s/<namespace> a system.
+  // The cosmos's own addresses are the default universe's: /universe the whole cosmos far out, /s/<namespace> a system.
   test("/universe is the Universe view and /s/<namespace> a System view, of the default universe alone", () => {
     expect(viewAt(onyx(), "/universe")).toBe("universe");
     expect(viewAt(onyx(), "/universe/")).toBe("universe");
@@ -214,7 +214,7 @@ describe("the site's universe and view of a path", () => {
     expect(cosmosAt("/")).toBeUndefined();
     expect(cosmosAt("/s/gnoland")).toEqual({ view: "system", system: "gnoland" });
     expect(cosmosAt("/s/%E0%A4%A")).toBeUndefined();
-    // D501: the Earth's system is its own page, /s/gnoland, whichever of its namespaces is named.
+    // The Earth's system is its own page, /s/gnoland, whichever of its namespaces is named.
     expect(systemPath(undefined)).toBe("/s/gnoland");
     expect(systemPath("gov")).toBe("/s/gnoland");
     for (const system of ["gnoswap", "g1abc", "a b/c"])
@@ -238,7 +238,7 @@ describe("the site's universe and view of a path", () => {
   });
 });
 
-// The home's block height comes from markets.json, which the server's timer writes (decision of 2026-10-31): the page reads no
+// The home's block height comes from markets.json, which the server's timer writes: the page reads no
 // chain, so a universe's view carries no RPC for it to ask.
 describe("a universe's view", () => {
   test("carries no RPC: the home asks no chain", () => {

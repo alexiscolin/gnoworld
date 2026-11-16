@@ -1,4 +1,4 @@
-// What the universe's stage holds (D401): the planets, the suns, the dust, the stars, the galaxy's body (drawn over the frame), the orbits
+// What the universe's stage holds: the planets, the suns, the dust, the stars, the galaxy's body (drawn over the frame), the orbits
 // of the system the camera is in, the plate, the planets near enough to be themselves, and the speed and the scan; each made once per
 // worlds' file, all disposed together.
 import { Scene, type PerspectiveCamera, type WebGLRenderer } from "three";
@@ -27,21 +27,21 @@ export interface Frame extends Open {
   /** The page's planet, by its index (-1 none), and how far the others have gone (0 to 1). */
   readonly uAlone: { value: number };
   readonly uSolo: { value: number };
-  /** How large on screen, in pixels, the others must stand to shrink away (0: all of them, a page's); the home's keeps far worlds (D499). */
+  /** How large on screen, in pixels, the others must stand to shrink away (0: all of them, a page's); the home's keeps far worlds. */
   readonly uSoloPx: { value: number };
   /** How far the far worlds the home kept have gone too, once it is left for a page (0 to 1). */
   readonly uSoloAll: { value: number };
-  /** How much larger the home system's worlds are drawn on the home's first screen (1 elsewhere), eased by the frame (D541). */
+  /** How much larger the home system's worlds are drawn on the home's first screen (1 elsewhere), eased by the frame. */
   readonly uBoost: { value: number };
-  /** How far a lens dims what it does not light (0 to 1), eased by the frame (D425). */
+  /** How far a lens dims what it does not light (0 to 1), eased by the frame. */
   readonly uLens: { value: number };
-  /** 1 while the frame goes through the flight's blur pass, which grades it anew: a sun's glow is drawn ungraded then (D497). */
+  /** 1 while the frame goes through the flight's blur pass, which grades it anew: a sun's glow is drawn ungraded then. */
   readonly uThrough: { value: number };
   /** The galaxy's arrival clock, in seconds (intro.ts); DONE once over or never run. */
   readonly uIntro: { value: number };
 }
 
-export interface Gains {
+interface Gains {
   readonly sun: { value: number };
   readonly dust: { value: number };
   readonly stars: { value: number };
@@ -69,11 +69,11 @@ export class Stage {
   readonly gains: Gains = { sun: { value: 1 }, dust: { value: 1 }, stars: { value: 1 } };
   readonly orbits = new Orbits();
   readonly plate = new Plate();
-  /** The orbit round a planet a page frames close (D458). */
+  /** The orbit round a planet a page frames close. */
   readonly round = new Round();
-  /** The moons round a planet a page frames close (D463). */
+  /** The moons round a planet a page frames close. */
   readonly moons: Moons;
-  /** The links between worlds, while the Map shows a system or a world (D433). */
+  /** The links between worlds, while the Map shows a system or a world. */
   readonly links = new Links(this.frame);
   /** The Earth's ground, where the page's signs stand. */
   readonly ground: EarthGround;
@@ -170,7 +170,7 @@ export class Stage {
     });
   }
 
-  /** Lights the planets and the suns of the worlds `only` names, the near ones drawn as themselves lit alone (D425); none, all. */
+  /** Lights the planets and the suns of the worlds `only` names, the near ones drawn as themselves lit alone; none, all. */
   light(universe: Universe, only: ReadonlySet<string> | undefined): void {
     if (this.near !== undefined) this.near.only = only;
     const lit = (planet: { readonly id: string } | undefined) => only?.has(planet?.id ?? "") === true;

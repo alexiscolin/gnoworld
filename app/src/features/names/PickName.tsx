@@ -1,4 +1,4 @@
-// The dialog that registers a name on the page's universe (9f): the fee read, the card and its signing parts come with it, at the account menu's
+// The dialog that registers a name on the page's universe: the fee read, the card and its signing parts come with it, at the account menu's
 // "Pick a name", never with the label.
 import { pageNames } from "./pageNames.ts";
 import { RegisterFlow } from "./RegisterFlow.tsx";

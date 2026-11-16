@@ -1,8 +1,8 @@
 // Jarvis's skills (ADR-0002 §5), read once at start from one folder, as text only: each entry a skill's folder holding
-// SKILL.md, optionally references/ of .md files, and a LICENSE and a NOTICE (D50); each a regular file, never a link
+// SKILL.md, optionally references/ of .md files, and a LICENSE and a NOTICE; each a regular file, never a link
 // (lstat), within a size and all within another, UTF-8 with no hidden or control character; SKILL.md's front matter
 // exactly a name, the folder's, and a description, read by a pattern. Anything else stops the start, naming the file
-// and why. It gives the index the system prompt lists, the tool load_skill, and the digest of every file (D51).
+// and why. It gives the index the system prompt lists, the tool load_skill, and the digest of every file.
 import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, type Stats } from "node:fs";
 import { join } from "node:path";
@@ -141,8 +141,8 @@ function descriptionOf(name: string, path: string, text: string): string {
 }
 
 // load_skill: a skill by its name, or one of its references by its file's name, both from what was loaded.
-// gnomcp's gno skill, copied whole (D50), is offered its nine reading references alone, never the five that teach an
-// agent that writes, signs and sends coins (Alexis, 2026-11-04); a skill of ours, each of its references.
+// gnomcp's gno skill, copied whole, is offered its nine reading references alone, never the five that teach an
+// agent that writes, signs and sends coins; a skill of ours, each of its references.
 function offers(skill: string, reference: string): boolean {
   const reading = [
     "audit",

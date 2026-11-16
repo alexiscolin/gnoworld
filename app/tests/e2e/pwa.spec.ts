@@ -6,7 +6,7 @@ import { cacheContents, controlled, expect, hydrated, PAGES, test, type Answer, 
 import { goBySearch } from "./palette.ts";
 import { GUARDED, UPDATING } from "./sites.ts";
 
-// The PWA as ADR-0001 §12 asks, nuanced by the 2026-10-18 decision (F172, F175): a manifest Chromium reads, the
+// The PWA as ADR-0001 §12 asks: a manifest Chromium reads, the
 // hashed files and the shell answered from the cache and nothing else cached, the app open with no network,
 // updates that wait for a click, `?nosw`. (Chromium's installability check answers nothing here: not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8}\.(js|css|woff2)$/;
@@ -30,7 +30,7 @@ const SHELL = [
   "/net/onyx/_.data",
   "/net/onyx/earth",
   "/net/onyx/earth.data",
-  // Each world of the data (8l's stations too), at its path and its canonical address.
+  // Each world of the data, its stations too, at its path and its canonical address.
   ...placesFrom({ universes, hubs, ecosystems })
     .filter(({ kind }) => kind === "world")
     .flatMap(({ path, canonical }) => [...new Set([path, canonical])].flatMap((each) => [each, `${each}.data`])),
@@ -50,7 +50,7 @@ const documentOf = (response: Answer) => ({
 });
 
 const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
-// The notice's words, in the top layer: its region stays in the page's flow and takes no room (F331).
+// The notice's words, in the top layer: its region stays in the page's flow and takes no room.
 const noticeOf = (page: Page) => promptOf(page).getByText("New version available.");
 
 const reload = (page: Page) =>
@@ -196,7 +196,7 @@ test("each icon the manifest names is a PNG of the size it states: 192, 512, and
   for (const icon of icons) expect(icon).toMatchObject({ sizes: icon.read, type: "image/png", png: true });
 });
 
-// Decision 1 (docs/decisions.md): the mark in cream on space. A platform cuts a maskable icon to its
+// The mark in cream on space. A platform cuts a maskable icon to its
 // own shape, keeping the circle of radius 2/5 of its side round the centre (W3C Web App Manifest, §2.3).
 test("the icons draw the mark in cream on space, the maskable one opaque and inside its safe zone", async ({
   page,
@@ -296,7 +296,7 @@ test("the worker answers the build's hashed files and shell from its cache, and 
   // The fonts too, the text's latin face among them: offline, the page keeps its face.
   const faces = installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path));
   expect(faces).toHaveLength(1);
-  // Of the fonts, the latin faces only, the text's and the code's (F292).
+  // Of the fonts, the latin faces only, the text's and the code's.
   const fonts = installed.paths
     .filter((path) => path.endsWith(".woff2"))
     .map((path) => path.replace(/^\/assets\/|-[\w-]{8}\.woff2$/g, ""));
@@ -342,7 +342,7 @@ test("the worker answers the build's hashed files and shell from its cache, and 
   expect(offline).toEqual({ asset: 200, font: 200, page: 200, other: "no answer" });
 });
 
-// ADR-0001 §12: offline, the page keeps its face and starts; here its documents do too (slice 4's plan, 4w).
+// ADR-0001 §12: offline, the page keeps its face and starts; here its documents do too.
 test("the app opens with no network: the home, a world, a reload on it, and a path the build never made", async ({
   page,
   context,
@@ -444,7 +444,7 @@ test.describe("updates", () => {
   }
 
   // Offline, the check an installed page makes when shown again fails, as expected: nothing is
-  // reported (F343). Chromium's own check escapes the page's offline mode, so the host goes down too.
+  // reported. Chromium's own check escapes the page's offline mode, so the host goes down too.
   test("a check that fails offline reports nothing", async ({ page, request, context }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -468,7 +468,7 @@ test.describe("updates", () => {
     }
   });
 
-  // The notice is a flash, in the top layer at the top of the screen, however long the page (F338).
+  // The notice is a flash, in the top layer at the top of the screen, however long the page.
   test("the prompt shows within the screen on a page longer than it", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await open(page);
@@ -502,7 +502,7 @@ test.describe("updates", () => {
       if (second !== undefined) await cache.put(second, new Response("a file someone changed"));
       return second?.url ?? "";
     });
-    // The region the prompt fills is there, empty, before it: a screen reader announces the change. The header's arrival pill (d303d6f1)
+    // The region the prompt fills is there, empty, before it: a screen reader announces the change. The header's arrival pill
     // has a region of its own, so every one is marked and the prompt's is found by its words.
     await page.locator("div[role='status']").evaluateAll((regions) => {
       for (const region of regions) region.id = "there-before";
@@ -558,7 +558,7 @@ test.describe("updates", () => {
     expect((await request.post(`${site}/__deploy`)).status()).toBe(204);
   };
 
-  // F679: a message to the worker may be lost; the page cannot tell, so the next click sends it again.
+  // A message to the worker may be lost; the page cannot tell, so the next click sends it again.
   test("a Reload click whose message was lost works at the next click", async ({ page, request }) => {
     await open(page);
     await page.evaluate(() => {
@@ -588,7 +588,7 @@ test.describe("updates", () => {
     await clickedThrough(page);
   });
 
-  // F175: the worker running answers a tab opened after the deploy with its own version, so the click is real.
+  // The worker running answers a tab opened after the deploy with its own version, so the click is real.
   test("a tab opened after a deploy runs the version before the click; its own click takes the new one", async ({
     page,
     request,
@@ -619,7 +619,7 @@ test.describe("updates", () => {
     }
   });
 
-  // F172: the host dropped the old files; the tab still on that version keeps them from the worker's cache.
+  // The host dropped the old files; the tab still on that version keeps them from the worker's cache.
   test("a tab still on the version before works after another tab's click took the new one", async ({
     page,
     request,

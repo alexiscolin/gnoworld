@@ -32,7 +32,7 @@ const at = (over: Partial<RoomAt> = {}): RoomAt => ({ me: ME, mode: "mentions", 
 const kindOf = (text: string, over: Partial<NoticeLine> = {}, where: Partial<RoomAt> = {}) =>
   roomNotice(line(text, over), ROOM, at(where))?.kind;
 
-// 4f-n (docs/decisions.md, 2026-10-26 "Notifications wait for a merge of their own"; docs/plans/slice-4.md §1): what a
+// What a
 // line is to the account that reads it. The kinds are a mention, a mention of the whole room, a reply, a direct message.
 describe("roomNotice: a room's line that is addressed to the account", () => {
   test("is a mention when the line names the account, with the line's id, time and author, in its room", () => {
@@ -78,7 +78,7 @@ describe("roomNotice: a room's line that is addressed to the account", () => {
     expect(kindOf("my answer", { reply: "q1", account: ME, from: ME }, { mode, held: [mine] })).toBeUndefined();
   });
 
-  // R16: an edit is a line of its own that names the line it corrects (+gnoworld/edit), shown in that line's place: the
+  // An edit is a line of its own that names the line it corrects (+gnoworld/edit), shown in that line's place: the
   // line made its notice when it came, so an edit makes none, one that adds a mention included.
   test("is none for an edit of a line, whatever it names", () => {
     expect(kindOf(`@${ME} corrected`, { edits: "m0" })).toBeUndefined();
@@ -236,12 +236,12 @@ describe("dmNotice: a direct message", () => {
     expect(dmNotice(to(ALICE, ALICE), undefined)).toBeUndefined();
   });
 
-  // R8: a NOTICE is what a bot or a server sends, a DM's too: one rule for the room and the nick.
+  // A NOTICE is what a bot or a server sends, a DM's too: one rule for the room and the nick.
   test("is none for an account's NOTICE to the reader, as for a room's", () => {
     expect(dmNotice(to(ALICE, ALICE, { kind: "notice" }), ME)).toBeUndefined();
   });
 
-  // F1524: a DM edit was a notice of its own, though the line it corrects was counted when it came, as a room's edit is not.
+  // A DM edit is no notice of its own: the line it corrects was counted when it came, as a room's edit is.
   test("is none for an edit of a message, as for a room's", () => {
     expect(dmNotice(to(ALICE, ALICE, { edits: "d0" }), ME)).toBeUndefined();
   });
@@ -251,7 +251,7 @@ describe("dmNotice: a direct message", () => {
   });
 });
 
-// F1687 (C5): each line of a page or a room was parsed whole, though a mention needs an @ and a reply is told by its tag.
+// A line of a page or a room is not parsed whole: a mention needs an @ and a reply is told by its tag.
 describe("roomNotice: when a line is parsed", () => {
   test("parses a line that holds an @ or answers another, and no other", () => {
     vi.mocked(markdown).mockClear();

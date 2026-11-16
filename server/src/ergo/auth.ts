@@ -1,7 +1,7 @@
-// Ergo's auth script, answered by the server (ADR-0002 §7; slice 3's plan, 3d). Ergo writes one JSON line,
+// Ergo's auth script, answered by the server (ADR-0002 §7). Ergo writes one JSON line,
 // the SASL account and a ticket as its passphrase, and reads one line back (irc/authscript.go). A ticket is
 // spent whatever the answer; failures count per visitor, never per account, so nobody locks another out.
-// The bot's own account, gnoworld, logs in with the operator's password alone (slice 3's max review).
+// The bot's own account, gnoworld, logs in with the operator's password alone.
 import { jsonOf } from "@gnoworld/core";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";

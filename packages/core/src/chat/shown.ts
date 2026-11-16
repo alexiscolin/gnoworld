@@ -1,12 +1,12 @@
-// A room's lines as shown (slice 4's 4d, F664): an edit is a line of its own that names the line it corrects
-// (+gnoworld/edit, docs/decisions.md 2026-10-21); the room shows the correction in that line's place, marked edited,
+// A room's lines as shown: an edit is a line of its own that names the line it corrects
+// (+gnoworld/edit); the room shows the correction in that line's place, marked edited,
 // when the same account wrote both, the line before the edit, in this room, and the line no edit itself. Any other edit
 // stays a line of its own, as a plain IRC client shows it.
 import type { IrcMessage } from "../irc/irc.ts";
 import { nickOf, redactAfter, sameName, type Line } from "./room.ts";
 
 /** Whether `me` may correct `line`: a message of their own that corrects none (an orphan correction names a line nothing
- * folds into), not an action, which a correction cannot turn back (CR5 of the room edit). */
+ * folds into), not an action, which a correction cannot turn back. */
 export const canEdit = (line: Line, me: string | undefined): boolean =>
   me !== undefined && line.account === me && line.kind === "message" && line.edits === undefined;
 
@@ -42,7 +42,7 @@ interface Folded {
 
 /** The room's lines, in their order, each corrected by its newest edit and the edits gone (the same array when no
  * line is corrected), and the line each folded edit corrects by the edit's own msgid, which a plain client answers or
- * reacts to (the code review's CR5): one fold for both. */
+ * reacts to: one fold for both. */
 export function foldEdits(lines: readonly Line[]): Folded {
   const { newest, folded } = folding(lines);
   const edited = new Map([...newest].map(([id, edit]) => [id, edit.id]));
@@ -58,7 +58,7 @@ export function foldEdits(lines: readonly Line[]): Folded {
 }
 
 /** One line as shownLines shows it, or none when it is folded into another or not there, in one pass and no allocation:
- * what a composer asks on each render while a reply or an edit is open (the room edit's complexity review). */
+ * what a composer asks on each render while a reply or an edit is open. */
 export function shownLine(lines: readonly Line[], id: string): ShownLine | undefined {
   const at = lines.findIndex((line) => line.id === id);
   const line = lines[at];
@@ -89,7 +89,7 @@ function ownCorrection(lines: readonly Line[], id: string, sender: string): bool
   return account !== undefined && sameName(account, sender) && folding(lines).folded.has(id);
 }
 
-/** The room's lines once `message` is read: a REDACT of a line takes the corrections shown in its place (R1's orphans);
+/** The room's lines once `message` is read: a REDACT of a line takes the corrections shown in its place;
  * the author's own of a correction whose line is held is held back, so a refused delete of the line never brings the
  * words edited out back; a moderator's hide of a correction shows the line as it was. The same array when nothing goes. */
 export function redactedLines(lines: readonly Line[], message: IrcMessage, room: string): readonly Line[] {

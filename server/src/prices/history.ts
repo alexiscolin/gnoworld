@@ -1,4 +1,4 @@
-// The prices' history (slice 8, 8i; the markets row's sparklines, frame 6): each token's price at each of the prices timer's reads over the
+// The prices' history (the markets row's sparklines): each token's price at each of the prices timer's reads over the
 // last day, oldest first, kept in a file beside markets.json so a restart keeps the day, and served at GET /api/markets/history. What the file
 // holds is read back through its schema: a file refused, or older than a day, starts the day again.
 import { MARKETS_HISTORY_MOST, MarketsHistory } from "@gnoworld/schemas/indexer";

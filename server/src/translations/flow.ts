@@ -66,7 +66,7 @@ export interface TranslationFlow {
 const LANGUAGES_A_LINE = 4;
 /** The edits remembered for their line: a REDACT of an edit drops the line's translations. */
 const EDITS = 10_000;
-/** Makings one account's asks start a minute: its own lines past this wait for the next minute (U2: the day's budget is shared). */
+/** Makings one account's asks start a minute: its own lines past this wait for the next minute. */
 const MAKINGS_PER_MINUTE = 20;
 
 // A line worth translating: some text that is not a link and nothing else.

@@ -1,4 +1,4 @@
-// The evals' own code, on Node's test runner (run.sh runs it before any case spends a cent; setup-10j.sh once): the
+// The evals' own code, on Node's test runner (run.sh runs it before any case spends a cent): the
 // cases read by their schema, the spans read for their tools and cost, each expectation an assertion that passes and
 // fails when it should, and the cache's key moved by any setting.
 import assert from "node:assert/strict";

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { feeText } from "./fee.ts";
 
-// 9d, question 9d-1 option 1: the fee line is an estimate, from what the last calls of the same realm and function paid
-// (ugnot) up to a block it names, labelled so; Adena simulates and sets the real fee when the person signs (reports/slice-9d-fee.md).
-const read = (fees: number[], height = 55414) => ({ fees, height });
-const AT = "an estimate from calls up to block 55,414";
+// The fee line is an estimate, from what the last calls of the same realm and function paid
+// (ugnot) up to a block it names, labelled so; Adena simulates and sets the real fee when the person signs.
+const read = (fees: number[], height = 4242) => ({ fees, height });
+const AT = "an estimate from calls up to block 4,242";
 
 describe("feeText: the card's fee line", () => {
   it("is the median of the fees in GNOT, labelled an estimate that names its block (1 GNOT is 1,000,000 ugnot)", () => {

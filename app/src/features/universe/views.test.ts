@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inSystem } from "./views.ts";
 
-// The Earth's system (D401, D501) holds the Earth and the worlds of the namespaces that orbit it, not only gnoland's: its rail missed
-// the Earth (Alexis, 2026-11-11: "pourquoi on ne voit pas la Terre dans le rail en haut ?").
+// The Earth's system holds the Earth and the worlds of the namespaces that orbit it, not only gnoland's: its rail lists the Earth too.
 describe("inSystem", () => {
   it("keeps the Earth and every home namespace's worlds in the Earth's system", () => {
     for (const id of ["earth", "gnoland/blog", "gov/dao", "sys/users", "demo/boards"])

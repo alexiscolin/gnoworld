@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import { closureOf, fileOf, LATE, lateWeights, weigh } from "./chunks.ts";
 import { BUILD } from "./sites.ts";
 
-// The late chunks weighed from the built files, with no page (Alexis, 2026-11-04: "Oui, les deux"): Playwright's own `test`, which opens
+// The late chunks weighed from the built files, with no page: Playwright's own `test`, which opens
 // no browser for a test that asks for no page, as the journeys' fixtures would. Each case but the last writes a folder of assets of its own.
 const assets = (files: Record<string, string>) => {
   const folder = join(mkdtempSync(join(tmpdir(), "chunks-")), "assets");

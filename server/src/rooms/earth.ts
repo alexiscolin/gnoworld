@@ -1,11 +1,11 @@
-// The Earth's public rooms (D394): how many lines each says in a day, which have gone quiet, and the sweep that archives them.
+// The Earth's public rooms: how many lines each says in a day, which have gone quiet, and the sweep that archives them.
 // A line is a verdict row (moderation/check.ts), a hidden one no line; the verdicts keep 180 days, past the 14 a room is spared.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Rooms } from "./create.ts";
 import type { Typed } from "./types.ts";
 
-// A guest's relayed line leaves no verdict (D430): the lines said in a room each hour, upserted by each relayed line, so a room only
+// A guest's relayed line leaves no verdict: the lines said in a room each hour, upserted by each relayed line, so a room only
 // guests speak in is neither swept nor shown as silent. The retention keeps 25 hours and each room's latest hour.
 export const ROOM_SAID = `
 CREATE TABLE room_said (room TEXT NOT NULL, hour INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (room, hour)) STRICT;

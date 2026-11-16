@@ -1,4 +1,4 @@
-// The login's bodies (slice 3's plan, 3c): what the browser sends, what the server answers. A request's own
+// The login's bodies: what the browser sends, what the server answers. A request's own
 // fields are strict; Adena's proof comes as the SDK types it.
 import { z } from "./zod.ts";
 import { Address } from "./address.ts";
@@ -6,7 +6,7 @@ import { ChainId } from "./realmPath.ts";
 
 export const ChallengeRequest = z.strictObject({ chainId: ChainId });
 
-// The nonce as the server writes it, 128 random bits in base64url: one schema for the challenge and the proof (F673).
+// The nonce as the server writes it, 128 random bits in base64url: one schema for the challenge and the proof.
 export const Nonce = z.string().check(z.regex(/^[\w-]{22}$/));
 
 export const Challenge = z.object({ nonce: Nonce, text: z.string(), expiresAt: z.iso.datetime() });
@@ -14,7 +14,7 @@ export type Challenge = z.infer<typeof Challenge>;
 
 // Adena's answer to signArbitrary (the SDK's SignedArbitraryData): a key it does not know is dropped, msgs'
 // items bounded by the body's 16 KiB alone. The SDK checks the signature over the canonical document it rebuilds
-// from signer, chain and text, so nothing dropped was ever signed (F672).
+// from signer, chain and text, so nothing dropped was ever signed.
 export const Proof = z.object({
   signed: z.object({
     chain_id: z.string().check(z.maxLength(50)),

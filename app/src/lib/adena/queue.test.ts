@@ -80,7 +80,7 @@ describe("serially", () => {
     expect(most).toBe(1);
   });
 
-  // D201: Adena's popup waits for the person, as long as they take. A timeout would end a request as failed
+  // Adena's popup waits for the person, as long as they take. A timeout would end a request as failed
   // while a late signature still lands on the chain, so the queue has none: a reload is what frees it.
   describe("a task that never settles", () => {
     afterEach(() => {

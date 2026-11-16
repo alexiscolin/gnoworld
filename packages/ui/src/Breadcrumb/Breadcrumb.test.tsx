@@ -65,7 +65,7 @@ describe("Breadcrumb", () => {
     staysText((text) => <Breadcrumb label="x" items={[{ label: text, href: "/" }, { label: "end" }]} />);
   });
 
-  // 7v: a system's view in the cosmos is no page of its own, so its way back is a step that acts, "← Cosmos › gnoswap" (frame 45's kicker).
+  // A system's view in the cosmos is no page of its own, so its way back is a step that acts, "← Cosmos › gnoswap" (frame 45's kicker).
   it("draws a step that acts as a button of its words, an arrow back before it no reader meets, pressed once a press", () => {
     let pressed = 0;
     render(

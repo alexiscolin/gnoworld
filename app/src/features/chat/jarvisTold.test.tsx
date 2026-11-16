@@ -7,7 +7,7 @@ import { mount, settled } from "../../../tests/mount.tsx";
 import { useJarvisOn } from "../../jarvisHere.ts";
 import { jarvisRoom } from "./jarvisTold.tsx";
 
-// 10u-a: whether Jarvis is on, for the page, and the room it reads.
+// Whether Jarvis is on, for the page, and the room it reads.
 type Result = HttpResult<JarvisState>;
 
 beforeAll(() => {

@@ -1,5 +1,5 @@
 // The one reader of what the build writes for a host (src/csp.ts): `_headers` and nginx's table. The host that serves the
-// build for the journeys, the journeys and the build tests all read them here, so a change of the format is made once (F2457).
+// build for the journeys, the journeys and the build tests all read them here, so a change of the format is made once.
 
 const POLICY = /^ {2}Content-Security-Policy: (.+)$/;
 const ROW = /^\s*("?)([^"\s]+)\1\s+"([^"]*)";$/;

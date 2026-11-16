@@ -6,14 +6,14 @@ Every claim cites `file:line` read in the installed packages, relative to each p
 Two outside sources, kept only where the code confirms them: Utsubo "100 Three.js Tips" (U#n = tip n;
 utsubo.com/blog/threejs-best-practices-100-tips) and dgreenheck/webgpu-claude-skill (MIT, W; cited, not copied).
 
-Settled by Alexis, 2026-11-01: `WebGLRenderer` for the demo, WebP, no KTX2, the CSP unchanged (ADR-0002 §10).
+Settled: `WebGLRenderer`, WebP, no KTX2, the CSP unchanged (ADR-0002 §10).
 
 ## 1. Imports and the lazy chunk
 - Import named symbols from `three`, never `import * as THREE`. The entry re-exports from `three.core.js` (three:build/three.module.js:6-7) and only `src/nodes/**` has side effects (three:package.json:25-27), so a bundler can drop the rest.
 - Addons are per-file paths (`three/addons/*`, three:package.json:15-16); take only what runs (`mergeGeometries`: three:examples/jsm/utils/BufferGeometryUtils.js:156).
-- The renderer is the weight: WebGL entry 133,691 B, `three/webgpu` 221,519 B (slice-7 §4, measured there, not by me; entry at three:package.json:18). The first screen has its 173 KiB cap: three, camera-controls and the scene live in one dynamic `import()` chunk, loaded after the text (ARCHITECTURE "React"), and a phone loads it only on "View in space".
+- The renderer is the weight: WebGL entry 133,691 B, `three/webgpu` 221,519 B (measured in the plan, not in this guide; entry at three:package.json:18). The first screen has its 173 KiB cap: three, camera-controls and the scene live in one dynamic `import()` chunk, loaded after the text (ARCHITECTURE "React"), and a phone loads it only on "View in space".
 - camera-controls has no `import` of three (cc has none) and takes it by `CameraControls.install({ THREE: subset })` (cc:314); pass the subset the typings list (Vector2/3/4, Quaternion, Matrix4, Spherical, Box3, Sphere, Raycaster; cc readme:~110-125). Without `install` it fails at first use (the `THREE` variable is set only there, cc:315).
-- No worker and no WebAssembly in three's core: no `new Worker`, `createObjectURL` only in `LoadingManager` (three:src/loaders/LoadingManager.js:189), no `WebAssembly` in `src/`. `KTX2Loader` starts a worker from a Blob URL (three:examples/jsm/loaders/KTX2Loader.js:342,347); its transcoder uses WebAssembly (slice-7 §3; not re-read by me). Never import it.
+- No worker and no WebAssembly in three's core: no `new Worker`, `createObjectURL` only in `LoadingManager` (three:src/loaders/LoadingManager.js:189), no `WebAssembly` in `src/`. `KTX2Loader` starts a worker from a Blob URL (three:examples/jsm/loaders/KTX2Loader.js:342,347); its transcoder uses WebAssembly (not re-read here). Never import it.
 
 ## 2. Creating the renderer
 - Defaults: `antialias=false`, `alpha=false`, `powerPreference='default'`, `preserveDrawingBuffer=false`, `stencil=false`, `depth=true`, `failIfMajorPerformanceCaveat=false` (three:src/renderers/WebGLRenderer.js:76-84).
@@ -104,7 +104,7 @@ Settled by Alexis, 2026-11-01: `WebGLRenderer` for the demo, WebP, no KTX2, the 
 ## 14. WebGL2 against WebGPURenderer at 0.187
 - `WebGLRenderer` is WebGL 2 only (a WebGL 1 context throws, WebGLRenderer.js:101-104; `getContext('webgl2')`, 411-413).
 - `WebGPURenderer` (`three/webgpu`) tries WebGPU, else falls back to a WebGL2 backend, or `forceWebGL: true` forces it (three:src/renderers/webgpu/WebGPURenderer.Nodes.js:25-37; W, U#2,8). The fallback costs: the 221 KB entry (plan), an async `init()` before any render (three:src/renderers/common/Renderer.js:899; W: `await renderer.init()`), a `setAnimationLoop` that awaits it (Renderer.js:2387-2389), node materials, and no `onBeforeCompile` (Material.js:520-531; TSL instead, W). Whether a given `ShaderMaterial` or the `examples/jsm` composer runs on it: NV. Device loss: `onDeviceLost` (Renderer.js:689; WebGPUBackend.js:266; WebGL backend `webglcontextlost`, WebGLBackend.js:246).
-- Decision input: the plan's shaders are WebGL GLSL (points, rims, program keys, composer). Choosing WebGPURenderer means rewriting them in TSL. Alexis chose `WebGLRenderer` for the demo; moving later means rewriting them.
+- Decision input: the plan's shaders are WebGL GLSL (points, rims, program keys, composer). Choosing WebGPURenderer means rewriting them in TSL. The choice is `WebGLRenderer`; moving later means rewriting them.
 
 ## 15. Testing
 - No GL needed (pure JS): `Vector3`, `Matrix4` (Matrix4.js:86), `Frustum.intersectsObject` (Frustum.js:146-166, with a geometry and no renderer), `Sphere`, `Box3`, `Color`, `Spherical`, `Timer`, `BufferGeometry`, `mergeGeometries`, and an `InstancedMesh` (its constructor only fills typed arrays, InstancedMesh.js:37-104). `core/*` stays free of GL so Vitest covers it.

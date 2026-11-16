@@ -1,6 +1,6 @@
-// The links over HTTP (owners' moderation, part 4; docs/plans/owners-moderation.md, section 5): /api/links lists a person's identity, issues a link
-// code, finishes a link with the other account's proof and unlinks. Each POST comes from a listed Origin in JSON (guard.ts) with the login's session,
-// signed within 10 minutes; limits are its own, never the login's; every refusal is one shape, its cause only in the log.
+// The links over HTTP: /api/links lists a person's identity, issues a link code, finishes a link with the other account's
+// proof and unlinks. Each POST comes from a listed Origin in JSON (guard.ts) with the login's session, signed within
+// 10 minutes; limits are its own, never the login's; every refusal is one shape, its cause only in the log.
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { Address, Nonce, Proof } from "@gnoworld/schemas";
@@ -43,7 +43,7 @@ const ReleaseVerify = z.strictObject({ nonce: Nonce, address: Address, file: Fil
 
 // The word and status of each cause: a code that is no good (unknown, expired, used, another session's) is 404, which depends on the code alone; a proof
 // that does not verify is 400, which depends on the signature alone; only once the proof has passed does a key already linked elsewhere say 403.
-// The word and status of each cause. A stale session and none are one answer: the page signs in again.
+// A stale session and none are one answer: the page signs in again.
 const refusals = {
   ...baseRefusals,
   pending: ["too_many", 429],
@@ -58,7 +58,7 @@ const refusals = {
 } as const satisfies Refusals;
 type Cause = keyof typeof refusals;
 
-// A person's links, as the server builds them: the command line's verifier is always there (F13858).
+// A person's links, as the server builds them: the command line's verifier is always there.
 export const serverLinks = (db: DatabaseSync, options: { now: () => number; chainId: string; secret: string }): Links =>
   makeLinks(db, { ...options, verifiers: { cli: cliVerify } });
 
@@ -102,7 +102,7 @@ function gates(
   };
 }
 
-// The release (D13940): no session says who asks, so a code per key and a file signed by it; the guard is the parent's.
+// The release: no session says who asks, so a code per key and a file signed by it; the guard is the parent's.
 function releaseRoutes({ links, block, proxy, log, now }: LinkRoutesOptions, refuse: Refuse): Hono<Guarded> {
   const app = new Hono<Guarded>();
   // The release's limits are its own, one window for each route: a visitor's calls, and the codes issued from its /64.

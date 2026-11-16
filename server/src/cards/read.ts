@@ -1,5 +1,6 @@
-// What the flow asks of the link reader and of OpenAI for one page (slice 13, L3): the reader's answer held to its schema and to the picture's
-// real size, the check of the card's words and picture, and what its answer means.
+// What the flow asks of the link reader and of OpenAI for one page: the reader's answer held to its
+// schema and to the picture's real size, the check of the card's words and picture, and what its
+// answer means.
 import { ReaderCard } from "@gnoworld/schemas";
 import type { Thresholds } from "../moderation/decide.ts";
 import { CATEGORIES, type Answer, type ModerationInput } from "../moderation/provider.ts";

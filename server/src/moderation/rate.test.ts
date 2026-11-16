@@ -42,7 +42,7 @@ describe("the lines an account sent in a minute", () => {
   });
 
   it("counts an account's lines whatever the server's own clock did between them, only Ergo's stamps counting (R1)", () => {
-    // S1 as reported forgot an account 60 s after the server last heard of it: the adds took no real time, so a test
+    // The rate forgot an account 60 s after the server last heard of it: the adds took no real time, so a test
     // of them alone never saw it. Here the server's clock jumps 61 s before every add.
     vi.useFakeTimers();
     const rate = lineRate();

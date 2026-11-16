@@ -1,4 +1,4 @@
-// The browser's client of the guest chat (server/src/guest/routes.ts, D430), through lib/api/http.ts's one JSON call: a name for the visit,
+// The browser's client of the guest chat (server/src/guest/routes.ts), through lib/api/http.ts's one JSON call: a name for the visit,
 // which the server's HttpOnly cookie holds, then a line the server judges before the bot says it. A refusal comes back with its cause.
 import { Guest, GuestRefusal, GuestSaid, type GuestCause, type GuestSayRequest } from "@gnoworld/schemas";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";

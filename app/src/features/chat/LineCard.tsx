@@ -1,5 +1,5 @@
-// The card under a line (link-previews L4), when the line has one (lineCard.ts): drawn by LinkCard, a chunk of its own asked by such a line
-// alone. A removal or an edit takes it away, the focus it held going back to the line (F896's class).
+// The card under a line, when the line has one (lineCard.ts): drawn by LinkCard, a chunk of its own asked by such a line
+// alone. A removal or an edit takes it away, the focus it held going back to the line.
 import { cardLinkOf, type Block } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { lazy, Suspense } from "react";
@@ -24,7 +24,7 @@ export interface LineCardProps {
   player: boolean;
   verdict: StreamEvent["state"] | undefined;
   mine: boolean;
-  /** Whether its link is a Tab stop: on the list's stop alone (U1). */
+  /** Whether its link is a Tab stop: on the list's stop alone. */
   tabbable: boolean;
 }
 

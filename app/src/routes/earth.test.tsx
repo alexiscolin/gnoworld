@@ -69,7 +69,7 @@ describe("the Earth's page", () => {
     expect(canonical(tags)?.href).toBe(`https://gno.world${expected}`);
   });
 
-  // D428 and the plate's rebuild (D567): the plate has no crumb to the universe any more; its kicker names the place and its kind.
+  // The plate has no crumb to the universe: its kicker names the place and its kind.
   test("has no crumb: the plate's kicker says Home, the general chat, and no link leads to the universe's cosmos", async () => {
     const html = await render(route("/net/:network/earth"), "/net/gnoland/earth");
     expect(html).not.toMatch(/<nav [^>]*aria-label="[^"]+"/);
@@ -78,7 +78,7 @@ describe("the Earth's page", () => {
   });
 });
 
-// The browser serves the pages the build wrote, from the same data (F2208).
+// The browser serves the pages the build wrote, from the same data.
 test("the browser's loader gives each pre-rendered earth what the build's does", () => {
   expectClientAsBuild("earth", clientLoader, loader);
 });
@@ -112,7 +112,7 @@ describe("the Earth's plate", () => {
     const { box } = drawn();
     const plate = await plateOf(box);
     expect(plate?.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in #general");
-    // The latest on X is the blog's card now (D13931), drawn only once a read of the chain has found posts: LatestOnX.test.tsx's.
+    // The latest on X is the blog's card, drawn only once a read of the chain has found posts: LatestOnX.test.tsx's.
     for (const [label, href] of [
       ["View on gnoweb", "https://onyx.testnets.gno.land"],
       ["Explorer", "https://gnoscan.io/?chainId=onyx-1"],
@@ -139,7 +139,7 @@ describe("the Earth's plate", () => {
   test("offers Follow and Share, as frame 86 draws them", async () => {
     const { box } = drawn();
     const plate = await plateOf(box);
-    // In words, both (D13915 reverses D536's icons: what they did was unclear).
+    // In words, both: icons left their meaning unclear.
     expectFollowAndShare(plate);
   });
 });

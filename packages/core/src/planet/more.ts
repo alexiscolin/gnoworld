@@ -1,6 +1,6 @@
-// The twelve anchors more (Alexis, 2026-11-02), each a real body or a documented kind of planet (the part's state file names each
-// reference): realistic, the strange ones rare. Each takes the row of the kept anchor nearest it, in its own colours set by eye from its
-// reference's published colour; its palette replaces 85% of the real map's colour or more. Tier 1 (docs/REVIEW.md).
+// The twelve more anchors, each a real body or a documented kind of planet: realistic, the strange ones rare. Each takes the row of the
+// base anchor nearest it, in its own colours set by eye from its reference's published colour; its palette replaces 85% of the real map's
+// colour or more. Tier 1 (docs/REVIEW.md).
 import type { AnchorRow, KeptAnchor, MoreAnchor } from "./anchors.ts";
 import { LAVA, ramp, rgb, SKY } from "./colours.ts";
 
@@ -74,7 +74,7 @@ export const moreRows = (kept: Record<KeptAnchor, AnchorRow>): Record<MoreAnchor
     recolour: [0.9, 1],
     palettes: [ramp(0x060505, 0x161210, 0x3a2c24), ramp(0x080606, 0x1c1410, 0x46302a)],
   },
-  // KELT-9 b, an ultra-hot Jupiter: silicate clouds; no glow today, for a glow on a banded world hides its night's lights.
+  // KELT-9 b, an ultra-hot Jupiter: silicate clouds; no glow, for a glow on a banded world hides its night's lights.
   "hot giant": {
     ...kept["gas giant"],
     ...RINGLESS,

@@ -4,7 +4,7 @@ import type { Scripted } from "./scripted.ts";
 import { asAccount, barOf, field, OTHER, T, tagged, tagmsg } from "./talk.ts";
 import { axeOf } from "./axe.ts";
 
-// 4d's reactions, replies and edits as they look and as a real Ergo keeps them (docs/decisions.md, 2026-10-26).
+// Reactions, replies and edits as they look and as a real Ergo keeps them.
 const LOOK = (address: string): Scripted => ({
   replayed: [
     tagmsg("r1", "+draft/react=👍;+reply=m1", { at: 2, who: OTHER }),
@@ -39,7 +39,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     await expect(page.getByRole("list", { name: "Messages" })).toHaveScreenshot("talk-computer.png");
   });
 
-  // F1179 (the UX review's U7): the prototype's quote, a rule at its start and its author in bold.
+  // The prototype's quote, a rule at its start and its author in bold.
   test("set a reply's quote apart by a rule at its start and its author in bold", async ({ page }) => {
     await asAccount(page, LOOK, 3);
     const quote = lineOf(page, "count me in").locator("p");
@@ -58,7 +58,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     expect(bold).toBeGreaterThan(plain);
   });
 
-  // The green pass: the composer's reply bar pictured and checked, as the lines are.
+  // The composer's reply bar pictured and checked, as the lines are.
   test("pass axe and look as the prototype's with the reply bar over the field, on a computer's screen", async ({
     page,
   }) => {
@@ -70,7 +70,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     await expect(form).toHaveScreenshot("reply-bar-computer.png");
   });
 
-  // slice-4-room-edit: the composer's edit bar over the field, on one's own line, pictured and checked as the reply bar is.
+  // The composer's edit bar over the field, on one's own line, pictured and checked as the reply bar is.
   for (const [screen, width, height] of [
     ["computer", 1280, 900],
     ["phone", 390, 844],
@@ -100,7 +100,7 @@ test.describe("reactions, replies and edits, as they look", () => {
       await expect(form).toHaveScreenshot(`edit-bar-${screen}.png`);
     });
 
-  // The green pass: a line's 20 chips and a quote wrap within a phone's width, nothing scrolling sideways.
+  // A line's 20 chips and a quote wrap within a phone's width, nothing scrolling sideways.
   test("fit a line of 20 reactions and a reply's quote on a phone's screen, and pass axe", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const emoji = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂")].map(
@@ -121,8 +121,8 @@ test.describe("reactions, replies and edits, as they look", () => {
       3,
     );
     const list = page.getByRole("list", { name: "Messages" });
-    // The 20 reactions, without the root's chip of its replies (4d's threads) or the author's name, which opens their card
-    // (8d): neither is a reaction.
+    // The 20 reactions, without the root's chip of its replies or the author's name, which opens their card:
+    // neither is a reaction.
     await expect(
       lines(page)
         .first()

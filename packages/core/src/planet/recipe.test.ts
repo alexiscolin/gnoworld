@@ -1,4 +1,4 @@
-// Good entropy (slice 7, 7b4, Alexis 2026-11-02, "avec bonne entropie"): on 12,000 synthetic worlds, 500 of each anchor in 500 systems,
+// Good entropy: on 12,000 synthetic worlds, 500 of each anchor in 500 systems,
 // each continuous value of a look and of its recipe fills its range evenly, no tenth of it holding under half its share, and no two values
 // correlate past 0.1. A value is read as its place in its own world's span, so a class's ranges, which ADR-0002 §3 links on purpose, do
 // not count; each anchor's share of worlds is choice.test.ts's. And only + - * / reach a value (below).
@@ -42,7 +42,7 @@ const TURN = Math.PI * 2;
 // byte read twice (a correlation near 1) still fails.
 const MANY = 2000;
 const FEW_BOUND = 0.25;
-// No byte is read twice on purpose since 7b5 retired the second map's share (F3476).
+// No byte is read twice on purpose.
 const LINKED: readonly (readonly string[])[] = [];
 
 type Span = readonly [number, number];
@@ -58,7 +58,7 @@ const placer =
     if (span !== undefined && span[0] < span[1]) places.set(name, (value - span[0]) / (span[1] - span[0]));
   };
 
-// The look's own values, today's shader's, each in its row's span.
+// The look's own values, the shader's, each in its row's span.
 function lookPlaces(places: Map<string, number>, look: PlanetLook): void {
   const place = placer(places);
   const row = ROWS[look.anchor];
@@ -150,7 +150,7 @@ describe("good entropy, on 12,000 synthetic worlds", () => {
   }, 60_000);
 });
 
-// Only + - * / reach a world's values (slice 7, 7b4; look.ts): Math's other functions are approximations each engine may round its own
+// Only + - * / reach a world's values (look.ts): Math's other functions are approximations each engine may round its own
 // way, so a world would look different from one browser to the next. With every one of them answering NaN, a look and a recipe stay what
 // they were. The `**` operator does not pass through Math and is not seen here.
 const INEXACT = [
@@ -199,7 +199,7 @@ describe("a world's recipe", () => {
   });
 });
 
-// A world's sea turns by its system's hue, as its palettes do (Alexis, 2026-11-03, "bleu-vert variant"): two systems give two seas, one
+// A world's sea turns by its system's hue, as its palettes do: two systems give two seas, one
 // path always the same, its lightness and chroma kept. A temperate world's teal stays a glance (10 in Lab, core's variety.ts) from the
 // frames' navy, which the Earth's sea is and the ocean keeps, at either end of the turn.
 describe("a world's sea", () => {
@@ -267,15 +267,15 @@ describe("a world's sea", () => {
   });
 });
 
-// Temperate worlds real (7b8; Alexis, 2026-11-03, "surtout naturel"): a world of continents grows the Earth's own plants and bares its
+// Temperate worlds real: a world of continents grows the Earth's own plants and bares its
 // own ground, read off its day map (earth-day.webp; 13-pixel means): forests (hue 114 to 122) to steppes (84), the Sahara's sand (L* 85),
-// the outback's ochre (59), cold steppes (75); its greens' mean chroma 25.1, the low-key bound ("toujours en retenue").
+// the outback's ochre (59), cold steppes (75); its greens' mean chroma 25.1, the low-key bound.
 describe("a world of continents", () => {
   const EARTH_MOST = 25.1;
   const DEGREE = Math.PI / 180;
   const hueOf = ([, a, b]: Lab) => Math.atan2(b, a) / DEGREE;
   const lights = ([low, mid, high]: readonly [Lab, Lab, Lab]) => [low[0], mid[0], high[0]] as const;
-  // Each world's recipe, and whether it grows the Earth's plants or other ones (its star's, 7b9).
+  // Each world's recipe, and whether it grows the Earth's plants or other ones (its star's).
   const temperate = (count: number) =>
     Array.from({ length: count }, (_, at) => {
       const path = asciiBytes(`gno.land/r/t${String(at % 50)}/w${String(at)}`);
@@ -326,7 +326,7 @@ describe("a world of continents", () => {
       }
   });
 
-  // The reviewer's R9: one rule for what a world of continents is, the program's too (its sea under an ocean's 0.8).
+  // One rule for what a world of continents is, the program's too (its sea under an ocean's 0.8).
   it("takes a world for one of continents from a sea of more than none to under an ocean's", () => {
     expect(CONTINENTS_SEA).toBe(0.8);
     expect([0, 0.0001, 0.45, 0.7999, 0.8, 1].map((sea) => ofContinents({ sea }))).toEqual([
@@ -361,7 +361,7 @@ describe("a world's values", () => {
   });
 });
 
-// 7b9: about one temperate world in four grows plants by its own star's warmth, near black under a dim red star, purple, then rust under a
+// About one temperate world in four grows plants by its own star's warmth, near black under a dim red star, purple, then rust under a
 // white one; never more saturated than the Earth's greens, and only a temperate world.
 describe("a temperate world's other plants", () => {
   const seeds = (count: number) =>

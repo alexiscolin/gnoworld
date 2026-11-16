@@ -62,7 +62,7 @@ const running = (pid: number) => {
   }
 };
 // What a child writes arrives in its own time: wait for it, a little at a time, 20 s at least, far from the few
-// milliseconds it takes on a quiet machine (F5138).
+// milliseconds it takes on a quiet machine.
 const until = async (seen: () => boolean): Promise<void> => {
   for (let tries = 0; !seen(); tries += 1) {
     if (tries > 2_000) throw new Error("waited 20 s for the child");
@@ -71,8 +71,8 @@ const until = async (seen: () => boolean): Promise<void> => {
 };
 // gnomcp's folders in the system's temporary folder: jarvis makes one at each start and removes it.
 const homes = () => readdirSync(realpathSync(tmpdir())).filter((name) => name.startsWith("jarvis-gnomcp-"));
-// Each test boots a Node process, some up to five, which takes seconds each at a load of 190 on 14 cores: a minute, not
-// Vitest's 5 s, as main.test.ts gives the server's (F5138).
+// Each test boots a Node process, some up to five, which takes seconds each under load: a minute, not
+// Vitest's 5 s, as main.test.ts gives the server's.
 const BOOTS = { timeout: 60_000 };
 
 describe("startGnomcp: gnomcp started read-only", BOOTS, () => {
@@ -199,7 +199,7 @@ describe("startGnomcp: gnomcp started read-only", BOOTS, () => {
       expect(error instanceof Error ? error.cause : undefined).toBeInstanceOf(Error);
       // The start's 1 s and the transport's close, 4 s at most, far below gnomcp's own 30 s.
       expect(performance.now() - started).toBeLessThan(20_000);
-      // Under load the start may end at initialize, its child ended before it wrote its start (F5138): its folder,
+      // Under load the start may end at initialize, its child ended before it wrote its start: its folder,
       // made before the child, is gone all the same.
       expect(homes()).toEqual(before);
       const seen = made.fake.starts();
@@ -219,7 +219,7 @@ describe("startGnomcp: gnomcp started read-only", BOOTS, () => {
   it("refuses to start when a profile Jarvis reads the indexer of is not gnomcp's", async () => {
     const made = setupOf();
     const setup = { ...made.setup, profiles: { read: PROFILES.read, indexed: ["onyx", "sapphire"] } };
-    // Refused before gnomcp is read once the tools are built from the profiles (V8), by gnomcp's own check before.
+    // Refused before gnomcp is read once the tools are built from the profiles, by gnomcp's own check before.
     await expect(startGnomcp(setup)).rejects.toThrow(/sapphire/);
   });
 
@@ -268,8 +268,7 @@ describe("Gnomcp.call: one read", BOOTS, () => {
     expect(fake.requests().filter((request) => request.method === "tools/call")).toHaveLength(1);
   });
 
-  // The MCP client compiles and checks the output schema a server lists, unless the call hands it a definition (F5111,
-  // F5253's class): a schema built to backtrack would hold the process; one the result fails, or none compiles, shows it.
+  // The MCP client compiles and checks the output schema a server lists, unless the call hands it a definition: a schema built to backtrack would hold the process; one the result fails, or none compiles, shows it.
   it.each([
     ["a schema its result fails", { type: "object", properties: { x: { type: "string" } }, required: ["x"] }],
     ["a schema that does not compile", { type: "object", properties: { x: { type: "no-such-type" } } }],
@@ -367,7 +366,7 @@ describe("Gnomcp.call: one read", BOOTS, () => {
     ]);
   });
 
-  // The asker left: the call ends at once and gnomcp is told, never waiting its 30 s (F5290, the reviewer's V6).
+  // The asker left: the call ends at once and gnomcp is told, never waiting its 30 s.
   it("ends a call once its signal fires, telling gnomcp, the child still answering the next one", async () => {
     // A call's time of 10 minutes: only the signal can end it within the test's minute.
     const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 600_000 });
@@ -392,7 +391,7 @@ describe("Gnomcp.call: one read", BOOTS, () => {
   });
 
   it("gives up a call at its timeout, the child still answering the next one", async () => {
-    // 2 s for a call, far from a quiet round trip with the child, and the bound far below gnomcp's own 30 s (F5138).
+    // 2 s for a call, far from a quiet round trip with the child, and the bound far below gnomcp's own 30 s.
     const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 2_000 });
     const started = performance.now();
     expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason: "timeout" });

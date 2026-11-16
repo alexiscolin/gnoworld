@@ -1,6 +1,6 @@
-// The name of an account on one chain (9f), read live from r/sys/users with the block it was read at, and the name the page shows:
+// The name of an account on one chain, read live from r/sys/users with the block it was read at, and the name the page shows:
 // mainnet's, else Onyx's, else the short address. The expressions are fixed ones over an address the schema proved (as
-// server/src/door/names.ts does, D92), built by evalCall.ts's `userCall` (D283). `ResolveAddress` gives nil for a
+// server/src/door/names.ts does), built by evalCall.ts's `userCall`. `ResolveAddress` gives nil for a
 // missing or deleted record, which `.Name()` would panic on, so `IsDeleted` is asked first (a nil receiver answers true).
 import { isName } from "@gnoworld/core";
 import { readHeight } from "@gnoworld/chain/node";
@@ -50,7 +50,7 @@ export async function readName(
   { chainId, account, height }: { chainId: string; account: string; height?: number },
   options: ReadOptions = {},
 ): Promise<ChainRead<Named>> {
-  // Nothing is asked for what is no address, and nothing of a node that is not the universe's chain (D118).
+  // Nothing is asked for what is no address, and nothing of a node that is not the universe's chain.
   if (!Address.safeParse(account).success) return failedRead("bad-name", sourceOf(rpc, options));
   const at = await blockOf(rpc, { chainId, given: height }, options);
   if (!at.ok) return at;

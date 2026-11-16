@@ -159,7 +159,7 @@ describe("loadSkills: what it gives", () => {
   });
 });
 
-// Alexis's choice of 2026-11-04 (D55's stricter one): gnomcp's gno skill teaches an agent that writes, signs and sends
+// gnomcp's gno skill teaches an agent that writes, signs and sends
 // coins in five of its references; Jarvis is offered its nine reading ones alone, the folder kept whole.
 describe("loadSkills: the gno skill's references Jarvis is never offered", () => {
   const WRITING = ["build.md", "debug.md", "gnokey.md", "mcp.md", "toolchain.md"];
@@ -451,7 +451,7 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
   });
 
   // scripts/hidden.py's set (Default_Ignorable_Code_Point, Cf, Zl, Zp), without its emoji exception, and every control
-  // character but tab and new line: one of each class it holds, its unassigned tags included (F5083, F5086).
+  // character but tab and new line: one of each class it holds, its unassigned tags included.
   const HIDDEN = [
     [0x202e, "a right-to-left override"],
     [0x2066, "a left-to-right isolate"],

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { listen } from "./events.ts";
 
-// Adena's `On(event, func)`: a listener cannot be removed and only the first one registered hears (plan 9, 9b).
+// Adena's `On(event, func)`: a listener cannot be removed and only the first one registered hears.
 class Wallet {
   registered: { event: string; func: (value: string) => void }[] = [];
   On(event: string, func: (value: string) => void) {

@@ -80,7 +80,7 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
   };
   const timed = (action === undefined || banner) && !pointed;
   // Its words, not its object, keep their count. The focus holds it where the page has it now: a removed
-  // element fires no blur in jsdom (Chromium 156 fires one), so no flag kept by events can say (F316).
+  // element fires no blur in jsdom (Chromium 156 fires one), so no flag kept by events can say.
   useEffect(() => {
     if (!timed || pillRef.current?.contains(document.activeElement) === true) return;
     const timer = setTimeout(() => {
@@ -90,9 +90,9 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
       clearTimeout(timer);
     };
   }, [timed, title, line, moves]);
-  // In the top layer, over a modal dialog's scrim when raised from it (F331), shown as it comes; its
+  // In the top layer, over a modal dialog's scrim when raised from it, shown as it comes; its
   // region stays in the page, where it is announced. A banner, raised by the page and never from a
-  // dialog, stays in the page: an open dialog's layer covers it (8j).
+  // dialog, stays in the page: an open dialog's layer covers it.
   usePillLayer(pillRef, banner);
   return (
     <div
@@ -109,7 +109,7 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
       }}
       onFocus={(event) => {
         moved();
-        // Coming in from outside, from nowhere included, it takes a new way back (F323).
+        // Coming in from outside, from nowhere included, it takes a new way back.
         const from = event.relatedTarget;
         if (!(from instanceof Node && event.currentTarget.contains(from)))
           backRef.current = from instanceof HTMLElement ? from : null;

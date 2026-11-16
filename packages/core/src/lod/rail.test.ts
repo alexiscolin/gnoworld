@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Signals } from "./labels.ts";
 import { AHEAD, chooseRail, RAIL_MOST, RISING_MOST, SEEDS_MOST, type RailAsk, type RailWorld } from "./rail.ts";
 
-// The rail (ADR-0002 §1's row, §10; plan §9, question 7): the Earth first, then the trends, the rising worlds and the seeds, each world once,
+// The rail (ADR-0002 §1's row, §10): the Earth first, then the trends, the rising worlds and the seeds, each world once,
 // 25 at most; its order changes only when a world is clearly ahead of the one shown above it.
 const ADDRESS = "g1um2pwwnx3gn8p3ryfdert8mhpu4u4up49sc9ru";
 const EARTH: RailAsk = { id: "earth", kind: "earth", signals: { here: 4 } };
@@ -313,7 +313,7 @@ describe("a world's name on the rail", () => {
   });
 });
 
-// Slice 8: the worlds the reader follows come right after the Earth, the last followed first, whatever they do now; ten at most, each once;
+// The worlds the reader follows come right after the Earth, the last followed first, whatever they do now; ten at most, each once;
 // the Earth never moves.
 describe("the rail's followed worlds", () => {
   const follow = (asks: readonly RailAsk[], followed: readonly string[]) => chooseRail(asks, [], followed);
@@ -356,7 +356,7 @@ describe("the rail's followed worlds", () => {
   });
 });
 
-// 7i: the newest seeds first, one of unknown age after every known one, two of an age by their ids.
+// The newest seeds first, one of unknown age after every known one, two of an age by their ids.
 describe("the seeds' order", () => {
   it("puts a seed of unknown age last and two of one age by id", () => {
     const unknown = world("aged", { uncharted: true });

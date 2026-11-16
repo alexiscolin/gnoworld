@@ -1,4 +1,4 @@
-// What the link joins (slice 4's 4b, moved out of link.ts): the rooms it follows, in JOIN and PART lines of 510
+// What the link joins: the rooms it follows, in JOIN and PART lines of 510
 // bytes at most.
 import { LINE_BYTES, nickOf, type IrcMessage } from "@gnoworld/core";
 
@@ -27,8 +27,7 @@ export function followed(listed: readonly string[], shown: string | undefined, m
   return late ? [...first.slice(0, max - 1), shown] : first;
 }
 
-/** What a JOIN of `room` leaves to ask Ergo: an echoed JOIN brings its NAMES and its MARKREAD, a second tab's neither
- * (CR7); who is here while none is known, and an account's place while the store holds none. */
+/** What a JOIN of `room` leaves to ask Ergo: an echoed JOIN brings its NAMES and its MARKREAD, a second tab's neither; who is here while none is known, and an account's place while the store holds none. */
 export function asksAfterJoin(
   room: string,
   held: { readonly members: readonly string[]; readonly read: string | undefined } | undefined,

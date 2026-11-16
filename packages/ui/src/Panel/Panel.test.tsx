@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Panel } from "./Panel.tsx";
 
-// Slice 5r: the panel of docs/DESIGN-SYSTEM.md's component table (header, body, footer; docked, floating, the plate).
+// The panel of docs/DESIGN-SYSTEM.md's component table (header, body, footer; docked, floating, the plate).
 describe("Panel", () => {
   it("is a region named by its label, its header, body and footer in order", () => {
     render(
@@ -124,7 +124,7 @@ describe("Panel", () => {
     });
   });
 
-  // F3259: the page's layout round a plate: the plate in its place, one outline no reader meets, and what stands beside it.
+  // The page's layout round a plate: the plate in its place, one outline no reader meets, and what stands beside it.
   describe("Panel.Layout", () => {
     it("holds the plate in its place, then what stands beside it, after an outline no reader meets", () => {
       const { container } = render(

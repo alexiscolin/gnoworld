@@ -1,4 +1,4 @@
-/* A link's player (4g): its card's state in words, then the service's frame, as wide as the line allows. */
+/* A link's player: its card's state in words, then the service's frame, as wide as the line allows. */
 @layer components {
   .status {
     color: var(--color-text-muted);

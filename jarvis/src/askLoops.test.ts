@@ -19,7 +19,7 @@ const CAPS = {
   toolResultBytes: 16_384,
 };
 
-// 10u-g: catch-up sums the lines it is given, so it is offered `decline` alone; the others keep the allowlist's tools.
+// catch-up sums the lines it is given, so it is offered `decline` alone; the others keep the allowlist's tools.
 describe("the two loops of /ask", () => {
   it("asks the fast model for catch-up with `decline` as its one tool, the main model for the rest with every tool", async () => {
     const { budget, close } = budgetFor(45 * 1_000_000_000);
@@ -57,7 +57,7 @@ afterAll(() => {
   data.remove();
 });
 
-// D13920: the loop that explains a function reads the code alone, on one chain's profile.
+// The loop that explains a function reads the code alone, on one chain's profile.
 const REALM = "gno.land/r/gov/dao";
 const READ = { profile: "gnoland", path: REALM, symbols: ["Vote"] };
 const SOURCE = "func Vote(cur realm, id int) { ... }";

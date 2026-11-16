@@ -1,4 +1,4 @@
-// The demo's lights (D401), each one draw: the suns, every system's dust, the far stars. Grains are placed by a hash of their index:
+// The demo's lights, each one draw: the suns, every system's dust, the far stars. Grains are placed by a hash of their index:
 // the same sky each visit, no chance drawn.
 import {
   BufferGeometry,

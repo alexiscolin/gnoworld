@@ -1,4 +1,4 @@
-// Making the worlds file fit its caps (slice 7, 7c; F3513). A chain's rows are a stranger's: one deployer can fill a world, so a
+// Making the worlds file fit its caps. A chain's rows are a stranger's: one deployer can fill a world, so a
 // file past a cap is shed, never refused, or one actor could stop the file for everyone for good. The least active world goes first
 // (calls ascending, a null count as none, then the most crowded namespace, then the heaviest): over the schema's count, whole
 // worlds; over the bytes, lists (functions and imports) first, then whole worlds. The others stay as they were, in the order they came.

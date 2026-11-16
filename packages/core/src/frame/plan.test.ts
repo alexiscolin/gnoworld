@@ -18,7 +18,7 @@ import { arrivalOf, type Arrival } from "./arrival.ts";
 import { planOf, plannedOf } from "./plan.ts";
 import { cameraTowards, DEGREE, dot, Look, minus, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
-// A system's Plan (7v; Alexis, 2026-11-03, the mock-up he approved at 14:09): seen from above, the only view that draws its orbits, as
+// A system's Plan (the approved mock-up): seen from above, the only view that draws its orbits, as
 // ellipses; its star at the centre, each world on its orbit with its name under it, to pick a world more simply. These read it through
 // the view's own projection, on the screens it is composed for.
 
@@ -64,7 +64,7 @@ const seenOn = (system: StarSystem) => {
 };
 // A name's room under its world, as the Plan stands it: 30 pixels high, 120 wide at the least.
 const NAME = { high: 30, half: 60 };
-// A world's radius goes as its own size to this power, worldSize's whole span 3.5 times apart (7v2, the mock-up's 26 to 92 px).
+// A world's radius goes as its own size to this power, worldSize's whole span 3.5 times apart (the mock-up's 26 to 92 px).
 const SIZE_POWER = Math.log(3.5) / Math.log(WORLD_MOST / WORLD_LEAST);
 // A Plan's rings, each one orbit its worlds share, nearest the star first, and the largest world on each.
 const ringsOf = (worlds: readonly Orbiter[]) =>
@@ -148,9 +148,9 @@ describe("a system's Plan", () => {
     },
   );
 
-  // The twelve largest by their own size, before a crowd's cap (7v's design review, F4470), computed here: every other body no larger than
-  // the least of them. Five rings at the most, the mock-up's, their worlds sharing them in their real order (7v2: twelve rings stood at like
-  // gaps, the planetarium's tell).
+  // The twelve largest by their own size, before a crowd's cap, computed here: every other body no larger than
+  // the least of them. Five rings at the most, the mock-up's, their worlds sharing them in their real order (twelve rings at like
+  // gaps would be the planetarium's tell).
   it.each(Object.keys(SETS) as SetName[])(
     "draws %s's twelve largest worlds of a body's size, on five rings at the most in their real order",
     (name) => {
@@ -175,7 +175,7 @@ describe("a system's Plan", () => {
     },
   );
 
-  // 7v's design review (F4470): every Plan world stood at one size (gnoswap's 16 all at their crowd's cap, 0.493). Each is drawn at its own
+  // Plan worlds do not all stand at one size (gnoswap's 16 all at their crowd's cap, 0.493, would). Each is drawn at its own
   // size, its use's, whatever its crowd's cap.
   it.each([
     ["60 mixed systems", () => mixed(60)],
@@ -195,7 +195,7 @@ describe("a system's Plan", () => {
     expect(varied).toBe(true);
   });
 
-  // 7v's design review (F4470): the Plan's orbits read as a diagram, evenly spaced (gnoswap's 41 to 48 px apart). They keep their real order
+  // The Plan's orbits are not a diagram, evenly spaced (gnoswap's 41 to 48 px apart would be). They keep their real order
   // and distance on a scale whose steps grow outward, as the mock-up's 130 to 180 px: never evenly.
   it.each(Object.keys(SETS) as SetName[])(
     "spaces the orbits of %s never evenly: not all gaps alike, and no three neighbours",
@@ -214,8 +214,8 @@ describe("a system's Plan", () => {
     },
   );
 
-  // The design review's second pass (F4470): gnoland's discs stood wider than the gaps between their rings (r 46 to 52 against 54 and 59
-  // px), so which ring a world was on could not be told; gnoswap's two inner rings 14 px apart. A disc's width between neighbours at least.
+  // A disc must not be wider than the gaps between its rings (gnoland's were: r 46 to 52 against 54 and 59
+  // px), or which ring a world is on cannot be told; nor gnoswap's two inner rings 14 px apart. A disc's width between neighbours at least.
   it.each(Object.keys(SETS) as SetName[])("keeps each ring of %s a disc's width or more from the next", (name) => {
     for (const system of bodied(name)) {
       const rings = ringsOf(planOf(system).postcard.worlds);
@@ -270,7 +270,7 @@ describe("a system's Plan", () => {
     },
   );
 
-  // The system's card at the top left (7v, the GUI board's option B): no world of a Plan, nor its name's room, in its room, a fourth across
+  // The system's card at the top left: no world of a Plan, nor its name's room, in its room, a fourth across
   // and a fifth down.
   it.each(Object.keys(SETS) as SetName[])("keeps the system's card's room clear of %s's worlds and names", (name) => {
     for (const system of bodied(name))
@@ -281,7 +281,7 @@ describe("a system's Plan", () => {
           ).toBe(false);
   });
 
-  // The mock-up's worlds stand 22 to 92 pixels in radius at 1,728 by 1,080: the most used of a Plan of six or fewer are 19 or more (the Plan is framed by its height now, SPAN_HEIGHT, D415).
+  // The mock-up's worlds stand 22 to 92 pixels in radius at 1,728 by 1,080: the most used of a Plan of six or fewer are 19 or more (the Plan is framed by its height, SPAN_HEIGHT).
   it("draws the largest world of a Plan of six or fewer 19 pixels in radius or more, on Onyx", () => {
     const small = bodied("the recorded Onyx file").filter(
       ({ worlds }) => worlds.filter(({ radius }) => radius >= GRAIN).length <= 6,
@@ -309,7 +309,7 @@ describe("a system's Plan", () => {
   });
 });
 
-// 7v's design review (F4470; the chief: 7 degrees, for Alexis's "une vue à plat"): at the home's 42.5 degree lens perspective put a Plan's
+// A Plan is seen nearly flat, at 7 degrees: at the home's 42.5 degree lens perspective put a Plan's
 // outer ellipse's centre 122 px under its star, and its system's own tilt rolled it 13 degrees. A Plan is seen through a lens of its own,
 // its plane level, each orbit round its star; a system's dynamic view keeps the home's.
 describe("a Plan's own lens", () => {
@@ -367,7 +367,7 @@ describe("a Plan's own lens", () => {
   });
 });
 
-// What a Plan draws besides its worlds (7v): each world's place, held still, and its orbit as a ring round the star, on the map, so the
+// What a Plan draws besides its worlds: each world's place, held still, and its orbit as a ring round the star, on the map, so the
 // chunk that draws them reads no rule of the disc and the cosmos's chunk keeps its own.
 describe("a Plan as drawn", () => {
   const system: StarSystem = {
@@ -439,7 +439,7 @@ describe("a Plan as drawn", () => {
   });
 });
 
-// 7v2: the Plan's rules on systems no one chose, as the mock-up's on the three sets above: five rings at most in their real order, worlds
+// The Plan's rules on systems no one chose, as the mock-up's on the three sets above: five rings at most in their real order, worlds
 // sharing them, never evenly spaced, a disc's width apart, sizes in their uses' order within worldSize's 3.5 times, none on the star's heart.
 describe("a Plan of a system no one chose", () => {
   it("keeps the Plan's rules on random namespaces and uses", () => {
@@ -477,7 +477,7 @@ describe("a Plan of a system no one chose", () => {
   });
 });
 
-// F5462 (Alexis, 2026-11-05, the mock-up): a Plan too full names as many worlds as there is room for, the largest first, and counts the rest
+// A Plan too full names as many worlds as there is room for, the largest first, and counts the rest
 // under a "+N" standing where the last name that does not fit would, on the outer ring.
 describe("a Plan too full to name every world", () => {
   const crowded = () => {
@@ -504,7 +504,7 @@ describe("a Plan too full to name every world", () => {
     }
   });
 
-  // G2 (the chief, 2026-11-05): the "+N" stands by the names' own rule, where the first unnamed world's name would, and where it would meet
+  // The "+N" stands by the names' own rule, where the first unnamed world's name would, and where it would meet
   // a name or a world one more name goes into the count, till it stands clear: on 48 crowded systems, none meets.
   it("stands its +N clear of every name and world, counting the unnamed, on 48 crowded systems", () => {
     let crowded = 0;

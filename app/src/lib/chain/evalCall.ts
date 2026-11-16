@@ -1,7 +1,7 @@
 // Tier 1 (docs/REVIEW.md). One of the two places a `vm/qeval` expression is built (the other, a name for an address, is
-// packages/core/src/chain/evalName.ts; the server's door has its own, D92). The chain runs ANY expression it is sent, so the
-// defence is here: one `<realm>.<Name>(<literals>)`, its arguments written by core's readArgs alone (D13301), one of r/sys/users's
-// two calls on a proved address (D283), or nothing. Each pattern is built inside its function (typescript.md, F412).
+// packages/core/src/chain/evalName.ts; the server's door has its own). The chain runs ANY expression it is sent, so the
+// defence is here: one `<realm>.<Name>(<literals>)`, its arguments written by core's readArgs alone, one of r/sys/users's
+// two calls on a proved address, or nothing. Each pattern is built inside its function (typescript.md).
 import { isExportedName, readArgs, type Param } from "@gnoworld/core";
 import { Address, isRealmPath } from "@gnoworld/schemas";
 

@@ -1,4 +1,4 @@
-// The home's first screen has depth (D510): the Earth stays close at the bottom right, lit at three quarters, but the eye is swung round
+// The home's first screen has depth: the Earth stays close at the bottom right, lit at three quarters, but the eye is swung round
 // the Earth's light cone, which keeps the light, to the side that shows most of the home system's other worlds as round spheres of
 // different sizes in the free part of the screen. Chosen once, as the first screen is framed; read as a pose's way and roll.
 import type { Circle } from "./goals.ts";
@@ -9,7 +9,7 @@ const FOV_HALF = Math.tan((50 * Math.PI) / 360);
 const STEP = 4;
 // The rolls tried, in degrees, round the sun's 140° on the screen; the Earth's light turns with them, so never far.
 const ROLLS = [-60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60];
-/** The frame's boost once the first screen has landed: the gate (this less 1) of each featured world's own boost, eased in (D541, D549). */
+/** The frame's boost once the first screen has landed: the gate (this less 1) of each featured world's own boost, eased in. */
 export const HOME_BOOST = 2;
 // The sun's way on the screen, up and to the left, in degrees: the roll of the eye.
 const SUN_ANGLE = 140;
@@ -23,7 +23,7 @@ export function normalise(v: Vec): Vec {
   return v;
 }
 
-// At three quarters (D458): 99° from the sun (cos -0.15) in its plane, whatever the sun's place, so of the disc the plate and the dock leave
+// At three quarters: 99° from the sun (cos -0.15) in its plane, whatever the sun's place, so of the disc the plate and the dock leave
 // in sight some 60 % stands in the light, the terminator across it; the eye rolled so the sun stands up and to the left, the night down to the right.
 const QUARTER = { sun: -0.15, aside: -0.989 } as const;
 
@@ -34,7 +34,7 @@ export interface Frame {
   readonly side: Vec;
 }
 
-// The way, `turn` degrees round the light cone from the plane's side: the light stays, the view swings (D510, vista.ts).
+// The way, `turn` degrees round the light cone from the plane's side: the light stays, the view swings.
 export function quarterOf(out: Vec, { toSun, n, side }: Frame, turn: number): Vec {
   const [across, up] = [
     Math.cos((turn * Math.PI) / 180) * QUARTER.aside,
@@ -114,7 +114,7 @@ function scoreOf(worlds: readonly Planet[], eye: Eye, { turn, roll, seconds, fix
 }
 
 /** The view the home's first screen stands at, once chosen and while it stands (follow.ts moves it); none till then. Its featured worlds are
- * chosen once, as it has landed, and then kept (`frozen`) till the view leaves the home (D551). */
+ * chosen once, as it has landed, and then kept (`frozen`) till the view leaves the home. */
 export const latch: { view: View | undefined; featured: readonly Featured[]; frozen: boolean; at: number } = {
   at: 0,
   view: undefined,
@@ -152,7 +152,7 @@ export function turnOf(
 }
 
 /** The worlds the first screen may feature: the home system's but the Earth, and the planets of the nearest other system, for a far layer
- * where no home world can stand in the free room (D549). */
+ * where no home world can stand in the free room. */
 export function featuredPool({ home, earth, systems }: Universe): Planet[] {
   const apart = (system: Universe["home"]): number =>
     Math.hypot(system.place.x - home.place.x, system.place.y - home.place.y, system.place.z - home.place.z);
@@ -184,7 +184,7 @@ export type { Featured };
 const LEAD = 6;
 
 /** Till the first screen has landed its view is chosen again every second and a half, for where the worlds will stand as the flight ends, so
- * a long flight lands on a view the quick orbits have not left (D553). */
+ * a long flight lands on a view the quick orbits have not left. */
 export function compose(worlds: readonly Planet[], eye: Eye, seconds: number): void {
   if (latch.frozen || (latch.view !== undefined && seconds < latch.at + 1.5)) return;
   const first = turnOf(worlds, eye, { seconds: seconds + LEAD });

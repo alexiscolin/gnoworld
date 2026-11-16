@@ -70,7 +70,7 @@ describe("connectAnthropic: the SDK's one client", () => {
     const headers = headersOf(call?.init ?? {});
     expect(Object.values(headers).some((value) => value.includes(KEY))).toBe(true);
     expect(JSON.stringify(bodyOf(call?.init ?? {}))).not.toContain(KEY);
-    // The plain messages API: no beta, so no server-side fallback (a decision of this part's, in docs/decisions.md).
+    // The plain messages API: no beta, so no server-side fallback.
     expect(headers["anthropic-beta"]).toBeUndefined();
     expect(bodyOf(call?.init ?? {})).not.toHaveProperty("fallbacks");
   });

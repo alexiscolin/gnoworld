@@ -1,6 +1,6 @@
-// What a realm's read functions need (5i): the list of names, once, from `vm/qfuncs`, and the result of each call a click
+// What a realm's read functions need: the list of names, once, from `vm/qfuncs`, and the result of each call a click
 // asks, from `vm/qeval` and the height it was read at. A read that fails is a state with its next step, never a blank. Each
-// function's card keeps one read in flight, starts one per 400 ms, gives it 10 s and reads 64 KB of the answer (D13301).
+// function's card keeps one read in flight, starts one per 400 ms, gives it 10 s and reads 64 KB of the answer.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { Failure, ReadOptions } from "@gnoworld/chain/read";
@@ -8,6 +8,7 @@ import { readHeight } from "@gnoworld/chain/node";
 import type { Read } from "../../lib/chain/evalCall.ts";
 import { readEval, realmFunctions, toFunctions } from "../../lib/chain/rpc.ts";
 import { queryClient } from "../../lib/query/client.ts";
+import { pageFetch } from "../../lib/query/policy.ts";
 import { listingOf } from "./useCallable.ts";
 import type { Height } from "./useRealm.ts";
 
@@ -70,13 +71,17 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
   };
   // The text first; the height, a neighbour of the read and a request of its own, follows when it comes. A height is kept only
   // by the read it was asked for: a later click replaces that read, and its height is its own. A read with a later one asked since,
-  // waiting or under way, settles nothing: its answer is not the later one's (F13318).
+  // waiting or under way, settles nothing: its answer is not the later one's.
   const ask = (
     name: string,
     call: Read | undefined,
     { signal, latest }: { signal: AbortSignal; latest: () => boolean },
   ) => {
-    readEval(rpc, { realm, name, ...call }, { ...options, timeoutMs: 10_000, maxBytes: 64 * 1024, signal })
+    readEval(
+      rpc,
+      { realm, name, ...call },
+      { fetch: pageFetch, ...options, timeoutMs: 10_000, maxBytes: 64 * 1024, signal },
+    )
       .then((text) => {
         if (!latest()) return undefined;
         if (!text.ok) {
@@ -85,7 +90,7 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
         }
         const shown: Result = { state: "read", text: text.value, height: undefined };
         settle(name, shown);
-        return readHeight(rpc, { ...options, chainId: null }).then((height) => {
+        return readHeight(rpc, { fetch: pageFetch, ...options, chainId: null, signal }).then((height) => {
           setResults((before) =>
             before[name] === shown
               ? { ...before, [name]: { ...shown, height: height.ok ? height.value : height.failure } }

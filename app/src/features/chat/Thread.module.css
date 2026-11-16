@@ -1,4 +1,4 @@
-/* A thread's panel beside the room (4d's threads): a column of the design system's medium width, or the whole of a
+/* A thread's panel beside the room: a column of the design system's medium width, or the whole of a
    narrow room, whose lines give it the place (RoomView.module.css). */
 @layer components {
   .panel {

@@ -7,9 +7,9 @@ import { message, script, text, thinking, usage, type Step } from "./testing/fak
 import { budgetFor, capture, spans } from "./testing/kit.ts";
 import { makeTranslator } from "./translate.ts";
 
-// 10k, ADR-0002 §5 ("Translation", point 5): one translation a message and language, with the fast model and its own
+// ADR-0002 §5 ("Translation", point 5): one translation a message and language, with the fast model and its own
 // budget, cached in jarvis's file for every reader; one that adds a link, an account or a number is dropped and the
-// original shows. Each value is built inside its test (F2356).
+// original shows. Each value is built inside its test.
 const closing: (() => void)[] = [];
 afterEach(() => {
   for (const close of closing.splice(0)) close();

@@ -2,7 +2,7 @@ import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { makeNames } from "./names.ts";
 
-// 10g (D92): whether an account has a name on the mainnet, read from r/sys/users through its RPC, for its quota (D43).
+// Whether an account has a name on the mainnet, read from r/sys/users through its RPC, for its quota.
 const RPC = "https://rpc.gno.land";
 const ANNA = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const BEN = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -46,7 +46,7 @@ interface Call {
   init: RequestInit;
   ms: number;
 }
-// The mainnet's chain (D120): the node's status names it before any name is read there (D118).
+// The mainnet's chain: the node's status names it before any name is read there.
 const MAINNET = "gnoland-1";
 const statusOf = (network: string | null) =>
   new Response(
@@ -93,7 +93,7 @@ describe("a mainnet name", () => {
     expect(await named(ANNA)).toBe(true);
     const expression = `gno.land/r/sys/users.ResolveAddress("${ANNA}").IsDeleted()`;
     const url = `${RPC}/abci_query?path=%22vm%2Fqeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
-    // Each request whole (10h's review, V3): a GET with no cookie, no redirect followed, no cache, and no header but accept.
+    // Each request whole: a GET with no cookie, no redirect followed, no cache, and no header but accept.
     const init = {
       method: "GET",
       credentials: "omit",

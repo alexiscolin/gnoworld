@@ -52,7 +52,7 @@
     color: var(--color-danger);
   }
 
-  /* A later slice's act: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
+  /* An act yet to come: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
   .item[aria-disabled="true"] {
     opacity: var(--opacity-disabled);
     cursor: not-allowed;

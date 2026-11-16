@@ -1,4 +1,4 @@
-// The door's calls to jarvis for an ask (D13985): the answers kept, the one call in flight for the same ask, and the effects
+// The door's calls to jarvis for an ask: the answers kept, the one call in flight for the same ask, and the effects
 // of an answer on the account's quota and share. Asks with the same key at once share one call, never
 // stopped for a reader leaving; a quota full for the asker that made it sends the others back through. The effects run
 // before the call leaves the table, so a later ask finds the answer kept or none in flight.

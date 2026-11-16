@@ -1,4 +1,4 @@
-// The guard of every route that changes something (slice 3's plan, 3c, 3l): no answer is cached, and a
+// The guard of every route that changes something: no answer is cached, and a
 // request that is no GET comes from a listed Origin and in JSON, the CSRF guard: Hono's own csrf() checks
 // form types only.
 import { jsonOf } from "@gnoworld/core";

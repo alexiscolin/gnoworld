@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SavedView, type SavedViewProps } from "./SavedView.tsx";
 
-// The saved messages' list (slice 4's 4d; ADR-0002: "Saved messages ... Device", a view shown as a dialog over the
+// The saved messages' list (ADR-0002: "Saved messages ... Device", a view shown as a dialog over the
 // current place): each line with its author, its room and its words, a way back to the room and a way to remove it,
 // and a word that they are kept on this device alone. A guest has none: it is given no way to open it.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");

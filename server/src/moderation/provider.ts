@@ -1,4 +1,4 @@
-// OpenAI's moderation, the check's provider (ADR-0002 §6; slice 3's plan, 3i): the text alone goes out,
+// OpenAI's moderation, the check's provider (ADR-0002 §6): the text alone goes out,
 // with the model's name and nothing that names its author. Every answer goes through Zod against the 13
 // categories OpenAI's API description lists: any other shape counts as not checked, and raises the alert.
 import { z } from "zod";

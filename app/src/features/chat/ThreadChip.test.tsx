@@ -4,11 +4,11 @@ import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
-// 4d's threads: the chip under a thread's root says how many replies the room's lines hold, and opens the thread.
+// The chip under a thread's root says how many replies the room's lines hold, and opens the thread.
 // The lines view is a lazy chunk: drawn once and waited for, as RoomView.test.tsx does.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
-// A line of the room; `reply` is the msgid it answers (4d's replies).
+// A line of the room; `reply` is the msgid it answers.
 const line = (id: string, minute: number, reply?: string): Line => ({
   id,
   time: T(minute),
@@ -93,7 +93,7 @@ describe("a thread's chip, under its root", () => {
     expect(chipOf(root)).not.toBeNull();
   });
 
-  // R13: a direct message's lines are the view's too, built with the same props but for the room: a reply there is
+  // A direct message's lines are the view's too, built with the same props but for the room: a reply there is
   // no thread, whether or not the page passes the handler.
   it("shows no chip in a direct message, though the page passes the handler and its lines answer one another", () => {
     const html = view({ room: undefined }, [line("root", 0), line("a", 1, "root")]);
@@ -107,7 +107,7 @@ describe("a thread's chip, under its root", () => {
     expect(html).not.toMatch(/\b\d+ repl(?:y|ies)\b/);
   });
 
-  // R1: the room's lines as it shows them (4d's edits): an edit is no reply, and a reply that names an edit's msgid
+  // The room's lines as it shows them: an edit is no reply, and a reply that names an edit's msgid
   // answers the line the edit corrects.
   it("counts an author's edit of a reply once: the edit is no second reply", () => {
     const lines = [
@@ -126,7 +126,7 @@ describe("a thread's chip, under its root", () => {
     expect(said(chipOf(root)?.[0] ?? "")).toMatch(/^1 reply\b/);
   });
 
-  // The list is one tab stop, a line (docs/decisions.md, 2026-10-26): a chip joins the roving, the Thread action of the
+  // The list is one tab stop, a line: a chip joins the roving, the Thread action of the
   // line's bar being the way to every thread by keyboard.
   it("keeps the chip out of the Tab order of every line but the list's one stop", () => {
     const [root = ""] = markup(view());

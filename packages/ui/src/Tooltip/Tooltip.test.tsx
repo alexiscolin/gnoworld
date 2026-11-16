@@ -94,7 +94,7 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
-  // F832: Chrome refuses to show a popover inside another popover's show or hide: a menu closed by Esc hands the focus
+  // Chrome refuses to show a popover inside another popover's show or hide: a menu closed by Esc hands the focus
   // back to its trigger, this tooltip's control, during its hide. The words show on the next frame, placed then.
   const refusing = (error: Error) => {
     const words = tip();
@@ -123,7 +123,7 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
-  // /code-review on F832: a refusal that lasts is waited out a few frames, never one every frame for good.
+  // A refusal that lasts is waited out a few frames, never one every frame for good.
   it("stops asking after three frames of refusals, its words left hidden (F832)", () => {
     draw();
     const words = tip();
@@ -180,7 +180,7 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
-  // The green pass (G4): only Chrome's refusal during another popover's toggle waits; any other DOMException, or an
+  // Only Chrome's refusal during another popover's toggle waits; any other DOMException, or an
   // error that merely shares its name, rises.
   it.each([
     ["a DOMException of another name", new DOMException("not allowed", "NotAllowedError")],
@@ -210,7 +210,7 @@ describe("Tooltip", () => {
     return tip();
   };
 
-  // The green pass (G3): words shown after a refusal are placed then, by their size once they have one.
+  // Words shown after a refusal are placed then, by their size once they have one.
   it("places its words by their size once shown, after a refused show (F832)", () => {
     const words = drawnAt40();
     // A box out of the top layer has no size, as a browser draws it.
@@ -246,7 +246,7 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
-  // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
+  // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same.
   it("hides the words the keyboard showed when their control leaves the page", async () => {
     const tipped = (control: boolean) => (
       <Tooltip label="Search the universe">
@@ -308,7 +308,7 @@ describe("Tooltip", () => {
     expect(shown()).toBe("true");
   });
 
-  // Two holds, each its own (WCAG 1.4.13, F334): the pointer leaving never ends the focus's, nor a blur
+  // Two holds, each its own (WCAG 1.4.13): the pointer leaving never ends the focus's, nor a blur
   // the pointer's.
   it("keeps the words the keyboard showed when the pointer comes and goes", () => {
     draw();

@@ -1,4 +1,4 @@
-// Which card a line gets (link-previews L4, D13919): one card a line, a player or a realm's capture first; only a checked line's, in a room
+// Which card a line gets: one card a line, a player or a realm's capture first; only a checked line's, in a room
 // (a direct message's lines are never checked); one that its author, or one who may pin in the room, can remove.
 import type { StreamEvent } from "@gnoworld/schemas";
 import { own } from "../../store/record.ts";
@@ -44,7 +44,7 @@ export function cardOf(
   return room === undefined ? undefined : { room, msgid, key, may: keeping?.moderate !== undefined, saving };
 }
 
-/** The same as bare values, for the props of a line that is drawn again only when one of them changes (F1222): no msgid, no card. */
+/** The same as bare values, for the props of a line that is drawn again only when one of them changes: no msgid, no card. */
 export const cardMarks = (...asked: Parameters<typeof cardOf>) => {
   const card = cardOf(...asked);
   return { cardMsgid: card?.msgid, cardKey: card?.key, may: card?.may ?? false, saving: card?.saving ?? false };

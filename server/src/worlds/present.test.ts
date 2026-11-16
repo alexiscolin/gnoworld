@@ -6,8 +6,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { makePresence } from "./presence.ts";
 import { PRESENT_MS, countriesTo, startPresent } from "./present.ts";
 
-// Who is here (slice 7, 7h, the sampler 7c left to the labels): the people the reconciler reads in each room a guest may see, a world's
-// counted once across its rooms, the bot left out; recorded into 7c's history, so a world rises against its own 14 days; and served as
+// Who is here: the people the reconciler reads in each room a guest may see, a world's
+// counted once across its rooms, the bot left out; recorded into the presence history, so a world rises against its own 14 days; and served as
 // counts alone, never a name, for the cosmos's labels.
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
@@ -317,7 +317,7 @@ describe("the history it keeps", () => {
   });
 });
 
-// The home's hero (8i): the people online, each once, and the countries those of them name: two counts, never who.
+// The home's hero: the people online, each once, and the countries those of them name: two counts, never who.
 describe("the people online", () => {
   const peopleOf = async (present: ReturnType<typeof setup>["present"]) => {
     const response = await present.routes.request("/people");
@@ -413,7 +413,7 @@ describe("the people online", () => {
     // Served: bo, ada and the 50 guests; the history: bo alone.
     expect(await hereIn("earth")).toBe(52);
     vi.advanceTimersByTime(MINUTE);
-    // The file this presence wrote: its sample holds bo alone, never the 50 guests (the batch's review: a new file read nothing).
+    // The file this presence wrote: its sample holds bo alone, never the 50 guests.
     expect(makePresence({ file, now: () => T0 + PRESENT_MS }).history("earth")).toEqual([{ at: T0, people: 1 }]);
   });
 
@@ -458,10 +458,9 @@ describe("the people online", () => {
   });
 });
 
-// Moved here from presence.test.ts: a test sits beside the file it tests.
 describe("guests and who is here (D430)", () => {
-  // A guest's relayed line counts in the plate's messages an hour and never in a trend or a history (D353, D374), and no
-  // anon/ nick is ever an account here (D430). Read in server/src/activity and worlds/present.ts: one `rates` feeds the plate,
+  // A guest's relayed line counts in the plate's messages an hour and never in a trend or a history, and no
+  // anon/ nick is ever an account here. Read in server/src/activity and worlds/present.ts: one `rates` feeds the plate,
   // the trend and the history alike, so the guests' own rates are a second source the plate adds and the others do not.
   const MINUTE = 60_000;
   const T0 = Date.parse("2026-11-03T12:00:00.000Z");

@@ -1,4 +1,4 @@
-// How often the scene draws and how sharp (P100, P103, P106): ambient drawing at 60 Hz at most, 30 where the window has no focus; the
+// How often the scene draws and how sharp: ambient drawing at 60 Hz at most, 30 where the window has no focus; the
 // pixel ratio stepped down by itself only where the frames cannot keep up.
 import type { Need } from "./redraw.ts";
 

@@ -23,7 +23,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
 export OpenTelemetry to whatever backend ops chooses: Grafana in the demo, Langfuse Cloud
-for Jarvis from phase 1 (ADR-0002 §5, §7).
+for Jarvis (ADR-0002 §5, §7).
 
 ## Repository layout
 
@@ -76,7 +76,7 @@ packages/schemas/            Zod schemas for every boundary, shared the same way
 packages/service/            what the server and Jarvis share, on Node: settings, db, log, net (the one way out)
 packages/chain/              every read of a chain's node or the indexer, for app, server and Jarvis: the capped
                              GET, the read through a schema, the node's reads with its universe check, the indexer's
-server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file (3g)
+server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file
   src/                       `main`, `app`, `config`, `limit`, `visitor`, `flights` (a read's bounded flights), then one folder per role:
                              login/ (the login, `links` linked accounts, `linkRoutes`, `cliProof`, `release`), ergo/ irc/ rooms/ guest/
                              (guests who speak with no account) pins/ moderation/ (the bot's and `/api/moderation/hide`, `/mute`),
@@ -92,13 +92,13 @@ link-reader/                 the link reader (its own workspace and image): it i
 jarvis/                      Jarvis (its own workspace and image): it imports nothing of server/
   src/                       the loop, its locks, limits, checks and tools; testing/, its fakes
   skills/                    Jarvis's skills, one SKILL.md folder each, read by its loader only (ADR-0002 §5)
-evals/                       Jarvis's evals (10j): promptfoo apart from the workspace, its own lockfile; cases/ plain JSON,
+evals/                       Jarvis's evals: promptfoo apart from the workspace, its own lockfile; cases/ plain JSON,
                              chains/ the recorded realms, provider.ts through jarvis's real entry; never in an image
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example; jarvis/ its image
                              and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
                              egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       not built yet: the admin console, on its own origin (ADR-0002 §6), reusing ui and lib
-gno/r/                       the realms: `satellite` (the slot realm); the seal out for now (D13197), hubs and profiles later (ADR-0001 §14)
+gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
 ```
 
 Inside a feature:
@@ -117,8 +117,7 @@ features/chat/
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` (`lint/core.config.ts`), `app`'s folders, `sw`, `features`,
 `routes`, `lib`, `store` and the scene (`lint/app.config.ts`), `ui` (`lint/react.config.ts`), and `jarvis`, `service`, `link-reader` and `chain` (`lint/server.config.ts`,
 `lint/chain.config.ts`), each wall proven by `scripts/probe.py`'s `walls` block.
-The scene's folder is `space/`, but `lint/app.config.ts` still names `app/src/scene`: until it names `space/`, the `space` wall below is
-kept by review alone.
+The scene's folder is `space/`, but `lint/app.config.ts` names `app/src/scene`, so the `space` wall below is kept by review alone until it names `space/`.
 
 | Folder | May import | Never imports |
 |---|---|---|
@@ -133,10 +132,10 @@ kept by review alone.
 | `jarvis` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its dependencies | `server`, `link-reader`, React, `space`, `ui`, `features` |
 | `link-reader` | `core`, `schemas`, Node's built-ins, its decoders and parser | `server`, `jarvis`, `chain`, `service`, the app: it holds nothing of the stack's |
 | `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
-| `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else (D113) |
+| `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `space` directly: the canvas is mounted by the universe feature |
 
-This is ADR-0001 §12's split, kept: a bug is either in the space or in the interface, and
+This is ADR-0001 §12's split: a bug is either in the space or in the interface, and
 the store is where they meet.
 
 ## TypeScript
@@ -160,10 +159,10 @@ import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:*
 option compares syntax trees). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, and in `sw` only `fetch` and the cache (the worker fetches and caches;
-its page side asks whether the host answers, F351), a read of a chain's node or the indexer only in
-`packages/chain`, however it is written (`gnoworld/chain-read`, D113), `Intl` formatting only in `core`'s formatters, no clock
+its page side asks whether the host answers), a read of a chain's node or the indexer only in
+`packages/chain`, however it is written (`gnoworld/chain-read`), `Intl` formatting only in `core`'s formatters, no clock
 in `core`, `console` only through the logger, no `Map`, `WeakMap` or `Set` at a module's top in `server/src` or a
-package's `src` (F412). **Dead code:** knip, at zero.
+package's `src`. **Dead code:** knip, at zero.
 
 **Types carry the meaning:**
 - **No `any`, no `@ts-ignore`, no `!`, and no `as` on outside data** (CLAUDE.md). `satisfies`
@@ -230,7 +229,7 @@ Rules:
 5. The chat joins the world's main room.
 6. Back, `Esc` and the breadcrumb are history moves.
 
-**A link gets its card** (slice 13, `docs/plans/link-previews.md`; off unless `LINK_CARDS=1`).
+**A link gets its card** (off unless `LINK_CARDS=1`).
 1. A line passes the bot's check and reaches `cards/flow.ts`, which finds its first https link.
 2. The server asks the link reader, `POST /card {url}` and nothing else: no cookie, no account, no room.
 3. The reader fetches the page through its own way out (`egress_links`), 256 KiB and 5 s at most, three redirects at most, public
@@ -240,11 +239,11 @@ Rules:
 5. The stream tells the line its card; the app draws `LinkCard` (a chunk of its own) and loads its picture from `/api/cards/<key>/picture`
    unless the reader saves data. A REDACT, an edit or the author's or a moderator's removal takes the card away.
 
-**A search** (`docs/plans/search.md`). The chat's search is the server's: `search/index.ts` keeps the lines moderation let through
+**A search.** The chat's search is the server's: `search/index.ts` keeps the lines moderation let through
 (2,048 a room, 90 days, SQLite full text) and drops a line with its REDACT. `GET /api/search` answers one world's rooms for the reader
 alone, asking the room's right again on every page; a members or hidden room is never in it. The palette (⌘K) finds places on the device.
 
-**An owner moderates** (`docs/plans/owners-moderation.md`). The owner of a world is the account (or one linked to it) that holds its
+**An owner moderates.** The owner of a world is the account (or one linked to it) that holds its
 namespace on the default chain (`roles/owners.ts`, read by the server and kept 60 s). `roles/mayModerate.ts` is the one place that gives
 the right; `POST /api/moderation/hide` and `/mute` and the pins ask it, then use the bot's own means. Accounts join one identity through
 `/api/links` (a code, then the other account's proof, from Adena or by a command-line signature rebuilt server-side, `login/cliProof.ts`);
@@ -306,16 +305,16 @@ a key linked by phishing is released by its own file (`login/release.ts`).
 - Each part (a world, a station, the belt, the labels) registers what it creates with one
   disposer. Leaving disposes everything it registered: geometry, material, texture, render
   target, listener.
-- The camera stays at the origin and the world comes to it (slice 7 §5): the eye is a position in doubles, and the GPU gets only what
+- The camera stays at the origin and the world comes to it the eye is a position in doubles, and the GPU gets only what
   remains of it, so a far coordinate is as steady as home.
 - The scenery (`core/space`, drawn by `space/`) is computed from a position and tied to no data (ADR-0002 §10): the mood is a smooth field,
   a cell's stars come from its hash, and both sit in tori of cells that follow the eye, so a step writes only what entered. The sky is
   marched at half the buffer's size a side, shows through the image's one grade (`space/renderer.ts`), and is added to the stage's black.
 - What runs on a frame makes nothing: `ON_A_FRAME` in `lint/shared.config.ts` holds it by name, in the scene and in core's `frame` and
   `space`; a function a frame reaches joins that list as it is written.
-- The planets carry their depth (D13993): relief shadows from a height map near the terminator (the Earth and the Moon from real maps, a
+- The planets carry their depth: relief shadows from a height map near the terminator (the Earth and the Moon from real maps, a
   light version on generated worlds), a sea mask, ambient occlusion, rings that turn faster inside than outside; every effect is off
-  under Low. The Earth shows the real hour (D13947): its sun stands over the place where it is noon now, from UTC (`space/earth/light.ts`).
+  under Low. The Earth shows the real hour: its sun stands over the place where it is noon now, from UTC (`space/earth/light.ts`).
 - Text is HTML anchored to the scene (ADR-0001 §7), never 3D geometry.
 - A page that shows space calls `useSpace` (`features/universe`). That door is all it holds of the scene: the universe comes after the
   text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the
@@ -329,7 +328,7 @@ a key linked by phishing is released by its own file (`login/release.ts`).
 
 ## Memory: the checklist
 
-Each slice that adds a resource proves it is released:
+Each change that adds a resource proves it is released:
 
 - [ ] Every `addEventListener` passes `{ signal }` from an `AbortController` that is aborted
       on cleanup.
@@ -365,7 +364,7 @@ Each slice that adds a resource proves it is released:
       which rate-limit by account and by address.
 - [ ] **Dependencies:** locked, audited in the gate, and every new one asked for
       (CLAUDE.md).
-- [ ] **The login** (`server/src/login/`, tier 1; slice 3's 3c, and 3d's ticket):
+- [ ] **The login** (`server/src/login/`, tier 1):
   - a nonce or a ticket is spent by one statement before the first `await`, and the request
     goes on only if it removed a row;
   - the verifier gets the signer, the chain and the text the server stored, never the
@@ -375,7 +374,7 @@ Each slice that adds a resource proves it is released:
   - every request but GET and HEAD comes from a listed `Origin` and in JSON; each visitor's
     calls are limited before any work; every failed login gets the same answer.
 
-- [ ] **The link reader** (`link-reader/`, `deploy/link-reader/`; slice 13; it fetches what strangers link):
+- [ ] **The link reader** (`link-reader/`, `deploy/link-reader/`; it fetches what strangers link):
   - its container holds no secret, no volume, a read-only root, a user of its own, and two networks: one it shares with the server alone,
     one to its way out; the stack's other services reach neither (`deploy/test-links.sh` proves each, with its mutants);
   - it has no DNS of its own: `egress_links` resolves each name and refuses a private answer, the guard's rules refuse every private
@@ -394,17 +393,16 @@ Each slice that adds a resource proves it is released:
 
 ## Search and pages
 
-- `react-router.config.ts` lists the places from `data/`. In phase 1, `r/gnoworld/hubs`
-  and the signals are read at build time. Only planets are pre-rendered; dust uses the
+- `react-router.config.ts` lists the places from `data/`. Only planets are pre-rendered; dust uses the
   fallback and is `noindex` (ADR-0002 §3).
-- Search is one palette (`features/search`, D355), a chunk of its own: ⌘K, `/`, the header's button, the rail's
+- Search is one palette (`features/search`), a chunk of its own: ⌘K, `/`, the header's button, the rail's
   "See all" and `/list` (which goes to `/#search`) open it. `searchIndex.ts` indexes the site's places and the
   worlds' file's systems and realms (and the functions each realm exports) once; `search.ts` answers a keystroke with the best 50 and the count. The
   palette's empty field is Discover (`search/discover`): shelves, cards and a realm's detail. What was said in a room is the server's search (`search/`, above), which the
   palette hands a query to (`handOff.ts`, `chatItems.ts`, `filters.ts`).
 - Each route exports its `meta`: title, description, canonical, Open Graph, Twitter Card
   and JSON-LD.
-- A build step writes `sitemap.xml` and `robots.txt`; a page's Open Graph tags carry no image yet (`docs/plans/share-image.md`).
+- A build step writes `sitemap.xml` and `robots.txt`; a page's Open Graph tags carry no image yet.
 - The host serves the pre-rendered file, or `__spa-fallback.html` for the device-only
   paths.
 

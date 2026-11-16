@@ -5,7 +5,7 @@ import { remember } from "../remember.ts";
 
 const KEYS = 5000;
 
-export interface Languages<L extends string> {
+interface Languages<L extends string> {
   /** A signed-in stream of `account` began or ended following these worlds in this language. */
   touch: (worlds: Iterable<string>, language: L, account: string) => void;
   /** The languages in use on a world, the most read first, then the most recently read; `open` the streams open now, `except` an account

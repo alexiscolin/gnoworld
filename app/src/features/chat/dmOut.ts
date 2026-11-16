@@ -1,5 +1,4 @@
-// A direct message's lines as the link sends them (slice 4's 4e, and 4d's DM bar), moved out of link.ts for the lint's
-// sizes: a line to an account's nick, labelled so Ergo's answer to it is known, from an account's connection alone.
+// A direct message's lines as the link sends them: a line to an account's nick, labelled so Ergo's answer to it is known, from an account's connection alone.
 import { isCountryCode, isTagMsgid, reactionLine, type Composed, type Line, type Reacting } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
@@ -33,7 +32,7 @@ const mayAct = (o: DmOut, partner: string) => {
   return o.key !== "guest" && me !== undefined && me !== partner && Address.safeParse(partner).success;
 };
 
-/** The tags a reply (+reply, with the msgid it answers) or a correction (+gnoworld/edit, our convention, decision 156, with the
+/** The tags a reply (+reply, with the msgid it answers) or a correction (+gnoworld/edit, our convention, with the
  * one it corrects) goes with, a msgid a tag carries; none at all when a msgid cannot ride in a tag. A room's lines and a
  * direct message's go with the same. */
 function marksOf({ reply, edit }: { reply?: string | undefined; edit?: string | undefined }): string[] | undefined {
@@ -50,7 +49,7 @@ const declared = (country: string | undefined): string[] =>
 
 /** The msgids of the corrections of mine to the line `id`, in the order the conversation holds them: a correction is a line of
  * its own, which a REDACT of its line does not take, and Ergo lets an author delete its own lines alone. Only the
- * lines the store holds are looked through: a correction it never heard is not named (R2's ceiling). */
+ * lines the store holds are looked through: a correction it never heard is not named. */
 function correctionsOf(lines: readonly Line[], me: string | undefined, id: string): string[] {
   return lines
     .filter((line) => line.edits === id && line.account === me && isCommandMsgid(line.id))
@@ -58,7 +57,7 @@ function correctionsOf(lines: readonly Line[], me: string | undefined, id: strin
 }
 
 /** A delete's REDACTs, in the one order a room and a conversation share: each correction first, the line's last, so a
- * REDACT of the line that is refused never leaves the words it was corrected from showing alone (the red pass's R1, CR2).
+ * REDACT of the line that is refused never leaves the words it was corrected from showing alone.
  * Whether the line's went. */
 function redactAll(edits: readonly string[], id: string, redact: (target: string) => boolean): boolean {
   for (const edit of edits) redact(edit);

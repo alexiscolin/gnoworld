@@ -1,4 +1,4 @@
-// Linked accounts (owners' moderation, part 2): one identity of up to ten addresses, each proven by its own signature.
+// Linked accounts: one identity of up to ten addresses, each proven by its own signature.
 // A code is the login's nonce with a kind of its own, spent by one statement before the first await; a link grants
 // moderation of worlds and nothing else.
 import { randomBytes, randomUUID } from "node:crypto";
@@ -49,7 +49,7 @@ export interface Links extends Release {
 export interface LinkOptions {
   now: () => number;
   chainId: string;
-  // The command line's verifier is part 3's: none given, it refuses.
+  // The command line's verifier: none given, it refuses.
   verifiers?: Partial<Verifiers>;
   linkCap?: number;
   // The server's secret, for the release codes' key.

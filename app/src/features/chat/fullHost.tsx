@@ -1,4 +1,4 @@
-// The full chat, one for the whole site (Alexis, 2026-11-07: "propre, bonne archi"): a page opened full says which chat it holds
+// The full chat, one for the whole site: a page opened full says which chat it holds
 // (PlaceChat), and the shell draws that one chat over everything (FullChatHost). A move from one place to another changes the chat's
 // world and keeps its rooms, its link and its history; it never makes the chat again.
 import {
@@ -33,7 +33,7 @@ export const chatHeld = (): boolean => held !== undefined;
 let holders = 0;
 
 // A page's hold on the shell's one chat. The chat is let go once no page holds it after the commit that moved from one page to the next,
-// so a move never makes it again (Alexis, 2026-11-10: the chat's moves from world to world, smooth).
+// so a move never makes it again.
 function useHolding() {
   useEffect(() => {
     holders += 1;
@@ -47,7 +47,7 @@ function useHolding() {
 }
 
 // A page's word in the full chat: its chat is the shell's. It draws nothing. A next page whose chat cannot be drawn yet keeps the one
-// before till it can: the full chat never gives way to space between two places (Alexis, 2026-11-08).
+// before till it can: the full chat never gives way to space between two places.
 function FullChat({ chat }: { chat: ChatProps | undefined }) {
   useEffect(() => {
     if (chat !== undefined) hold(chat);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { answerOf, checkCard, readCard } from "./read.ts";
 import type { Page } from "./store.ts";
 
-// Slice 13, L3: the reader's answer held to its schema and to the picture's real size; a stored page back into the reader's shape.
+// The reader's answer held to its schema and to the picture's real size; a stored page back into the reader's shape.
 // A JPEG header (SOI, a frame of 4 x 2 px) as base64: only its size is read.
 const SMALL = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 0, 2, 0, 4, 1, 1, 0x11, 0, 0xff, 0xd9]);
 const card = (picture: { width: number; height: number; jpeg: string } | null) => ({

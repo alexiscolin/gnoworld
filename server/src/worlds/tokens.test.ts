@@ -58,7 +58,7 @@ describe("txsOf, the checks on the indexer's events", () => {
   });
 });
 
-// An indexer with the chain's pages: a request for events above a height answers the rows there, a block read its height's, blocks' times 2026-11-12.
+// An indexer with the chain's pages: a request for events above a height answers the rows there, a block read its height's, blocks' times.
 function chain(rows: ReturnType<typeof page>["data"]["getTransactions"], asked: string[] = []): Send {
   return (_url, init) => {
     const body = JSON.parse(typeof init.body === "string" ? init.body : "") as {

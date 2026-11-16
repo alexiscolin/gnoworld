@@ -779,7 +779,7 @@ describe("the members as a list shows them", () => {
   });
 });
 
-// The release (D13940, M2): a command-line key's way out of an identity with no session. The code is stateless (an HMAC of the key, the
+// The release: a command-line key's way out of an identity with no session. The code is stateless (an HMAC of the key, the
 // host and the expiry, carried in the code): asking writes nothing, so no flood of asks can evict anyone's code; a signed release spends it.
 describe("the release of a command-line key", () => {
   const setupCli = (options: Parameters<typeof setup>[0] = {}) => {

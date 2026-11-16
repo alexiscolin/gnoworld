@@ -1,10 +1,10 @@
-// A room's reading place on its page (slice 4's 4f, Ergo's draft/read-marker): the line marked New while the room is
+// A room's reading place on its page (Ergo's draft/read-marker): the line marked New while the room is
 // open, and the room marked read to its newest line while the reader is at the end and the page shows.
 import { newMarkAfter, type Line, type NewMark, type Reaction } from "@gnoworld/core";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
- * while the room is open, as the place moves on and lines come; moved to the line a reader asks to go back to (4d: the
+ * while the room is open, as the place moves on and lines come; moved to the line a reader asks to go back to (the
  * device's place `unread`, which only the earlier of it and Ergo's `read` decides from). */
 function useNewMark(
   lines: readonly Line[],
@@ -19,7 +19,7 @@ function useNewMark(
 }
 
 /** Marks the room read to its newest line while the reader is at the end and the page shows: as a line comes, as the
- * tab shows again, as `onRead` comes (none until the room's history came: 4f's G1), and through the look it gives back,
+ * tab shows again, as `onRead` comes (none until the room's history came), and through the look it gives back,
  * which the list calls as it scrolls. */
 function useReadAtEnd(lines: readonly Line[], seesEnd: () => boolean, onRead: ((id: string) => void) | undefined) {
   const newest = lines.at(-1)?.id;
@@ -28,7 +28,7 @@ function useReadAtEnd(lines: readonly Line[], seesEnd: () => boolean, onRead: ((
   };
   const seen = useEffectEvent(look);
   const reading = onRead !== undefined;
-  // The tab shown again: one listener a page, not one a line (E5).
+  // The tab shown again: one listener a page, not one a line.
   useEffect(() => {
     const shows = () => {
       seen();
@@ -45,7 +45,7 @@ function useReadAtEnd(lines: readonly Line[], seesEnd: () => boolean, onRead: ((
 }
 
 /** What reading to the end does in a room: Ergo told the newest line read (`onRead`), and the device's place for the
- * room forgotten, but only when the view was opened with it (4d): the reader who marks a line unread at the end of the
+ * room forgotten, but only when the view was opened with it: the reader who marks a line unread at the end of the
  * room keeps the mark until the next time it is read through, never losing it at once. None until the history came. */
 export function useReading({
   lines,
@@ -67,7 +67,7 @@ export function useReading({
     paged
       ? (id) => {
           onRead?.(id);
-          // Only while the room holds a place: once it is forgotten, a mark another tab sets stays (F1470).
+          // Only while the room holds a place: once it is forgotten, a mark another tab sets stays.
           if (opened && keeping?.unread !== undefined) keeping.onReadThrough();
         }
       : undefined,
@@ -75,7 +75,7 @@ export function useReading({
 }
 
 /** Calls `look` each time the list's box changes size: one a phone's panel hid (no height) and Close shows again at its
- * end is read then, the lines that came meanwhile (F1856). A page with no ResizeObserver has no panel to close. */
+ * end is read then, the lines that came meanwhile. A page with no ResizeObserver has no panel to close. */
 function useLookWhenResized(listRef: RefObject<HTMLElement | null>, look: () => void) {
   const seen = useEffectEvent(look);
   useEffect(() => {
@@ -97,9 +97,9 @@ const AT_END = 32;
 // Whether a list is scrolled to its end, or within AT_END of it.
 const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
 
-// The lines held at their newest while the reader is there, as a line comes or a reaction grows one (the code review's
-// CR3); once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once (UX review's
-// U1), and the reader is at the end only if that shows it.
+// The lines held at their newest while the reader is there, as a line comes or a reaction grows one;
+// once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once,
+// and the reader is at the end only if that shows it.
 function useNewestInView(
   lines: readonly Line[],
   fresh: string | undefined,
@@ -172,7 +172,7 @@ function useListReading(
   };
 }
 
-// Where the reader left the room, once its history page came: Ergo's reading place, or the account's own mark (4f, 4d).
+// Where the reader left the room, once its history page came: Ergo's reading place, or the account's own mark.
 const placeOf = (paged: boolean, read: string | undefined, unread: string | undefined) =>
   paged ? { read, unread } : { read: undefined, unread: undefined };
 

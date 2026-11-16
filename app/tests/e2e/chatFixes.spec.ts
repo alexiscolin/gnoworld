@@ -6,14 +6,14 @@ import { MEMBER } from "./scripted.ts";
 import { field, OTHER, room, T } from "./scriptedRoom.ts";
 import { chipOf, inThread, panel } from "./thread.ts";
 
-// 5q fix pass: what the review of the chat found lost or wrong, by journey (rows 3, 5, 6, 7, 18, 27).
+// What the chat lost or got wrong, by journey.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const message = (page: import("./fixtures.ts").Page) => page.getByRole("group", { name: "Message box" });
 
 test.describe("the chat's fixes", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
-  // Row 3: Who's here then Message on a phone left the dialog open over the conversation, the field never focused.
+  // Who's here then Message on a phone left the dialog open over the conversation, the field never focused.
   test("closes the people's dialog on a phone when Message opens the conversation, the field taking the focus", async ({
     page,
   }) => {
@@ -31,7 +31,7 @@ test.describe("the chat's fixes", () => {
     await expect(page.getByRole("textbox", { name: /^Message / })).toBeFocused();
   });
 
-  // Row 5: a conversation had no dock, no inset, no Who's here.
+  // a conversation had no dock, no inset, no Who's here.
   test("draws a conversation's composer in the same dock as a room's: the quick actions, the inset, the rule", async ({
     page,
   }) => {
@@ -54,7 +54,7 @@ test.describe("the chat's fixes", () => {
     expect(talk.y + talk.height - (box.y + box.height)).toBeGreaterThan(12);
   });
 
-  // Row 6: the list shrinks as the composer grows; the reader at the end who writes lost the newest lines.
+  // the list shrinks as the composer grows; the reader at the end who writes lost the newest lines.
   test("keeps the newest line in view as the draft grows to six lines", async ({ page }) => {
     await logIn(page, "fix-grow");
     await room(page, {
@@ -72,7 +72,7 @@ test.describe("the chat's fixes", () => {
       .toBeLessThanOrEqual(1);
   });
 
-  // Row 7: with a thread open Who's here did nothing, and a click otherwise moved no visible thing.
+  // with a thread open Who's here did nothing, and a click otherwise moved no visible thing.
   test("closes the open thread and lands on the people, with a ring, when Who's here is pressed", async ({ page }) => {
     await logIn(page, "fix-thread");
     const opened = await room(page, {
@@ -97,7 +97,7 @@ test.describe("the chat's fixes", () => {
     await expect(info.getByText(MEMBER.slice(0, 6))).toBeVisible();
   });
 
-  // Row 27: a press released outside the list left the next keyboard focus without its bar in view.
+  // a press released outside the list left the next keyboard focus without its bar in view.
   test("brings a line's bar into view for the keyboard after a press released outside the list", async ({ page }) => {
     await logIn(page, "fix-press");
     await room(page, {

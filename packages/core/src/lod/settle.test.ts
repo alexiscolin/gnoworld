@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { BOXES_MOST, DEPTH, DISCS_MOST, LABEL_SLOTS, LabelLayout, PLACE, settle } from "./settle.ts";
 
-// Where the labels stand on a frame (ADR-0002 §1: labels never overlap; slice 7 §3: off the plate, the rail and each other): beside their
+// Where the labels stand on a frame (ADR-0002 §1: labels never overlap, off the plate, the rail and each other): beside their
 // bodies as frame 4's sit, the first slots first, clear of each other, of the boxes the page keeps and of the bodies' discs; a label that
 // finds no room hides. A far world's label is smaller and fainter. Nothing is made on a frame: the layout is the caller's, written in place.
 const SCREEN = { width: 1728, height: 1080 };
@@ -340,7 +340,7 @@ describe("depth", () => {
   });
 });
 
-// 7h2's measures, the chief's fix B (2026-11-03): Onyx's agents at (1590.741, 876.574), radius 33.106, at 1,728 px (96 more at 1,920),
+// Onyx's agents at (1590.741, 876.574), radius 33.106, at 1,728 px (96 more at 1,920),
 // by the rail's band, from 6 px of air before the rail's 1,585 in frame 4: 149 px wide. A pill slides left of the band, its stem upright
 // over the body's disc, so the body keeps its name (labels.spec, "names what the view draws").
 describe("a label by the rail's band", () => {

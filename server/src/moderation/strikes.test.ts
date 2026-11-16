@@ -136,7 +136,7 @@ describe("an account's mute, its hides settled out of order (the max review)", (
       expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);
   });
 
-  // F13188: a line with no server-time of its own is timed once, when its hide is written; a clock read again for its strike, a
+  // A line with no server-time of its own is timed once, when its hide is written; a clock read again for its strike, a
   // millisecond later, fell past the run's last hide, and nothing was ever muted.
   it("mutes a line with no time of its own, however far the clock moved since its hide was written", () => {
     const { db, verdict } = setup();

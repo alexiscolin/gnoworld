@@ -20,7 +20,7 @@ import {
 import { ActionForm } from "./ActionForm.tsx";
 import { InlineCard } from "./InlineCard.tsx";
 
-// 9e, ADR-0002 section 4, "Proposed actions": a pinned or proposed action shows only once vm/qfuncs confirms its function, types
+// ADR-0002 section 4, "Proposed actions": a pinned or proposed action shows only once vm/qfuncs confirms its function, types
 // and argument names: a card prefilled, every field editable, naming the realm and function it says; else nothing, so a planted
 // message forges no button. NOT recorded: qfuncs' shape.
 const DAO = "gno.land/r/gov/dao";
@@ -329,7 +329,7 @@ describe("a checked action, as parts", () => {
   });
 });
 
-// 9e-1 (Alexis): a team's pinned action in the chat's quick actions bar is one pill under its label, beside Who's here; the card it
+// A team's pinned action in the chat's quick actions bar is one pill under its label, beside Who's here; the card it
 // opens is the bar's own (`bar.card`), drawn where the bar puts it. A call of more than two fields is a link to the realm view.
 describe("a pinned action in the quick actions bar", () => {
   const PLACE = { realm: DAO, chain: CHAIN };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Presence, PRESENCE_ANSWER_MAX } from "./presence.ts";
 
-// GET /api/presence (slice 7, 7h): who is here in each world a guest may see, counts alone, read by the cosmos's labels.
+// GET /api/presence: who is here in each world a guest may see, counts alone, read by the cosmos's labels.
 const world = { world: "earth", here: 184, perHour: 130.4, rise: 0.21 };
 
 describe("Presence", () => {

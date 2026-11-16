@@ -4,10 +4,10 @@ import { adena } from "./adena.ts";
 import { callWallet, connect, phoneOf as touchPhone, type Wallet } from "./callCard.ts";
 import { hydrated, type Page } from "./fixtures.ts";
 
-// The name journeys' world (9f): both chains' RPC stood in as a browser gets them, and a login made on a computer then read at the
-// size under test. NOT recorded: the shapes of vm/qeval and tx as the 9d journeys write them.
+// The name journeys' world: both chains' RPC stood in as a browser gets them, and a login made on a computer then read at the
+// size under test. NOT recorded: the shapes of vm/qeval and tx as the journeys write them.
 const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
-const BASE64_HASH = "eFwYnlgr7KfDvMsmr6ntZ5vCoe/JcHLddE0pzi+D0Fg=";
+const BASE64_HASH = "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=";
 export const NAME = "nym-alexis042";
 export const DOWN = "down";
 
@@ -18,13 +18,13 @@ export interface World {
   onyx?: string | null;
 }
 
-// The call as `tx` gives it once it is in block 55414.
+// The call as `tx` gives it once it is in block 4242.
 const LANDED = {
   jsonrpc: "2.0",
   id: "",
   result: {
     hash: BASE64_HASH,
-    height: "55414",
+    height: "4242",
     index: 0,
     tx_result: {
       ResponseBase: { Error: null, Data: null, Events: null, Log: "ok", Info: "" },

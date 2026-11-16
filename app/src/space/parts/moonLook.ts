@@ -1,4 +1,4 @@
-// One room's moon (D490): a rocky world of the product's own look pipeline (core's look and recipe, the generated program), seeded from the
+// One room's moon: a rocky world of the product's own look pipeline (core's look and recipe, the generated program), seeded from the
 // room's id, its program patched to fade in and out, to flare when its room speaks and to keep a little earthshine on its night side. Its maps are the shared ones.
 import { asciiBytes, planetLook, planetRecipe, type Anchor } from "@gnoworld/core";
 import type { BufferGeometry } from "three";

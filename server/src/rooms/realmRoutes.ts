@@ -1,4 +1,4 @@
-// POST /api/rooms/realm {path} (D390, D413): a realm's chat room, for a visitor with or without an account. A listed Origin and JSON, a body of
+// POST /api/rooms/realm {path}: a realm's chat room, for a visitor with or without an account. A listed Origin and JSON, a body of
 // one realm path, then the room: one that exists (every listed realm's does, made ahead) is answered at once and costs nothing; a path the job
 // lists is made, one it does not is looked up on the chain first (reads.ts), then made; making takes the visitor's hourly rate and the cap.
 import { realmRoom } from "@gnoworld/core";
@@ -23,7 +23,7 @@ interface Options {
   visitor: (c: Context) => string;
   // The rooms a visitor makes an hour.
   perVisitor?: number;
-  // Whether the chain holds a path the job does not list (D413); none: only a listed path has a room.
+  // Whether the chain holds a path the job does not list; none: only a listed path has a room.
   onChain?: (path: string) => Promise<OnChain>;
   // The chain reads a visitor causes an hour, in flight at once, in all an hour, and the paths found missing that are remembered.
   perVisitorReads?: number;

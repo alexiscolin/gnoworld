@@ -5,7 +5,7 @@ import universes from "../../data/universes.json" with { type: "json" };
 import { violations } from "./axe.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 
-// Slice 5's 5d: every place of the data has its page, at its path and at its canonical address.
+// Every place of the data has its page, at its path and at its canonical address.
 const places = placesFrom({ universes, hubs, ecosystems });
 const widths = [390, 1280];
 
@@ -60,7 +60,7 @@ test.describe("the pages added in 5d", () => {
   });
 
   test("a link from the Earth to a world changes the page without a reload", async ({ page }) => {
-    // The full chat's worlds list is the Earth's way to a world (8g); beside the dock it is hidden.
+    // The full chat's worlds list is the Earth's way to a world; beside the dock it is hidden.
     await page.goto("/earth?chat=full");
     await hydrated(page);
     await page.evaluate(() => {
@@ -78,13 +78,13 @@ test.describe("the pages added in 5d", () => {
     await hydrated(page);
     await expect(page).toHaveURL(/\/#search$/);
     await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
-    // Its empty field is Discover (D373): the places are found by their name.
+    // Its empty field is Discover: the places are found by their name.
     await page.getByRole("combobox", { name: "Search places" }).fill("bubb");
     await page.getByRole("option", { name: /Bubble/ }).click();
     await expect(page).toHaveURL("/w/bubble");
   });
 
-  // F376: the path's case is part of the address.
+  // The path's case is part of the address.
   for (const path of ["/W/bubble", "/W/Bubble", "/Earth", "/LIST", "/net/onyx/W/bubble", "/E/tokens"]) {
     test(`${path} is refused with a 404, in the host and in the browser`, async ({ page, request }) => {
       expect((await request.get(path)).status(), path).toBe(404);
@@ -98,8 +98,8 @@ test.describe("the pages added in 5d", () => {
     });
   }
 
-  // F376's own path: a link shared in another case is a direct load, the host's 404 page then hydrated by the client. The
-  // refused page is not indexed and names no address: its harm was a world page a search engine would index.
+  // A link shared in another case is a direct load, the host's 404 page then hydrated by the client. The
+  // refused page is not indexed and names no address, or a search engine would index a world page at the wrong case.
   for (const path of ["/W/bubble", "/w/Bubble", "/net/Onyx/w/bubble", "/Earth"]) {
     test(`a direct visit to ${path} shows not found, not indexed, with no canonical address`, async ({ page }) => {
       await page.goto(path);

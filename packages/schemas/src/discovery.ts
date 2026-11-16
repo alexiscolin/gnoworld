@@ -1,9 +1,9 @@
-// The discovery's data files (slice 8): the daily expedition's stops and the quests across worlds, each naming worlds the site holds.
+// The discovery's data files: the daily expedition's stops and the quests across worlds, each naming worlds the site holds.
 import { byId, DATA_CAPS, Key, RealmPath, text, unique } from "./data.ts";
 import { ExportedName } from "./worlds.ts";
 import { z } from "./zod.ts";
 
-// A world as the expedition and the quests name it (slice 8): a hub of the file's universe by its slug, or a realm by its path,
+// A world as the expedition and the quests name it: a hub of the file's universe by its slug, or a realm by its path,
 // never both; the build checks the slug against hubs.json (app/src/dataFiles.ts).
 const oneWorld = (row: { hub?: string | undefined; realm?: string | undefined }) =>
   (row.hub === undefined) !== (row.realm === undefined);
@@ -34,7 +34,7 @@ export const Expedition = byId(
 /** The most steps a quest holds, and the fewest. */
 const QUEST_STEPS = { min: 2, max: 8 } as const;
 
-// A quest's step: a visit to a world, words said in a hub's main room, or a realm's call, which ends every quest (slice 9 signs it).
+// A quest's step: a visit to a world, words said in a hub's main room, or a realm's call, which ends every quest.
 const Step = z
   .strictObject({
     id: Key,

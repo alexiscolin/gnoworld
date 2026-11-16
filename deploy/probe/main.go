@@ -1,4 +1,4 @@
-// The stack's health probe (slice 3's plan, 3e): Ergo's and the way out's images have no shell or tool that
+// The stack's health probe: Ergo's and the way out's images have no shell or tool that
 // dials a port, so this does: `probe <host:port>` answers 0 when something listens there, else 1.
 package main
 

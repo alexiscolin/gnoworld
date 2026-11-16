@@ -1,6 +1,6 @@
 // The one way out of the server (ADR-0002 §7): a call carries its timeout and follows no redirect,
 // whatever the caller asks, and what comes back is read up to a size. Where it may go is the egress
-// proxy's to decide (slice 3e). A read through it is capped, and its fault named by a kind, never by what
+// proxy's to decide. A read through it is capped, and its fault named by a kind, never by what
 // the answer or the error held.
 import { cappedBytes, isPublicOrigin, jsonOf } from "@gnoworld/core";
 import { jsonOfBytes, strictUtf8 } from "@gnoworld/schemas";
@@ -44,7 +44,7 @@ export class Failure extends Error {
   }
 }
 
-// A call's fault by its causes' codes, as fetch gives them (undici in Node 24.22.0 and 26.12.0, measured on 2026-11-05; F4872): the way out's
+// A call's fault by its causes' codes, as fetch gives them (undici in Node 24.22.0 and 26.12.0): the way out's
 // refusal of a tunnel is undici's abort two causes down. A code alone is read, never a message, which names the host.
 function kindOfCode(code: unknown): Kind | undefined {
   switch (code) {
@@ -142,7 +142,7 @@ export async function readCapped(response: Response, max: number): Promise<strin
 }
 
 /** The body's JSON, at most `max` bytes of it; undefined for a longer one, for bytes that are no UTF-8 or no JSON, and for an answer
- * whose status is no success, whose body is cut off unread so its connection is free at once (F5273). */
+ * whose status is no success, whose body is cut off unread so its connection is free at once. */
 export async function readJson(response: Response, max: number): Promise<unknown> {
   if (!response.ok) {
     await response.body?.cancel();

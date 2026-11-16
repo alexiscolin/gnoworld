@@ -74,7 +74,7 @@ const post = (app: App, path: string, sent: Sent = {}) => {
 const me = (app: App, cookie: string | undefined, peer = PEER) =>
   app.request("/api/login/me", { headers: cookie === undefined ? {} : { cookie } }, connection(peer));
 const session = (token: string): string => `${SESSION}=${token}`;
-// /me's answer when no session holds: nobody, a 200, so a visitor's page logs no error (Alexis, 2026-10-25).
+// /me's answer when no session holds: nobody, a 200, so a visitor's page logs no error.
 const NOBODY = JSON.stringify({ address: null });
 
 const challenge = async (app: App, sent: Sent = {}) => {

@@ -62,7 +62,7 @@ const refusal = (reason: "refused" | "forbidden" | "malformed"): Promise<Result<
   Promise.resolve({ ok: false, reason });
 
 describe("verdictAsker: the server's verdicts of the lines in view", () => {
-  // F884: a line from the stream's opening on has its verdict from the stream; asking the server too made every
+  // A line from the stream's opening on has its verdict from the stream; asking the server too made every
   // reader ask for every new link at once.
   it("asks the lines older than the stream's opening alone", () => {
     const t = server();
@@ -70,7 +70,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     expect(t.sent).toEqual([["a"]]);
   });
 
-  // F884: what it asked is kept for the lines in view alone, so a long session holds no more.
+  // What it asked is kept for the lines in view alone, so a long session holds no more.
   it("forgets a line that left the view, and asks it again when it comes back", () => {
     const t = server();
     t.ask([line("a"), line("b")]);
@@ -96,7 +96,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     expect(t.sent).toEqual([["a"], ["b"]]);
   });
 
-  // F1055 (C1): every line older than the stream with no player was read again at each new line, 0.4 ms at 200.
+  // Every line older than the stream with no player was read again at each new line, 0.4 ms at 200.
   it("reads a line once while it stays in view, a line with no player too", () => {
     const t = server();
     let reads = 0;
@@ -114,7 +114,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     expect(t.sent).toEqual([["a"], ["b"]]);
   });
 
-  // F892 (CR4): Ergo may carry a msgid the route refuses, which made it refuse the whole request, its 99 others too.
+  // Ergo may carry a msgid the route refuses, which made it refuse the whole request, its 99 others too.
   it("asks nothing of a line whose id the route would refuse, and the others of its request still", () => {
     const t = server();
     const long = "m".repeat(129);
@@ -147,7 +147,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
       { msgid: "a", room: "#bubble", state: "hidden" },
       { msgid: "b", room: "#bubble", state: "checked" },
     ]);
-    // In one call, so the store updates once for the answer (F1057).
+    // In one call, so the store updates once for the answer.
     expect(t.answers()).toBe(1);
   });
 
@@ -163,8 +163,8 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
   });
 });
 
-// F890: the page dated the stream's opening by its own clock, against Ergo's server-time: ahead, it asked the server
-// of every line said in the gap, one request each; behind, it left lines to nobody. The stream says when it began.
+// The page must not date the stream's opening by its own clock against Ergo's server-time: ahead, it would ask the server
+// of every line said in the gap, one request each; behind, it would leave lines to nobody. The stream says when it began.
 const LINES = [line("a"), line("b", "2026-10-26T12:00:00.000Z"), line("c", "2026-10-26T12:05:00.000Z")];
 // An asker whose stream says when it began only when told to; the page's clock as given.
 function told(clock = OPENED) {
@@ -174,7 +174,7 @@ function told(clock = OPENED) {
   let follows = 0;
   const languages: (string | undefined)[] = [];
   let stops = 0;
-  // Not a literal, so a part the asker no longer takes (its clock) is still handed, as the page's was.
+  // Not a literal, so a part the asker does not take (its clock) is still handed, as the page's was.
   const parts = {
     verdicts: (_room: string, ids: readonly string[]) => {
       sent.push([...ids]);
@@ -249,7 +249,7 @@ describe("verdictAsker: when the stream began, by the stream's word", () => {
   });
 });
 
-// F891 (CR3): a line the server had no verdict of yet stayed asked for good, though a later stream's replay could no
+// A line the server had no verdict of yet stayed asked for good, though a later stream's replay could no
 // longer give it; and a guest's refused room stayed refused after a login, the stream still the guest's.
 describe("verdictAsker, asking anew", () => {
   it("asks again, at the stream's next word, a line the server had no verdict of", () => {
@@ -300,8 +300,8 @@ describe("verdictAsker, asking anew", () => {
   });
 });
 
-// F888: the stream given up (a 429 for a fifth tab, a restart's 502), a line said since waited for good, asked of no
-// one; now every line in view is the server's, and the stream is followed again after the route's minute.
+// The stream given up (a 429 for a fifth tab, a restart's 502): a line said since is asked of no one by the stream, so
+// every line in view is the server's, and the stream is followed again after the route's minute.
 describe("verdictAsker, when the stream ends for good", () => {
   const LINES = [line("a"), line("c", "2026-10-26T12:05:00.000Z")];
   afterEach(() => {
@@ -368,8 +368,8 @@ describe("verdictAsker, when the stream ends for good", () => {
   });
 });
 
-// F874: a failure that may pass left its lines waiting forever (a server's 500, a 429), or asked them again at each
-// new line (the network); now they are asked again once, after a rest, and nothing is asked during it.
+// A failure that may pass (a server's 500, a 429) must neither leave its lines waiting forever nor ask them again at each
+// new line (the network): they are asked again once, after a rest, and nothing is asked during it.
 describe("verdictAsker, when the server cannot answer yet", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -446,7 +446,7 @@ describe("verdictAsker, when the server cannot answer yet", () => {
   });
 });
 
-// Alexis, 2026-10-26: the page asks the server the verdicts of the lines in view it does not hold, a line older
+// The page asks the server the verdicts of the lines in view it does not hold, a line older
 // than the stream's replay among them; a line with no player needs none, and one asked is not asked again.
 describe("unjudged: the lines in view whose player waits on a verdict the page does not hold", () => {
   const said = (id: string, text: string): Line => ({
@@ -471,7 +471,7 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
     expect(unjudged([], { held: undefined, asked: new Set() }, linked)).toEqual([]);
   });
 
-  // R4 (redpass-red): the player of a corrected line waits on its correction's verdict, so the correction's own id is
+  // The player of a corrected line waits on its correction's verdict, so the correction's own id is
   // asked, from the lines as the store holds them (the page's ChatPanel passes those, never the folded ones).
   it("names a correction of a line, as a line of its own, whatever its line's verdict", () => {
     const lines = [
@@ -484,7 +484,7 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
   });
 });
 
-// Slice 9h (D215): the page follows one stream for its shown room; a first signal that stream gives goes to the store through
+// The page follows one stream for its shown room; a first signal that stream gives goes to the store through
 // the same follower, so the page opens no second stream for the arrival banners.
 describe("verdictAsker: the first signals on the room's one stream", () => {
   const CHART: Signal = {
@@ -516,7 +516,7 @@ describe("verdictAsker: the first signals on the room's one stream", () => {
   });
 });
 
-// Link previews L4: the cards of the same lines are asked beside their verdicts (GET /api/cards), the answer into the store as a server's.
+// The cards of the same lines are asked beside their verdicts (GET /api/cards), the answer into the store as a server's.
 describe("verdictAsker: the cards of the lines in view", () => {
   const KEY = "a".repeat(64);
   afterEach(() => {

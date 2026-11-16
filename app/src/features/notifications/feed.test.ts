@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../events/index.ts";
 import { feedOf, isUnread, whenOf, type Naming, type Sources } from "./feed.ts";
 
-// The bell's list (slice 8; frames 86, 87): the account's notices (Messages), the coming day's events and the followed worlds where people
+// The bell's list (frames 86, 87): the account's notices (Messages), the coming day's events and the followed worlds where people
 // are (Worlds), the team's news for 14 days (News); each unread until marked, or until a "Mark all read" past its time.
 const NOW = Date.parse("2026-11-05T12:00:00.000Z");
 const HOUR = 3_600_000;

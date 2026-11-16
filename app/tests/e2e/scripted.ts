@@ -1,4 +1,4 @@
-// A scripted Ergo for the screenshots (slice 4): the page's socket answered line by line, so a room's lines, topic
+// A scripted Ergo for the screenshots: the page's socket answered line by line, so a room's lines, topic
 // and people are the same each run, the page being a guest or an account; the rooms come from the real server.
 import { echoedLines, several, type Open } from "./severalLines.ts";
 import type { WebSocketRoute } from "@playwright/test";
@@ -103,15 +103,15 @@ export interface Scripted {
   holdRedact?: boolean;
   /** The room whose history it holds, #games unless named. */
   room?: string;
-  /** The history of other rooms, by room: the page asks it as it opens one (4f-n). */
+  /** The history of other rooms, by room: the page asks it as it opens one. */
   others?: Readonly<Record<string, readonly HistoryLine[]>>;
-  /** The reading place Ergo gives that room as the page joins it (4f), none unless named. */
+  /** The reading place Ergo gives that room as the page joins it none unless named. */
   read?: string;
   /** Ergo answers no MARKREAD of the page's, as when the link drops before its answer. */
   quietMarks?: boolean;
   /** Ergo echoes the page's lines (echo-message), at this time, or true for one after the history's; none unless named. */
   echo?: string | true;
-  /** Ergo answers the page's CHATHISTORY once this settles, so a live line may come before the page (4f's G1). */
+  /** Ergo answers the page's CHATHISTORY once this settles, so a live line may come before the page. */
   historyAfter?: Promise<void>;
   /** Lines Ergo replays after the history's, as it sends them: a reaction's TAGMSG, a reply or an edit. */
   replayed?: readonly string[];

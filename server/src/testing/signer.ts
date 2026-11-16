@@ -1,6 +1,6 @@
-// A wallet for the tests (decision 141): a secp256k1 key from Node's crypto signs the login text as
+// A wallet for the tests: a secp256k1 key from Node's crypto signs the login text as
 // Adena's signArbitrary does, over the document the SDK's own makeArbitrarySignDoc builds. Nothing
-// proves Adena signs the same bytes: slice 4's first merge checks it against the real extension.
+// here proves Adena signs the same bytes: only the real extension does.
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { getArbitrarySignBytes, makeArbitrarySignDoc, type SignedArbitraryData } from "@adena-wallet/sdk";
 import { Address, toAddress } from "@gnoworld/schemas";

@@ -1,7 +1,7 @@
-// The prices timer (slice 5 part 2, 5l; decision 151): every five minutes, the price and 24 hour change of GNOT, ATONE and
+// The prices timer: every five minutes, the price and 24 hour change of GNOT, ATONE and
 // BTC from CoinGecko's keyless /simple/price, through the server's one way out (net.ts, then the egress proxy), written
 // to markets.json for the home page's markets row; with the default universe, its latest block height through the chain
-// package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
+// package, on a node checked to be its chain, so no visitor's browser asks a chain. What
 // comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
 // logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
 import { readHeight } from "@gnoworld/chain/node";
@@ -38,7 +38,7 @@ interface Options {
 
 export interface Prices {
   stop: () => void;
-  /** The day's prices so far (8i), from the file beside markets.json. */
+  /** The day's prices so far, from the file beside markets.json. */
   history: History["current"];
 }
 
@@ -130,7 +130,7 @@ export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const { universe } = options;
   const node = universe === undefined ? undefined : { url: checkedRpc(universe.rpc), chainId: universe.chainId };
-  // Each token's day of prices beside the file (8i), for the markets row's sparklines.
+  // Each token's day of prices beside the file, for the markets row's sparklines.
   const history = makeHistory(besideOf(file, "history"), now);
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
@@ -142,7 +142,7 @@ export function startPrices(options: Options): Prices {
   }
 
   // The history's one seeding from CoinGecko's own past: once a process, right after a price was read (so the way out works), its failure only
-  // logged, the history then as today's.
+  // logged, the history then staying as it is.
   let seeded = false;
   async function seed(isStopped: () => boolean): Promise<void> {
     if (seeded || !history.short()) return;
@@ -180,8 +180,8 @@ export function startPrices(options: Options): Prices {
     if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }
 
-  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one; as before
-  // F4872, one whose cause has no name is asked again soon too, for it is one call.
+  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one;
+  // one whose cause has no name is asked again soon too, for it is one call.
   const wait = waits(everyMs, (kind) => kind === "request" || reachedNothing(kind));
   const timer = repeat({
     pass: read,

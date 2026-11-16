@@ -23,12 +23,12 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* With credentials: the demo asks for a password, and Chromium sends none for a manifest otherwise. */}
+        {/* With credentials: the site asks for a password, and Chromium sends none for a manifest otherwise. */}
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-        {/* First of the sheets: the layers rank by first mention, so the order is never left to the chunks (F3260). */}
+        {/* First of the sheets: the layers rank by first mention, so the order is never left to the chunks. */}
         <link rel="stylesheet" href={layers} />
-        {/* The two latin faces every page draws with, asked with the page rather than once the sheets are read (P409, D13978). */}
+        {/* The two latin faces every page draws with, asked with the page rather than once the sheets are read. */}
         {LATIN_FONTS.map((href) => (
           <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
         ))}

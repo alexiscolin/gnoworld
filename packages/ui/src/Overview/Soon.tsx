@@ -1,4 +1,4 @@
-// The gauges and what a later slice brings (slice 8), on the overview.
+// The gauges and what is yet to come, on the overview.
 import { ComingSoon } from "../ComingSoon/ComingSoon.tsx";
 import { Cluster } from "../compositions/index.ts";
 import { Progress } from "../Progress/Progress.tsx";

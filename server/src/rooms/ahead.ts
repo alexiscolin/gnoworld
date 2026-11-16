@@ -1,4 +1,4 @@
-// Every hub's main room and every listed realm's room, made ahead (D413), a few a second so Ergo's datastore and the loop are never
+// Every hub's main room and every listed realm's room, made ahead, a few a second so Ergo's datastore and the loop are never
 // hit at once (the bot is nofakelag: no flood guard to trip). Hubs first, then the worlds file's realms, busiest world first, read once
 // for the route too and again only when the job has written it anew. One pass at a time; a pass that did not finish is made again by
 // the next check, even for the same file; stopping ends a wait at once.
@@ -12,7 +12,7 @@ const PER_SECOND = 10;
 // The paths whose room name is kept: a set far past it is hashed again, never held whole.
 const ROOM_KEYS = 100_000;
 
-export interface AheadOptions {
+interface AheadOptions {
   /** The worlds job's file. */
   file: string;
   rooms: Rooms;

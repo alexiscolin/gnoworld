@@ -46,13 +46,13 @@ async function heldHistory(
   return { sent, sockets, release };
 }
 
-// 4f (docs/decisions.md, 2026-10-21): the reading place Ergo keeps for the account (draft/read-marker): the first line
+// The reading place Ergo keeps for the account (draft/read-marker): the first line
 // past it marked New, and the room in view marked read, on a scripted Ergo. No test sleeps: what the page did not send
 // is read before a later word of its own (sentBefore).
 test.describe("the reading place", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
-  // The red pass (R1): Ergo answers the page's MARKREAD, and another session moves the place on; the mark stays.
+  // Ergo answers the page's MARKREAD, and another session moves the place on; the mark stays.
   test("marks the first line past the reading place New, and keeps it there as the room is read", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, ergo } = await room(page, { me: address, read: T(0) });
@@ -66,7 +66,7 @@ test.describe("the reading place", () => {
     await expect(page.locator("[data-new]")).toHaveCount(1);
   });
 
-  // The green pass (G1): a live line before the room's history page takes no mark; the first past the place does.
+  // A live line before the room's history page takes no mark; the first past the place does.
   test("marks the first history line past the place New though a live line came before the history", async ({
     page,
   }) => {
@@ -88,7 +88,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(5)}`]);
   });
 
-  // The code review (CR3): each connection's history waited on, not the first's alone.
+  // Each connection's history waited on, not the first's alone.
   test("marks nothing read on a reconnect before that connection's history came", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, sockets, release } = await heldHistory(page, address, (connection, held) =>
@@ -107,7 +107,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent).at(-1)).toBe(`MARKREAD ${ROOM} timestamp=${T(9)}`);
   });
 
-  // The code review (CR1): the room shown to the link before its lines read it, so a room come back to is read.
+  // The room shown to the link before its lines read it, so a room come back to is read.
   test("marks a room come back to read to a line that came while it was away", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, ergo } = await room(page, { me: address, read: T(0) });
@@ -122,7 +122,7 @@ test.describe("the reading place", () => {
       .toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`, `MARKREAD ${ROOM} timestamp=${T(3)}`]);
   });
 
-  // The code review (CR2): a busy room read at its end tells Ergo its place a few times, not once a line.
+  // A busy room read at its end tells Ergo its place a few times, not once a line.
   test("tells Ergo a busy room's place at most once each 2 s, its newest last", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, ergo } = await room(page, { me: address, read: T(0) });
@@ -141,7 +141,7 @@ test.describe("the reading place", () => {
     await expect(page.locator("[data-new]")).toHaveCount(0);
   });
 
-  // The red pass (R1b): a line seen coming in a room read to its end is no news.
+  // A line seen coming in a room read to its end is no news.
   test("marks a live line read as it comes while the reader is at the end, and not New", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, ergo } = await room(page, { me: address, read: T(2) });
@@ -151,18 +151,18 @@ test.describe("the reading place", () => {
     await expect(page.locator("[data-new]")).toHaveCount(0);
   });
 
-  // The red pass (R4): the room in view alone; another room's line moves no place.
+  // The room in view alone; another room's line moves no place.
   test("marks no other room read as its lines come", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, ergo } = await room(page, { me: address, read: T(2) });
     ergo().send(live("elsewhere", T(3), { room: "#bubble" }));
     ergo().send(live("here", T(4)));
-    // Its words exactly: an account's first line says "new here" in its head (8d).
+    // Its words exactly: an account's first line says "new here" in its head.
     await expect(lines(page).filter({ has: page.locator("[data-line-text]", { hasText: /^here$/ }) })).toBeVisible();
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(4)}`]);
   });
 
-  // The red pass (R22): the account's own line, echoed by Ergo, is read on its other devices too.
+  // The account's own line, echoed by Ergo, is read on its other devices too.
   test("marks the room read at the account's own line, as Ergo echoes it", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent } = await room(page, { me: address, read: T(2), echo: T(5) });
@@ -195,7 +195,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=2026-10-25T11:00:00.000Z`]);
   });
 
-  // The UX review (U1, U7): a room with news opens on its first, and is read only as the reader reaches its end.
+  // A room with news opens on its first, and is read only as the reader reaches its end.
   test("opens a long backlog on its New line, and marks it read only once the reader scrolls to the end", async ({
     page,
   }) => {
@@ -216,7 +216,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(59)}`]);
   });
 
-  // The UX review (U4): "New" is a divider row of its own, in caps with a rule running on, so the time column of the
+  // "New" is a divider row of its own, in caps with a rule running on, so the time column of the
   // lines stays aligned.
   test("sets New as a divider row above its line, the times in one column", async ({ page }) => {
     const address = await logIn(page, word("read"));
@@ -235,7 +235,7 @@ test.describe("the reading place", () => {
     expect(rule.row).toBe(rule.line);
   });
 
-  // The UX review (U6): the focus ring of a line, the New line's included, lies whole inside the list that scrolls, so
+  // The focus ring of a line, the New line's included, lies whole inside the list that scrolls, so
   // its sides are not clipped and it keeps off the divider's rule.
   test("draws a line's focus ring whole inside the list, the New line's too", async ({ page }) => {
     const address = await logIn(page, word("read"));
@@ -262,7 +262,7 @@ test.describe("the reading place", () => {
     }
   });
 
-  // The green pass (G3): each newest line's look at the tab lets the last one go.
+  // Each newest line's look at the tab lets the last one go.
   test("holds one look at the tab however many lines come", async ({ page }) => {
     await hiddenTab(page, false);
     const address = await logIn(page, word("read"));
@@ -283,7 +283,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
   });
 
-  // The red pass (R11): hidden after the room opened, a line that comes is read once the tab shows again.
+  // Hidden after the room opened, a line that comes is read once the tab shows again.
   test("marks a line that came while the tab was away read once it shows, and once", async ({ page }) => {
     await hiddenTab(page, false);
     const address = await logIn(page, word("read"));
@@ -296,7 +296,7 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(3)}`]);
   });
 
-  // The red pass (R10): a MARKREAD the link lost before Ergo answered goes again once the page is back in the room.
+  // A MARKREAD the link lost before Ergo answered goes again once the page is back in the room.
   test("marks the room read again after the link drops before Ergo's answer", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { sent, sockets } = await room(page, { me: address, read: T(0), quietMarks: true });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pinProblem, saveProblem } from "./problem.ts";
 
-// 4d's R9: each refusal of a pin, an unpin or a save has its own sentence; the reader is never left with silence, nor with
+// Each refusal of a pin, an unpin or a save has its own sentence; the reader is never left with silence, nor with
 // one cause worded as another (a full room is no limit of requests).
 describe("what the page says of a pin the server refused", () => {
   it.each([

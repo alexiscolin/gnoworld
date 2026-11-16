@@ -1,6 +1,6 @@
-// A world's rooms by section (slice 4's 4b): the sections the server lists, in its order, a section with no
+// A world's rooms by section: the sections the server lists, in its order, a section with no
 // room left out; each room a link to its address on the site, the one shown marked. An account's direct messages
-// follow (4e), each conversation a link to its page.
+// follow, each conversation a link to its page.
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
@@ -21,13 +21,13 @@ export interface RoomsViewProps {
   current: string | undefined;
   /** An account's direct messages: none for a guest. */
   dms?: DmsProps | undefined;
-  /** What says the rooms could not load, in their place (CR8). */
+  /** What says the rooms could not load, in their place. */
   failed?: ReactNode;
-  /** The unseen count by room id or by a conversation's partner; none or 0 draws no badge (4f-n). */
+  /** The unseen count by room id or by a conversation's partner; none or 0 draws no badge. */
   badges?: Readonly<Record<string, number>> | undefined;
-  /** What the account was told: none for a guest (4f-n). */
+  /** What the account was told: none for a guest. */
   notices?: NoticesProps | undefined;
-  /** What stands last, under the direct messages: an account's saved messages (4d) and the room's media (8d). */
+  /** What stands last, under the direct messages: an account's saved messages and the room's media. */
   media?: ReactNode;
   saved?: ReactNode;
 }
@@ -158,7 +158,7 @@ function Dms({
 }
 
 /** What a screen reader is told as a notice comes: a status always on the page, never inside the rooms' list, which a
- * phone's closed drawer hides from it (F2301). Its own place, so an empty list still says what comes. */
+ * phone's closed drawer hides from it. Its own place, so an empty list still says what comes. */
 export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" | "saidId"> | undefined }) {
   // None for a guest, who is told of nothing.
   return notices === undefined ? null : (
@@ -180,7 +180,7 @@ export function RoomsView({ sections, current, dms, failed, badges, notices, med
       <Stack space="l">
         {listed}
         <Dms {...dms} badges={badges} />
-        {/* The reader's own shortcuts last, under a rule: the search first, the rooms, the conversations (Alexis, 2026-11-07). */}
+        {/* The reader's own shortcuts last, under a rule: the search first, the rooms, the conversations. */}
         {saved === undefined && media === undefined ? null : (
           <div className={styles["saved"]}>
             {saved}
@@ -196,7 +196,7 @@ export function RoomsView({ sections, current, dms, failed, badges, notices, med
       ) : (
         <Stack space="l">
           {body}
-          {/* After the rooms, so a first notice moves none of their rows (U4). */}
+          {/* After the rooms, so a first notice moves none of their rows. */}
           {notices.list.length === 0 ? null : <Notices {...notices} navRef={navRef} />}
         </Stack>
       )}

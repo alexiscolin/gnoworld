@@ -1,4 +1,4 @@
-// Around it (D566): the place in the middle, what it links to on one side and what links to it on the other, the minigraph and the list of the
+// Around it: the place in the middle, what it links to on one side and what links to it on the other, the minigraph and the list of the
 // side picked. A dot picked says its path; picked again (or a row) it leads to that place's page; a package with no page has none.
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -89,7 +89,7 @@ export function Around({ around }: { around: AroundData }) {
             />
           </Cell>
           <Cell span={6}>
-            {/* A rule between the graph and its list, so the two halves read apart (Alexis, 2026-11-12). */}
+            {/* A rule between the graph and its list, so the two halves read apart. */}
             <div className="rule-start">
               <Stack space="xs">
                 <PagedList

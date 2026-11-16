@@ -1,4 +1,4 @@
-// A realm page's dialect of the block reader (5h): headings, tables, alerts (a quote that opens with its kind and its severity), stacked columns and
+// A realm page's dialect of the block reader: headings, tables, alerts (a quote that opens with its kind and its severity), stacked columns and
 // forms (every field shown), read down to blocks the page may draw, never HTML (gnoweb at gno v1.5.0, ADR-0002 §4).
 // Any other tag is text. Every pass over the lines is linear: a close or a mate is found once for all the lines.
 import { Blocks, type Dialect, type Grammar, type Read } from "./blocks.ts";
@@ -39,7 +39,7 @@ export type PageBlock = Tree<PageExtra>;
 
 const HEADING = /^(#{1,6}) (.*)$/s;
 const ALERT = /^\[!([A-Za-z]+)\](-)?(?:[ \t]+(.*))?$/s;
-// Looked up in Maps, never in objects: a page's word (`constructor`) must find nothing on an object's own keys (S-F3). Each
+// Looked up in Maps, never in objects: a page's word (`constructor`) must find nothing on an object's own keys. Each
 // is made where it is used, as the tests see it.
 
 const alertLabel = (kind: string): string | undefined =>
@@ -139,7 +139,7 @@ class PageLines implements Grammar<PageExtra> {
 
   // A word, as ```go: anything else after the backticks would be dropped from view, so the line is text.
   // The blanks go first, with `trim`, then a pattern with one run: two `\s*` round an optional middle took half a minute
-  // on a line of blanks and a mark (R-F1).
+  // on a line of blanks and a mark.
   fence = (language: string): boolean => /^[\w+#.-]*$/.test(language.trim());
 
   extra(at: number): (() => Read<PageExtra>) | undefined {

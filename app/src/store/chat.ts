@@ -1,4 +1,4 @@
-// The chat's slice of the store (slice 4's merge 4b): the rooms the page follows, each with its newest lines
+// The chat's slice of the store: the rooms the page follows, each with its newest lines
 // (its window), who is here and its description, and my nick on Ergo while connected. Ergo's lines change it
 // through core/chat's rules; each action sets the state only when something changed, so a subscriber hears a
 // change once and nothing else.
@@ -26,7 +26,7 @@ import type { RoomList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { own } from "./record.ts";
 
-/** The lines a room keeps: its history's window (docs/plans/slice-4.md, §4). */
+/** The lines a room keeps: its history's window */
 export const LINES_KEPT = 200;
 /** The reactions a room keeps, after one an account, a line and an emoji: five on each line of a window. */
 export const REACTIONS_KEPT = 1000;
@@ -37,18 +37,18 @@ export interface RoomState {
   readonly members: readonly string[];
   /** The room's description, its IRC topic. */
   readonly topic: string | undefined;
-  /** The msgid of a line Ergo refused to delete, until the page has said so (4c's message menu). */
+  /** The msgid of a line Ergo refused to delete, until the page has said so. */
   readonly refused: string | undefined;
-  /** Who is typing, each nick with the time its typing ends on the page's clock (4f); none while nobody is. */
+  /** Who is typing, each nick with the time its typing ends on the page's clock; none while nobody is. */
   readonly typing: Typing;
-  /** The time of the last line the account read here, as Ergo keeps it for the account (4f); none while unknown. */
+  /** The time of the last line the account read here, as Ergo keeps it for the account; none while unknown. */
   readonly read: string | undefined;
-  /** This connection's history page came, an empty one too: the New mark and the read mark wait on it (4f's G1,
-   * CR3); none before, and none again once the link drops. */
+  /** This connection's history page came, an empty one too: the New mark and the read mark wait on it;
+   * none before, and none again once the link drops. */
   readonly paged?: true | undefined;
-  /** The reactions Ergo relayed and replayed (4d), in time order; none until the first. */
+  /** The reactions Ergo relayed and replayed, in time order; none until the first. */
   readonly reactions?: readonly Reaction[];
-  /** Ergo refused one of the page's reactions here (4d), until the page has said so. */
+  /** Ergo refused one of the page's reactions here, until the page has said so. */
   readonly cannotReact?: true | undefined;
   /** The msgid of the message the room is read around (a found message's window): its lines are that window, and live lines wait. */
   readonly jump?: string | undefined;
@@ -174,8 +174,8 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         }
         const id = concerns(message);
         // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
-        // rooms shared alone (one QUIT at 100 rooms of 2,500: about 0.22 ms, 4f's E3, so 1,000 about 0.22 s); a
-        // nick's rooms indexed in the store is the next step.
+        // rooms shared alone (one QUIT at 100 rooms of 2,500: about 0.22 ms, so 1,000 about 0.22 s);
+        // indexing a nick's rooms in the store would avoid it.
         const now = Date.now();
         if (id === "*") {
           change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me, now })) });

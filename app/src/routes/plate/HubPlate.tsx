@@ -1,6 +1,6 @@
-// A hub world's plate (slice 13, D567): the adapter that gives the model what the chat knows of a world, who is here and its hours, and
+// A hub world's plate: the adapter that gives the model what the chat knows of a world, who is here and its hours, and
 // what the worlds' file says of its realm, with no block of its own chain reads. Its proposals, the calls its team pins and the capture of
-// its page stand between the chart and the foot, as they did.
+// its page stand between the chart and the foot.
 import { hubWorldOf, stampKey } from "@gnoworld/core";
 import universes from "../../../data/universes.json" with { type: "json" };
 import { grouped } from "@gnoworld/ui";
@@ -19,7 +19,7 @@ import { chatFigures, hourWidgets, statusOf } from "./figures.ts";
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
-// A world's page's capture (8f, frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
+// A world's page's capture (frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
 const Preview = lazy(async () => ({ default: (await import("../../features/previews/Preview.tsx")).Preview }));
 
 type World = ReturnType<typeof site.world>;

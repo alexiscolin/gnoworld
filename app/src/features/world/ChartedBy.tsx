@@ -8,7 +8,7 @@ import { shortAddress } from "../chat/index.ts";
 export const useFirst = (world: string, kind: Signal["kind"]) =>
   useApp(({ signals }) => signals.find((signal) => signal.world === world && signal.kind === kind));
 
-/** Plain text of the short address until slice 9f's names (D212); the end of the description's paragraph, as frame 91 has it. */
+/** Plain text of the short address, with no name lookup; the end of the description's paragraph, as frame 91 has it. */
 export function ChartedBy({ world }: { world: string }) {
   const charted = useFirst(world, "chart");
   return charted === undefined ? null : (

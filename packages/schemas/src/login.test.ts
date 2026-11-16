@@ -69,7 +69,7 @@ describe("VerifyRequest", () => {
     expect(VerifyRequest.safeParse(body).success).toBe(false);
   });
 
-  // Every bound of the proof, at its limit and one past: StrykerJS cannot judge a schema built at import (F412).
+  // Every bound of the proof, at its limit and one past: StrykerJS cannot judge a schema built at import.
   const coin = { denom: "ugnot", amount: "1" };
   const text = (n: number): string => "a".repeat(n);
   const bounds: [string, number, (n: number) => object][] = [
@@ -103,7 +103,7 @@ describe("Me", () => {
   });
 });
 
-// F673: one nonce schema, the server's challenge and the browser's proof read alike.
+// One nonce schema, the server's challenge and the browser's proof read alike.
 describe("Nonce", () => {
   const CHALLENGE = { nonce: "_-09azAZxxxxxxxxxxxxxx", text: "Sign in", expiresAt: "2026-10-25T10:00:00.000Z" };
 

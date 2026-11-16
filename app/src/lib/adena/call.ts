@@ -1,4 +1,4 @@
-// One call to a realm through Adena (slice 9's plan, 9b): the request the card drew, the account and the network
+// One call to a realm through Adena: the request the card drew, the account and the network
 // read again right before signing, one MsgCall, and the answer read as outside data. Every end is a result with
 // its reason, and nothing is asked of Adena for the request until those asked before it have answered (queue.ts).
 import { Address, CallRequest } from "@gnoworld/schemas";
@@ -105,7 +105,7 @@ async function switchTo(need: Need, { chainId, name, rpc }: Universe): Promise<F
 }
 
 /** What DoContract is given: the request's one MsgCall, no coins, no memo; pinned to the universe's chain and node. */
-export const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
+const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
   messages: [
     {
       type: "/vm.m_call",
@@ -124,26 +124,26 @@ export const transaction = (request: CallRequest, { chainId, rpc }: Universe) =>
   networkInfo: { chainId, rpcUrl: rpc },
 });
 
-// Once DoContract was asked, the popup may have broadcast whatever came back (F5728): so says a failure but a lock or a pending
-// request, any naming a hash (followed then, F5750), an account switched mid-send (F5751), and a refusal, as closing the window
-// after Confirm answers TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844, F5747, Alexis 9d-2).
+// Once DoContract was asked, the popup may have broadcast whatever came back: so says a failure but a lock or a pending
+// request, any naming a hash, an account switched mid-send, and a refusal, as closing the window after Confirm answers
+// TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844).
 const SENT_MAYBE: readonly CallFailure[] = ["failed", "malformed", "wrong-account"];
 const maybeSent = (failure: Failed): Failed => {
   if (failure.hash !== undefined || SENT_MAYBE.includes(failure.reason)) return { ...failure, reason: "maybe-sent" };
   return failure.reason === "declined" ? { ...failure, reason: "declined-maybe-sent" } : failure;
 };
-/** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then (F5747). */
-export const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
+/** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then. */
+const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
 
 async function send(
   doContract: (...args: unknown[]) => unknown,
   request: CallRequest,
   universe: Universe,
 ): Promise<CallResult | Failed> {
-  // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
-  // and the realm's Log, with no height and no check_tx or deliver_tx.
+  // As Adena's extension answers, not as the SDK's types say: a hex hash and the realm's Log, with no height and no
+  // check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
-  // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again (F5747).
+  // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again.
   const done = await read(() => doContract(transaction(request, universe), CONTRACT_OPTIONS), "DoContract", Sent).catch(
     () => refusal("maybe-sent"),
   );

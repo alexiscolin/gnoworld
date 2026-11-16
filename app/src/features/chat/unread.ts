@@ -1,6 +1,6 @@
 import type { NavItemProps } from "@gnoworld/ui";
 
-// The unseen count a row or the rooms' control says: its number, 99+ past 99 (4f-n; slice 5's 5b).
+// The unseen count a row or the rooms' control says: its number, 99+ past 99.
 export const countWords = (count: number): string => (count > 99 ? "99+" : String(count));
 
 /** Every room's and conversation's unseen count, added. */

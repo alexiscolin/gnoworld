@@ -1,9 +1,9 @@
 // Jarvis's loop (ADR-0002 §5, "Harness"): one question to an answer through our own small loop, not the SDK's tool
 // runner, as every call must pass our checks first. The system prompt is frozen per version and cached; the question
-// and the room's lines go in as untrusted blocks under the question's one tag (D80); each turn reserves, calls and
+// and the room's lines go in as untrusted blocks under the question's one tag; each turn reserves, calls and
 // settles the model (model.ts), then each tool call passes the allowlist and the tag's check, eight a turn at most, runs
-// with the question's words and own cards (D103), its result cut and wrapped. It stops at the answer, with its cards,
-// the turn cap, max_tokens, a refusal (D81), an error, an unasked stop, the budget (D84), or its asker gone (D177).
+// with the question's words and own cards, its result cut and wrapped. It stops at the answer, with its cards,
+// the turn cap, max_tokens, a refusal, an error, an unasked stop, the budget, or its asker gone.
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
@@ -21,7 +21,7 @@ import { resultsOf, type Runs } from "./toolRun.ts";
 import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
-/** A question: its words, its room's lines, each a text, what the server read for it by source, and a `finds`: the function a read of its realm's code must hold for the answer to be kept (D13920). */
+/** A question: its words, its room's lines, each a text, what the server read for it by source, and a `finds`: the function a read of its realm's code must hold for the answer to be kept. */
 export interface Question {
   readonly text: string;
   readonly room: readonly string[];
@@ -151,7 +151,7 @@ async function converse(run: Run, prompt: Prompt): Promise<Result> {
   const { parts, trace } = run;
   const attempts = { ...parts, retries: parts.caps.retries, trace, signal: run.signal, paid: run.paid };
   for (;;) {
-    // callModel asks nothing once the asker left: it answers gone (D177).
+    // callModel asks nothing once the asker left: it answers gone.
     const called = await callModel(attempts, requestOf(parts, prompt, run.messages));
     if (!called.ok) return unanswered(run.paid, called.reason);
     run.turns += 1;
@@ -186,6 +186,6 @@ const requestOf = (
   tools: offered,
   messages: [...messages],
   cache_control: { type: "ephemeral" },
-  // Thinking counts toward max_tokens; at low effort the model thinks little on a plain question (D84).
+  // Thinking counts toward max_tokens; at low effort the model thinks little on a plain question.
   output_config: { effort: "low" },
 });

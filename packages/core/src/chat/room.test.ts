@@ -74,7 +74,7 @@ describe("concerns: the room a message is about", () => {
   });
 });
 
-// 7f2: the speaker's declared country, a client's tag of our own beside +gnoworld/edit. 7j sends it, with the opt-in; a line only reads it,
+// The speaker's declared country, a client's tag of our own beside +gnoworld/edit. The page sends it, with the opt-in; a line only reads it,
 // and a page's other client may write anything there.
 describe("lineOf: the country a line declares", () => {
   const withCountry = (value: string) =>
@@ -287,7 +287,7 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 
   test("holds a flood of 10,000 lines in one page, in reverse order, to its cap", () => {
-    // Each line a millisecond after the one before: lines of one time keep the order they came in (F773).
+    // Each line a millisecond after the one before: lines of one time keep the order they came in.
     const flood = Array.from({ length: 10_000 }, (_, n) =>
       line(`m${String(n).padStart(5, "0")}`, new Date(Date.parse(T0) + n).toISOString(), String(n)),
     );
@@ -360,7 +360,7 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 });
 
-// 4c's message menu: Ergo's refusal of a delete (irc/handlers.go, v2.19.1: FAIL REDACT <code> <target> <msgid> :text),
+// The message menu: Ergo's refusal of a delete (irc/handlers.go, v2.19.1: FAIL REDACT <code> <target> <msgid> :text),
 // which the page says.
 describe("refusedOf: the line Ergo refused to delete", () => {
   test.each([
@@ -376,7 +376,7 @@ describe("refusedOf: the line Ergo refused to delete", () => {
     ["another command's FAIL", ":ergo FAIL CHATHISTORY MESSAGE_ERROR #bubble a :error"],
     ["a WARN of a REDACT", ":ergo WARN REDACT REDACT_FORBIDDEN #bubble a :careful"],
     ["a FAIL REDACT cut short", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble"],
-    // The green pass (G13): a reply of another shape than Ergo's five parameters is no refusal read.
+    // A reply of another shape than Ergo's five parameters is no refusal read.
     ["a FAIL REDACT with a parameter more", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble a b :You are not"],
     ["a REDACT itself", ":gnoworld!u@h REDACT #bubble a"],
   ])("reads none of %s", (_, line) => {
@@ -559,15 +559,14 @@ describe("topicAfter: the room's description", () => {
   });
 });
 
-// 4d: a reaction travels as a TAGMSG to its room (draft/react), which a client with 100 rooms reads in that one.
+// A reaction travels as a TAGMSG to its room (draft/react), which a client with 100 rooms reads in that one.
 describe("concerns: a reaction's room", () => {
   test("names the room of a TAGMSG, whatever its case", () => {
     expect(concerns(read(`@+draft/react=x;+reply=a :${ALICE}!u@h TAGMSG #Bubble`))).toBe("#bubble");
   });
 });
 
-// 4d: a line answers another by its msgid (+reply, ratified in 2026; +draft/reply, its draft name, read too:
-// docs/plans/chat-features.md, M2). A value is a msgid a tag may carry back, of 64 characters at most, or no mark.
+// A line answers another by its msgid (+reply; +draft/reply, its draft name, read too). A value is a msgid a tag may carry back, of 64 characters at most, or no mark.
 describe("lineOf: the line a line answers", () => {
   const tagged = (tags: string) =>
     read(`@msgid=b;time=${T0};account=${ALICE};${tags} :${ALICE}!u@h PRIVMSG #bubble :x`);
@@ -616,7 +615,7 @@ describe("lineOf: the line a line answers", () => {
   });
 });
 
-// 4d: a line corrects one of its author's by our own tag (+gnoworld/edit, docs/decisions.md 2026-10-21), whose value is
+// A line corrects one of its author's by our own tag (+gnoworld/edit), whose value is
 // a msgid a tag may carry back, of 64 characters at most, or no mark.
 describe("lineOf: the line a line corrects", () => {
   const tagged = (tags: string) =>
@@ -698,7 +697,7 @@ describe("isTagMsgid: a msgid a tag carries back", () => {
   });
 });
 
-// 7j: what may ride in the tag, going out as coming in. A value is written into a line, so a character more could open a tag of its own.
+// What may ride in the tag, going out as coming in. A value is written into a line, so a character more could open a tag of its own.
 describe("isCountryCode", () => {
   test("takes two capitals", () => {
     expect(isCountryCode("JP")).toBe(true);

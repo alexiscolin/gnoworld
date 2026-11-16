@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP } from "./realmRollup.ts";
 
-// A realm's rollup (slice 13a): the file the worlds job writes for each realm beside worlds.json, and the plate reads with this schema.
+// A realm's rollup: the file the worlds job writes for each realm beside worlds.json, and the plate reads with this schema.
 // Everything in it came from a chain or its indexer: every list is capped, every count whole, every text checked. The file the job wrote
 // from onyx-1 is read against it in server/src/worlds/rollup.test.ts.
 const CALLER = "g1e3vld469ekks28mhtd4aqua3mdaz64qgdtz29k";

@@ -1,4 +1,4 @@
-// The thread open beside a room (slice 4's 4d threads, apart from Loaded.tsx): the root and the line that opened it,
+// The thread open beside a room (apart from Loaded.tsx): the root and the line that opened it,
 // kept for the conversation in view alone, and the panel, a lazy chunk like the composer and the lines' view: a page
 // that opens no thread never loads its code (ADR-0001 §12).
 import type { Line } from "@gnoworld/core";
@@ -29,7 +29,7 @@ export function useThreads(page: Page) {
   const { shown, state } = page;
   const [open, setOpen] = useState<Open>();
   const [typed] = useState<Typed>(() => new Map());
-  // A logout is a fresh start: the words are handed to no next account, and kept for no return of the same one (R1).
+  // A logout is a fresh start: the words are handed to no next account, and kept for no return of the same one.
   const reader = page.session.kind;
   useEffect(() => {
     if (reader !== "in") typed.clear();

@@ -1,4 +1,4 @@
-// The browser's half of the login's signature (slice 4's merge 4a, decision 139): Adena's extension, read
+// The browser's half of the login's signature: Adena's extension, read
 // as outside data. Its calls and answers as @adena-wallet/sdk 0.1.1 types and tables them (window.adena,
 // AdenaResponse; bin/index.js:636-990): an answer is read by its type, as the SDK reads it, never by its
 // status alone, since "already connected" comes as a failure. Whatever the extension does, a call here

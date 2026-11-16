@@ -261,7 +261,7 @@ describe("a realm's room", () => {
   });
 });
 
-// D394: on the Earth any account makes a room, 3 a day, a thousand in all, apart from the moderators' 20.
+// On the Earth any account makes a room, 3 a day, a thousand in all, apart from the moderators' 20.
 describe("a room anyone makes on the Earth", () => {
   const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

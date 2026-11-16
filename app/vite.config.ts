@@ -21,7 +21,7 @@ const serviceWorker: Plugin = {
       const client = builder.environments["client"];
       if (client === undefined) throw new Error("no browser build to precache");
       const out = resolve(builder.config.root, client.config.build.outDir);
-      // Each file's digest spelled once, as the worker checks it (src/sw/digest.ts, F342).
+      // Each file's digest spelled once, as the worker checks it (src/sw/digest.ts).
       const list = await precached(
         readdirSync(out, { recursive: true }),
         (name) => new Uint8Array(readFileSync(join(out, name))),
@@ -60,23 +60,23 @@ const dataFiles: Plugin = {
 };
 
 // Baseline widely available (docs/DESIGN-SYSTEM.md, "Browsers") at the newest features the code uses: RegExp's `v` flag
-// and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default stops at 2026-01-01's (S1).
+// and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default is an older baseline.
 const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 
-// One chunk each for the store, all of ui and the libraries two chunks share: 20 chunks, not 27, /w/bubble's first screen
-// 173,363 B, not 178,495 B (F3157). The chat's and the lines' code stay behind their own chunks: budgets.spec.ts holds that.
-// The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first (F3260).
+// One chunk each for the store, all of ui and the libraries two chunks share: fewer chunks and a lighter first screen
+// for /w/bubble. The chat's and the lines' code stay behind their own chunks: budgets.spec.ts holds that.
+// The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first.
 const CHUNKS = [
   // saveData goes with the store: the chat and the universe share it, and a file of its own costs a world's first screen 131 B. So does its
-  // React binding, now the Earth's page and the chat both read it. The pages' one JSON call and the copy join it too: the first screen and the
-  // first signals' chunk (features/world/Banners.tsx) share them, and a chunk of their own costs every world's first screen (slice 9h).
+  // React binding, which the Earth's page and the chat both read. The pages' one JSON call and the copy join it too: the first screen and the
+  // first signals' chunk (features/world/Banners.tsx) share them, and a chunk of their own costs every world's first screen.
   {
     name: "store",
     test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts|lib\/api\/http\.ts$|lib\/copy\.ts$)/,
   },
-  // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
-  // Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i), and the plate's
-  // Figures, Network, PagedList and Room (slice 13, D13979): the chunks that need them load them after the first screen.
+  // Not the activity chart, the stat, Avatar, Popover, Card, Skeleton (3 KB on every page), Breadcrumb, EmptyState,
+  // Field (7.7 KB), Tabs (the bell's panel at its first press, 482 B), Progress and Sparkline, and the plate's
+  // Figures, Network, PagedList and Room: the chunks that need them load them after the first screen.
   {
     name: "ui",
     test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Field|Listbox|Row|Tabs|Progress|Sparkline|Figures|Network|PagedList)\/|(?:alone|flip|roomDom)\.tsx?$)/,

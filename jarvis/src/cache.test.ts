@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { boundOf, together } from "./cache.ts";
 import { jarvisMigrations } from "./migrations.ts";
 
-// What jarvis's two caches share (10k, D191, D192): the bytes bound of a table and one making for readers at once. Each
-// value is built inside its test (F2356).
+// What jarvis's two caches share: the bytes bound of a table and one making for readers at once. Each
+// value is built inside its test.
 const closing: (() => void)[] = [];
 afterEach(() => {
   for (const close of closing.splice(0)) close();

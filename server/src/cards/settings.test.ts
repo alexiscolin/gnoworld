@@ -4,8 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../config.ts";
 
-// L3 (docs/plans/link-previews.md §7 "config.ts", D13906 "off by default", Q11): LINK_CARDS is a kill switch, off unless set, and it needs the
-// reader's address; the card thresholds are stricter for `sexual` than the lines'. config.ts is tier 1.
+// LINK_CARDS is a kill switch, off unless set, and it needs the reader's address; the card thresholds are stricter for `sexual` than the lines'. config.ts is tier 1.
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-cards-config-"));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });

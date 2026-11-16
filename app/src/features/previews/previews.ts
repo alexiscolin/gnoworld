@@ -1,4 +1,4 @@
-// The previews' shared parts (8f): the captures' file, kept a page however many places ask, the universe whose pages it holds, and a
+// The previews' shared parts: the captures' file, kept a page however many places ask, the universe whose pages it holds, and a
 // path written as the video writes it.
 import type { Previews } from "@gnoworld/schemas/indexer";
 import { queryOptions } from "@tanstack/react-query";

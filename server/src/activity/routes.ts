@@ -1,7 +1,7 @@
-// GET /api/activity?worlds=a,b (slice 3's plan, 3h): each asked world's rooms and their messages a
-// minute, kept a few seconds by any cache (ADR-0002, the heat). A world the server does not know is
-// absent, not an error; 25 at most, the rail's size. Since 3m, a room is listed to whom may see it, by
-// the login's session: the answer to a session is private.
+// GET /api/activity?worlds=a,b: each asked world's rooms and their messages a minute, kept a few
+// seconds by any cache. A world the server does not know is absent, not an error; 25 at most, the
+// rail's size. A room is listed to whom may see it, by the login's session: the answer to a
+// session is private.
 import type { DatabaseSync } from "node:sqlite";
 import { type ActivityRooms, type ApiError } from "@gnoworld/schemas";
 import { Hono } from "hono";
@@ -45,7 +45,7 @@ export function activityRoutes(activity: Activity, options: Options): Hono {
       rooms.map(({ room }) => room),
       now(),
     );
-    // The answer depends on the session: a shared cache keeps each cookie's apart (F585).
+    // The answer depends on the session: a shared cache keeps each cookie's apart.
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
     c.header("vary", "cookie");
     return c.json({

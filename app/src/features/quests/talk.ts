@@ -1,4 +1,4 @@
-// A quest's talk step (slice 8): done once the reader's own message shows in the hub's main room the step names, whether the reader just
+// A quest's talk step: done once the reader's own message shows in the hub's main room the step names, whether the reader just
 // said it or the room's history brought it back. Only the rooms a quest names are looked at, and only when their record changes.
 import type { StoreApi } from "zustand/vanilla";
 import { site } from "../../places.ts";

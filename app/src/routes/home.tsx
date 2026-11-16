@@ -28,7 +28,7 @@ import { AimTag } from "./aimTag.tsx";
 import { useFraming } from "./placeFrame.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
-// case is checked (F376).
+// case is checked.
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "cosmos");
 }
@@ -71,8 +71,8 @@ function OverSpace({
   );
 }
 
-// The home's first screen on a computer (D459): the Earth close at the bottom right and its "Start here" tag (none from above, where the
-// Earth is not framed); no figures column (D489). The box stands from the first render, so the door to space marks it drawn as it goes
+// The home's first screen on a computer: the Earth close at the bottom right and its "Start here" tag (none from above, where the
+// Earth is not framed); no figures column. The box stands from the first render, so the door to space marks it drawn as it goes
 // home, and shows once the page frames it so.
 function FirstScreen({ to, people }: { to: string; people: People | undefined }) {
   const framed = useFraming(`not ${PHONE_QUERY}`);
@@ -90,13 +90,13 @@ function FirstScreen({ to, people }: { to: string; people: People | undefined })
   );
 }
 
-// A system's name on the hero: the Earth's as the header says it (D501), another's as its namespace.
+// A system's name on the hero: the Earth's as the header says it, another's as its namespace.
 const systemTitle = (id: string): string => (isHome(id) ? "gno.land" : nameOf(id));
 
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
-  // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's (7d6). The number reads that count,
-  // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
+  // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's. The number reads that count,
+  // whether the scene runs or not, from a few bytes of its own, so a phone asks nothing of the cosmos before View in space.
   const drawn = useWorldsCount(universe.isDefault);
   const drawnSpace = useSpace(universe.isDefault ? "cosmos" : undefined);
   // Back from a page's flight, the hero and the list rise in again instead of standing there cut in.
@@ -107,7 +107,7 @@ export default function Home() {
   // way, and comes back at rest.
   const resting = useResting();
   const restingWorlds = useRestingWorlds(resting);
-  // Who is online on the relay (8i): the default universe's rooms alone, so another universe's hero counts its worlds.
+  // Who is online on the relay: the default universe's rooms alone, so another universe's hero counts its worlds.
   const people = usePeople(universe.isDefault);
   // The first visit's one filled call is the Earth's "Start here", which only the default universe's cosmos labels (ADR-0003 §3).
   const newcomer = useNewcomer();
@@ -135,8 +135,8 @@ export default function Home() {
   );
 }
 
-// Every route catches its own errors (docs/ARCHITECTURE.md; F329); the app may be what failed, so the
-// way home loads the document again (F325).
+// Every route catches its own errors (docs/ARCHITECTURE.md); the app may be what failed, so the
+// way home loads the document again.
 export function ErrorBoundary() {
   return <RouteError noun="universe" />;
 }

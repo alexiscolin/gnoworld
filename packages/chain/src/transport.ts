@@ -1,6 +1,6 @@
-// The capped, timed GET of every chain read (the browser's since 5g, 5m's markets too; the server's and Jarvis's since 10h):
+// The capped, timed GET of every chain read (the browser's, the server's and Jarvis's):
 // the bytes of an answer under a time limit and a size cap, or a kind of failure. Nothing here reads a schema: `read.ts` does.
-// This site's own files are read here too (7n2): a module of their own, shared by the first screen and the scene's chunk, would be a
+// This site's own files are read here too: a module of their own, shared by the first screen and the scene's chunk, would be a
 // chunk that every lazy chunk names.
 import { cappedBytes } from "@gnoworld/core";
 import { jsonOfBytes } from "@gnoworld/schemas";
@@ -187,7 +187,7 @@ export function parseSiteBytes<T>(bytes: Uint8Array, schema: z.ZodMiniType<T>): 
   return value === undefined ? undefined : schema.safeParse(value).data;
 }
 
-/** A file the server's jobs write from a chain, at this site's `url` (slice 7): its own credentials and cache, under `maxBytes`, as `schema`
+/** A file the server's jobs write from a chain, at this site's `url`: its own credentials and cache, under `maxBytes`, as `schema`
  * reads it, or nothing if it did not come whole. Never a throw, for a page has nothing to do with one. */
 export async function readSiteFile<T>(
   url: string,

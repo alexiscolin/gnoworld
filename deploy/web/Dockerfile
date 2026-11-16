@@ -1,4 +1,4 @@
-# The demo's static server (docs/plans/slice-1c.md): the client built here from the lockfile, then
+# The demo's static server: the client built here from the lockfile, then
 # served by nginx as a user with no rights. The build's context is the repository's root, which
 # .dockerignore narrows to what the build reads.
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build

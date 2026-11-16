@@ -1,7 +1,5 @@
-// The inline scripts React Router writes in a page, which the CSP allows by their hash (csp.ts): the forms a script's text
-// may take, and no other. Split from csp.ts to keep each file small; nothing else changed.
-// The inline scripts React Router 8.4.0 writes in a page, and no other (F475): a script planted in a page fails the build
-// instead of being allowed by its hash. Copied from a build (cspFixture.ts); an upgrade that changes one stops the build until
+// The inline scripts React Router 8.4.0 writes in a page, which the CSP allows by their hash (csp.ts): the forms a script's
+// text may take, and no other. A script planted in a page fails the build instead of being allowed by its hash. Copied from a build (cspFixture.ts); an upgrade that changes one stops the build until
 // it is read again. What varies (a JSON, a string, a file name) is checked as data.
 import { jsonOf } from "@gnoworld/core";
 

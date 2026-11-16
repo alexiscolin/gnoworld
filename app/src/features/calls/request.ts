@@ -1,4 +1,4 @@
-// The call card's one request (9d): the texts typed in the fields become the one CallRequest that builds both the preview and
+// The call card's one request: the texts typed in the fields become the one CallRequest that builds both the preview and
 // Adena's message (lib/adena/call.ts), so the card cannot show one call and sign another.
 import { callFields, type Param, type Problem } from "@gnoworld/core";
 import type { Address, CallRequest } from "@gnoworld/schemas";
@@ -11,7 +11,7 @@ interface Typed {
   texts: readonly string[];
 }
 
-export type Built = { ok: true; request: CallRequest } | { ok: false; problems: (Problem | undefined)[] };
+type Built = { ok: true; request: CallRequest } | { ok: false; problems: (Problem | undefined)[] };
 
 /** The request of a card's texts as `caller` on `chainId`, or the problem of each field and no request. The caps and the shapes are
  * read again where Adena is asked (lib/adena/call.ts): this chunk carries none of that schema. */

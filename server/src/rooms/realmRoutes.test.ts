@@ -252,9 +252,8 @@ describe("POST /api/rooms/realm", () => {
   });
 });
 
-// Moved here from realmRoutes.chain.test.ts: a test sits beside the file it tests.
 describe("realm rooms asked on the chain (D413)", () => {
-  // D413: a path the worlds job does not list gets its room on its first open if it is on the chain; a listed realm's room is made ahead,
+  // A path the worlds job does not list gets its room on its first open if it is on the chain; a listed realm's room is made ahead,
   // so its page's ask is answered with no work.
   const T0 = Date.parse("2026-11-08T12:00:00.000Z");
   const HOUR = 60 * 60_000;

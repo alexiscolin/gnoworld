@@ -1,4 +1,4 @@
-// Space seen from above, the Map (D433): at every level the scene's own view from over its plane, the links of the world in view drawn.
+// Space seen from above, the Map: at every level the scene's own view from over its plane, the links of the world in view drawn.
 // Kept in the address (?view=map, addressState.ts); the door to space hears it and the engine flies between the two framings.
 import { addressState } from "./addressState.ts";
 

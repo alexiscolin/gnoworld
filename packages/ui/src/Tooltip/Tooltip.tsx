@@ -15,7 +15,7 @@ export interface TooltipProps {
 const DELAY = 500;
 
 // The frames a refused show waits at most: Chrome's refusal lasts one popover's toggle; one that lasts longer leaves
-// the words hidden until the next change (/code-review on F832).
+// the words hidden until the next change.
 const FRAMES_WAITED = 3;
 
 // The words shown or hidden; false when Chrome refuses it during another popover's toggle.
@@ -31,7 +31,7 @@ function toggled(words: HTMLElement, shown: boolean): boolean {
 
 // Shown before it is placed: a box out of the top layer has no size to place by. Chrome refuses a show inside another
 // popover's show or hide (a menu closed by Esc hands the focus back to its trigger, this control, in its hide): the
-// words wait for the next frame. The frames waited, which place them again (F832).
+// words wait for the next frame. The frames waited, which place them again.
 function useToggled(tipRef: RefObject<HTMLSpanElement | null>, shown: boolean): number {
   const [frames, setFrames] = useState(0);
   // The frames waited since the last toggle that went: each refusal its own few, never one every frame for good.
@@ -58,7 +58,7 @@ function useToggled(tipRef: RefObject<HTMLSpanElement | null>, shown: boolean): 
 /** An icon-only control's name above it: under the pointer after a moment, at once with the keyboard's
  * focus; it stays while the pointer is on it, a press or Esc hides it (WCAG 1.4.13). */
 export function Tooltip({ label, children, drops }: TooltipProps) {
-  // The pointer's hold and the keyboard focus's, each its own (F334), and Esc, which hides the words
+  // The pointer's hold and the keyboard focus's, each its own, and Esc, which hides the words
   // until the pointer or the focus comes again.
   const [pointer, setPointer] = useState<"away" | "waiting" | "over">("away");
   const [focused, setFocused] = useState(false);
@@ -82,7 +82,7 @@ export function Tooltip({ label, children, drops }: TooltipProps) {
     setDismissed(true);
   });
   // A focused control removed may fire no blur (jsdom fires none): while the focus holds the words, a
-  // change inside reads where the focus is now (F353, F316's class).
+  // change inside reads where the focus is now.
   useEffect(() => {
     const anchor = anchorRef.current;
     if (!focused || anchor === null) return;

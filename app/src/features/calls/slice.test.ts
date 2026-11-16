@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { callsIn, ensureCalls, type CallsStore } from "./slice.ts";
 
-// 9d: the call cards' slice. A card is one call being prepared, signed and followed to its block; its state moves
+// The call cards' slice. A card is one call being prepared, signed and followed to its block; its state moves
 // only along the course, so nothing shows as done before the chain's answer (ADR-0002 section 4).
-const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const PARAMS = [
   { Name: "cur", Type: "gno.land/p/nt/ufmt/v0.realm" },
   { Name: "bio", Type: "string" },
@@ -83,8 +83,8 @@ describe("the store's calls slice", () => {
     expect(state(store)).toBe("signing");
     landing("SetBio", HASH);
     expect(card(store)?.state).toEqual({ kind: "landing", hash: HASH });
-    done("SetBio", { height: 55414, value: "(42 int)" });
-    expect(card(store)?.state).toEqual({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
+    done("SetBio", { height: 4242, value: "(42 int)" });
+    expect(card(store)?.state).toEqual({ kind: "done", hash: HASH, height: 4242, value: "(42 int)" });
   });
 
   it("keeps Adena's log from landing to a failure, for the card to say (F5749)", () => {

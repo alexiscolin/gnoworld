@@ -45,8 +45,8 @@ describe("Field", () => {
     expect(said).toEqual(["On gno.land", "Taken already"]);
   });
 
-  // A region inserted already filled may not be announced (F177's class): it waits on the page (F335),
-  // and names its field, the error read alone tying it to none (F356).
+  // A region inserted already filled may not be announced: it waits on the page,
+  // and names its field, the error read alone tying it to none.
   it("keeps a status region for its error from the start, and says the error there when it comes", () => {
     const { rerender } = render(<Field label="Name" value="x" onChange={vi.fn()} />);
     const region = screen.getByRole("status");
@@ -59,7 +59,7 @@ describe("Field", () => {
     expect(region.textContent).toBe("");
   });
 
-  // The region says it; the one shown only describes the box, or a screen reader reads it twice (F348).
+  // The region says it; the one shown only describes the box, or a screen reader reads it twice.
   it("says its error once: the one shown is out of the reading order, still describing the box", () => {
     render(<Field label="Name" error="Taken already" value="x" onChange={vi.fn()} />);
     const shown = document.getElementById(screen.getByRole("textbox").getAttribute("aria-describedby") ?? "");
@@ -82,7 +82,7 @@ describe("Field", () => {
     expect(screen.getByLabelText("Starts").getAttribute("type")).toBe("datetime-local");
   });
 
-  // A box of several lines (slice 4's multiline, docs/decisions.md row 255): Enter submits its form, Shift+Enter
+  // A box of several lines (multiline): Enter submits its form, Shift+Enter
   // adds a line, as a chat's box does; an Enter that ends a composition (an input method's) submits nothing.
   it("is a box of several lines when asked, named by its label and described by its help", () => {
     render(<Field kind="lines" label="Message" help="Shift+Enter adds a line" value="" onChange={vi.fn()} />);
@@ -138,7 +138,7 @@ describe("Field", () => {
     expect(submitted).not.toHaveBeenCalled();
   });
 
-  // F1713 (CR1): Safari sends the Enter that confirms a candidate after compositionend, isComposing false, keyCode 229.
+  // Safari sends the Enter that confirms a candidate after compositionend, isComposing false, keyCode 229.
   it("submits nothing on a Safari composition's Enter: keyCode 229 with isComposing false, or while composing", () => {
     const { submitted, box } = formOf({ value: "か" });
     expect(fireEvent.keyDown(box, { key: "Enter", keyCode: 229, isComposing: false })).toBe(true);
@@ -151,7 +151,7 @@ describe("Field", () => {
     expect(submitted).toHaveBeenCalledTimes(1);
   });
 
-  // F1714 (CR2, decided by Alexis): a touch keyboard has no Shift, so there Enter adds the line and Send sends.
+  // A touch keyboard has no Shift, so there Enter adds the line and Send sends.
   it("adds a line on Enter, and submits nothing, when asked that Enter adds a line", async () => {
     const { submitted, box } = formOf({ enterAddsLine: true });
     await userEvent.type(box, "one{Enter}two{Shift>}{Enter}{/Shift}three");
@@ -165,7 +165,7 @@ describe("Field", () => {
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Name" }).value).toBe("alexis");
   });
 
-  // 9k (answer 9f-1, F5860): the prefix is drawn inside the field's box, which is the one frame (border and fill), not
+  // The prefix is drawn inside the field's box, which is the one frame (border and fill), not
   // editable, and read with the field, before its help.
   it("draws its prefix inside the box that holds the input, not editable, and reads it with the field", () => {
     render(<Field label="Name" prefix="nym-" help="5 to 13 letters" value="alexis" onChange={vi.fn()} />);
@@ -184,7 +184,7 @@ describe("Field", () => {
     expect(said).toEqual(["nym-", "5 to 13 letters"]);
   });
 
-  // F5976: the prefix and the frame's padding are part of the box, as a person sees it: a click anywhere in it types.
+  // The prefix and the frame's padding are part of the box, as a person sees it: a click anywhere in it types.
   it("focuses its input when the prefix or the frame around it is clicked", async () => {
     render(<Field label="Name" prefix="nym-" value="" onChange={vi.fn()} />);
     const input = screen.getByRole("textbox", { name: "Name" });
@@ -228,7 +228,7 @@ describe("Field", () => {
     expect(input.closest("[data-part='box']")).not.toBeNull();
   });
 
-  // 9k (F5861): every label in the one label style (mono caps, muted), the utility class the Kicker uses.
+  // Every label in the one label style (mono caps, muted), the utility class the Kicker uses.
   it("sets its visible label in the one label style", () => {
     render(<Field label="Message" value="" onChange={vi.fn()} />);
     expect(screen.getByText("Message").classList.contains("label")).toBe(true);

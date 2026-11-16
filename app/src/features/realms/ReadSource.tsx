@@ -1,4 +1,4 @@
-// Where a read came from and when (5k): the source's host and its time, on every fact and every failure, so the page never shows
+// Where a read came from and when: the source's host and its time, on every fact and every failure, so the page never shows
 // a number without its source and age. A failed read is a state with its next step (our sentence, never the answer's words).
 import { hostOf, type Failure, type Source } from "@gnoworld/chain/read";
 

@@ -1,4 +1,4 @@
-/* The saved messages' list (4d): each line a card, its author and room muted above its words. */
+/* The saved messages' list: each line a card, its author and room muted above its words. */
 @layer components {
   .line {
     padding: var(--space-2xs) var(--space-xs);

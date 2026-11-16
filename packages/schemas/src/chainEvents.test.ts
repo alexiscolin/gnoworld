@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
 
-// Slice 9g (D260 to D269): what the server tells a page of the chain, through the stream's own events `chain` and `realms`.
+// What the server tells a page of the chain, through the stream's own events `chain` and `realms`.
 // Every text is a name the chain's own rules bound (an address, a realm's path, a function's name), and no text of a
 // transaction's args or memo ever travels: what a stranger wrote reaches a room as bounded names or not at all.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -56,7 +56,7 @@ describe("a chain event", () => {
     expect(ChainEvent.safeParse(event).success).toBe(false);
   });
 
-  // The caps' own edges (red pass): one past is refused and the edge itself is not, so a cap moved either way fails. The
+  // The caps' own edges: one past is refused and the edge itself is not, so a cap moved either way fails. The
   // realm's cap (256) is the chain event's own, not RealmPath's 128 (data.ts): a path deployed under an address and nested
   // names is longer than a world's data holds, and a deploy shows what the chain accepted.
   it("takes a function of 64 characters and a realm's path of 256, and refuses one more of each", () => {

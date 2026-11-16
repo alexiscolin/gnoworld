@@ -1,4 +1,4 @@
-// The home's first screen names its featured worlds (D510, D549): those standing this many pixels across their radius as drawn, the Earth
+// The home's first screen names its featured worlds: those standing this many pixels across their radius as drawn, the Earth
 // never, the largest first. Into `out`, made anew each frame. And the pill's own parts: a name, who is here, the way in.
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import type { Seen } from "./see.ts";
@@ -31,7 +31,7 @@ export interface LabelHooks {
   readonly fact?: ((id: string) => number | undefined) | undefined;
 }
 
-/** The parts of a name pill: its name and the people here (the glyph and the number); no button, the pill is the link as a whole (D551). */
+/** The parts of a name pill: its name and the people here (the glyph and the number); no button, the pill is the link as a whole. */
 export function fillPill(button: HTMLElement): void {
   const count = document.createElement("span");
   count.className = `nowrap with-icon ${styles["count"] ?? ""}`;
@@ -72,7 +72,7 @@ function showCount(button: HTMLElement, here: number | undefined): void {
 }
 
 /** Puts a name `button` where its world stands (`on`, the world's middle on screen), 14 px over it, or on the home's first screen under the
- * world's own disc as drawn (D541), so it reads as that world's tag; a world's with the number here, none while unknown or none (D551, D562). */
+ * world's own disc as drawn, so it reads as that world's tag; a world's with the number here, none while unknown or none. */
 export function tagOf(
   button: HTMLElement,
   {
@@ -92,7 +92,7 @@ export function tagOf(
   },
 ): void {
   const under = arrival && "radius" in item;
-  // Every world's name carries who is there, as the video's labels do (D562); a system's, none.
+  // Every world's name carries who is there, as the video's labels do; a system's, none.
   showCount(button, "radius" in item ? fact?.(item.id) : undefined);
   const drop = under ? (seen?.pixels(at, item.radius * scaleOf(item.index)) ?? 0) + 10 : -14;
   button.style.transform = `translate3d(${on.x.toFixed(1)}px, ${(on.y + drop).toFixed(1)}px, 0)`;

@@ -1,16 +1,14 @@
 # Design system
 
 The look and the rules every screen follows. Values come from the approved prototype
-(`docs/prototype`), reduced by the coherence review of 2026-10-19 (`docs/design/coherence.md`):
-every CSS rule, script style, icon, screen and second of the recorded tour mapped to one token and
-one component, its 38 decisions approved by Alexis. Then independent UX, UI and design-systems
-reviews of the 2a designs, against the needs of phases 0 to 3 (`docs/design/review-2a.md`), and
-Alexis's four decisions on them. The changes that show are approved again on the before/after
-designs of slice 2a; nothing in the style changes without his approval.
+(`docs/prototype`), reduced to one token and one component for every CSS rule, script style, icon
+and screen of the recorded tour (`docs/design/coherence.md`). The UX, UI and design-systems review
+of the first designs is in `docs/design/review-2a.md`. Nothing in the style changes without the
+owner's approval.
 
 ## Principles
 
-These are the lead's and Alexis's rules from the prototype reviews.
+These are the owner's rules from the prototype reviews.
 
 - **Space first.**
   - The 3D carries the page; panels are light and few.
@@ -61,7 +59,7 @@ These are the lead's and Alexis's rules from the prototype reviews.
 ### Colour
 
 The theme is dark only (`color-scheme: dark`). Ten base colours, then four that the frames draw where no mix of the
-ten gives the value exactly (D13129), each with one role:
+ten gives the value exactly, each with one role:
 
 | Primitive | Value | Role |
 |---|---|---|
@@ -76,7 +74,7 @@ ten gives the value exactly (D13129), each with one role:
 | coral | `#FF8A7A` | Errors, danger, a falling trend; what is new (`--color-new`) |
 | dusk | `#6885D9` | `--world` until a world has its own colour: its plate's tint, 16 % over the night. Nothing else |
 | slate | `#2C313C` | `--color-outline`: the one outline round the plate, the scene and the dock |
-| sky | `#5EAAFD` | `--world-earth`: the Earth's own colour, the frames' blue over its plate (f0039) |
+| sky | `#5EAAFD` | `--world-earth`: the Earth's own colour, the frames' blue over its plate |
 | white | `#FFFFFF` | `--color-lit`: the light on a planet's lit side, the `Planet` stand-in's highlight |
 | mist | `#C8D0DE` | `--color-text-soft`: the soft grey of a line read under a figure or a title (the hero's line, the info panel's words) |
 
@@ -85,9 +83,9 @@ Semantic roles, all computed from them:
 | Role | Made of | Use |
 |---|---|---|
 | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
-| `--color-text-faint` | muted at 80% | A field's placeholder alone, dimmer than the prefix as frame 10's (F5980): 5.1:1 on a field over night, 5.4:1 over space, 4.6:1 inside a card (WCAG AA; D311) |
-| `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show (F369) |
-| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover; a field's resting edge is the strong one (frame 10, F5968) |
+| `--color-text-faint` | muted at 80% | A field's placeholder alone, dimmer than the prefix as frame 10's: 5.1:1 on a field over night, 5.4:1 over space, 4.6:1 inside a card (WCAG AA) |
+| `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show |
+| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover; a field's resting edge is the strong one (frame 10) |
 | `--color-card`, `--color-card-hover` | text at 3% and 6% | The hub card of a places' list; under the pointer |
 | `--color-bubble` | space at 94% | A bubble over the scene: near-black, no blur |
 | `--color-pill-glass` | surface at 72% | The translucent pills over the scene and the globe (a space label, a country tag) |
@@ -132,7 +130,7 @@ avatar. "Never a verified badge" means no badge granted by the platform; a check
 is theirs. The network is always named, and a testnet always says "Testnet". "Sponsored" is for
 paid placement only; a fee someone else pays reads "Fee paid by gnoworld".
 
-**Contrast,** every pair at least 6.3:1. These are measured on 2026-10-19 with an sRGB mix: the
+**Contrast,** every pair at least 6.3:1. These are measured with an sRGB mix: the
 oklab mix differs by little, and axe in the gate measures the real pixels.
 
 | Pair | On space | On night |
@@ -157,17 +155,17 @@ the brightest planet behind the header's pills.
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
 | `--font-reading` | 13 px, leading 1.5 | Geist 400 | The sentence under a card's or a dialog's title (frames 10 and 110): a line read, not a control |
 | `--font-chat` | 13.5 px, leading 1.45 | Geist 400 | A chat's lines on a phone |
-| `--font-chat-l` | 15 px, leading 1.5 | Geist 400 | A chat's lines with room for them: the full chat's and the dock's on a computer (D419) |
+| `--font-chat-l` | 15 px, leading 1.5 | Geist 400 | A chat's lines with room for them: the full chat's and the dock's on a computer |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
-| `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
+| `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
 | `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
 | `--font-title-room` | 22 px, leading 1 | Geist 300 | A room's name in the chat's header |
-| `--font-title-m` | 26 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts (frame 10's dialog title, F5969) |
+| `--font-title-m` | 26 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts (frame 10's dialog title) |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
 | `--font-count`, `--font-hint`, `--font-tick`, `--font-mono-ui`, `--font-chip`, `--font-card-title` | `--font-data`; 10.5 px; 11 px mono; 13 px mono 500; 12 px 500; 17 px 500 | | A count beside its words; the smallest hint; the chart's axis labels; a function's signature; a chip's words in the plate's pills; a card's title |
-| `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
+| `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat`; its caption is the label |
 
 - Each role is a composite token (`font: var(--font-body)`). The label's tracking and caps are a
   utility (`label`) that components compose once. No component sets caps itself: words in capitals
@@ -189,14 +187,14 @@ the brightest planet behind the header's pills.
 | Token | Values |
 |---|---|
 | `--space-3xs` … `--space-2xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
-| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 44 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. The default is 44 with a pointer too, as the video's (F5967); a field's box is the default and its two edges, 46 |
+| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 44 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. The default is 44 with a pointer too, as the video's; a field's box is the default and its two edges, 46 |
 | `--radius-s` / `--radius-item` / `--radius-m` / `--radius-box` / `--radius-l` / `--radius-pill` | 8 / 10 / 12 / 16 / 24 / 999 px: small controls, rows, menus / cards, fields, popovers, bubbles / panels, dialogs / buttons, chips, tabs |
 | `--icon-s` / `--icon-m` / `--icon-l` | 12 / 16 / 20 px, the only icon sizes |
 | `--size-counter` / `--size-dot` / `--size-dot-l` / `--size-bar` | 18 px (an unread count) / 6 and 8 px (a dot) / 44 px (a bar of controls) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-s` / `-m` / `-l` | 32 / 52 / 64 px: a row's lead / a card / the rail |
 | `--dir` | 1; -1 under `[dir="rtl"]`, 1 again under a `[dir="ltr"]` inside it: the inline axis's sign (CSS rules, "Direction"; the token page's "Direction" group) |
-| Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400; 360 and 320 before 2026-11-08, D419), plate 808 with its fade (`--plate-w`), dialog 490 and wide 760, popover 300 px and wide 440; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
+| Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400), plate 808 with its fade (`--plate-w`), dialog 490 and wide 760, popover 300 px and wide 440; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
@@ -219,10 +217,10 @@ No token names a layer: the page stacks by the order of its elements, and a modu
 (`packages/ui/src/Flash/Flash.module.css`, `Panel/Panel.module.css`). The flash is the topmost, one at a time, queued.
 
 Dialogs, popovers and the flash use the browser's top layer, which stacks by opening order. The flash shows at the top of the screen, centred, above a dialog's scrim when it
-opens after the dialog (F331). A modal dialog makes everything outside it inert, the top layer
+opens after the dialog. A modal dialog makes everything outside it inert, the top layer
 included: a flash raised over one is seen, and its Close and action wait until the dialog closes.
 A flash shown before a modal dialog opens, such as the update notice, which stays, sits under the
-dialog's scrim, dimmed and inert, and shows again as it was when the dialog closes (F354): raising
+dialog's scrim, dimmed and inert, and shows again as it was when the dialog closes: raising
 it again would show an action no one can press until then.
 
 ### Motion
@@ -246,7 +244,7 @@ it again would show an action no one can press until then.
 | `--transition-tint`, `--transition-fade` | background and ink; opacity | A fill and an ink easing as a control is pointed at; a box fading as its opacity changes |
 | `--motion-scale` | 1, or 0 | Every duration is multiplied by it: 0 under reduced motion, the system's or the site's own setting |
 
-Enter and leave (the motion pass, 2026-11-07): everything that appears also leaves. It enters on `--ease-standard`
+Enter and leave: everything that appears also leaves. It enters on `--ease-standard`
 with a 4–12 px travel from where it comes, and leaves on `--ease-in` in about 70% of the time, with a fade and a few
 pixels at most. Dialogs and popovers use `@starting-style` and `transition-behavior: allow-discrete`. The scene sets the
 pace; the page follows its phases.
@@ -291,10 +289,10 @@ current one in text; thin bars (24 for a day); the peak and the current value wr
 
 Baseline "widely available", with four named exceptions: from 2024, the `popover` attribute and
 `@starting-style`; and `forced-color-adjust`, for pictures only (the avatar's face), which forced
-colours then leave as drawn, the property doing nothing where forced colours do not exist (Alexis,
-2026-10-21, F319); and `field-sizing` and `resize`, for the box of lines, which grows with its draft
-and drags by its height alone (F1729). The lint holds the line and lists the exceptions, the last two
-for the avatar's and the field's sheets alone (F349, F1729). Popovers are positioned by a
+colours then leave as drawn, the property doing nothing where forced colours do not exist; and
+`field-sizing` and `resize`, for the box of lines, which grows with its draft and drags by its
+height alone. The lint holds the line and lists the exceptions, the last two for the avatar's and
+the field's sheets alone. Popovers are positioned by a
 small function of ours until CSS anchor positioning (Baseline 2026) is widely available.
 
 ## Testing the CSS
@@ -305,10 +303,9 @@ stops Vitest counting assertions. The stories' journeys (`app/tests/stories`) bu
 walk every story in Chromium, in GitHub's gate for a change of the design system or the harness.
 - **Lint and types,** `@eslint/css` and typed modules (`tsc`) in the commit gate; `check_css.py` and jscpd in GitHub's.
 - **Pictures:** every story, at three container widths and with reduced motion, screenshotted
-  by Playwright and compared with the approved images (the browser and its platform: slice 2's
-  plan). A new baseline is its own commit, which Alexis reviews; changing or deleting an
+  by Playwright and compared with the approved images (the browser and its platform are pinned). A new baseline is its own commit, which the owner reviews; changing or deleting an
   approved one fails the push unless the commit says why (`Updated-baseline:`,
-  `scripts/check_regressions.py`). Since the speed plan (2026-11-06) the default runs compare none: the pictures spec stays in the repository and
+  `scripts/check_regressions.py`). The default runs compare none: the pictures spec stays in the repository and
   runs by hand; the approved video is the reference, compared by eye, and the design is decided live.
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
@@ -339,7 +336,7 @@ component with its CSS Module, documented by its props.
   The compositions alone (`Stack`, `Cluster`, `Grid`, `Sidebar`, `Switcher`, `Center`) take a
   block's own class beside theirs, an `id`, ARIA (`aria-*`) and `as`, the element they draw (`li`
   and `button` among them; a button composition submits nothing), so a block that must name,
-  label or style its box keeps their layout (D13128). None takes `style`.
+  label or style its box keeps their layout None takes `style`.
 - **Context cascades.** `data-tone` and `data-density` on a container, and the surface level (a
   card on a panel is one step lighter), reach everything inside.
 
@@ -367,13 +364,13 @@ component with its CSS Module, documented by its props.
 | `Field` | text, search, lines, date (the browser's `datetime-local`); a pill shape; label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
 | `Disclosure` | sizes m (44 px) and s (36); a lead, a title, a trail; closed, open | A row that opens in place: a chevron that turns, and the body grown from nothing to its height. The body is always drawn and held shut, so a test reaches it and opening costs no second render. It opens from outside when `open` turns true |
 | `Network` | a centre and two lanes of dots, each a realm (a round pill in the world's colour) or a pure package (square-cornered, empty); selected; one lane empty | The graph "Around it" on a realm's plate: what it imports and what imports it, at most 7 dots a lane and the rest a number in the legend; a word is cut where its count begins, and its full name is the dot's label. Drawn from its own width, with no `viewBox` scaling |
-| `Switch` | off, on; a description; disabled | A real checkbox with `role="switch"`, its name and description at the left and the switch at the right; on is cream with a dark knob, as chosen elsewhere; the slide follows `--motion-scale`. An on/off setting that takes effect at once (the settings, D450) |
+| `Switch` | off, on; a description; disabled | A real checkbox with `role="switch"`, its name and description at the left and the switch at the right; on is cream with a dark knob, as chosen elsewhere; the slide follows `--motion-scale`. An on/off setting that takes effect at once (the settings) |
 | `Select` | the small control's height; a name for assistive technology | The browser's own list, for a choice among many fixed rows (a country): a phone's picker does better than a list of ours |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's nebula is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; three clouds of colour on night and the address's constellation over them (five stars, one per fifth of the disc so the shape stays open, joined in one of three orders, one bright), the same at every size, readable at 20 px. Never an NFT: the face is computed from the address, which only its key controls (ADR-0001 §11). Where the clouds and stars sit always comes from the address; the palette is chosen in phase 1. A face tells people apart at a glance, never who they are: anyone can try addresses until a face looks like yours, so the name, and the short address where a person matters, identify; my own messages are marked by my name in mint and the word "you", never by the face. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
 | `Stamp` | a seed, a name, a day, a system; an icon; gold | A visit's mark: a superellipse whose roundness, proportions, tilt, inner dashes and ink hue come from the seed (continuous values), the icon of the world's kind, its name, day and system; gold with a star where charted first. Its family is the world's; a challenge's is `Badge` |
 | `Badge` | a name, an icon, a tone; earned or not; a count | A challenge's medal: scalloped, filled in its tone once earned, dashed before, its name on a band across it |
-| `Stat` | number, unit, caption; the heat badge; delta | Geist Mono 500, tabular, the "instrument" figures (Alexis, 2026-10-31), that count up on arrival. Under reduced motion, effects become `Stat` counts |
+| `Stat` | number, unit, caption; the heat badge; delta | Geist Mono 500, tabular, the "instrument" figures, that count up on arrival. Under reduced motion, effects become `Stat` counts |
 | `ActivityChart` | 24 h bars, a hover tooltip, sparkline | SVG, no chart library; Data graphics, above |
 | `Progress` | bar, steps, arc | The flight, a quest, the signing wait, a speaker, the passport's gauge |
 | `Kicker` | with a dot; vertical (the plate's atlas caption) | `--font-label` |
@@ -384,7 +381,7 @@ component with its CSS Module, documented by its props.
 | `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
 | `NavItem` | current; a lead, a badge, a meta; a link, a button, or coming soon | An item of a column of places, the full chat's rooms and direct messages: a pill that fills cream when it is the one in view |
 | `Breadcrumb` | a labelled trail of links ending on the current page | The video's kicker: the one label style, a dot in the world's colour, a chevron between steps |
-| `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later slice brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing |
+| `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later release brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing |
 | `PagedList` | rows, a filter, sorts | 12 rows a page; the filter (64 characters) and the sorts show past 12 rows, a foot counts and adds 12 up to 100 |
 | `Figures` | cells of a label, a value (a count that counts up, or a word), a unit, a line under it, a small line of its last values | The figures band of a world's plate, in one hub card |
 | `Sparkline` | tone up (mint), down (coral), flat (muted); from the range or from zero; fills its box; arrives | A small line of how a value moved, its area shaded, for the eye alone: the words beside it say the change (a price's 24 h). Fewer than two values draw nothing |
@@ -394,7 +391,7 @@ component with its CSS Module, documented by its props.
 | `Room`, `useAlone` | | The element that holds the plate's cards, which one is open and its Escape; a card opens in place by itself without one |
 | `LinkProvider` | `pages`, the paths the app routes | Hands every link of the design system the page's own link, for the site's own paths; a link that must `reload` the document stays a plain anchor |
 
-Not built, each when its slice needs it: `Table` and `Checkbox` (the admin console). A message is an assembly of the chat feature
+Not built, each when it is needed: `Table` and `Checkbox` (the admin console). A message is an assembly of the chat feature
 (`app/src/features/chat/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
 slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
@@ -411,10 +408,9 @@ Dev help"). A person's message stays a plain row; the composer's placeholder nam
 #general or ask @jarvis").
 
 This covers who's here, catch up, realm and vote, station, quest and expedition, poll, room games
-and contest. A new kind is an assembly in its own slice, with its story. The calendar is gone (its
-dialog left with D13995: Events is greyed, `ComingSoon`, until a realm gives it events).
+and contest. A new kind is an assembly of its own, with its story. There is no calendar: Events is greyed, `ComingSoon`, until a realm gives it events.
 
-The cards of slice 13, all in `app/src/features/`, none in `ui`:
+The link and market cards, all in `app/src/features/`, none in `ui`:
 - **The link card** (`chat/LinkCard.tsx`, a chunk of its own, asked by a line that has a card): a media `Card` under the line with the page's
   site, host, title, description and picture, as the server checked them. All its text is React's text, never markup; the picture is
   the server's own copy (`referrerPolicy="no-referrer"`), absent for a reader who saves data; the whole card links to the line's own URL,
@@ -465,13 +461,13 @@ a person or Jarvis wrote is drawn as text with its source.
 
 ### Icons
 
-- One set of 61: close, plus, arrow, arrow-up-right, chevron, hash, search, chat, search-messages (a magnifier in a speech bubble: the chat's own search, slice 13), thread, reply, bell,
+- One set of 61: close, plus, arrow, arrow-up-right, chevron, hash, search, chat, search-messages (a magnifier in a speech bubble: the chat's own search), thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
-  video (a video call, coming soon, D13995),
-  spark, retry (a failed read tried again, slice 13), news, satellite, planet, orbits, map (space seen from above, D433), bold, italic, underline, strikethrough, slash, caret,
-  share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings, slice 8). A new icon joins the
-  list in the slice that needs it. Those that point along the text turn right to left: arrow,
+  video (a video call, coming soon),
+  spark, retry (a failed read tried again), news, satellite, planet, orbits, map (space seen from above), bold, italic, underline, strikethrough, slash, caret,
+  share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings). A new icon joins the
+  list in the change that needs it. Those that point along the text turn right to left: arrow,
   arrow-up-right, reply, list-bulleted, list-numbered and quote; the chevron and the caret point
   across it and stay.
 - A 16 px grid, a 1.5 px stroke, round caps and joins, `currentColor`, drawn at `--icon-m` or
@@ -489,7 +485,7 @@ a person or Jarvis wrote is drawn as text with its source.
 | Hero | Bottom left of the cosmos, 48 px from the left and 32 from the bottom | The kicker, the number in mono with its line at the right (the network line: the chain's day, `features/home/NetworkLine.tsx`), two actions, and the tags that light space (`app/src/Lenses.tsx`); the scene keeps it clear (a safe area) |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |
 | Plate | Left of a world's frame | 808 px with its fade (`--plate-w`); its background fades into space over its last 64 px, with no border, so the planet keeps the frame's free area; the dot grid and the vertical atlas caption; a scroll cue when its content is cut |
-| Chat dock | Right | 420 px, 380 px under 1400 px (D419), on the surface colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
+| Chat dock | Right | 420 px, 380 px under 1400 px, on the surface colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Credits | A fixed corner, wherever textures show, on phones too | One 11 px "Credits" link in the muted grey, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link) |
 
 Search is a ⌘K palette (a wide `Dialog` with a search `Field`), not a drawer.
@@ -579,8 +575,7 @@ Components use container queries, so they fit wherever they are placed.
     `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
     outer `margin`, in a block's module. A block that truly needs one (an icon beside a
     label) says why in a `/* layout: … */` comment, and the gate prints the count of those
-    exceptions so review sees it grow (494 on 2026-11-13, converted later, screen by screen:
-    D13128);
+    exceptions so review sees it grow (converted screen by screen);
   - **no copied rules:** the same set of three or more declarations in two modules fails
     `check_css.py`; it becomes a composition, a utility or a `composes`;
   - a class a component names (`styles.x`, `styles["x"]`) that its module lacks fails

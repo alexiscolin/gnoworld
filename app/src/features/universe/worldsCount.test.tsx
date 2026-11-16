@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// 7d6: the hero counts what the cosmos draws; 7n2: the home reads that count from the few bytes the job writes beside the worlds' file, on
+// The hero counts what the cosmos draws; the home reads that count from the few bytes the job writes beside the worlds' file, on
 // phones and computers alike, so a phone asks nothing of the cosmos before View in space. The scene's own read of the file (worldsFile.ts),
 // when it runs, says what it draws, and that count stands.
 const read = vi.hoisted(() => ({ count: vi.fn(), worlds: vi.fn() }));

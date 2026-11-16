@@ -1,7 +1,6 @@
 // New families and batches are found by comparing the list read now with the one read last time: the chain gives no deploy date
-// through the paths (7c-notes.md), and one transaction can deploy many packages (chain-feasibility.md, item 11). With no earlier
-// list nothing is new. A realm that left the list is no news, and neither is one that comes back (the job keeps every realm it
-// has seen, since a chain only adds them; a list cut short is no departure).
+// through the paths, and one transaction can deploy many packages. With no earlier list nothing is new. A realm that left the
+// list is no news, and neither is one that comes back (a chain only adds realms, and a list cut short is no departure).
 import { groupWorlds } from "./group.ts";
 
 /** One namespace that gained this many realms or more in one pass is a batch: one deploy of many packages, not many products. */

@@ -1,4 +1,4 @@
-// The chat's search field read as the canvas shows it (slice 13, C): words, then `in:#room`, `from:@kai`, `has:link`. Pure functions from
+// The chat's search field read as the canvas shows it: words, then `in:#room`, `from:@kai`, `has:link`. Pure functions from
 // the text to what the server is asked. A filter that names nothing found is `bad`, never a wider search.
 import { Address, SEARCH_Q_MIN } from "@gnoworld/schemas";
 import type { SearchAsk } from "../../../lib/api/search.ts";

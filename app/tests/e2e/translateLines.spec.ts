@@ -44,7 +44,7 @@ const json =
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
 // The room as an account sees it: four lines of another's, one of its own, and the two routes; the batches the page asked, and any ask of
-// the door's old route, one line a request.
+// the door's per-line route (/api/jarvis/translate), one line a request.
 async function room(page: Page, answer: (asked: Asked) => unknown = stored) {
   const address = await logIn(page, `tr${crypto.randomUUID().slice(0, 6)}`);
   await page.route("**/api/jarvis/state", json({ on: true }));

@@ -1,5 +1,5 @@
-// The Earth's "Latest on" card (frame 40, the proposal's cardLatest; D13931: gno.land's blog for now, X later): the two last posts of gno.land's
-// blog realm, side by side (D13008), read on chain (one vm/qrender of the mainnet, where the posts are: onyx-1's blog is empty), its title, its day and its page on
+// The Earth's "Latest on" card (frame 40, the proposal's cardLatest; gno.land's blog for now, X later): the two last posts of gno.land's
+// blog realm, side by side, read on chain (one vm/qrender of the mainnet, where the posts are: onyx-1's blog is empty), its title, its day and its page on
 // gnoweb. A read that fails or finds no post draws no card, never an error. The card is a late chunk: the first screen holds none of it.
 import { Card, Grid } from "@gnoworld/ui";
 import { queryOptions, useQuery } from "@tanstack/react-query";

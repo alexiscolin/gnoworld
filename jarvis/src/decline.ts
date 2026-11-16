@@ -1,4 +1,4 @@
-// The tool a question off Jarvis's ground ends on (D13985), and a question's cost in the unit the door counts.
+// The tool a question off Jarvis's ground ends on, and a question's cost in the unit the door counts.
 import type Anthropic from "@anthropic-ai/sdk";
 
 /** `decline`, no arguments: offered to the concierge's loop beside its allowlist's tools. */

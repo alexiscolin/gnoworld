@@ -1,10 +1,10 @@
 // The identity of the account logged in, as the server lists it (GET /api/links), read once for the page and shared: the chat's owner chip and
-// Settings read the same answer. A link or an unlink asks again; an answer for another account than the one now logged in is dropped. A read that
+// Settings read the same answer. A link or an unlink asks again; an answer for another account than the one logged in is dropped. A read that
 // fails keeps the last good list and says so, so a linked person is never shown as unlinked.
 import { pageLinksApi, type LinkList } from "../api/links.ts";
 import { Heard } from "../heard.ts";
 
-let held: { account: string; list: LinkList } | undefined;
+let lastList: { account: string; list: LinkList } | undefined;
 let asking: string | undefined;
 let failed: string | undefined;
 const heard = new Heard();
@@ -15,7 +15,7 @@ export async function readLinks(account: string): Promise<void> {
   const got = await pageLinksApi().list();
   if (asking !== account) return;
   if (got.ok) {
-    held = { account, list: got.value };
+    lastList = { account, list: got.value };
     failed = undefined;
   } else {
     asking = undefined;
@@ -24,5 +24,5 @@ export async function readLinks(account: string): Promise<void> {
   heard.tell();
 }
 
-/** What is held now, whether the last read of an account failed, and the way to hear either change. */
-export const linksHeld = { subscribe: heard.subscribe, get: () => held, failed: () => failed, asked: () => asking };
+/** What is held, whether the last read of an account failed, and the way to hear either change. */
+export const linksHeld = { subscribe: heard.subscribe, get: () => lastList, failed: () => failed, asked: () => asking };

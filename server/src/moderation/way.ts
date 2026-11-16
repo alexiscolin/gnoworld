@@ -1,5 +1,5 @@
-// A line's way once heard (slice 3's plan, 3h to 3k), as the chat runs it through its fair queue: checked, acted on,
-// streamed and struck toward a mute, or kept among its room's recent lines (10g), then settled in its room's mark.
+// A line's way once heard, as the chat runs it through its fair queue: checked, acted on,
+// streamed and struck toward a mute, or kept among its room's recent lines, then settled in its room's mark.
 import type { DatabaseSync } from "node:sqlite";
 import type { Said } from "../irc/link.ts";
 import type { Command } from "../irc/lines.ts";
@@ -15,7 +15,7 @@ export interface Steps {
   stream: Stream;
   progress: Progress;
   strike: (said: Said) => void;
-  // A line moderation let through (the door's recent lines, 10g).
+  // A line moderation let through (the door's recent lines).
   passed: (said: Said) => void;
 }
 

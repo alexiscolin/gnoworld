@@ -1,5 +1,5 @@
-// A realm's write functions (9d, 9e; the call card's first place, frame 33): each a row with a "Call" button that opens the call card
-// under it, in the thread and never in a modal; one field, two, more, or none (D254). A function with a type a call does not carry
+// A realm's write functions: each a row with a "Call" button that opens the call card
+// under it, in the thread and never in a modal; one field, two, more, or none. A function with a type a call does not carry
 // has no Call, but a way to the realm on gnoweb. The read functions are RealmFunctions'. The list is read once from `vm/qfuncs`; a card
 // reads the indexer once, for its fee line, when it opens, and Adena is asked nothing until its signature.
 import { callFields } from "@gnoworld/core";

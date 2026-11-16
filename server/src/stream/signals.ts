@@ -1,4 +1,4 @@
-// The first signals' side of the stream (slice 9h): a signal is told to the readers of any room of its world they may
+// The first signals' side of the stream: a signal is told to the readers of any room of its world they may
 // read, in the same sequence of ids as the verdicts, and the world's last of each kind is kept for a reader who comes after.
 import type { Signal } from "@gnoworld/schemas";
 import { worldOf } from "../rooms/rooms.ts";

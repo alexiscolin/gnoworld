@@ -1,8 +1,6 @@
-# Coherence review of the prototype (slice 2a)
+# Coherence review of the prototype
 
-Status: approved by Alexis, 2026-10-19 ("go": every recommendation below), and written into
-`docs/DESIGN-SYSTEM.md`; the visible changes are shown again on the before/after designs of 2a
-(decision 36). Each value and element of the approved prototype (`docs/prototype/`) was mapped to
+Every recommendation below is approved and written into `docs/DESIGN-SYSTEM.md`. Each value and element of the approved prototype (`docs/prototype/`) was mapped to
 one token and one component, so the design system can be rebuilt with nothing duplicated.
 
 ## Coverage
@@ -23,7 +21,7 @@ component and variant, region, feature, scene or dead; its off-token values and 
 duplicates), `script-map.json` (inline styles, icons, screens, classes), and `brief.md` (the
 targets and rules the mapping used).
 
-## What the prototype does today
+## What the prototype does
 
 - 36 font sizes, 33 spacings, 17 control heights, 16 radii, 6 weights, 20 letter-spacings, 13 line
   heights, 27 durations, 157 literal colours (10 white alphas for the same fills, 20 dark
@@ -32,7 +30,7 @@ targets and rules the mapping used).
   "selected" drawn four ways, fields with 4 radii and 4 heights, the message styled three times,
   the dialog box six times, the caps label 26 times, ellipsis 20 times.
 
-## The scale (proposed)
+## The scale
 
 - **Colour:** nine base colours (space #05070D, night #0B0F18, text #F4F6FA, muted #9DA8BC, cream
   #F2EFEA, mint #5CF2C8, amber #FFC46B, violet #B79CFF, coral #FF8A7A); everything else computed
@@ -68,9 +66,8 @@ targets and rules the mapping used).
 
 ## Components
 
-DESIGN-SYSTEM.md's set covers the 341 elements, plus seven new in slice 2: Panel, ChoiceGroup,
-Progress (bar, steps, spinner, wave, arc), Tooltip, Toolbar, Logo, Combobox. Later, each in its
-slice: Message (4), Breadcrumb and the ⌘K palette (5), the scene Label (7). Menu is a Popover,
+DESIGN-SYSTEM.md's set covers the 341 elements, plus seven new: Panel, ChoiceGroup,
+Progress (bar, steps, spinner, wave, arc), Tooltip, Toolbar, Logo, Combobox. Each built when a screen needs it: Message, Breadcrumb, the ⌘K palette, the scene Label. Menu is a Popover,
 Badge a static Chip, Dot an Avatar slot, Divider a base `hr`. A component exists once two places
 use it; otherwise it is a variant. Every interactive structure of the chat (calendar, who's here,
 catch up, realm and vote, station, quest, poll, room games, contest) is one Card: a header (type
@@ -103,13 +100,13 @@ evolutions board, the range slider, avatar upload.
 ## Not covered by this review
 
 The phone layout in pictures (the tour is filmed wide), keyboard paths, anything shorter than a
-second between two frames, the 3D art (slice 7), a voice-and-tone guide.
+second between two frames, the 3D art, a voice-and-tone guide.
 
-## Decisions (approved, 2026-10-19)
+## Decisions
 
 1. One secondary grey. 2. One label style (mono 11 caps 0.14em), the header's links included.
 3. Selected is the cream fill; current row a quiet fill. 4. Targets 24 px with a pointer, 44 by
-touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300 (26/300 since answer 9k-3, the video's).
+touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300 (26/300, the video's).
 7. The astronaut from the name replaces planets and uploads (ADR-0002 §6). 8. Transactions are
 call cards in the thread (ADR-0002 §4). 9. No blue in the system. 10. Seven new components, the
 rule of two uses. 11. Search becomes a ⌘K palette. 12. The dead UI is not rebuilt. 13. Three tiers
@@ -122,6 +119,6 @@ alone. 28. The missing states get their stories. 29. Motion as a system. 30. The
 everything, or held during a dialog. 31. A very light credit: one 11 px "Credits" link, wherever
 textures show, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link). 32. Minimum
 heights. 33. The browser target, with two named exceptions. 34. Glass holds its contrast on the
-brightest planet. 35. Blur on small surfaces, measured in slice 7. 36. Visible changes approved on
+brightest planet. 35. Blur on small surfaces, measured. 36. Visible changes approved on
 before/after designs. 37. One source for the tokens. 38. Long text and a font that does not shift
 the page.

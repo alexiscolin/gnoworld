@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod/mini";
 import { hostOf, readChain, sourceOf, type ChainFetch, type ChainRead, type Failure } from "./read.ts";
 
-// 5g, the failure paths of what the browser reads from the chain (the plan's §3 row on the RPC's answers). A small schema stands
+// The failure paths of what the browser reads from the chain. A small schema stands
 // in: these paths do not depend on what an answer holds. The answers' own shapes (qrender, qeval, qfuncs, the block height)
 // wait for fixtures recorded through gnomcp.
 const URL_OK = "https://rpc.example.org/status";
@@ -484,7 +484,7 @@ describe("readChain, the defaults production uses", () => {
   });
 });
 
-// 5k: the two helpers the views and the readers share (F2967, F2968).
+// The two helpers the views and the readers share.
 describe("sourceOf", () => {
   it("gives the address and the time of the options' clock", () => {
     expect(sourceOf("https://rpc.example", { now: () => new Date("2026-10-31T06:00:00.000Z") })).toStrictEqual({

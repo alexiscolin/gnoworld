@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CallFailure } from "../../lib/adena/answers.ts";
 import { sayFailure, sayProblem, shown } from "./say.ts";
 
-// 9d, D206: every failure of a call is a state with the next step the person can take. The text is ours: Adena's message and
+// Every failure of a call is a state with the next step the person can take. The text is ours: Adena's message and
 // the realm's log are shown as what they are, after it, never in place of it.
 const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain" | "not-loaded", RegExp> = {
   missing: /install adena/i,
@@ -67,7 +67,7 @@ describe("sayFailure: each failure's next step", () => {
   });
 
   it("names the hash of a call that was sent and never seen in a block, so it can be looked up", () => {
-    const hash = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+    const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     expect(sayFailure({ reason: "unseen", hash })).toContain(hash);
   });
 

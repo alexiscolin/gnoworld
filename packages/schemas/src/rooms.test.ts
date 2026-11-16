@@ -71,7 +71,7 @@ describe("a room's id", () => {
   });
 });
 
-// F671: the room the server made, read by its client as a room's id.
+// The room the server made, read by its client as a room's id.
 describe("a room made", () => {
   it("is the room's id", () => {
     expect(MadeRoom.parse({ room: "#bubble/garden" })).toEqual({ room: "#bubble/garden" });
@@ -82,7 +82,7 @@ describe("a room made", () => {
   });
 });
 
-// A world's rooms as a reader may see them (Alexis, 2026-10-25): in its moderators' sections, then the rest.
+// A world's rooms as a reader may see them: in its moderators' sections, then the rest.
 describe("a world's rooms", () => {
   const LIST = {
     world: "bubble",
@@ -106,7 +106,7 @@ describe("a world's rooms", () => {
     expect(RoomList.safeParse({ world: "bubble", sections }).success).toBe(true);
   });
 
-  // D394: a room's counts are additive: an answer with none (an older server) still parses, the fields kept when present.
+  // A room's counts are additive: an answer with none (an older server) still parses, the fields kept when present.
   it("takes a room with its people here and its messages in a day, or with neither", () => {
     const room = { room: "#earth/cafe", type: "open" as const };
     const list = (rooms: unknown[]) => ({ world: "earth", sections: [{ name: null, rooms }] });

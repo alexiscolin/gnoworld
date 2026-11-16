@@ -5,11 +5,11 @@ import type { HistoryLine } from "./scripted.ts";
 import { asAccount, ROOM, T, tagged } from "./talk.ts";
 import { chipOf, closeButton, inThread, panel, say, threadField, threadOf } from "./thread.ts";
 
-// What the code review of 4d's threads found (docs/review/findings.md, F1760 on): each journey fails without its fix.
+// What a code review of threads found: each journey fails without its fix.
 test.describe("threads, from the review", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
-  // CR9 (F1760): the panel reads its root from the room's lines each time it draws, not once at the click.
+  // The panel reads its root from the room's lines each time it draws, not once at the click.
   test("follows a chain that grows while its panel is open: the root it now has, and its tag", async ({ page }) => {
     const history: HistoryLine[] = [["m1", T(0), "the first root"]];
     const { ergo, said } = await asAccount(
@@ -20,7 +20,7 @@ test.describe("threads, from the review", () => {
     await threadOf(lineOf(page, "the late reply"));
     await expect(panel(page)).toContainText(/earlier message/i);
     await expect(inThread(page)).toHaveText([/the late reply/]);
-    // The line it answers comes, itself an answer to the first: one thread now, rooted in the first.
+    // The line it answers comes, itself an answer to the first: one thread, rooted in the first.
     ergo().send(tagged("m2", "the middle", { at: 2, tags: "+reply=m1" }));
     await expect(lines(page)).toHaveCount(3);
     await expect(inThread(page)).toHaveText([/the first root/, /the middle/, /the late reply/]);
@@ -31,7 +31,7 @@ test.describe("threads, from the review", () => {
     await closeButton(page).click();
   });
 
-  // CR1 (F1761): words typed in a thread are not lost to an Escape, another thread or a room; kept in the page's memory.
+  // Words typed in a thread are not lost to an Escape, another thread or a room; kept in the page's memory.
   test("keeps the words typed in a thread through Escape, another thread and a room, till they are sent", async ({
     page,
   }) => {
@@ -73,7 +73,7 @@ test.describe("threads, from the review", () => {
     await expect(threadField(page)).toHaveText("");
   });
 
-  // R7: on a screen that shows both, the list beside the open panel is seen at its end: a live line is marked read.
+  // On a screen that shows both, the list beside the open panel is seen at its end: a live line is marked read.
   test("marks a line read that comes while the panel is open beside a list that shows its end", async ({ page }) => {
     const heard: string[] = [];
     const { ergo } = await asAccount(
@@ -119,7 +119,7 @@ test.describe("threads, from the review", () => {
       return { heard, ergo };
     };
 
-    // CR2 (F1762): a line that comes while the list is hidden is not one the reader saw: no reading place moves.
+    // A line that comes while the list is hidden is not one the reader saw: no reading place moves.
     test("marks no line read that comes while the panel hides the list", async ({ page }) => {
       const { heard, ergo } = await hiddenByPanel(page);
       await expect(panel(page)).toBeVisible();
@@ -131,7 +131,7 @@ test.describe("threads, from the review", () => {
       expect(marks(heard).join()).not.toContain(T(45));
     });
 
-    // R7: what is hidden is read once it is shown at its end again: the line that came meanwhile is marked at Close.
+    // What is hidden is read once it is shown at its end again: the line that came meanwhile is marked at Close.
     test("marks the line that came while the panel hid the list once the panel is closed", async ({ page }) => {
       const { heard, ergo } = await hiddenByPanel(page);
       await expect(lines(page).first()).toBeHidden();
@@ -141,7 +141,7 @@ test.describe("threads, from the review", () => {
       await expect.poll(() => marks(heard).join()).toContain(T(45));
     });
 
-    // CR2: the list comes back at the end it was left at, the reader being there when the panel opened.
+    // The list comes back at the end it was left at, the reader being there when the panel opened.
     test("gives the list back at its end after a panel opened and closed", async ({ page }) => {
       await asAccount(page, () => ({ history: forty, replayed: [reply] }), 41);
       await expect.poll(() => atEnd(page)).toBe(true);
@@ -153,7 +153,7 @@ test.describe("threads, from the review", () => {
     });
   });
 
-  // CR3 (F1763): the panel's code is a lazy chunk. A chunk that cannot be fetched is the panel's failure alone, and the
+  // The panel's code is a lazy chunk. A chunk that cannot be fetched is the panel's failure alone, and the
   // next thread opened asks for it again; one that is slow shows a panel with its Close, which a phone needs, as the
   // room is hidden meanwhile.
   test.describe("the panel's code", () => {

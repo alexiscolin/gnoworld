@@ -1,4 +1,4 @@
-// A line's More menu items (slice 4's 4c, 4d), apart from LineActions.tsx.
+// A line's More menu items, apart from LineActions.tsx.
 import type { MenuItem } from "@gnoworld/ui";
 
 /** What a line's menu is given to act with. */
@@ -9,16 +9,16 @@ export type MenuItems = Parameters<typeof menuItems>[0];
 export function menuItems(
   acts: {
     onCopy: (what: "text" | "link") => void;
-    /** Copy room link: a room's line alone, a direct message's having no link (4d's DM bar); yes by default. */
+    /** Copy room link: a room's line alone, a direct message's having no link; yes by default. */
     link?: boolean;
     onThread?: ((id: string) => void) | undefined;
     /** Opens the author's card, the keyboard's way to it: the name is no Tab stop. */
     onCard?: (() => void) | undefined;
     /** Folds the line's translation away or brings it back, where one is drawn under it; `hidden` says which it offers. */
     onTranslation?: { hidden: boolean; onToggle: () => void } | undefined;
-    /** What the reader keeps of the line: Save, Mark unread (4d). */
+    /** What the reader keeps of the line: Save, Mark unread. */
     kept?: readonly MenuItem[];
-    /** Puts the line's words in the composer to correct them (4d's edits). */
+    /** Puts the line's words in the composer to correct them. */
     onEdit?: (() => void) | undefined;
     onDelete?: (() => void) | undefined;
   },

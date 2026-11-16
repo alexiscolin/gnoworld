@@ -2,8 +2,8 @@ import { adena } from "./adena.ts";
 import { callAndSign, calls, openCall, callWallet, connect, openRealm, signNow, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
-// The card's four states as they look, on a computer's screen (9d; frames 31 to 33 and 108 to 114): the preview, the wait for
-// the signature, the landing in a block, the result. The pictures are made and approved on the Mac Studio (decision 4238523f):
+// The card's four states as they look, on a computer's screen (frames 31 to 33 and 108 to 114): the preview, the wait for
+// the signature, the landing in a block, the result. The pictures are made and approved on the Mac Studio:
 // the header, which names the test wallet drawn at the server's start, is masked.
 test.describe("the call card, as it looks", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });

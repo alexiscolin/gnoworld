@@ -7,7 +7,7 @@ import { keptRail, type Known, RailOrder, type RailPlaces } from "./railWorlds.t
 import type { WorldSignals } from "./features/universe/signals.ts";
 
 const RAIL_MINUTE = 60_000;
-// The rail of a first read: shown at once (railOf is the order's own, no longer exported).
+// The rail of a first read: shown at once.
 const railOf = (known: Known, places: RailPlaces) => {
   const order = new RailOrder(places);
   order.read(known);
@@ -16,8 +16,8 @@ const railOf = (known: Known, places: RailPlaces) => {
   return entries;
 };
 
-// The rail's worlds from the worlds' file and what is known of them now (7i): the Earth first, then the trends, the rising worlds and the
-// seeds as core orders them, each with its page. Its order changes at most once a minute, and never while the reader is on it (ADR-0002 §1).
+// The rail's worlds from the worlds' file and what is known of them now: the Earth first, then the trends, the rising worlds and the
+// seeds as core orders them, each with its page. Its order changes at most once a minute, and never while the reader is on it.
 const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 const DAY = 86_400_000;
 const realm = (path: string, callers: number | null = null) => ({ callers, path: `gno.land/r/${path}` });
@@ -117,7 +117,7 @@ describe("the rail's worlds", () => {
 });
 
 describe("the rail on Onyx's recorded worlds (tests/recordedWorlds.json)", () => {
-  // The recorded file (2026-11-01) counts no caller in any realm: 30 of its worlds are given callers here, 30 down to 1.
+  // The recorded file counts no caller in any realm: 30 of its worlds are given callers here, 30 down to 1.
   const called = () =>
     (recorded.worlds as CosmosWorld[]).map((world, at) =>
       at < 30 ? { ...world, realms: world.realms.map((each) => ({ ...each, callers: 30 - at })) } : world,

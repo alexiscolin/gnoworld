@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { gated, HOST_AT_ONCE } from "./policy.ts";
 
-// The shared RPC is public: no page asks more than a few requests of one host at once (the plan's threat model), however many views ask.
+// The shared RPC is public: no page asks more than a few requests of one host at once, however many views ask.
 describe("the per-host cap", () => {
   it("holds the requests past the cap until one ends, and never mixes two hosts", async () => {
     const ends: (() => void)[] = [];

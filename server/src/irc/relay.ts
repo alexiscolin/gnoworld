@@ -1,4 +1,4 @@
-// A guest's line said by the bot (D430): one RELAYMSG with a label of its own, settled by the line Ergo answers it with.
+// A guest's line said by the bot: one RELAYMSG with a label of its own, settled by the line Ergo answers it with.
 import type { Socket } from "node:net";
 import { allowed, line } from "./lines.ts";
 import type { State } from "./session.ts";

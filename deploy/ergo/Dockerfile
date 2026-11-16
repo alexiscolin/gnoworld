@@ -1,4 +1,4 @@
-# Ergo in the stack (slice 3's plan, 3e): the project's own image at the pinned tag (deploy/ergo/VERSION), by
+# Ergo in the stack: the project's own image at the pinned tag (deploy/ergo/VERSION), by
 # digest, with gnoworld's settings rendered at each start (render.sh) and a probe for its health check. It runs
 # as 65532, the server's user too, so Ergo dials the auth socket the server makes in their shared volume.
 FROM golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1 AS probe

@@ -1,4 +1,4 @@
-// A realm's read functions (5i, ADR-0002 §4): the ones that take nothing and give something, listed once from `vm/qfuncs`,
+// A realm's read functions (ADR-0002 §4): the ones that take nothing and give something, listed once from `vm/qfuncs`,
 // each a row with a Read button that reads its result once through `vm/qeval` when clicked. A read is free and signs nothing: the label says
 // so, with the block height it was read at, and no wallet is ever asked. One request a view for the list, two a click (the
 // call, shown first, and the height, which follows it); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a

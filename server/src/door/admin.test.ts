@@ -12,7 +12,7 @@ import { adminRoutes } from "./admin.ts";
 import type { Jarvis } from "./jarvis.ts";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
-// 10g (ADR-0002 §6, D96): the admin API that changes Jarvis's quotas, allowlist and budgets, by a team account's session
+// ADR-0002 §6: the admin API that changes Jarvis's quotas, allowlist and budgets, by a team account's session
 // and a fresh signature of each change, its text the action in words.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
 const ORIGIN = "https://admin.gnoworld.test";
@@ -259,7 +259,7 @@ describe("the admin API, a change", () => {
     expect(events().at(-1)).toContain(
       '"event":"admin_refused","route":"/api/admin/jarvis/change","status":503,"error":"unapplied"',
     );
-    // Jarvis may have applied what it did not answer: the line says what was asked (F5107).
+    // Jarvis may have applied what it did not answer: the line says what was asked.
     expect(events().at(-1)).toContain('"setting":"budget_translate","value":3');
     expect(events().join("")).not.toContain('"admin_change"');
   });

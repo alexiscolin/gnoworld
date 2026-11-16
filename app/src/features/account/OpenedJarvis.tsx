@@ -1,4 +1,4 @@
-// The account menu with its Jarvis item alive once Jarvis is on and the chat in view has a room it can read (10u-a); in the menu's own
+// The account menu with its Jarvis item alive once Jarvis is on and the chat in view has a room it can read; in the menu's own
 // chunk, so the first screen carries none of it.
 import type { ComponentProps } from "react";
 import { useJarvisHere, useJarvisOn } from "../../jarvisHere.ts";

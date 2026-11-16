@@ -5,7 +5,7 @@ import { createAppStore } from "../../store/index.ts";
 import { BATCH_MS, chainFeed } from "./chainFeed.ts";
 import { followVerdicts, type VerdictSource } from "./verdicts.ts";
 
-// Slice 9g (red pass): the glue between the stream's single frames and the store's batches. The unit tests of the store call
+// The glue between the stream's single frames and the store's batches. The unit tests of the store call
 // `heard` with a batch; this is the path a page takes: frames through the stream client's schemas, then one update a burst.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, world = "govdao"): ChainEvent => ({

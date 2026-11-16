@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, mount, noMedia, one } from "../../../tests/mount.tsx";
 import { Head, openAuthorCard } from "./LineHead.tsx";
 
-// View profile (8j): the More menu's item opens the card of the line's author, whose name is the pointer's way and no Tab stop; the focus
+// View profile: the More menu's item opens the card of the line's author, whose name is the pointer's way and no Tab stop; the focus
 // goes to the name, which the card gives back as it closes.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const GUEST: ShownLine = {

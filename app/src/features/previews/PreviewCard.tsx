@@ -1,4 +1,4 @@
-// A page's capture as a card (8f): on a world's plate (frame 26, "Preview · gno.land/r/gov/dao · captured · Open large") and under a chat
+// A page's capture as a card: on a world's plate (frame 26, "Preview · gno.land/r/gov/dao · captured · Open large") and under a chat
 // line (frames 104, 107). The page is drawn small by the realm view's own drawing, as a picture: inert and hidden from assistive technology,
 // so nothing of it is a control. The card's one button opens it at size, with when it was captured and the way to the page as it is now.
 import type { Capture } from "@gnoworld/schemas/indexer";
@@ -17,11 +17,11 @@ export interface PreviewCardProps {
   /** The default universe's gnoweb, which the capture's links to a path resolve against. */
   gnoweb: string;
   via: Drawing;
-  /** The realm page's drawing (5h's RealmBlocks), which comes through its slot. */
+  /** The realm page's drawing (RealmBlocks), which comes through its slot. */
   Blocks: PageDrawing;
   /** The realm's view on this site: the page as it is now. */
   live: string;
-  /** Whether the card is a Tab stop: under a line, on the list's stop alone (U1). */
+  /** Whether the card is a Tab stop: under a line, on the list's stop alone. */
   tabbable?: boolean;
 }
 

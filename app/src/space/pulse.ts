@@ -1,4 +1,4 @@
-// A loop that may sleep (P400): `run` is called each frame and says whether another is wanted; when it says no, no frame is asked until
+// A loop that may sleep: `run` is called each frame and says whether another is wanted; when it says no, no frame is asked until
 // the returned `wake` is called, which asks one. Ends for good when `signal` aborts.
 export function pulse(
   run: (now: number) => boolean,

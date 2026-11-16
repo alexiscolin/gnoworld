@@ -1,5 +1,5 @@
 #!/bin/sh
-# Ergo's start in the stack (slice 3's plan, 3e): ircd.yaml.tmpl rendered as the server's tests render it
+# Ergo's start in the stack: ircd.yaml.tmpl rendered as the server's tests render it
 # (server/src/testing/ergo.ts), each {{NAME}} a JSON value, from the settings and the oper's secret file; then
 # Ergo runs. A missing setting, an origin that is none or a name left unfilled stops it before it listens.
 set -euf # -f: an origin of * is a word, never the files it would match
@@ -8,7 +8,7 @@ fail() {
 	exit 1
 }
 
-# The sites a WebSocket may come from: an empty list would let every origin in (F422), so none is refused.
+# The sites a WebSocket may come from: an empty list would let every origin in, so none is refused.
 origins=""
 for origin in $(printf '%s' "${ORIGINS:-}" | tr ',' ' '); do
 	printf '%s\n' "$origin" | grep -Eqx 'https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?' || fail "ORIGINS: [$origin] is no origin"
@@ -16,16 +16,16 @@ for origin in $(printf '%s' "${ORIGINS:-}" | tr ',' ' '); do
 done
 [ -n "$origins" ] || fail "ORIGINS: required, the sites of the app"
 printf '%s\n' "${SERVER_NAME:-}" | grep -Eqx '[a-z0-9-]+(\.[a-z0-9-]+)+' || fail "SERVER_NAME: required, a host name"
-# web's address alone may say who a WebSocket's visitor is (X-Forwarded-For, listeners.go:159, F449).
+# web's address alone may say who a WebSocket's visitor is (X-Forwarded-For, listeners.go:159).
 printf '%s\n' "${PROXY_FROM:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}' || fail "PROXY_FROM: required, web's address"
 # The server's socket, which Ergo dials for each login, with no command (irc/script.go, RunScript).
 printf '%s\n' "${AUTH_SOCKET:-}" | grep -Eqx '/[A-Za-z0-9/._-]+' || fail "AUTH_SOCKET: required, the server's socket"
 # The inside network, whose addresses (the server's link among them) the connection limits leave alone: the
-# server's crash loop must not meet the throttle (F720). A visitor's address is never one of its own.
+# server's crash loop must not meet the throttle. A visitor's address is never one of its own.
 printf '%s\n' "${INSIDE_SUBNET:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}/([89]|[12][0-9]|3[0-2])' || fail "INSIDE_SUBNET: required, the internal network (/8 to /32)"
 # The oper's password: one word of printable characters, 32 to 72 of them (bcrypt keeps 72 bytes: genpasswd refuses
 # more, and the server takes up to 256, config.ts). Ergo's genpasswd hashes the file's first line alone, an empty one
-# too, and OPER is open on /ws (F706): the whole file is read, and a blank line, a space or a tab in it is refused.
+# too, and OPER is open on /ws: the whole file is read, and a blank line, a space or a tab in it is refused.
 LC_ALL=C
 export LC_ALL
 password=$(cat /run/secrets/ergo_oper_password)

@@ -1,4 +1,4 @@
-// Tier 1 (docs/REVIEW.md). The one place that gives an owner's right: the staff right as the pins give it today, or the holder of the room's
+// Tier 1 (docs/REVIEW.md). The one place that gives an owner's right: the staff right as the pins give it, or the holder of the room's
 // namespace being the account or one of its identity, read on the room's own chain. Nothing here feeds isTeam, spared, the console, the room
 // lists or the reconciler. The namespace comes from the server's own tables (placeOf), never from a request.
 import { Address } from "@gnoworld/schemas";
@@ -59,7 +59,7 @@ export function makeMayModerate({ staff, maker, placeOf, identityOf }: MayModera
     if (place === undefined) return false;
     let holder: Address | null | undefined;
     try {
-      // One key for the read's limits: the account and the visitor's /64 together (F13831).
+      // One key for the read's limits: the account and the visitor's /64 together.
       holder = await place.owner(place.namespace, `${who} ${visitor}`);
     } catch {
       return "failed";

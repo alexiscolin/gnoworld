@@ -3,7 +3,7 @@ import { sound } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { openGovdao } from "./govdaoChain.ts";
 
-// 9e-1 (Alexis, 2026-11-06): GovDAO's pinned "Vote" (hubs.json) on its page under Read the proposals and in the chat's pinned row,
+// GovDAO's pinned "Vote" (hubs.json) on its page under Read the proposals and in the chat's pinned row,
 // each once vm/qfuncs confirms it; its card names the realm and the function, every field empty and editable.
 const opened = openGovdao;
 const plate = (page: Page) => page.locator("[data-look='plate']");
@@ -37,7 +37,7 @@ for (const width of [390, 1280] as const) {
     await bar(page).getByRole("button", { name: "Vote" }).click();
     const card = page.getByRole("article").filter({ hasText: "MustVoteOnProposalSimple" });
     await expect(card).toContainText("gno.land/r/gov/dao");
-    // D272: a GovDAO vote's card says, before Adena opens, that only its members can vote.
+    // A GovDAO vote's card says, before Adena opens, that only its members can vote.
     await expect(card).toContainText(
       "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost.",
     );
@@ -46,7 +46,7 @@ for (const width of [390, 1280] as const) {
       await expect(box).toHaveText("");
       await expect(box).toBeEditable();
     }
-    // The card opens over the bar inside the dock: the bar stays on the screen, the card scrolls in its own box (design review, 9e-1).
+    // The card opens over the bar inside the dock: the bar stays on the screen, the card scrolls in its own box.
     // Under 1280 px the chat is a block of the page, which scrolls: the bar is there, not fixed to the screen.
     const row = await bar(page).boundingBox();
     if (width >= 1280) expect(row !== null && row.y + row.height <= (page.viewportSize()?.height ?? 0)).toBe(true);
@@ -61,7 +61,7 @@ for (const width of [390, 1280] as const) {
 }
 
 test("GovDAO shows no pinned Vote anywhere when vm/qfuncs does not list its function", async ({ page }) => {
-  // The plate and the bar read the functions: the answer, before any absence is asserted (the combined review of 9e-1).
+  // The plate and the bar read the functions: the answer, before any absence is asserted.
   let answers = 0;
   page.on("response", (response) => {
     if (decodeURIComponent(response.url()).includes("vm/qfuncs")) answers += 1;
@@ -77,7 +77,7 @@ test("GovDAO shows no pinned Vote anywhere when vm/qfuncs does not list its func
   await expect(page.getByRole("figure")).toHaveCount(0);
 });
 
-// F1763: a chunk that cannot be fetched leaves its own place alone, never the page: the plate and the chat's bar stand.
+// A chunk that cannot be fetched leaves its own place alone, never the page: the plate and the chat's bar stand.
 test("GovDAO keeps its plate and its chat's bar when the pinned actions' code cannot be fetched", async ({ page }) => {
   // A route on the page does not see this chunk's request here; one on the context does.
   await page.context().route(/\/assets\/Pinned-[\w-]+\.js$/, (route) => route.abort());
@@ -85,7 +85,7 @@ test("GovDAO keeps its plate and its chat's bar when the pinned actions' code ca
   await opened(page, 1280);
   await failed;
   // What only the proposals' code draws, after the failed chunk: a proposal read from the chain. The pre-rendered page holds the rest,
-  // its "Proposals" heading too, so a journey waiting on those passed while the page fell (F5941, refuted by the verifier).
+  // its "Proposals" heading too, so a journey waiting on those passed while the page fell.
   await expect(
     plate(page)
       .getByRole("link", { name: /Set validator gno-core-validator-1 to voting power 60/ })
@@ -99,7 +99,7 @@ test("GovDAO keeps its plate and its chat's bar when the pinned actions' code ca
   await expect(page.getByRole("button", { name: "Vote" })).toHaveCount(0);
 });
 
-// Alexis, D273 (answer 9e-3, F5950): GovDAO's action row holds Read the proposals and Share on one line in its column, as frame 30.
+// GovDAO's action row holds Read the proposals and Share on one line in its column, as frame 30.
 test("GovDAO's action row is Read the proposals then Share, on one line, at the video's size", async ({ page }) => {
   await opened(page, 1728);
   const row = plate(page).getByRole("link", { name: "Read the proposals" });

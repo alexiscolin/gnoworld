@@ -1,6 +1,6 @@
 # Textures
 
-Every file in `app/public/textures/` comes from a real map or image, read on 2026-11-02. `app/src/space/planet/credits.ts` holds the
+Every file in `app/public/textures/` comes from a real map or image. `app/src/space/planet/credits.ts` holds the
 words shown wherever one is drawn (`docs/DESIGN-SYSTEM.md`, "Credits"); a test holds that every file has its row.
 
 ## Solar System Scope, CC BY 4.0
@@ -24,7 +24,7 @@ fictional terrain, and the site lists Ceres and Eris as fictional.
 
 The shaders warp, recolour and mix them by each world's seed.
 
-The Earth's view's scenery (part 7x, read on 2026-11-04 from the same page, under the same terms): the real planets drawn as their maps
+The Earth's view's scenery (from the same page, under the same terms): the real planets drawn as their maps
 came, no warp and no colour, small for they stand far, and loaded only once the cosmos is asked; a credit row of their own. Encoded by
 Chromium's WebP encoder from the files named, scaled down by halves with high-quality smoothing.
 
@@ -65,7 +65,7 @@ Credit: NASA, ESA, Hubble Heritage Team.
 
 ## ESA/Webb, CC BY 4.0
 
-https://esawebb.org/copyright/, read on 2026-11-02: images "released under the Creative Commons Attribution 4.0 International license"; the
+https://esawebb.org/copyright/: images "released under the Creative Commons Attribution 4.0 International license"; the
 credit listed under each image, in full and legible; no endorsement implied; changes mentioned after the credit; no logos.
 
 | File | Source | Size | Changes |
@@ -83,7 +83,7 @@ The nebulae's star removal is ffmpeg's: a pass is `erosion` and `dilation` filte
 then `blend=all_mode=difference` against the original, a `lut` threshold, three `dilation`s and a `gblur` for the mask, and
 `maskedmerge` of the original with the opened picture, all in `gbrp`.
 
-## Height maps (13, read 2026-11-11)
+## Height maps
 
 Made by `app/tests/tools/heightMaps.mjs` at the one size they are read at (no variants: `textureVariants.mjs` skips `-height`), loaded late and not under Low.
 

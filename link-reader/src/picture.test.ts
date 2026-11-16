@@ -199,7 +199,7 @@ describe("reencode, before any decoding", () => {
     expect(decoded()).toBe(0);
   });
 
-  // D13943: 2 megapixels. No rectangle within 4,096 a side has exactly 2,000,001 pixels, so the edge is 2,000,000 (2,000 by 1,000) and 2,000,999 (1,001 by 1,999).
+  // 2 megapixels. No rectangle within 4,096 a side has exactly 2,000,001 pixels, so the edge is 2,000,000 (2,000 by 1,000) and 2,000,999 (1,001 by 1,999).
   it("holds the cap's own edge: 2,000 by 1,000 (2,000,000 pixels) is decoded, 1,001 by 1,999 (2,000,999) is not", async () => {
     expect(PIXELS_MAX).toBe(2_000_000);
     const inside = spy();
@@ -287,7 +287,7 @@ describe("reencode, the work", () => {
   });
 });
 
-// The real codecs (@jsquash/jpeg, png, resize, in WebAssembly): they need `pnpm install` (the report's commands).
+// The real codecs (@jsquash/jpeg, png, resize, in WebAssembly): they need `pnpm install`.
 describe("reencode with the real codecs", () => {
   const made = async (bytes: Uint8Array) => {
     const got = await reencode(bytes, wasmCodecs);

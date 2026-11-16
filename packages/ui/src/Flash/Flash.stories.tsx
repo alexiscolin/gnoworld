@@ -7,7 +7,7 @@ import { Flash, type FlashMessage } from "./Flash.tsx";
 const meta = {
   component: Flash,
   args: { message: { title: "Saved to your rooms", line: "Bubble · the AMA on sessions" }, onClose: () => undefined },
-  // In the top layer, so pictured as the whole screen (F331).
+  // In the top layer, so pictured as the whole screen.
   tags: ["viewport"],
 } satisfies Meta<typeof Flash>;
 export default meta;
@@ -28,7 +28,7 @@ export const LongText: Story = {
   },
 };
 
-// A flash raised from a dialog's action, as the timed story's: it shows over the dialog's scrim (F331).
+// A flash raised from a dialog's action, as the timed story's: it shows over the dialog's scrim.
 function FromADialog() {
   const [message, setMessage] = useState<FlashMessage | null>(null);
   return (

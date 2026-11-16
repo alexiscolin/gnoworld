@@ -2,7 +2,7 @@
 // a filmic curve holds the frames' deep black and rolls warm light off to white, before anything compiles, and for everything drawn.
 import { ACESFilmicToneMapping, WebGLRenderer } from "three";
 
-// The dive's grade (D401): the planets' quads and the planets drawn as themselves are matched under it, the rail's portraits too.
+// The dive's grade: the planets' quads and the planets drawn as themselves are matched under it, the rail's portraits too.
 const EXPOSURE = 1;
 
 type Rgb = readonly [number, number, number];

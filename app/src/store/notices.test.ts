@@ -18,7 +18,7 @@ const read = (line: string): IrcMessage => {
   return parsed.message;
 };
 
-// 4f-n (docs/decisions.md, 2026-10-26): the notices a page holds, which of them are unseen, and what each room counts.
+// The notices a page holds, which of them are unseen, and what each room counts.
 describe("the store's notices slice", () => {
   const setup = (rooms: readonly string[] = [GAMES, MAIN]) => {
     const store = createAppStore();
@@ -76,7 +76,7 @@ describe("the store's notices slice", () => {
       expect(ids(t.state().notices)).toEqual(["a", "b"]);
     });
 
-    // F1534: a history page of up to 200 lines made a notification for each notice.
+    // A history page of up to 200 lines made a notification for each notice.
     it("adds a list at once: one notification, each notice once, the same cap as one at a time", () => {
       const t = setup();
       t.notices.add(notice({ id: "a" }));
@@ -101,7 +101,7 @@ describe("the store's notices slice", () => {
       expect(t.state().notices.at(-1)?.id).toBe(`n${String(NOTICES_KEPT)}`);
     });
 
-    // R10: past the cap a notice already seen goes first, since none counts it; else the oldest; and what a room
+    // Past the cap a notice already seen goes first, since none counts it; else the oldest; and what a room
     // counts is what the store holds, so no badge keeps a notice that is gone.
     it("drops a seen notice before an unseen one when it holds more than NOTICES_KEPT", () => {
       const t = setup();
@@ -125,7 +125,7 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(unseenNotices(t.state()).length);
     });
 
-    // F1670 (S1): a stranger who floods one room must not push out what another place told the account.
+    // A stranger who floods one room must not push out what another place told the account.
     it("keeps the cap for each place, so a flood of one room drops that room's own oldest alone", () => {
       const t = setup();
       t.kept(ALICE);
@@ -167,7 +167,7 @@ describe("the store's notices slice", () => {
       expect(unseenNotices(t.state())).toEqual([]);
     });
 
-    // R11: React reads a selector's answer on every render (zustand's useSyncExternalStore), and draws again for a new
+    // React reads a selector's answer on every render (zustand's useSyncExternalStore), and draws again for a new
     // array each time: the same list while it holds the same notices.
     it("gives the same list while it holds the same notices, whatever else the store changes", () => {
       const t = setup();
@@ -221,7 +221,7 @@ describe("the store's notices slice", () => {
       expect(ids(unseenNotices(t.state()))).toEqual(["n1"]);
     });
 
-    // G6 (F1505): the same count with other content is a new list, though one place of the old list holds the same notice.
+    // The same count with other content is a new list, though one place of the old list holds the same notice.
     it("answers the new list when one notice left and another came, the count the same, the first kept", () => {
       const t = setup();
       t.notices.add(notice({ id: "a", where: GAMES, time: T(5) }));
@@ -242,7 +242,7 @@ describe("the store's notices slice", () => {
     });
   });
 
-  // F1674 (CR2): a notice of a partner the store no longer keeps, or the account no longer hears, had no row to open or
+  // A notice of a partner the store does not keep, or the account does not hear, had no row to open or
   // to mark seen, yet counted in the tab title and the list.
   describe("a conversation the store drops", () => {
     it("counts a partner's notice only while the store keeps the partner and the account hears from it", () => {
@@ -257,7 +257,7 @@ describe("the store's notices slice", () => {
       expect(unseenNotices(t.state())).toEqual([]);
     });
 
-    // R2 (redpass2-4fn): the conversations are bounded, the notices of those that went were not.
+    // The conversations are bounded, the notices of those that went were not.
     it("keeps the notices of the conversations the store keeps alone, as many as it keeps of them", () => {
       const t = setup();
       const partners = Array.from({ length: DMS_KEPT + 50 }, (_, n) => toAddress(new Uint8Array(20).fill(n + 1)));
@@ -374,7 +374,7 @@ describe("the store's notices slice", () => {
       expect(badgeOf(t.state(), GAMES)).toBe(2);
     });
 
-    // F1679 (CR7): with no mark, the whole window counted ("200 unread") while the page made no notice in that case; and
+    // With no mark, the whole window counted ("200 unread") while the page made no notice in that case; and
     // while the connection was down the account's own lines past the mark counted, `chat.me` being none.
     it("counts nothing in all mode while the room's mark is unknown, and what is past it once it is known", () => {
       const t = setup();
@@ -411,7 +411,7 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(1);
     });
 
-    // G7 (F1506): an edit is a line of its own that shows in its target's place, so it is no new unread line.
+    // An edit is a line of its own that shows in its target's place, so it is no new unread line.
     it("counts no edit in all mode: it corrects a line the reader has or has not had", () => {
       const t = setup();
       t.marked(GAMES, 0);
@@ -490,7 +490,7 @@ describe("the store's notices slice", () => {
     });
   });
 
-  // R3: a room the account was taken out of (a KICK, a PART from another session) opens on nothing it can read.
+  // A room the account was taken out of (a KICK, a PART from another session) opens on nothing it can read.
   describe("left", () => {
     it("drops the notices of that room alone, and notifies no one when it holds none", () => {
       const t = setup();
@@ -505,7 +505,7 @@ describe("the store's notices slice", () => {
     });
   });
 
-  // G12 (F1509): in all mode the room's lines stay held, and the room it left must not keep counting them.
+  // In all mode the room's lines stay held, and the room it left must not keep counting them.
   describe("left, in all mode", () => {
     it("keeps counting no unread line of a room left in all mode, its lines still held, and counts again what comes once back", () => {
       const t = setup();
@@ -561,7 +561,7 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(2);
     });
 
-    // G10 (F1508): each place's mark is its own newest time, not another place's.
+    // Each place's mark is its own newest time, not another place's.
     it("marks each place at its own newest unseen time", () => {
       const t = setup();
       t.kept(ALICE);
@@ -581,8 +581,8 @@ describe("the store's notices slice", () => {
     });
   });
 
-  // F1682 (CR10, C1): the total and the badges each filtered every notice again for each place, at every store update:
-  // O(places x notices). One pass counts them all.
+  // One pass counts every place: the total and the badges must not each filter every notice again at every store update,
+  // which costs O(places x notices).
   describe("the counts, in one pass", () => {
     // The state as a reader that counts its reads of `notices`.
     const counted = (state: AppState) => {
@@ -654,7 +654,7 @@ describe("the store's notices slice", () => {
       expect(modeOf(t.state(), MAIN)).toBe("all");
     });
 
-    // G1 (F1500): an account that held no mode, with a notice or a mark alone, leaves nothing for the next one.
+    // An account that held no mode, with a notice or a mark alone, leaves nothing for the next one.
     it.each([
       [
         "a notice and no mark",
@@ -706,7 +706,7 @@ describe("the store's notices slice", () => {
       expect(writes).toEqual([{ [GAMES]: "none" }, { [GAMES]: "none", [MAIN]: "all" }, { [MAIN]: "all" }]);
     });
 
-    // F1675 (CR3): a page held the modes it read at its start and wrote the whole map, so a tab opened earlier undid what
+    // A page must not write the whole map of modes it read at its start: a tab opened earlier would undo what
     // another tab chose since.
     it("merges what the device holds now with the mode changed, so two pages lose none of each other's", () => {
       const first = setup();
@@ -736,8 +736,8 @@ describe("the store's notices slice", () => {
       prefs.modes = base;
     });
 
-    // F1671 (S2): the link began a session, so with the chat closed through a sign-out and another sign-in the next
-    // account held the last one's notices, marks and conversations.
+    // With the chat closed through a sign-out and another sign-in, the next account must not hold the last one's
+    // notices, marks and conversations.
     it("forgets the last account's notices, marks and conversations when the session changes, the chat closed", () => {
       const t = setup();
       const { loginActions } = t.store.getState();

@@ -1,4 +1,4 @@
-// A realm's rollup (slice 13a): what the worlds job counts of a realm's calls from the chain's indexer, written to one file per realm beside
+// A realm's rollup: what the worlds job counts of a realm's calls from the chain's indexer, written to one file per realm beside
 // worlds.json and read by its plate. Every text came from a chain, so it is checked; every list is capped; a fact not read is null, never
 // made up. Days are UTC days read from the blocks' own times.
 import { Day } from "./day.ts";

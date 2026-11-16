@@ -1,4 +1,4 @@
-// The fields this device keeps for whoever uses it (slice 8), their shapes and their defaults: what the store holds from the first screen.
+// The fields this device keeps for whoever uses it, their shapes and their defaults: what the store holds from the first screen.
 // Reading and writing them, with their schemas, is device.ts's, which the page asks for once it runs.
 import type { Language } from "../language.ts";
 

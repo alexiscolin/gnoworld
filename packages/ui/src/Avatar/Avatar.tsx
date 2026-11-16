@@ -21,7 +21,7 @@ export interface AvatarProps {
 const KIND = { person: "", assistant: ", assistant", bot: ", bot" } as const;
 
 // What assistive technology says: the name and its kind, unless a name beside says them, then here and
-// speaking, which only the avatar shows (F320).
+// speaking, which only the avatar shows.
 function said({ name, kind = "person", here, speaking, decorative }: AvatarProps) {
   const states = [here === true ? "here now" : "", speaking === true ? "speaking" : ""];
   return [decorative === true ? "" : `${name}${KIND[kind]}`, ...states].filter((part) => part !== "").join(", ");
@@ -80,7 +80,7 @@ function Nebula({ address }: { address: string }) {
   );
 }
 
-// Jarvis's orb: a violet glow, lit from its upper start (decision 3; never mint).
+// Jarvis's orb: a violet glow, lit from its upper start (never mint).
 function Orb() {
   const id = useId();
   return (
@@ -98,7 +98,7 @@ function Orb() {
 }
 
 // The face on its night disc, the same at every size: the sheet scales it. The night is the picture's
-// own, so forced colours, which leave a picture as drawn, keep it (F319).
+// own, so forced colours, which leave a picture as drawn, keep it.
 function Face({ address, kind }: { address: string; kind: "person" | "assistant" }) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={styles["face"]}>

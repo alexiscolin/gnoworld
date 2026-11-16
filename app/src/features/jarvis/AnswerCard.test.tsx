@@ -12,7 +12,7 @@ import { drawing } from "../chat/index.ts";
 import { drawerOf } from "./drawer.ts";
 import { AnswerCard, type DrawMarkdown } from "./AnswerCard.tsx";
 
-// 10u-a, tier 1: an answer is a machine's words, drawn through the chat's reader and never as HTML; its buttons are checked again here:
+// Tier 1: an answer is a machine's words, drawn through the chat's reader and never as HTML; its buttons are checked again here:
 // an action opens the call card only once vm/qfuncs lists the function with exactly its arguments' names, never coins.
 // A link on gnoweb or on the app's own origin is an anchor, any other a button behind the leaving warning.
 interface Proposed {

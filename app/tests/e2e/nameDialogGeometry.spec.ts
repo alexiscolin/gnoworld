@@ -3,7 +3,7 @@ import { box, near, style, tokenColour } from "./geometry.ts";
 import { logIn } from "./namesChain.ts";
 import { axeOf } from "./axe.ts";
 
-// 9k (answer 9f-1): the name dialog at the video's size (1728 by 1080) against frames 9 to 15, read off the frames' pixels: the
+// The name dialog at the video's size (1728 by 1080) against frames 9 to 15, read off the frames' pixels: the
 // dialog 489 px wide (619 to 1108), the kicker above the title, no Close button, the field's label in the mono caps muted style and
 // `nym-` inside the field's box. A box is held to 2 px of the frame's (geometry.ts). One test a fact, so a first failure hides none.
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Pick a name and a face" });
@@ -30,7 +30,7 @@ test.describe("the name dialog against the frames", () => {
     const title = await box(page, "dialog[open] h2");
     expect(kicker.y + kicker.height, "the kicker sits above the title").toBeLessThanOrEqual(title.y);
     near(kicker.x - frame.x, 25, "the kicker's inset");
-    // F5965: the frames' kicker caps sit 33 px under the border and 19 px above the title's caps; a box here is the line: 11 px
+    // The frames' kicker caps sit 33 px under the border and 19 px above the title's caps; a box here is the line: 11 px
     // for the label (caps 1 px in), a title's caps 4 px below its line's top.
     near(kicker.y - frame.y, 33, "the kicker's top under the dialog's edge");
     near(title.y - (kicker.y + kicker.height), 13, "the gap from the kicker to the title");
@@ -46,14 +46,14 @@ test.describe("the name dialog against the frames", () => {
     expect(face.y + face.height, "the face is above the field").toBeLessThanOrEqual(field.y);
   });
 
-  // F5970: the registry line is 13 px with a 1.5 leading (frame 10), the notes below it 12 px.
+  // The registry line is 13 px with a 1.5 leading (frame 10), the notes below it 12 px.
   test("sets the registry line in 13 px over 19.5 px", async ({ page }) => {
     await opened(page, [1728, 1080]);
     expect(await style(page, "dialog[open] p:has(code)", "font-size")).toBe("13px");
     expect(await style(page, "dialog[open] p:has(code)", "line-height")).toBe("19.5px");
   });
 
-  // F5981: the frames draw the registry's path in the text colour with no fill, not as a chip.
+  // The frames draw the registry's path in the text colour with no fill, not as a chip.
   test("draws the registry's path in the text colour, on no fill", async ({ page }) => {
     await opened(page, [1728, 1080]);
     expect(await style(page, "dialog[open] code", "background-color")).toBe("rgba(0, 0, 0, 0)");
@@ -74,26 +74,26 @@ test.describe("the name dialog against the frames", () => {
     expect(prefix.x + prefix.width).toBeLessThanOrEqual(field.x + field.width);
   });
 
-  // F5967 (answer 9k-3): frame 10's field is 46 px from edge to edge (rows 566 to 611), a 44 px control and its two edges.
+  // Frame 10's field is 46 px from edge to edge (rows 566 to 611), a 44 px control and its two edges.
   test("draws the field's box 46 px tall, the control's 44 and its edges", async ({ page }) => {
     await opened(page, [1728, 1080]);
     expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(46);
   });
 
-  // F5967: frame 14's Register fill and frame 10's Later border run from row 654 to 697, 44 px.
+  // Frame 14's Register fill and frame 10's Later border run from row 654 to 697, 44 px.
   test("draws Register and Later 44 px tall", async ({ page }) => {
     await opened(page, [1728, 1080]);
     for (const name of ["Register · 0 GNOT", "Later"])
       expect((await dialog(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
   });
 
-  // F5969: frame 10's title has capitals 19 px tall, Geist 300 at 26 px.
+  // Frame 10's title has capitals 19 px tall, Geist 300 at 26 px.
   test("sets the title in 26 px", async ({ page }) => {
     await opened(page, [1728, 1080]);
     expect(await style(page, "dialog[open] h2", "font-size")).toBe("26px");
   });
 
-  // F5968: frame 10's resting edge is (70, 73, 82) over the dialog's (11, 15, 24), about a fifth of the text: the strong line.
+  // Frame 10's resting edge is (70, 73, 82) over the dialog's (11, 15, 24), about a fifth of the text: the strong line.
   test("draws the resting field's edge in the strong line", async ({ page }) => {
     await opened(page, [1728, 1080]);
     await page.mouse.move(0, 0);
@@ -102,7 +102,7 @@ test.describe("the name dialog against the frames", () => {
     );
   });
 
-  // F5980: frame 10's placeholder is dimmer than the prefix beside it (luma 128 against 174).
+  // Frame 10's placeholder is dimmer than the prefix beside it (luma 128 against 174).
   test("draws the placeholder in the faint grey, the prefix in the muted one", async ({ page }) => {
     await opened(page, [1728, 1080]);
     const placeholder = await page
@@ -115,7 +115,7 @@ test.describe("the name dialog against the frames", () => {
     );
   });
 
-  // F5963: the focus ring is the frame's, so it encloses the prefix; the bare input inside draws none.
+  // The focus ring is the frame's, so it encloses the prefix; the bare input inside draws none.
   test("rings the whole box when its input has the focus, not the input alone", async ({ page }) => {
     await opened(page, [1728, 1080]);
     await expect(dialog(page).getByRole("textbox", { name: "Name" })).toBeFocused();

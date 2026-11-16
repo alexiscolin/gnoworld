@@ -1,5 +1,5 @@
 // The files under public/textures each row of CREDITS credits, with no extension, in its order: only the credits' test reads them, so the
-// first screen, which shows the rows, never ships the names (Alexis, 2026-11-04, for 7x's scenery maps).
+// first screen, which shows the rows, never ships the names.
 import { CREDITS, type Credit } from "./credits.ts";
 
 const FILES: readonly (readonly string[])[] = [

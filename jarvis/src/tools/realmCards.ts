@@ -1,4 +1,4 @@
-// A realm's digest and proposal on its reads already made (10k, the digest's route): give_digest and propose_action,
+// A realm's digest and proposal on its reads already made (the digest's route): give_digest and propose_action,
 // the cards' own definitions, for that realm and chain alone, each kept as the cards keep theirs, grounded on the
 // chain's reads only, as no asker's words are among them (one digest serves every reader).
 import type { Ran } from "../gnomcp.ts";

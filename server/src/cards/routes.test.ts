@@ -6,7 +6,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import type { Right } from "../roles/mayModerate.ts";
 import { cardsRoutes } from "./routes.ts";
 
-// L3 (docs/plans/link-previews.md §3 step 5 and 6, §4 "Removal abuse", "Links acting on a GET"): GET /api/cards, GET /api/cards/<key>,
+// GET /api/cards, GET /api/cards/<key>,
 // GET /api/cards/<key>/picture, POST /api/cards/remove. No GET ever fetches: the routes hold no reader at all.
 const ORIGIN = "https://gnoworld.test";
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");

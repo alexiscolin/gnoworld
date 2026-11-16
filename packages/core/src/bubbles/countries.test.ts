@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { centreOf, COUNTRIES, countryName } from "./countries.ts";
 
-// Slice 6's 6b: the table of countries a bubble can come from (docs/plans/slice-6.md §7): the ISO 3166-1 code, a name and
+// The table of countries a bubble can come from: the ISO 3166-1 code, a name and
 // a centre in degrees, from a public-domain source named in the file's header (dataFiles.test.ts reads the header).
 // A centre differs from one source to another, so a spot check is a wide box, never a number.
 describe("COUNTRIES", () => {
@@ -10,7 +10,7 @@ describe("COUNTRIES", () => {
     expect(COUNTRIES.length).toBeLessThanOrEqual(260);
   });
 
-  // F3370: a lost or an added row changes this list in a diff, which the range above would not notice. Bonaire, Sint
+  // A lost or an added row changes this list in a diff, which the range above would not notice. Bonaire, Sint
   // Eustatius and Saba (BQ) are in the map units file of the release the header names, so a message from there counts.
   it("holds exactly these 250 codes, Natural Earth 5.1.2's 249 and BQ from its map units", () => {
     const pinned =
@@ -72,7 +72,7 @@ describe("COUNTRIES", () => {
     expect(c?.lon).toBeLessThanOrEqual(east);
   });
 
-  // Finding 9: a sign flipped on any row puts a country on the other side of the globe, so every continent and each
+  // A sign flipped on any row puts a country on the other side of the globe, so every continent and each
   // quadrant of (lat, lon) is checked, by a box wide enough for any source's centre.
   it.each([
     ["US", [25, 50, -125, -67]],

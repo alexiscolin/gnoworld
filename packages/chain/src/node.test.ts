@@ -3,7 +3,7 @@ import { readEvaluated, readFunctionList, readHeight, readRender, type NodeOptio
 import type { ChainFetch, ChainRead } from "./read.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "./testing/envelopes.ts";
 
-// The universe check (D118; 10f's security review): a read given a chain's id asks the node's /status first and reads
+// The universe check: a read given a chain's id asks the node's /status first and reads
 // nothing more of a node whose network is another chain, or that names none. A fake node answers each address it is asked.
 const RPC = "https://rpc.onyx.example:443";
 const LIST = [{ FuncName: "Vote", Params: [{ Name: "id", Type: "int" }] }];
@@ -289,7 +289,7 @@ describe("a node read given its universe's chain", () => {
   });
 });
 
-// A caller's memory of its nodes' checks (10h's review, V7): a node seen on its chain is asked its status once a minute.
+// A caller's memory of its nodes' checks a node seen on its chain is asked its status once a minute.
 describe("a node read given its caller's memory of the nodes it saw on their chain", () => {
   const T0 = Date.parse("2026-11-04T12:00:00.000Z");
   const at = (ms: number) => () => new Date(T0 + ms);

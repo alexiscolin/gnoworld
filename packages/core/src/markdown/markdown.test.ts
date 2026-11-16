@@ -156,7 +156,7 @@ describe("markdown: marks within a line", () => {
   });
 });
 
-// 8k: the composer's U (frame 73) writes `++`, the chat's one mark Markdown lacks (markdown-it-ins's, HackMD's); `__`
+// The composer's U (frame 73) writes `++`, the chat's one mark Markdown lacks (markdown-it-ins's, HackMD's); `__`
 // stays bold, as CommonMark, gnoweb and every line written before read it. Another IRC client shows `++word++`.
 describe("markdown: underline, `++` at word bounds", () => {
   const strike = (...children: Inline[]): Inline => ({ type: "strike", children });
@@ -219,7 +219,7 @@ describe("markdown: underline, `++` at word bounds", () => {
     plain,
   );
 
-  // F5383: a run that closes before a letter closes nothing, as one that opens after a letter opens nothing.
+  // A run that closes before a letter closes nothing, as one that opens after a letter opens nothing.
   test.each(["++a++b", "++a++é", "++a++𝐀", "++a++9"])("reads no underline closing inside a word (%j)", plain);
 
   test("ends an underline at its line's end: one closed on the next line is none", () => {
@@ -257,7 +257,7 @@ describe("markdown: underline, `++` at word bounds", () => {
     reads("**see https://a.example/C++**", paragraph(strong(text("see "), link("https://a.example/C++"))));
   });
 
-  // F5382: the rule holds while an underline is open, never after one closed or one the depth cap refused.
+  // The rule holds while an underline is open, never after one closed or one the depth cap refused.
   test("keeps a `+` ending a bare address in it once an underline closed, or when none could open", () => {
     reads(
       "++a++ see https://a.example/C++",
@@ -278,7 +278,7 @@ describe("markdown: underline, `++` at word bounds", () => {
     reads("(++https://a.example/x++)", paragraph(text("("), underline(link("https://a.example/x")), text(")")));
   });
 
-  // F5384: an address in an open underline ends before its `+`, so the next run closes the underline; an odd run is
+  // An address in an open underline ends before its `+`, so the next run closes the underline; an odd run is
   // text. A link written `[label](…)` keeps its address whole, a `+` at its end too.
   test("ends an address in an open underline before its `+`: the run after it closes the underline", () => {
     reads("++see https://a.example/C++", paragraph(underline(text("see "), link("https://a.example/C"))));
@@ -287,14 +287,14 @@ describe("markdown: underline, `++` at word bounds", () => {
     reads("++[c++](https://a.example/C++)++", paragraph(underline(link("https://a.example/C++", "c++"))));
   });
 
-  // F5382: only the underline's own opening run may come before an address; a `+` of the writer's inside it may not.
+  // Only the underline's own opening run may come before an address; a `+` of the writer's inside it may not.
   test("starts a bare address after the underline's opening run alone, never after another `+`", () => {
     reads("++a+https://a.example/x++", paragraph(underline(text("a+https://a.example/x"))));
     reads("++a +https://a.example/x++", paragraph(underline(text("a +https://a.example/x"))));
     reads("++**https://a.example/x**++", paragraph(underline(strong(link("https://a.example/x")))));
   });
 
-  // F5381: what a label holds is its words, an underline's address too: one link, to the label's own address.
+  // What a label holds is its words, an underline's address too: one link, to the label's own address.
   test("links no bare address inside a label, an underline round it or not", () => {
     reads(
       "[++https://a.example/x++](https://b.example)",
@@ -356,7 +356,7 @@ describe("markdown: underline, `++` at word bounds", () => {
 });
 
 describe("markdown: links, https alone", () => {
-  // Slice 13 (R13 of B's red pass): a realm page's `$help` link is an action only through withActions, which the chat never calls.
+  // A realm page's `$help` link is an action only through withActions, which the chat never calls.
   test.each(["[a](/r/gov/dao$help&func=F)", "[a](https://gno.land/r/gov/dao$help&func=F&x=1)"])(
     "makes no action of %j, a `$help` link: text or a plain link",
     (source) => {
@@ -626,7 +626,7 @@ describe("markdown: blocks", () => {
     );
   });
 
-  // /code-review (F780): a number the sender typed is the list's own, not lost to a 1.
+  // A number the sender typed is the list's own, not lost to a 1.
   test("keeps an ordered list's first number", () => {
     reads("2024. was a good year", { type: "list", ordered: true, start: 2024, items: [[text("was a good year")]] });
   });
@@ -730,7 +730,7 @@ describe("markdown: mentions", () => {
     plain(`_@${ALICE}_x`);
   });
 
-  // 4d's green pass (G1): each of bech32's 32 letters, anywhere in the address; none of the four it leaves out.
+  // Each of bech32's 32 letters, anywhere in the address; none of the four it leaves out.
   test.each(Array.from(BECH32))("reads an address ending in %s as a mention", (letter) => {
     const address = `g1${"q".repeat(37)}${letter}`;
     reads(`@${address}`, paragraph(mention(address)));
@@ -894,7 +894,7 @@ describe("mentions: the accounts a message names", () => {
   });
 });
 
-// The green pass's cases (4c's pre-merge): each kills a StrykerJS survivor the tests above let live.
+// Each case kills a StrykerJS survivor the tests above let live.
 describe("markdown: the edges StrykerJS found", () => {
   const strike = (...children: Inline[]): Inline => ({ type: "strike", children });
   test.each([
@@ -905,7 +905,7 @@ describe("markdown: the edges StrykerJS found", () => {
     "see https://a.example/x\u200by",
   ])("keeps %j as text: an address no host or character allows", plain);
 
-  // /code-review (F785): a port past 65535, or 0, makes an address no browser opens.
+  // A port past 65535, or 0, makes an address no browser opens.
   test.each([
     "https://a.example:99999/x",
     "https://a.example:0/x",
@@ -946,7 +946,7 @@ describe("markdown: the edges StrykerJS found", () => {
     );
   });
 
-  // 4c's security review (F781): what draws nothing but is no space or format character, in text or in code.
+  // What draws nothing but is no space or format character, in text or in code.
   test.each(["\u3164", "\u2800", "\u115f", "\u1160", "\u034f", "\ufe0f", "\u3164\u2800"])(
     "makes no link of a label of %j, a character that draws nothing",
     (blank) => {
@@ -1235,7 +1235,7 @@ describe("markdown: whatever comes", () => {
 
   // Linear time (ADR-0002 §9): read at n and 4n characters, about four times as long, where a quadratic reader takes
   // sixteen, seconds at 16,000. The fastest of five reads each, so a pause or StrykerJS's instrumentation change
-  // nothing; no growth is read under 100 ms (20 ms failed under a merge check's load, F831).
+  // nothing; no growth is read under 100 ms (20 ms failed under a merge check's load).
   const fastest = (source: string) =>
     Math.min(
       ...[1, 2, 3, 4, 5].map(() => {
@@ -1245,7 +1245,7 @@ describe("markdown: whatever comes", () => {
       }),
     );
   // StrykerJS's instrumented code (its `__stryker__` global) times nothing of the algorithm: there the comparison
-  // gives way, and runs in the gate and the coverage run, on the code itself (F831).
+  // gives way, and runs in the gate and the coverage run, on the code itself.
   const instrumented = "__stryker__" in globalThis;
   const linear = (family: (size: number) => string) =>
     instrumented || fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 100);
@@ -1305,9 +1305,9 @@ describe("markdown: whatever comes", () => {
     expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
   });
 
-  // A window of messages at the caps of several lines (docs/decisions.md row 255): 200 lines, the store's LINES_KEPT
+  // A window of messages at the caps of several lines: 200 lines, the store's LINES_KEPT
   // (app/src/store/chat.ts), each 40 lines and 4096 bytes of deep quotes, nested lists and fences never closed. It
-  // reads in 5 to 10 ms (2026-10-26); 250 ms, the fastest of three, leaves a loaded gate its margin.
+  // reads in 5 to 10 ms; 250 ms, the fastest of three, leaves a loaded gate its margin.
   test("reads a window of 200 messages of 40 lines and 4096 bytes in under 250 ms", () => {
     const kinds = ["> > > > **a _b ~~c", "- item *a", "  - nested _b", "1. one ~~c", "```"];
     const lines = Array.from({ length: MULTILINE_LINES }, (_, at) =>
@@ -1323,7 +1323,7 @@ describe("markdown: whatever comes", () => {
     expect(instrumented || Math.min(window(), window(), window()) < 250).toBe(true);
   });
 
-  // 8k: underline's `+` runs, open, closed or neither, and its addresses, cost what `~~`'s cost (F5385).
+  // Underline's `+` runs, open, closed or neither, and its addresses, cost what `~~`'s cost.
   test.each(["++a ", "+", "++", "+++ ", "a++ ", "++[", `++@${ALICE} `, "++https://a.example/x++ ", "++a https://x/+ "])(
     "reads a line of %j in linear time, a backslash and a ) closing it",
     (piece) => {

@@ -1,4 +1,4 @@
-// Who is here in each world now, as the rail reads it (7i): the server's counts keyed by each world as space holds it (a hub's world is its
+// Who is here in each world now, as the rail reads it: the server's counts keyed by each world as space holds it (a hub's world is its
 // first realm's, gov/dao for the slug govdao; the Earth and a hub with no realm by their slug), the default universe's hubs' names and
 // this reader's visits. A chunk of its own, asked once the rail shows. The names and visits never wait on the server; a failed read drops
 // every count.
@@ -31,7 +31,7 @@ export interface WorldSignals {
 /** The signals from the server's answer, read at `now`. */
 function fromPresence({ worlds }: Presence, now: number): WorldSignals {
   const universe = universes.find((each) => each.default === true)?.id ?? "";
-  // A station's world stands round the Earth, never in the cloud (Alexis, 2026-11-05): its people count on no world of the rail.
+  // A station's world stands round the Earth, never in the cloud: its people count on no world of the rail.
   const stations = new Set(hubs.filter((hub) => hub.kind === "station").map(({ slug }) => slug));
   const ours = hubs.filter((hub) => hub.universe === universe && !stations.has(hub.slug));
   const bySlug = new Map(ours.map((hub) => [hub.slug, hubWorldOf(hub)]));
@@ -56,7 +56,7 @@ export async function readSignals(): Promise<WorldSignals | undefined> {
   return read.ok ? fromPresence(read.value, Date.now()) : undefined;
 }
 
-/** What the data says of world `id` now: who is here, its rise, its callers, whether it is new to this reader (7h, 7i). A world under seven
+/** What the data says of world `id` now: who is here, its rise, its callers, whether it is new to this reader. A world under seven
  * days old this reader never entered is uncharted. */
 export function signalsOf(
   world: CosmosWorld | undefined,

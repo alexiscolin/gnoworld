@@ -1,4 +1,4 @@
-# The night on GitHub's machines (the harness overhaul, phase 2): what the gate leaves out, whole. It runs on main only (a
+# The night on GitHub's machines: what the gate leaves out, whole. It runs on main only (a
 # schedule runs on the default branch: docs.github.com, events-that-trigger-workflows) or by hand, reads the repository and holds
 # no secret; one job, report, may open an issue, and it runs none of the repository's code. A red night opens or updates one issue,
 # "Nightly red": the next landing should wait for it. scripts/test_hooks.sh, section ci, holds each promise.
@@ -16,9 +16,9 @@ env:
   NODE_OPTIONS: --max-old-space-size=8192 # check.sh's heap, for every node of the night
   GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
   GNOROOT: /home/runner/.cache/gno-toolchain/src
-  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
+  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1
 jobs:
-  # Every journey of the gate's and the old merge list, flights whole, in four shards; no pictures (the pixel specs stay on the Mac).
+  # Every journey, the gate's included, flights whole, in four shards; no pictures (the pixel specs stay on the Mac).
   journeys-all:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -167,7 +167,7 @@ jobs:
         run: cd gno && "$GNO" test ./... && python3 -I ../scripts/mutate.py
 
   # deploy/test.sh --mutants: the stack passes as it is first, then each planted fault must fail its own check (STOP_AT). Its plain
-  # run fails on Linux today (F13163), and stops the mutants: red each night till then.
+  # run fails on Linux, and stops the mutants: red each night until it passes.
   deploy-mutants:
     runs-on: ubuntu-24.04
     timeout-minutes: 355

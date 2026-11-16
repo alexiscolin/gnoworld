@@ -1,5 +1,4 @@
-// What the link sends for the account (slice 4's 4c to 4e, 4d's DM bar and the room's edits), moved out of link.ts for the
-// lint's sizes: its lines to a room or to another account, a correction, a reaction, a delete, its typing; each an account's alone,
+// What the link sends for the account: its lines to a room or to another account, a correction, a reaction, a delete, its typing; each an account's alone,
 // a room's in a room Ergo says it is in. Whether each went.
 import type { Composed, IrcMessage, Reacting } from "@gnoworld/core";
 import { isPublicRoom } from "@gnoworld/core/bubbles";
@@ -35,7 +34,7 @@ export class Speaking {
   readonly #host: Host;
   // The next batch's reference, one a connection's own: letters and digits, as Ergo takes them (irc/utils/args.go).
   #batches = 0;
-  // What the account sent in the last minute, against the server's rates (F2092).
+  // What the account sent in the last minute, against the server's rates.
   readonly #pace = new Pace();
   // The rooms heard closing since the list came, which no new list follows in an open tab.
   readonly #closed = new Set<string>();
@@ -70,12 +69,12 @@ export class Speaking {
     return may;
   };
 
-  /** A live line of Ergo's: a flag that closes a room to a passer-by (3m: +R an account's, +i a member's), alone or among others. */
+  /** A live line of Ergo's: a flag that closes a room to a passer-by (+R an account's, +i a member's), alone or among others. */
   readonly heard = ({ command, params: [room = "", flags = ""] }: IrcMessage): void => {
     if (command === "MODE" && /\+[^-]*[iR]/.test(flags)) this.#closed.add(room);
   };
 
-  /** Why a message of a room is held back for the server's pace, none when it may go (F2092). */
+  /** Why a message of a room is held back for the server's pace, none when it may go. */
   readonly slow = (composed: Composed): string | undefined => {
     const slow = this.#slow(composed);
     return slow === undefined ? undefined : tooFast(slow);
@@ -93,7 +92,7 @@ export class Speaking {
     return this.#pace.slow(Date.now(), messages, lines);
   }
 
-  // The country a new line of `room` shows: the account's own, its time zone's by default (D395), read as it speaks, in a room the list says anyone may read and none
+  // The country a new line of `room` shows: the account's own, its time zone's by default, read as it speaks, in a room the list says anyone may read and none
   // heard closing since. What it says stays out of the rest, and one no of a list that names the room twice is a no (ADR-0001 §7).
   #country(room: string): string | undefined {
     const { key, store } = this.#host;

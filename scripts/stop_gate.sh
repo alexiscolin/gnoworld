@@ -1,14 +1,14 @@
 #!/bin/sh
-# stop_gate.sh: Claude Code's Stop hook, which only reaps since D13173 (its turn's gate and the ping-pong's exception left): it
+# stop_gate.sh: Claude Code's Stop hook, which only reaps: it
 # runs outside the sandbox, so it runs no code a sandboxed command could have written, no gate and no tool of the tree, the system's
 # ps and kill alone; it never blocks a turn.
 set -eu
-# At every turn's end it stops what runs of this project left behind (Alexis, 2026-10-29: StrykerJS workers of a
-# killed run spun for 31 hours, a vitest for 6 days), which the sandbox cannot see: a node process naming a folder
+# At every turn's end it stops what runs of this project left behind (StrykerJS workers of a
+# killed run spin for hours, a vitest for days), which the sandbox cannot see: a node process naming a folder
 # `gnoworld/` whose parent is gone for 30 minutes or more (2 hours while a gate runs; a session's server started a moment
 # ago is spared), or a test tool's, not in a dev or watch mode, 3 hours old or more.
 # TERM, then KILL a second later. It writes nothing the sandbox could have planted a link at: no temporary file, and its
-# log, `<pid> <seconds> <command>` a line, under ~/Library/Logs (security-S1, S3). A cleanup that fails never fails the
+# log, `<pid> <seconds> <command>` a line, under ~/Library/Logs. A cleanup that fails never fails the
 # turn.
 reap() {
 	list=$(ps -Ao pid=,ppid=,etime=,command= | awk -v self=$$ '

@@ -1,4 +1,4 @@
-// What the link makes of Ergo's lines for the notices' slice (slice 4's 4f-n, moved out of link.ts): a notice for each
+// What the link makes of Ergo's lines for into notices: a notice for each
 // line addressed to the account, none for a guest; the notices of a line REDACT takes away or of a room the account is
 // out of; a conversation seen as Ergo's place for it passes. The classifier is core's (roomNotice, dmNotice); this reads
 // what it needs from the store.

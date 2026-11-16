@@ -3,7 +3,7 @@ import { open } from "./chatScreenOpen.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 
-// 5q, item 7 of the chief's comparison: the video's chat text is 13.5 px on 1.45 (prototype index.html:138, 196-200), a
+// The video's chat text is 13.5 px on 1.45 (prototype index.html:138, 196-200), a
 // half point under the design system's body. Measured on what the chat draws, the lines, the pin and the field.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
@@ -25,7 +25,7 @@ test.describe("the chat's text at the video's size", () => {
     await expect(first).toBeVisible();
     expect(await first.locator("[data-line-text]").evaluate((e) => getComputedStyle(e).fontSize)).toBe("15px");
     expect(await of('[role="group"][aria-label="Message box"] [role="textbox"]')).toBe("15px 1.5");
-    // The full chat sets its text a step larger (ChatScreen.module.css's --font-chat-l, Alexis 2026-11-07). The pin is 13 px (prototype index.html:180; frame 66: "Welcome...fine." 289 px wide), a half point under the lines.
+    // The full chat sets its text a step larger (ChatScreen.module.css's --font-chat-l). The pin is 13 px (prototype index.html:180; frame 66: "Welcome...fine." 289 px wide), a half point under the lines.
     expect(await of('section[aria-label="Pinned messages"] button')).toBe("13px 1.45");
   });
 });

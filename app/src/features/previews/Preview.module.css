@@ -1,4 +1,4 @@
-/* A page's capture as a card (8f): on a world's plate, the page small at the start and its words beside it (frame 26); under a chat line,
+/* A page's capture as a card: on a world's plate, the page small at the start and its words beside it (frame 26); under a chat line,
    the page as wide as the line and its words under it (frames 104, 107). The card's button covers the whole card, the page included (ui's
    `covers`); the compositions lay it out. */
 @layer components {

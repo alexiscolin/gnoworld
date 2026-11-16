@@ -1,4 +1,4 @@
-// The server's reads as queries (slice 13): who is here, a world's activity and a world's rooms for a reader. Each on the page's own client
+// The server's reads as queries: who is here, a world's activity and a world's rooms for a reader. Each on the page's own client
 // (lib/api), through the per-host cap.
 import { queryOptions } from "@tanstack/react-query";
 import { pageActivityApi } from "../api/activity.ts";

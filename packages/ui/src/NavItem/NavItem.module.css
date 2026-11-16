@@ -34,7 +34,7 @@
     background: var(--color-fill);
   }
 
-  /* What a later slice brings: greyed, refusing the pointer's promise of an act, no fill under it (as ComingSoon). */
+  /* What is yet to come: greyed, refusing the pointer's promise of an act, no fill under it (as ComingSoon). */
   .item[data-soon] {
     opacity: var(--opacity-disabled);
     background: none;

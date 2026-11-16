@@ -27,7 +27,7 @@ describe("pacer", () => {
     expect(waits).toEqual([250, 250]);
   });
 
-  // 7k3: a pause after each answer made a first pass of onyx-1 13.2 minutes, 1,628 calls at about 233 ms each plus 250 of pause. Here the
+  // A pause after each answer made a first pass of onyx-1 13.2 minutes, 1,628 calls at about 233 ms each plus 250 of pause. Here the
   // wait moves the clock, as time does, and each call takes the time given: the calls start a pause apart, or later after a slow one.
   it("starts the calls a pause apart on its clock: it waits what is left of the pause, and nothing after a call slower than it", async () => {
     const waits: number[] = [];

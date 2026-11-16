@@ -48,7 +48,7 @@ test("no two routes share an id: a file at two paths is told apart", () => {
   expect(new Set(ids).size).toBe(routes.length);
 });
 
-// ADR-0003 §4: a reader is new until they enter a place. The pages that are places keep it, the Earth's, a world's and a realm's view, a
+// A reader is new until they enter a place. The pages that are places keep it, the Earth's, a world's and a realm's view, a
 // world's page for one with no hub; the home and the list are none.
 describe("the places a reader enters", () => {
   test.each([

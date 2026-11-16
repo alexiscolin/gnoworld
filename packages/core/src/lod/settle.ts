@@ -1,4 +1,4 @@
-// Where a view's labels stand on a frame (ADR-0002 §1: labels never overlap; slice 7 §3: off the plate, the rail and each other): beside
+// Where a view's labels stand on a frame (ADR-0002 §1: labels never overlap, off the plate, the rail and each other): beside
 // their bodies as frame 4's stand, a stem from the label to the body's outline, in the slots' order of priority, clear of each other, of the
 // boxes the page keeps and of the bodies' discs. A label keeps its side while it fits, tries the others, and hides where none fits. Depth: a
 // far world's label is smaller and fainter. Plain numbers in typed arrays the caller keeps, for a frame runs it.

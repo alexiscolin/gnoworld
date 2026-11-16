@@ -1,4 +1,4 @@
-// The browser's one way to read the chain (slice 5 part 2, 5g): `fetch` and Zod, nothing else. One GET of an https address,
+// The browser's one way to read the chain: `fetch` and Zod, nothing else. One GET of an https address,
 // its answer read under a time limit and a size cap, then through a schema. A fault is a typed state with its next step, and
 // every result, good or not, names where it was read and when: the page never shows a number without its source.
 // One request a call: no retry, no timer left behind, so nothing polls. Unlike lib/api/http.ts it caps the answer's size.

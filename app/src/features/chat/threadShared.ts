@@ -5,7 +5,7 @@ import type { RoomActs } from "./roomActs.ts";
 import type { Shown } from "./shown.tsx";
 
 // A thread open: its conversation and the line that opened it, which the focus goes back to. Its root is read from
-// the lines each time they change: a chain grows while its panel is open (CR9).
+// the lines each time they change: a chain grows while its panel is open.
 export interface Open {
   key: string;
   from: string;
@@ -30,6 +30,5 @@ export interface Page {
 }
 
 // The words typed in each thread's field and not sent, by account and the line that opened it (a root changes as its
-// chain grows, R3): the page's memory, kept on no device, so a close, a room or another thread keeps them (CR1), and a
-// logout clears them (R1).
+// chain grows): the page's memory, kept on no device, so a close, a room or another thread keeps them, and a logout clears them.
 export type Typed = Map<string, string>;

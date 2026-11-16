@@ -1,4 +1,4 @@
-// The chat's recent searches on the device (slice 13, C): the last few words typed, newest first, in one key of the page's storage.
+// The chat's recent searches on the device: the last few words typed, newest first, in one key of the page's storage.
 // What the device gives back is checked: a word the search would refuse is dropped and the others kept; a device that refuses keeps nothing.
 import { SEARCH_Q_MAX, SEARCH_Q_MIN } from "@gnoworld/schemas";
 import { jsonOf } from "@gnoworld/core";

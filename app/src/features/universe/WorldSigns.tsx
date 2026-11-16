@@ -1,11 +1,10 @@
-// The bubbles over a world that is not the Earth (D565): the rooms its page follows, each speaker on a spot of their own (spot.ts). The code of the
+// The bubbles over a world that is not the Earth: the rooms its page follows, each speaker on a spot of their own (spot.ts). The code of the
 // Earth's signs, which they are, comes in its own chunk once the page has one to show.
 import { lazy, Suspense } from "react";
 import { useNavigate } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
 
-// Asked as this module runs, not as the first render does: the plate's chunk, asked at the page's load, would hold the signs' code behind it
-// (the chat's budget counted it then, as the page's first screen no longer held it).
+// Asked as this module runs, not as the first render does: the plate's chunk, asked at the page's load, would hold the signs' code behind it.
 const earth = import("../../EarthSigns.tsx").then(
   (signs) => ({ signs }),
   (cause: unknown) => ({ cause }),

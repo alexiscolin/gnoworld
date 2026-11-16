@@ -1,4 +1,4 @@
-// What the composer's field says of a draft (moved out of Composer.tsx, which grew past the lint's size): why it cannot
+// What the composer's field says of a draft: why it cannot
 // go, what Tab completes, and the bytes left near the end.
 import { markdown, mentionsRoom, MULTILINE_BYTES, MULTILINE_LINES, type Composed } from "@gnoworld/core";
 import type { FieldProps } from "@gnoworld/ui";
@@ -9,7 +9,7 @@ export const NEAR = 50;
 
 const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "bytes"}`;
 
-/** What the field says as @room stands in the draft: whether it notifies in this room (4f-n, decisions 2026-10-27, N3). */
+/** What the field says as @room stands in the draft: whether it notifies in this room. */
 export const ROOM_NOTIFIES = "@room notifies the members who keep notifications on for this room.";
 export const ROOM_SILENT = "@room notifies no one in this room: it counts only in announcement and members rooms.";
 
@@ -47,7 +47,6 @@ function refusal(composed: Composed, multiline: boolean | undefined): string | u
 export interface Context {
   nick?: string;
   draft?: string;
-  /** What Tab completes the word being typed to. */
   /** Whether the connection sends a message of several lines whole (draft/multiline); else each line goes alone. */
   multiline?: boolean | undefined;
 }
@@ -58,11 +57,11 @@ const tooMany = (composed: Composed, multiline: boolean | undefined): number =>
   multiline === false && composed.kind === "lines" ? composed.lines.length - ALONE_LINES : 0;
 
 /** An edit that composes to an action is refused, said in the field: Save would turn the message into one that nothing can
- * turn back, as Edit is for messages alone (CR4 of the room edit). */
+ * turn back, as Edit is for messages alone. */
 export const editRefusal = (composed: Composed, editing: boolean): Pick<FieldProps, "error"> =>
   editing && composed.kind === "line" && composed.action ? { error: "An edit cannot be an action." } : {};
 
-/** Whether the draft may go: a line or a message of lines, not past what the connection sends (F1719). */
+/** Whether the draft may go: a line or a message of lines, not past what the connection sends. */
 export const sendable = (
   composed: Composed,
   multiline: boolean | undefined,
@@ -70,7 +69,7 @@ export const sendable = (
   (composed.kind === "line" || composed.kind === "lines") && tooMany(composed, multiline) <= 0;
 
 // The bytes left once few: a message of lines counts its tightest line's budget, about 440, when that is less than the
-// message's 4096, and names the line (F1720).
+// message's 4096, and names the line.
 function nearEnd(composed: Composed, { nick }: Context): string | undefined {
   if (!("left" in composed)) return undefined;
   const tight = composed.kind === "lines" && nick !== undefined ? composed.tightest : undefined;
@@ -80,7 +79,7 @@ function nearEnd(composed: Composed, { nick }: Context): string | undefined {
   return line === undefined ? `${bytes(left)} left.` : `Line ${String(line.line)}: ${bytes(left)} left.`;
 }
 
-// An action is one line: a break in the draft after /me is a space in what goes (F1718).
+// An action is one line: a break in the draft after /me is a space in what goes.
 const actionOnly = (composed: Composed, { draft = "" }: Context): string | undefined =>
   composed.kind === "line" && composed.action && /[\r\n]/u.test(draft.trim())
     ? "An action is one line: its line breaks become spaces."

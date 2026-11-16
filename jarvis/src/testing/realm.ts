@@ -1,4 +1,4 @@
-// A realm's write function as gno's `vm/qfuncs` writes it (D70): its first parameter's type is the realm type's base,
+// A realm's write function as gno's `vm/qfuncs` writes it: its first parameter's type is the realm type's base,
 // printed at gno's tag chain/onyx. The cards' tests and the entry's share it.
 export const REALM_TYPE = [
   "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool;",

@@ -1,4 +1,4 @@
-// The first signals' places on a world's page (slice 9h, frames 90 to 97): the arrival banners, mounted as one element, and
+// The first signals' places on a world's page (frames 90 to 97): the arrival banners, mounted as one element, and
 // the plate's "First charted by", at the end of the description. The banners' chunk is asked once a person is logged in (who
 // charts on arrival), the plate's small one once the stream has told a signal: a page without either draws nothing and asks
 // for nothing more, and this file is all a world's first screen carries of them (budgets.spec.ts).

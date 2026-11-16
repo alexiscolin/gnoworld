@@ -1,4 +1,4 @@
-// A token world's holders and supply (slice 13): what the server replays from grc20's own events and serves at GET /api/tokens/<hash of the
+// A token world's holders and supply: what the server replays from grc20's own events and serves at GET /api/tokens/<hash of the
 // realm's path>. The events are the indexer's, written by whoever deployed a realm: each is checked here, one at a time, so a hostile one
 // costs itself alone. Amounts are decimal text (an int64 on the chain, past a JS number); a fact not read is absent, never a zero.
 import { Day } from "./day.ts";

@@ -1,4 +1,4 @@
-// The chain-read package (D112): the boundary every chain read crosses, for the app, the server and Jarvis. It imports core,
+// The chain-read package: the boundary every chain read crosses, for the app, the server and Jarvis. It imports core,
 // Zod and the schemas alone, never a workspace that imports it nor the service package, tests included; its code runs in the
 // browser too, so no React, design system, store or Node module, and console nowhere. A part of the lint config, which
 // eslint.config.ts composes; gnoworld.config.ts holds the rule that keeps a read's words in it.

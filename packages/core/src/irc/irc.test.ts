@@ -1,4 +1,4 @@
-// The contract of core/irc, written for the pairing; the code is Claude's (docs/decisions.md, 2026-10-22).
+// The contract of core/irc, written for the pairing.
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import {
@@ -375,7 +375,7 @@ describe("formatLine", () => {
   });
 });
 
-// F667 and F669, decided by Alexis on 2026-10-23 (docs/decisions.md); written first, the code after.
+// Spaces before the command count in the body; an empty source is its own error.
 describe("parseLine counts a line whole, the spaces before its command too (F667)", () => {
   const body = (bytes: number) => "PRIVMSG #gno :" + "a".repeat(bytes - 14);
   test("refuses a tagless line led by a million spaces", () => {
@@ -397,7 +397,7 @@ describe("parseLine counts a line whole, the spaces before its command too (F667
   test("refuses tags, two spaces and a body of 510: the second space makes 511", () => {
     expect(parseLine("@a=b  " + body(510))).toStrictEqual({ ok: false, error: "body-too-long" });
   });
-  // The side a fix must keep, passing today: 510 in all, spaces included, and CR LF never counted.
+  // The side that must hold: 510 in all, spaces included, and CR LF never counted.
   test.each([
     ["one space and a body of 509", " " + body(509)],
     ["two spaces and a body of 508", "  " + body(508)],
@@ -423,7 +423,7 @@ describe("parseLine refuses an empty source, as formatLine does (F669)", () => {
   test("and a colon at the end of a line, with nothing after", () => {
     expect(parseLine(":")).toStrictEqual({ ok: false, error: "empty-source" });
   });
-  // A tab is part of the word: the source is "\tNICK", a line a fix must not refuse (passing today).
+  // A tab is part of the word: the source is "\tNICK", a line to accept.
   test("still takes a source that starts with a tab", () => {
     expect(parseLine(":\tNICK x").ok).toBe(true);
   });

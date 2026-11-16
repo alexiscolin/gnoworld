@@ -1,4 +1,4 @@
-// A line's addresses (slice 4's 4c): where an https address starting at a place ends, as a link's or a bare one.
+// A line's addresses: where an https address starting at a place ends, as a link's or a bare one.
 // Nothing else is an address: a host of ASCII letters, digits, dots and hyphens (no look-alike letter), no user
 // before an `@`, and no space, quote, angle, backslash, backtick, control or format character anywhere. Each
 // answer costs the address's host, the rest read once a line, so a line of addresses reads in linear time.
@@ -6,7 +6,7 @@ import { before } from "./scan.ts";
 
 // A bare address's closing punctuation, left out of it; a `)` too when the address does not open it.
 const TRAIL = /[.,:;!?*_~']/;
-// Inside an underline, its `+` closes an address too: elsewhere a `+` is the address's own, as GFM reads it (8k).
+// Inside an underline, its `+` closes an address too: elsewhere a `+` is the address's own, as GFM reads it.
 const closing = (char: string, underline: Underline) => TRAIL.test(char) || (underline !== undefined && char === "+");
 // What may come before a bare address: a line's start, a space, a mark's opening or a `(` (GFM's rule).
 const WORD_START = /[\s*_~(]/u;
@@ -15,7 +15,7 @@ const ENDS = /[\s<]/u;
 // What opens an address's path, after its host.
 const PATH = /[/?#]/;
 
-/** Where `https://host[:port]` starting at `at` ends, or -1; a port from 1 to 65535, or none a browser opens (F785). */
+/** Where `https://host[:port]` starting at `at` ends, or -1; a port from 1 to 65535, or none a browser opens. */
 function authority(source: string, at: number): number {
   if (!source.startsWith("https://", at)) return -1;
   const host = /[A-Za-z0-9][A-Za-z0-9.-]*(?::(\d{1,5})(?!\d))?/y;
@@ -52,7 +52,7 @@ function parens(source: string): Int32Array {
 
 const count = (source: string, char: string): number => source.split(char).length - 1;
 
-/** Where the line's reader is as to an underline (8k): just after the run that opened one (`opened`), whose `+` may come
+/** Where the line's reader is as to an underline: just after the run that opened one (`opened`), whose `+` may come
  * before an address as a word's start does; in one (`open`), whose `+` ends an address; or in none. */
 export type Underline = "opened" | "open" | undefined;
 

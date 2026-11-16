@@ -1,4 +1,4 @@
-// What a world's people and pace count (D353, D374, D430): the accounts the reconciler found and the streams open, the guests apart.
+// What a world's people and pace count: the accounts the reconciler found and the streams open, the guests apart.
 import { GUEST_PREFIX } from "@gnoworld/core";
 import type { PresencePeople } from "@gnoworld/schemas/indexer";
 import { NICK } from "../irc/lines.ts";
@@ -10,11 +10,11 @@ export const hourOf = (rates: Rates, names: readonly string[], at: number): numb
   [...rates(names, at).values()].reduce((sum, rate) => sum + rate, 0) * 60;
 
 /** Not the bot, not a relayed guest (no connection can take a nick with the relay's separator), not a reading guest: Ergo names
- * a connection with no account Guest-<nick>, and it counts through its stream alone (D352, D374). `nick` is lower case. */
+ * a connection with no account Guest-<nick>, and it counts through its stream alone. `nick` is lower case. */
 export const isPerson = (nick: string): boolean =>
   nick !== NICK && !nick.startsWith(GUEST_PREFIX) && !nick.startsWith("guest-");
 
-// What the answer serves of a world (D374): its accounts once, the relay's and the streams', plus its guests.
+// What the answer serves of a world: its accounts once, the relay's and the streams', plus its guests.
 export const shownOf = (
   nicks: ReadonlySet<string> | undefined,
   open: { guests: number; accounts: Iterable<string> } | undefined,
@@ -32,7 +32,7 @@ export function peopleOf(
 }
 
 // The lines a pace says in the five minutes it is read over (activity.ts): its hour over twelve, added to the hour of each sample, the
-// plate's hours (8g); the sample at the stop adds none, its five minutes overlapping the last one's.
+// plate's hours; the sample at the stop adds none, its five minutes overlapping the last one's.
 export const linesOf = (perHour: number): number => Math.round(perHour / 12);
 
 // Each world with its people and its messages an hour, the worlds none of whose rooms was read left out.

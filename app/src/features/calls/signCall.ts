@@ -1,4 +1,4 @@
-// The call card's course (9d): the preview's texts become the one request, Adena signs it, and the hash is followed to its block
+// The call card's course: the preview's texts become the one request, Adena signs it, and the hash is followed to its block
 // on the universe's own node. The card is done only from the chain's answer, its height and its value or its error log, never
 // from Adena's word. Its parts come in, so a test gives its own and the page gives the real ones.
 import type { Landed } from "@gnoworld/chain/tx";
@@ -18,7 +18,7 @@ export interface SignDeps {
   /** One read of the transaction, on the universe's node. */
   read: (hash: string) => Promise<ChainRead<Landed>>;
   wait: (ms: number) => Promise<void>;
-  /** Starts following Adena's account (F5651): the first gesture of a card loads it. */
+  /** Starts following Adena's account: the first gesture of a card loads it. */
   watch: (adena: unknown) => unknown;
   /** The clock in ms; the time of the reads counts in the bound. */
   now?: () => number;
@@ -65,7 +65,7 @@ async function follow(id: string, { hash, adena }: Sent, deps: Course): Promise<
       }
       return;
     }
-    // A final answer is said with its own sentence; only a wait that ran out says the wait (F5725).
+    // A final answer is said with its own sentence; only a wait that ran out says the wait.
     if (!AGAIN.includes(landed.failure.kind)) {
       failed(id, { reason: "unseen", hash, log: landed.failure.next, adena });
       return;
@@ -77,12 +77,12 @@ async function follow(id: string, { hash, adena }: Sent, deps: Course): Promise<
 }
 
 // Adena's answer to the card's call: a hash is followed to its block, a failure without one is the card's state. A call that may
-// have been sent, with a hash, is followed as a sent one: the chain says what became of it (F5728).
+// have been sent, with a hash, is followed as a sent one: the chain says what became of it.
 async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>, deps: Course): Promise<void> {
   const { landing, failed } = actionsOf(deps);
   const hash = signed.ok || signed.reason === "maybe-sent" ? signed.hash : undefined;
   if (hash !== undefined) {
-    // Adena's log of a call it named a hash for and said failed (the node refused the broadcast, F5749): the card says it.
+    // Adena's log of a call it named a hash for and said failed (the node refused the broadcast): the card says it.
     const adena = signed.ok || signed.log === undefined ? undefined : signed.log;
     landing(id, hash, adena);
     await follow(id, { hash, adena }, deps);

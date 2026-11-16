@@ -98,7 +98,7 @@ describe("a postcard's worlds", () => {
     for (const { orbit, radius } of worlds) expect(orbit + radius).toBeLessThanOrEqual(CELL / 2);
   });
 
-  // 7d6's design review: a world of one sat on its star, its edge 12 px from the star's white heart (f0004's stand 50 to 73 px from theirs).
+  // A world of one does not sit on its star, its edge 12 px from the star's white heart (f0004's stand 50 to 73 px from theirs).
   it("keeps each world off its star: its centre three of its radii from the star, or as far as its cell lets it", () => {
     const large = postcardWorlds(systemOf([[1.5, 1.2, 0.4]]));
     expect(large).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("a postcard's worlds", () => {
     }
   });
 
-  // 7d3, no debris near a planet: widened past it, a world would stand in its system's far belt, among the rocks.
+  // No debris near a planet: widened past it, a world would stand in its system's far belt, among the rocks.
   it("keeps a belted system's worlds inside the belt's inner edge, off their star as far as that leaves them", () => {
     const [one, three] = [
       systemOf([[1.5, 1.2, 0.4]]),
@@ -137,7 +137,7 @@ describe("a postcard's worlds", () => {
     }
   });
 
-  // 7d6's review (lots 3 and 4): the 15% rule and the twelve largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
+  // The 15% rule and the twelve largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
   // is (each off its star, the nearest two 3 apart), so two at `arc` apart leave a gap of `6·sin(arc/2) − 0.6` between them.
   const arcFor = (gap: number) => 2 * Math.asin((gap + 0.6) / 6);
   const onOrbit = (phases: readonly number[]) => systemOf(phases.map((phase) => [0.3, 3, phase]));
@@ -193,9 +193,9 @@ describe("a postcard's worlds at a count", () => {
   });
 });
 
-// 7d3's review: a postcard's specks stand at their own orbits while its bodies are widened; none within a body's width of its ground, half a
-// unit at the least (Alexis's pebbles, 2026-11-03), and no grain on a body's path, its drawn width each side of its orbit ("Poussière fine",
-// F3594). A system turns as one, so what stands clear at rest stays clear.
+// A postcard's specks stand at their own orbits while its bodies are widened; none within a body's width of its ground, half a
+// unit at the least, and no grain on a body's path, its drawn width each side of its orbit
+// A system turns as one, so what stands clear at rest stays clear.
 describe("a postcard's specks", () => {
   const clearOf = ({ radius }: Orbiter) => Math.max(0.5, radius);
   // A grain, a real world too small for a body: a world of a body's size the postcard does not draw is no pebble.
@@ -276,7 +276,7 @@ describe("a postcard's plane", () => {
   });
 });
 
-// Alexis, 2026-11-03, option B (part 7p): a postcard reads in depth by its worlds' drawn sizes, its plane turned about the eye's line, as open
+// A postcard reads in depth by its worlds' drawn sizes, its plane turned about the eye's line, as open
 // as it was, till no two neighbours stand at one height. Measured here on the video's screen, through the home's lens.
 describe("a postcard in depth", () => {
   const screen = REST_SCREENS[0];
@@ -338,7 +338,7 @@ describe("a postcard in depth", () => {
     expect(levelled.worlds).toEqual(postcardWorlds(system));
   });
 
-  // The review of 7p (R1): as the eye leaves the rest the drawing eases back to the system's own, so no body jumps where the ladder takes
+  // As the eye leaves the rest the drawing eases back to the system's own, so no body jumps where the ladder takes
   // over: its plane's normal and each world's share, the given part of the way.
   it("eases a postcard back to its system's own plane and sizes: none of the way, halfway, all the way", () => {
     const system = systemOf([

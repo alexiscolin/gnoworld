@@ -17,7 +17,6 @@ const COUNTS_LEFT = 48;
 /** How much of the globe's room must be on screen for its signs to mean anything. */
 const IN_SIGHT = 0.6;
 
-// The right edge a bubble keeps: the ring's, where the dock begins, or the window's.
 // The edge a page's bubble must stand left of to be read: the dock's, else the window's.
 const keepOf = () => document.querySelector("[data-dock]")?.getBoundingClientRect().left ?? innerWidth;
 
@@ -90,7 +89,7 @@ function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, k
     from,
     aim,
     sent: element.dataset["said"] === undefined ? undefined : Number(element.dataset["said"]),
-    // The ping stands still till the arrival has calmed (D13001; EarthSigns.module.css).
+    // The ping stands still till the arrival has calmed (EarthSigns.module.css).
     calm: () => {
       calmed(element);
     },
@@ -116,16 +115,16 @@ function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, k
 }
 
 /** Where the bubbles stand: the right edge they keep, and the share of their size they are drawn at (a small view's, EarthSigns.tsx). */
-export interface Fit {
+interface Fit {
   readonly reach: number;
   readonly scale: number;
   /** The highest a bubble stands: none in the page, the small view's top edge. */
   readonly floor: number;
-  /** The page's x a bubble must stand left of to be read, which turns the Earth (D488); none in a small view. */
+  /** The page's x a bubble must stand left of to be read, which turns the Earth; none in a small view. */
   readonly keep?: number | undefined;
-  /** Where a bubble's country is brought to: a point of the free area, as the frames keep it (D13916); none in a small view. */
+  /** Where a bubble's country is brought to: a point of the free area, as the frames keep it; none in a small view. */
   readonly aim?: { readonly x: number; readonly y: number } | undefined;
-  /** A world's: the plate's right edge and the header's foot, which its bubbles keep clear of (D565); none on the Earth, whose do not. */
+  /** A world's: the plate's right edge and the header's foot, which its bubbles keep clear of; none on the Earth, whose do not. */
   readonly from?: { readonly x: number; readonly y: number } | undefined;
 }
 

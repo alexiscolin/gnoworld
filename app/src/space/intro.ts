@@ -1,4 +1,4 @@
-// The galaxy's arrival (Alexis, 2026-11-10, option F): once per visit, when the view first stands from its URL. The camera leans in from the
+// The galaxy's arrival: once per visit, when the view first stands from its URL. The camera leans in from the
 // disc's rim over INTRO.total seconds; the seven heaviest systems light first, the others from the core outward; each world fades and grows
 // over INTRO.each seconds on the GPU (uIntro, aDelay), its name following it. It starts as the scene comes in from black (one clock).
 import { DISC, type Universe } from "./layout.ts";

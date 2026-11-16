@@ -3,7 +3,7 @@ import { logIn } from "./irc.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { accountPill, connectButton, logOutHere, phoneWith } from "./account.ts";
 
-// The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
+// The login, end to end: the page, a stand-in for Adena (adena.ts), the static host and the real
 // server behind its /api.
 
 test.describe("the login with Adena", () => {
@@ -112,7 +112,7 @@ test.describe("on a phone", () => {
   });
 });
 
-// 8p's red pass (medium): the way out moved into the account's menu, which a phone given a computer's session must still reach.
+// The way out is in the account's menu, which a phone given a computer's session must still reach.
 test("logs out of a phone through the account's menu, the session handed from a computer", async ({
   page,
   playwright,
@@ -133,7 +133,7 @@ test("logs out of a phone through the account's menu, the session handed from a 
 
 test.describe("Adena's code", () => {
   // Adena's calls (connect, sign) are the login's click's: a page that never logs in does not load them, and the click
-  // asks for them (docs/decisions.md, 2026-10-28).
+  // asks for them.
   const ADENA_CALLS = "SIGN_ARBITRARY";
 
   test("comes with the click that logs in, not with the page", async ({ page }) => {

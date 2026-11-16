@@ -1,8 +1,7 @@
-// Grounding (backlog row 10: "every number, link and function in a digest traces to its source"; ADR-0002 §4, "Grounded";
-// §5, point 4): every link, number and account a digest or an answer's button states, and every word of a form's
+// Grounding (ADR-0002 §4, "Grounded"; §5, point 4): every link, number and account a digest or an answer's button states, and every word of a form's
 // arguments, is in the sources the server read, by string match against sets of their facts built once, so n characters
 // stated against m read cost O(n + m); each form proposes a call of the realm read that proposed.ts's check passes. Only
-// the chain's node and indexer state a fact; the asker's words may fill a form's arguments; gnoscope's ground nothing (D107).
+// the chain's node and indexer state a fact; the asker's words may fill a form's arguments; gnoscope's ground nothing.
 import { AnswerButton, Digest } from "@gnoworld/schemas";
 import type { FunctionList } from "@gnoworld/schemas/functions";
 import { coreOf, digestFacts, sourceFactsOf, type DigestFacts, type SourceFacts } from "./facts.ts";
@@ -60,8 +59,8 @@ interface Missing {
 
 /** Why nothing is shown: what was given is none (`shape`), states nothing checkable (`nothing`), or states what is missing. */
 type Ungrounded = { ok: false; reason: "shape" | "nothing" } | { ok: false; reason: "missing"; missing: Missing[] };
-export type GroundedDigest = { ok: true; digest: Digest } | Ungrounded;
-export type GroundedButton = { ok: true; button: AnswerButton } | Ungrounded;
+type GroundedDigest = { ok: true; digest: Digest } | Ungrounded;
+type GroundedButton = { ok: true; button: AnswerButton } | Ungrounded;
 
 const states = (stated: DigestFacts): boolean =>
   stated.room || stated.links.size + stated.numbers.size + stated.addresses.size + stated.actions.length > 0;

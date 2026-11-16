@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DraftStorage } from "./drafts/drafts.ts";
 import { keepCountry, keptCountry, shownCountry, zoneCountry } from "./country.ts";
 
-// 7j: the country an account declares (ADR-0001 §7): opt-in, on the device, a country or nothing. What the device gives back goes into a
+// The country an account declares (ADR-0001 §7): opt-in, on the device, a country or nothing. What the device gives back goes into a
 // line of the chat, so it is checked as what it is: outside data.
 const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");

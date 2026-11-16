@@ -378,7 +378,7 @@ describe("archiving a room", () => {
   });
 });
 
-// D394: on the Earth a signed-in account makes a room: 3 a day, its name checked as a message is, never a guest.
+// On the Earth a signed-in account makes a room: 3 a day, its name checked as a message is, never a guest.
 describe("archiving a realm's room", () => {
   it("refuses a moderator of the hub and the team alike to archive a room made for a realm: it keeps +M, never +m +s", async () => {
     const { rooms, sent, archive } = setup();

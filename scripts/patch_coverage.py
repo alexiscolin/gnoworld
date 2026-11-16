@@ -32,13 +32,13 @@ total = run = 0
 # Tests and configs are never measured (Storybook's config and the tests' setup are of those); nor
 # what vitest.config.ts leaves out of coverage: the app's document shell and server entry, which only
 # the build renders, and Storybook's pages, whose handlers do nothing; the Playwright journeys walk
-# them (docs/decisions.md, F247); the server's and jarvis's entries, run in child processes by their
+# them; the server's and jarvis's entries, run in child processes by their
 # main.test.ts; and evals/, installed apart, whose own Node tests run in evals/run.sh. Matched inside
-# the repository only (F098).
+# the repository only.
 UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|(^|/)\.storybook/|(^|/)testSetup\.ts$|^packages/ui/src/.*\.stories\.tsx$|^packages/ui/src/Overview/Overview\.tsx$|^app/src/(root|entry\.server)\.tsx$|^(server|jarvis)/src/main\.ts$|^evals/"
-# The default coverage measures tier 1 alone (the speed plan, 2026-11-06): a file outside it is refused only when docs/REVIEW.md's
-# tier 1 holds it, the table read from this script's own tree (the base's on GitHub), none read making every file tier 1 (F13179).
-# COVERAGE_ALL (check.sh --everything) measures every source file: any one missing is refused.
+# The default coverage measures tier 1 alone: a file outside it is refused only when docs/REVIEW.md's
+# tier 1 holds it, the table read from this script's own tree (the base's on GitHub), none read making every file tier 1.
+# COVERAGE_ALL measures every source file: any one missing is refused.
 every = bool(os.environ.get("COVERAGE_ALL"))
 try:
     security = [folded(p) for p in rows(str(pathlib.Path(__file__).resolve().parent.parent))["1"]]

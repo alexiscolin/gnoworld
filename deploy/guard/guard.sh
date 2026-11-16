@@ -1,15 +1,17 @@
 #!/bin/sh
-# The demo's only way out (docs/decisions.md, 2026-10-18). This container holds the network that
-# Tailscale shares, and loads its rules before anything else runs there: web's port, on web alone; the
-# way out's replies to the internal network, to connections it accepted (slice 3: smokescreen listens
-# here on 4750, and only that network may reach it); the DNS servers Docker forwards to from this
-# network; then every private, local, carrier and reserved address refused, so the host, its LAN and
-# any tailnet stay out of reach; then public TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is
-# closed. jarvis's way out listens here too, on 4751, reached from jarvis's own network alone, which gets nothing
-# else in and nothing out but its replies (10j), and its reader's, on 4753, the same for the reader's network
-# (10u-g2), and the link reader's, on 4754, the same for the link reader's network (slice 13). deploy/test.sh proves each line.
+# The only way out. This container holds the network the egress proxies share, and loads its rules before anything
+# else runs there: each proxy's port, open from its own network alone (smokescreen listens here on 4750 for the
+# internal network, 4751 for jarvis's, 4753 for the reader's, 4754 for the link reader's). In: each proxy's port is refused
+# from every other interface, and jarvis's, the reader's and the link reader's networks get nothing else in; the internal
+# network and the outside bridge are not walled, INPUT's policy being ACCEPT, so any other port the guard held a listener
+# on would be open to them (none is). Out, from each proxy's port: replies to connections it opened, nothing else. The DNS servers
+# Docker forwards to from this network; then
+# every private, local, carrier and reserved address refused, so the host, its LAN and any VPN stay out of reach; then
+# public TCP 80 and 443, and nothing else: no UDP, no other port. Nothing in this network starts a connection to web
+# or to any container of the stack. IPv6 is closed. deploy/test.sh proves each line.
 set -eu
 
+# The internal network is the one web is on: its interface is the route to web's address.
 web=$(getent hosts web | awk '{ print $1 }')
 inside=$(ip route get "$web" | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
 if [ -z "$web" ] || [ -z "$inside" ]; then
@@ -61,7 +63,6 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 	echo "-A INPUT -i $links_out -j REJECT"
 	echo '-A INPUT -p tcp --dport 4754 -j REJECT'
 	echo '-A OUTPUT -o lo -j ACCEPT'
-	echo "-A OUTPUT -o $inside -d $web -p tcp --dport 8080 -j ACCEPT"
 	echo "-A OUTPUT -o $inside -p tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	echo "-A OUTPUT -o $jarvis_out -p tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	echo "-A OUTPUT -o $reader_out -p tcp --sport 4753 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
@@ -75,7 +76,6 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 		echo "-A OUTPUT -d $range -j REJECT"
 	done
 	echo '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
-	echo '-A OUTPUT -p udp -j ACCEPT'
 	echo 'COMMIT'
 } | iptables-nft-restore
 

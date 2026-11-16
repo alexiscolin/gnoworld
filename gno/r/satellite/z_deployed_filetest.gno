@@ -8,7 +8,7 @@ import (
 	"gno.land/r/gnoworld/satellite"
 )
 
-// The realm as deployed (D3, D14): renting paused at 2,000,000 ugnot a day,
+// The realm as deployed: renting paused at 2,000,000 ugnot a day,
 // its deployer the owner, no operator. gno test deploys an imported realm
 // from the empty address, which no test can call from: this file is the only
 // test that sees init's state, and nothing here can unpause it.

@@ -1,7 +1,6 @@
 // An eval run's recorded node and spans' receiver, on loopback servers (provider.ts): a realm by its universe and
 // path, at the height its case recorded, to jarvis's reads and to gnomcp's; jarvis's span batches, JSON alone. Each
-// answers a request naming its own loopback Host alone, as a page another site's DNS steers here names another (10j's
-// review, S6).
+// answers a request naming its own loopback Host alone, as a page another site's DNS steers here names another.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import { bodyOf, onLoopback } from "../jarvis/src/testing/loopback.ts";

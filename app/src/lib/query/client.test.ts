@@ -3,7 +3,7 @@ import { focusManager, onlineManager, QueryObserver } from "@tanstack/react-quer
 import { FRESH_MS, makeQueryClient, quietUnread, Unread } from "./client.ts";
 import { keys, invalidateRealm } from "./keys.ts";
 
-// The app's reads through one query client (slice 13, D13973): a held answer, one fresh read past fifteen seconds and none before, a failed read
+// The app's reads through one query client: a held answer, one fresh read past fifteen seconds and none before, a failed read
 // that keeps the last good data and is not kept itself, an abort that is kept for no one, the chain in every key, a signed call that invalidates.
 const RPC = "https://rpc.example";
 const REALM = "gno.land/r/a/b";

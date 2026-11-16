@@ -1,7 +1,7 @@
-// A room (slice 4's 4b): its newest lines as the store holds them
+// A room: its newest lines as the store holds them
 // (the window), held at the newest while the reader is there, who is here, and the state of the link. A line's
-// text is Markdown (4c), built into elements from an allowlist (Message.tsx); one that mentions the reader says so
-// (4d); the composer, given, goes below.
+// text is Markdown, built into elements from an allowlist (Message.tsx); one that mentions the reader says so;
+// the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import type { Line, Reacting, Reaction, Typing } from "@gnoworld/core";
@@ -17,10 +17,9 @@ import { chunked } from "./Failing.tsx";
 import { NO_ROOM_YET } from "./loginWords.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
-// WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
-// 2026-10-26). One boundary for every feature of a line.
+// WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12). One boundary for every feature of a line.
 const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
-// The room's pins above its lines come from the server after the page is drawn, and show once there is one (4d).
+// The room's pins above its lines come from the server after the page is drawn, and show once there is one.
 const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
 // Who is typing is asked once someone is: a room where nobody types draws only its one empty line, kept so the composer never
 // moves, and the first screen does not carry the names' code (ADR-0001 §12).
@@ -77,25 +76,25 @@ const NOTICES: Record<Exclude<ErgoState | "off", "connected">, string> = {
 };
 
 export interface RoomViewProps {
-  /** The room whose lines are in view: its lines have bars (4c); none for a direct message's (4e). */
+  /** The room whose lines are in view: its lines have bars; none for a direct message's. */
   room?: string | undefined;
-  /** The partner of the direct message in view: its lines have bars too (4d's DM bar), with no link and no player. */
+  /** The partner of the direct message in view: its lines have bars too, with no link and no player. */
   partner?: string | undefined;
   state:
     | {
         lines: readonly Line[];
         members: readonly string[];
-        /** The msgid of a line Ergo refused to delete (4c). */
+        /** The msgid of a line Ergo refused to delete. */
         refused?: string | undefined;
-        /** Who is typing, each nick with the time its typing ends (4f). */
+        /** Who is typing, each nick with the time its typing ends. */
         typing?: Typing;
-        /** The time of the last line the account read here, Ergo's (4f). */
+        /** The time of the last line the account read here, Ergo's. */
         read?: string | undefined;
-        /** This connection's history page came (4f's G1, CR3). */
+        /** This connection's history page came. */
         paged?: true | undefined;
-        /** Its reactions (4d). */
+        /** Its reactions. */
         reactions?: readonly Reaction[] | undefined;
-        /** Ergo refused one of the page's reactions here (4d). */
+        /** Ergo refused one of the page's reactions here. */
         cannotReact?: true | undefined;
       }
     | undefined;
@@ -104,27 +103,27 @@ export interface RoomViewProps {
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
-  /** Deletes a line, the reader's own (4c's message menu); whether it went out. */
+  /** Deletes a line, the reader's own (the message menu); whether it went out. */
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss: () => void;
-  /** The room read to its newest line, as the reader reaches it (4f). */
+  /** The room read to its newest line, as the reader reaches it. */
   onRead?: ((id: string) => void) | undefined;
-  /** What it says while it holds no line, once connected: a conversation's own words (4e). */
+  /** What it says while it holds no line, once connected: a conversation's own words. */
   empty?: string | undefined;
-  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  /** The room's lines' verdicts, by msgid, from the server's stream. */
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
-  /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked. */
   saving?: boolean;
-  /** What the reader keeps in this room and offers of it: none for a direct message's, which has none (4d). */
+  /** What the reader keeps in this room and offers of it: none for a direct message's, which has none. */
   keeping?: RoomKeeping | undefined;
-  /** The room's pins, above its lines; none when it holds none (4d). */
+  /** The room's pins, above its lines; none when it holds none. */
   pins?: RoomPins | undefined;
-  /** Reacts to a line, or takes the reaction back (4d's reactions); whether it went out. */
+  /** Reacts to a line, or takes the reaction back; whether it went out. */
   onReact?: ((reaction: Reacting) => boolean) | undefined;
-  /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
+  /** Makes a line, by its msgid, the one the composer's next answers. */
   onReply?: ((id: string) => void) | undefined;
-  /** Opens a line's thread, by the msgid of its root (4d's threads); none for a direct message's lines. */
+  /** Opens a line's thread, by the msgid of its root; none for a direct message's lines. */
   onThread?: ((id: string) => void) | undefined;
   /** Puts a line's words in the composer to correct them, the reader's own (a direct message's). */
   onEdit?: ((id: string) => void) | undefined;
@@ -178,7 +177,7 @@ export function RoomView(props: RoomViewProps) {
         onEdit={onEdit}
       />
       {connected && lines.length === 0 ? <p className={styles["lead"]}>{empty}</p> : null}
-      {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}
+      {/* A room's, whose place is kept so the composer never moves; a direct message tells none. */}
       {room === undefined ? null : <TypistsHere key={`${room} typing`} typing={typing} />}
       {composer}
     </div>

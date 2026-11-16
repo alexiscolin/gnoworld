@@ -32,7 +32,7 @@ const block = fc.oneof(
 const draft = fc.array(block, { minLength: 1, maxLength: 4 }).map((blocks) => blocks.join("\n\n"));
 
 // What a writer types: words, spaces and marks in any order, often unmatched. `kept` leaves out what stays different once through
-// the editor (listed in .claude/tmp/slice-13/reports/lexical.md): marks and punctuation with no word, an `_` pair beside
+// the editor: marks and punctuation with no word, an `_` pair beside
 // punctuation, a space inside a code span's backticks, a doubled mark left open, a quote with two spaces, a mark over a link.
 const prose = fc
   .array(
@@ -99,6 +99,13 @@ describe("the composer's Markdown, to the editor and back", () => {
     expect(getMarkdown(editor)).toBe("**two**");
     setMarkdown(editor, "");
     expect(getMarkdown(editor)).toBe("");
+  });
+
+  // fast-check found `"1. \n1. "` (seed -1916808078): empty list items.
+  it("leaves the room's reading of empty list items as it was", () => {
+    for (const md of ["1. \n1. ", "1. ", "- \n- ", "1. \n\n1. ", "- ", "a\n- \n- b", "1. a\n1. ", "1. a\n1. \n1. b"]) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
   });
 
   // The room's reader, not the text, is what must not change: the tree of the draft and of what the editor gives back.

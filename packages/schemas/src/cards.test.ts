@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CardEvent, CardRemove, LineCards, LinkCard, ReaderCard } from "./cards.ts";
 
-// L2 (docs/plans/link-previews.md §4 "Malicious text in og fields", §7): each schema takes what sits at each bound and refuses one past.
+// Each schema takes what sits at each bound and refuses one past.
 const KEY = "a".repeat(64);
 // Base64 of FF D8 FF E0 00 10 4A 46 49 46 00 01; and of a JPEG's first three bytes then `bytes - 3` zeros, for the cap's two sides.
 const JPEG = "/9j/4AAQSkZJRgAB";

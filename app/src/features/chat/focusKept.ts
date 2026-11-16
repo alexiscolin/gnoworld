@@ -1,5 +1,5 @@
-// The focus held in a part of a line that a verdict can take away (4g's player, F896; 8f's page preview): when a hide or an edit takes
-// the part away, the focus goes back to its line, which the list's keys reach (4c: the list is no tab stop itself), not to the page.
+// The focus held in a part of a line that a verdict can take away (a link's player, a page preview): when a hide or an edit takes
+// the part away, the focus goes back to its line, which the list's keys reach (the list is no tab stop itself), not to the page.
 import { useLayoutEffect, useRef, type FocusEvent } from "react";
 
 /** The handlers to spread on the part's box; `hidden` says the verdict took the part away. */

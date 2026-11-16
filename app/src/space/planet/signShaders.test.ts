@@ -29,8 +29,8 @@ import { LIGHTS, lightCode } from "./signShaders.ts";
 import { PARTS, SHADE } from "./surfaceParts.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
-// A world's signs on its render (slice 7, 7b2): a world at rest carries none, so the program, the meshes and every uniform are the ones
-// the lab drew, and the signs a stage adds only ever add light.
+// A world's signs on its render: a world at rest carries none, so the program, the meshes and every uniform are the ones
+// it was made with, and the signs a stage adds only ever add light.
 const PATH = asciiBytes("gno.land/r/gov/dao");
 const SEED = planetSeed(PATH);
 const REST: WorldState = { vitality: 0.1, present: 0, fresh: false };
@@ -166,8 +166,8 @@ describe("a world's signs on its render", () => {
     expect(freed).toHaveBeenCalledOnce();
   });
 
-  // The light Alexis approved (21b00fc8), word for word: the terminator's arc, the softening towards it, the night a world keeps, its
-  // rim and the blue night of its air (the sea's glint is D500's). 7b5 draws every world's surface anew, on purpose, so the pin holds the light, not the surface.
+  // The shared light, word for word: the terminator's arc, the softening towards it, the night a world keeps, its
+  // rim and the blue night of its air (the sea's glint is pinned apart). The pin holds the light, not the surface.
   it("keeps the approved light word for word, whatever the surface under it", () => {
     for (const shader of [SHADE, SURFACE_FRAGMENT, GENERATED_FRAGMENT])
       for (const line of [
@@ -177,8 +177,7 @@ describe("a world's signs on its render", () => {
         "  float soft = pow(light, 0.9) * pow(facing, 0.28);\n",
         "mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();\n",
         "colour = albedo * shine + albedo * NIGHT;\n",
-        // The sea's glint, D500 (Alexis, 2026-11-09): a broad lobe and a tighter one, capped so a cloud over it still wins; the old one was
-        // `pow(gleam, 60.0) * 0.05`.
+        // The sea's glint: a broad lobe and a tighter one, capped so a cloud over it still wins.
         "    float broad = pow(max(dot(normal, lobe), 0.0), 22.0) * 0.1;\n",
         "    float tight = pow(max(dot(chop, lobe), 0.0), 150.0) * 0.28;\n",
         "min(broad + tight, 0.4)",

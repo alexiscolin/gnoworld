@@ -1,6 +1,6 @@
 #!/bin/sh
 # evals/run.sh: gnoworld's evals (ADR-0002 §5, "Evals"), on a developer's machine whose packages and evals/ are installed
-# (.claude/tmp/slice-10/setup-10j.sh), with Anthropic's key in a file nobody pastes:
+# (`pnpm install` in evals/), with Anthropic's key in a file nobody pastes:
 #   ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh [promptfoo eval's options]
 # It checks the evals' own code first (types, tests), then runs promptfoo: each case not kept in evals/.cache costs its
 # model calls and its grading, written to evals/results/. GNOMCP names gnomcp 0.11.0 (default: the one on PATH).

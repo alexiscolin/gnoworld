@@ -12,7 +12,7 @@ const PER_MINUTE = 60;
 const PER_SECOND = 20;
 const Subject = z.string().max(200);
 
-export interface ExplainRoutesOptions {
+interface ExplainRoutesOptions {
   explainer: { answer: (key: Key, visitor: string) => Explanation; ready: (key: Key) => Explanation | undefined };
   proxy?: string | undefined;
   now: () => number;
@@ -47,7 +47,7 @@ export function explainRoutes({ explainer, proxy, now, keys = 100_000 }: Explain
       return c.json(ready);
     }
     if (key === undefined) return c.json({ error: "refused" }, 400);
-    // A day's new makings are counted by the visitor's /48, as the guests' and the links' are (D430).
+    // A day's new makings are counted by the visitor's /48, as the guests' and the links' are.
     const answer = explainer.answer(key, visitor48Of(c, proxy));
     if (answer.status === "ready") c.header("cache-control", "public, max-age=300");
     return c.json(answer);

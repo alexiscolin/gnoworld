@@ -4,9 +4,9 @@ import { describe, expect, test } from "vitest";
 import { robotsTxt, sitemapXml } from "./sitemap.ts";
 import { FIXTURE } from "./placesFixture.ts";
 
-// Slice 5's 5e. sitemaps.org/protocol.html, read 2026-10-29: "no more than 50,000 URLs" a file, "no larger than 50MB
+// sitemaps.org/protocol.html: "no more than 50,000 URLs" a file, "no larger than 50MB
 // (52,428,800 bytes)" uncompressed, every value entity-escaped, and robots.txt names it with `Sitemap: <full url>`.
-// The plan's figure, from memory, was right. Decisions 2026-10-29: the sitemap holds the mainnet's places only.
+// The sitemap holds the mainnet's places only.
 const data = {
   ...FIXTURE,
   universes: FIXTURE.universes.map((universe) => ({ ...universe, testnet: universe.id === "onyx" })),
@@ -68,7 +68,7 @@ describe("sitemapXml", () => {
     expect(() => sitemapXml(many(50_001 - others))).toThrow(/50,000/);
   });
 
-  // Onyx is the default universe in the data; the day gno.land is, a mainnet place's path is no longer its address.
+  // Onyx is the default universe in the data; the day gno.land is, a mainnet place's path stops being its address.
   test("names the canonical address, never the plain path, when the mainnet is the default universe", () => {
     const swapped = {
       ...data,

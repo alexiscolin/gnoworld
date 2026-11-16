@@ -6,8 +6,8 @@ import rules from "../../../data/bubbles.json" with { type: "json" };
 import { createAppStore } from "../../store/index.ts";
 import { Signs, type SignsDeps } from "./signs.ts";
 
-// What the Earth shows, from the store to the page: `pickBubbles` when a line comes and once a second, never on a frame (docs/plans/slice-6.md
-// §4). The clock is the page's, faked here; the rules are the file's, so tuning them breaks nothing.
+// What the Earth shows, from the store to the page: `pickBubbles` when a line comes and once a second, never on a frame.
+// The clock is the page's, faked here; the rules are the file's, so tuning them breaks nothing.
 const SHOW = rules.showSeconds * 1000;
 const NOW = Date.UTC(2026, 10, 2, 12, 0, 0);
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

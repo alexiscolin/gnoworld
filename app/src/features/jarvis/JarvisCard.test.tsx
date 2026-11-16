@@ -14,7 +14,7 @@ import { drawerOf } from "./drawer.ts";
 import { JarvisCard, type JarvisCardContext } from "./JarvisCard.tsx";
 import type { DrawMarkdown } from "./AnswerCard.tsx";
 
-// 10u-a: Jarvis's cards in the chat column: the introduction (fixed asks that send no words, a field of 500 code points, a guest's way in),
+// Jarvis's cards in the chat column: the introduction (fixed asks that send no words, a field of 500 code points, a guest's way in),
 // then each ask as a card: the answer, or one plain line for a guard, with the forms that need no model where Jarvis cannot answer.
 type Answer = Result<JarvisAnswer>;
 const ROOM = "#bubble";

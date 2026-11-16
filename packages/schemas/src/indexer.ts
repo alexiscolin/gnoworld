@@ -1,14 +1,14 @@
-// What the browser reads from the public indexer for a realm's facts (slice 5 part 2, 5k; 8g, F4875), and, for the realm view's call card (9d), a
+// What the browser reads from the public indexer for a realm's facts, and, for the realm view's call card, a
 // function's fees and a node's `tx`: no first-screen module reads them, so they sit here and not in the root's chain.ts. onyx-1's indexer defines no
-// `realmFacts`, so a realm's facts are its deploy, the first successful MsgAddPackage of its path, as `getTransactions` answered on
-// 2026-11-04 (app/tests/chain/onyxRealmDeploy.json). The indexer has no time field (F2950), so no fact here may be a count by date.
+// `realmFacts`, so a realm's facts are its deploy, the first successful MsgAddPackage of its path, as `getTransactions` answers it
+// (app/tests/chain/onyxRealmDeploy.json). The indexer has no time field, so no fact here may be a count by date.
 // Every text is capped, every count is a whole number: what an account or a realm wrote reaches the page as bounded text or not at all.
 import { z } from "./zod.ts";
 
 /** The most characters of the two texts a realm's facts hold; a realm path and a bech32 address are far shorter. */
 export const REALM_FACTS_CAPS = { path: 256, deployer: 128 } as const;
 
-// Not z.int(): its class would sit in the store's chunk, which the first screen loads, for a schema only a realm's page uses (F2976).
+// Not z.int(): its class would sit in the store's chunk, which the first screen loads, for a schema only a realm's page uses.
 const count = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative());
 
 /** The facts of one realm, as the reader builds them from a deploy; a fact the indexer did not give is absent, never a zero. */
@@ -55,21 +55,21 @@ export {
   WORLDS_CAPS,
   WORLDS_MAX_BYTES,
 } from "./worlds.ts";
-// Each realm's rollup (13a) behind it too: only a realm's plate reads one, from a chunk of its own.
+// Each realm's rollup behind it too: only a realm's plate reads one, from a chunk of its own.
 export { RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP } from "./realmRollup.ts";
-// Who is here (7h) behind the same door: only the universe's feed reads it, after the first screen.
+// Who is here behind the same door: only the universe's feed reads it, after the first screen.
 export { Presence, HubSlug, PRESENCE_ANSWER_MAX, PresencePeople, PRESENCE_PEOPLE_MAX_BYTES } from "./presence.ts";
-// A world's hours (8g) too: only a plate's activity reads them, from a chunk of its own.
+// A world's hours too: only a plate's activity reads them, from a chunk of its own.
 export { PRESENCE_HOURS, PRESENCE_HOURS_MAX_BYTES, PresenceHours } from "./hours.ts";
-// The prices' history (8i) too: only the markets row's sparklines read it, from a chunk of their own.
+// The prices' history too: only the markets row's sparklines read it, from a chunk of their own.
 export { MARKETS_HISTORY_MAX_BYTES, MARKETS_HISTORY_MOST, MarketsHistory } from "./marketsHistory.ts";
-// The preview captures (8f) behind it too: only a page that draws a preview reads them, from a chunk of its own.
+// The preview captures behind it too: only a page that draws a preview reads them, from a chunk of its own.
 export { Capture, CAPTURE_MAX_BYTES, Previews, PREVIEWS_MAX, PREVIEWS_MAX_BYTES } from "./previews.ts";
 
 /** The most characters of the realm path and the function a fee read names, as a CallRequest takes them. */
 export const CALL_FEES_CAPS = { path: 256, func: 128 } as const;
 
-/** The indexer's `getTransactions` for a function's calls (SHARED/recordings/README.md, not recorded): a row short of a field is
+/** The indexer's `getTransactions` for a function's calls: a row short of a field is
  * dropped by the reader, never a failure. */
 export const CallFeesAnswer = z.object({
   data: z.object({

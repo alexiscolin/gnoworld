@@ -1,4 +1,4 @@
-// A card's picture (docs/plans/link-previews.md §4, "Decompression bombs", "SVG, HTML or a polyglot"): JPEG or PNG by magic bytes alone,
+// A card's picture: JPEG or PNG by magic bytes alone,
 // its size read from the header before any decoding, then always a fresh JPEG of about 160 px made from the pixels (no metadata, no
 // trailing bytes), at most CARD_CAPS.pictureBytes. The WebAssembly codecs are the real ones; a test hands others in.
 import { readFileSync } from "node:fs";
@@ -23,7 +23,7 @@ export interface Codecs {
   resize(raster: Raster, width: number, height: number): Promise<Raster>;
   encodeJpeg(raster: Raster, quality: number): Promise<Uint8Array>;
 }
-export interface Info {
+interface Info {
   format: "jpeg" | "png";
   width: number;
   height: number;

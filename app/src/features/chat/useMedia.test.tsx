@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMedia } from "./useMedia.ts";
 
-// F2302: the hook the drawer's layout and the composer's Enter both read the screen through.
+// The hook the drawer's layout and the composer's Enter both read the screen through.
 function Probe() {
   return <p>{String(useMedia("(max-width: 900px)"))}</p>;
 }

@@ -12,7 +12,7 @@ import {
   type SystemRef,
 } from "./cosmos.ts";
 
-// core/cosmos (slice 7, 7c and 7d1; ADR-0002 §3 and §10; F3520): systems take cells in rings by their rank in the set, a thick disc with
+// core/cosmos (ADR-0002 §3 and §10): systems take cells in rings by their rank in the set, a thick disc with
 // clusters above and below it, their height from a smooth field of position. Nothing piles up, an arrival moves others little and only
 // outward, and a curated ecosystem's namespaces sit together. Most numbers below are bounds on shape; the golden table pins real ones.
 const ids = (count: number, prefix = "ns"): string[] =>
@@ -192,7 +192,7 @@ describe("the disc, with constant density", () => {
     expect(ratio).toBeLessThan(3.5);
   });
 
-  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": a disc a cell thick or more, never a plane seen edge on.
+  // A disc a cell thick or more, never a plane seen edge on.
   it("is thick: systems stand over a cell above and below the plane, none past the field's bound and the disc's", () => {
     const places = [...placed(3_000).values()];
     expect(places.filter((p) => p.y > CELL / 2).length / places.length).toBeGreaterThan(0.15);
@@ -276,7 +276,7 @@ describe("a hundred arrivals move no system far", () => {
     };
   };
 
-  // What the first draft of a rank did, a spiral of rings (the report's measure): 26, 52 and 182 cells at most.
+  // A rank that spiralled through the rings would give 26, 52 and 182 cells at most.
   it.each([
     [100, 12, 4.5],
     [1_000, 16, 1.8],
@@ -335,7 +335,7 @@ describe("a hundred arrivals move no system far", () => {
     expect(inward(before, after)).toEqual([]);
   });
 
-  // One fixture missed the mutant that reads a wedge from the exact size (F3558): five names by ten sizes, none on a rung.
+  // One fixture missed the mutant that reads a wedge from the exact size: five names by ten sizes, none on a rung.
   it("only ever moves others outward when one joins an ecosystem on its rung, whatever its name and size", () => {
     for (const name of ["defi", "games", "art", "dao", "tools"]) {
       for (const size of [3, 5, 6, 7, 9, 10, 12, 17, 20, 25]) {
@@ -347,8 +347,8 @@ describe("a hundred arrivals move no system far", () => {
     }
   });
 
-  // An ecosystem's wedge narrows as its rank doubles, so the arrival that doubles it moves systems either way, once (F3557, accepted as
-  // seasonal by Claude for Alexis's review): 8.4 cells at most and 26 of 1,276 inward, measured. The ranks mirror `cosmos.ts`'s hashes.
+  // An ecosystem's wedge narrows as its rank doubles, so the arrival that doubles it moves systems either way, once (accepted as
+  // seasonal): 8.4 cells at most and 26 of 1,276 inward, measured. The ranks mirror `cosmos.ts`'s hashes.
   it("moves no system far, and few inward, when a loose arrival doubles an ecosystem's rank", () => {
     const curated = ids(30, "defi").map((id) => ({ id, ecosystem: "defi" }));
     const own = textHash("ecosystem defi");
@@ -513,8 +513,7 @@ describe("a curated ecosystem is placed together", () => {
 });
 
 // Golden: the map every device and every release draws, worked out apart from this code, in Python. Changing one is a deliberate change of
-// the map, said in its commit (7d2's reserved cells moved three systems; 7d6's thicker disc, "l'espace n'est pas en 2D", every height and
-// no x or z). A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
+// the map, said in its commit. A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
 describe("golden coordinates", () => {
   const set = [
     ...loose([
@@ -614,7 +613,7 @@ describe("the edges of the input", () => {
 });
 
 // A whole set in one ecosystem, 45 ms measured: the test's own timeout is the bound (rings.test.ts says why). Its wedge is the whole turn
-// (F3560): the worst rays, one ray, are rings.test.ts's.
+// The worst rays, one ray, are rings.test.ts's.
 describe("its cost: n log n at most, measured", () => {
   it("places 30,000 systems of one ecosystem", () => {
     const places = placeSystems(ids(30_000).map((id) => ({ id, ecosystem: "one" })));

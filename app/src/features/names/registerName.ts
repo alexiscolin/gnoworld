@@ -1,4 +1,4 @@
-// Register of r/sys/namereg/v0 through 9d's card course: the name is checked before anything opens, the call's one argument is `nym-`
+// Register of r/sys/namereg/v0 through the call card's course: the name is checked before anything opens, the call's one argument is `nym-`
 // and what was typed, and the card is done only from the chain's answer. One card holds the registration, so who it was opened for
 // (the account and the chain) is kept with it: a card of another account or chain is never read as this person's.
 import { realmType } from "@gnoworld/core";
@@ -26,7 +26,7 @@ export function registrationOf(state: AppState, account: string, chainId: string
     : undefined;
 }
 
-// A failed card that may have been sent has no way back to a second signature (9d-2); one the chain ran and refused changed nothing.
+// A failed card that may have been sent has no way back to a second signature; one the chain ran and refused changed nothing.
 function mayBeSent(state: CallCard["state"]): boolean {
   return state.kind === "failed" && state.reason !== "chain" && !retryable(state);
 }

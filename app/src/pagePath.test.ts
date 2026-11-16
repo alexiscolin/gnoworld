@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { isPagePath } from "./pagePath.ts";
 
-// F326: the app's route test, handed to ui's link slot. The catch-all route answers every path with "No page here", so
+// the app's route test, handed to ui's link slot. The catch-all route answers every path with "No page here", so
 // a path that names a file must not reach the router.
 describe("isPagePath", () => {
   test.each([

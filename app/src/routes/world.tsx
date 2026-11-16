@@ -1,5 +1,5 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
-// route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
+// route's not-found. The world is found by the request's path as written: its case is part of the address.
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useLoaderData, type MetaArgs } from "react-router";
 import { hubWorldOf } from "@gnoworld/core";
@@ -24,7 +24,7 @@ const NO_CALLS: readonly ChainHeard[] = [];
 // The plate's blocks (routes/plate), in a chunk once the first screen has drawn.
 const HubPlate = lazy(() => import("./plate/HubPlate.tsx"));
 
-// A world's kind as its crumb says it (frames 22, 93, 104); a world the data says nothing of is a hub.
+// A world's kind as its crumb says it; a world the data says nothing of is a hub.
 const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp", station: "Station" };
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -41,7 +41,7 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
-// A station round the Earth (8l), by its world's slug: its name, its size and its project's own site.
+// A station round the Earth, by its world's slug: its name, its size and its project's own site.
 const stationOf = (slug: string) => stations.find((station) => station.slug === slug);
 type SiteWorld = ReturnType<typeof useLoaderData<typeof loader>>;
 
@@ -50,7 +50,7 @@ function useWorldSpace(world: SiteWorld) {
   return useSpace({ world: hubWorldOf(world), name: world.name });
 }
 
-// The plate's kicker: the world's genre when it has one, and its kind; the header's levels say where it is (the plan space-simple).
+// The plate's kicker: the world's genre when it has one, and its kind; the header's levels say where it is.
 const kickerOf = (world: ReturnType<typeof site.world>) =>
   [...(world.genre === undefined ? [] : [world.genre]), KINDS[world.kind ?? "hub"] ?? "Hub"].join(" · ");
 
@@ -59,7 +59,7 @@ export default function World() {
   const universe = site.home(world);
   // What the chain told of this world's realms, from its events alone, drawn among its main room's messages.
   const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
-  // The plate is the page and the chat a block under it on a phone, as the Earth's and a realm's (the proposal's section 5).
+  // The plate is the page and the chat a block under it on a phone, as the Earth's and a realm's.
   const chat = {
     world: world.slug,
     place: chatPlace({ ...world, room: `#${world.slug}`, pinned: pinnedBar(world, universe), inPage: true }, universe),
@@ -76,7 +76,7 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
   const chatDue = useWorldSpace(world);
   // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
   const loaded = useLoaded();
-  // A station round the Earth (8l) keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
+  // A station round the Earth keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
   const own = stationOf(world.slug)?.url;
   const address = ORIGIN + world.canonical;
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
@@ -90,7 +90,7 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
         plate={
           <>
             <Kicker planet>{kickerOf(world)}</Kicker>
-            {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
+            {/* The arrival banners: nothing unless the server's signal says this account earned one. */}
             <Banners world={world.slug} name={world.name} address={address} />
             <Panel.Title>{world.name}</Panel.Title>
             <Suspense fallback={null}>

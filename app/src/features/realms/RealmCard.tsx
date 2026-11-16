@@ -1,4 +1,4 @@
-// A realm in the chat (5h): its page's first heading and first paragraph, cut short, the block height it was read at, and
+// A realm in the chat: its page's first heading and first paragraph, cut short, the block height it was read at, and
 // the link to the realm on gnoweb, which every card carries. A page the reader did not read (past the cap) shows the cap's
 // state and the link, never a part of it. Plain text only: what a realm says of itself is its own words. The design
 // system's compact Card, and gnoweb's address from lib/chain.

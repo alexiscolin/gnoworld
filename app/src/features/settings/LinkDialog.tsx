@@ -1,4 +1,4 @@
-// The dialog that links an account (owners' moderation, part 5; the approved proposal's "The screens"): two tabs, Adena and Command line.
+// The dialog that links an account: two tabs, Adena and Command line.
 import type { Address } from "@gnoworld/schemas";
 import { Dialog, Stack, Tabs } from "@gnoworld/ui";
 import { useState } from "react";

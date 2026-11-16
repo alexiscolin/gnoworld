@@ -29,7 +29,7 @@ import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
-// A mute's line, not a room's mode, which the bot sets too (3l).
+// A mute's line, not a room's mode, which the bot sets too.
 const MUTE_LINE = /^SAMODE \S+ [+-]b m:/;
 const MINUTE = 60_000;
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
@@ -66,10 +66,10 @@ const setup = (
     session?: (token: string | undefined) => string | undefined;
     redactRetryMs?: number;
     presence?: string;
-    // The first signals' store, as main hands it to the chat (slice 9h).
+    // The first signals' store, as main hands it to the chat.
     signals?: boolean;
   } = {},
-  // What the lines that pass tell Jarvis's door (D13985).
+  // What the lines that pass tell Jarvis's door.
   extra?: Pick<Parameters<typeof startChat>[2], "door">,
 ) => {
   const db = openDatabase(":memory:", [
@@ -129,7 +129,7 @@ describe("the chat, as the server starts it", () => {
     const { rooms } = setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => clock.now });
     const peer = await ergo.peer(0);
     await welcome(peer);
-    // A line of a history page counts nothing now, however recent its time (the max review).
+    // A line of a history page counts nothing now, however recent its time.
     peer.say(":ergo.test BATCH +h chathistory #bubble");
     peer.say(message("batch=h;account=g1a;msgid=m0", "a!u@h", ["#bubble", "said before"]));
     peer.say(":ergo.test BATCH -h");
@@ -491,7 +491,7 @@ describe("the chat, as the server starts it", () => {
       ]);
     });
 
-    // F2462: Ergo relays a room's line to its members, then writes it into its history (channel.go:1418, then 1424),
+    // Ergo relays a room's line to its members, then writes it into its history (channel.go:1418, then 1424),
     // so a REDACT sent at once on the line just read can reach it first and be refused UNKNOWN_MSGID: the id is then
     // not yet known, not gone. Nothing was hidden, and the line stays seen by everyone.
     const HIDE = "REDACT #bubble m1 :a word this world bans";
@@ -525,13 +525,13 @@ describe("the chat, as the server starts it", () => {
       peer.say(unknown("m1"));
       await peer.next(/^REDACT /);
       peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
-      // A refusal coming late, after the echo: the hide is taken, so nothing is asked on it (F2654).
+      // A refusal coming late, after the echo: the hide is taken, so nothing is asked on it.
       peer.say(unknown("m1"));
       await quiet(peer);
       expect(hides(peer)).toEqual([HIDE, HIDE]);
     });
 
-    // F2654: the retry timer is pending when Ergo's word comes; the word cancels it. The wait is 300 ms here, so
+    // The retry timer is pending when Ergo's word comes; the word cancels it. The wait is 300 ms here, so
     // the word (a line away) comes well before it, and 900 ms is three times that.
     const SLOW = { redactRetryMs: 300 };
     it("cancels the ask waiting when Ergo's echo of the hide comes first (F2654)", { timeout: 5000 }, async () => {
@@ -584,7 +584,7 @@ describe("the chat, as the server starts it", () => {
         // The first ask and six more: seven, never an eighth.
         expect(hides(peer)).toHaveLength(7);
         expect(logged.filter((l) => l.includes("redact_refused"))).toEqual([]);
-        // No alert, but a trace: ops can tell a line its author deleted from one still seen (F2652).
+        // No alert, but a trace: ops can tell a line its author deleted from one still seen.
         const gaveUp = logged.filter((l) => l.includes('"event":"redact_gave_up"'));
         expect(gaveUp).toHaveLength(1);
         expect(gaveUp[0]).toContain('"room":"#bubble"');
@@ -642,7 +642,7 @@ describe("the chat, as the server starts it", () => {
     });
 
     // The bot's hide comes back to it as a REDACT of its own (Ergo tells each member of the room, the sender too): the
-    // pin of a hidden line goes with it, as with an author's delete (4d's R1).
+    // pin of a hidden line goes with it, as with an author's delete.
     it("takes a line's pin away as Ergo tells it taken from the room, the bot's own hide as an author's delete", async () => {
       const { peer, chat, db } = await linked({ worlds: worlds("bubble"), moderation: OFF });
       const AUTHOR = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -1004,7 +1004,7 @@ describe("the chat, as the server starts it", () => {
       for (let n = 1; n <= 105; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "flood"]));
       await expect.poll(() => logged.some((l) => l.includes("moderation_account_full"))).toBe(true);
       held.open();
-      // Settled, each: past 20 a minute the flood is hidden as too fast (3k).
+      // Settled, each: past 20 a minute the flood is hidden as too fast.
       await expect.poll(() => verdicts().filter(({ action }) => action !== "pending").length).toBe(104);
       const again = await reconnect(peer, ergo);
       expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(105)} 50`);
@@ -1505,7 +1505,7 @@ describe("the chat, as the server starts it", () => {
       expect(await rooms("member")).toContain("#bubble/crew");
     });
 
-    // Who reads and who pins, by the real rules of the roles file (4d's R2): a members room's pins are its members', and
+    // Who reads and who pins, by the real rules of the roles file: a members room's pins are its members', and
     // pinning is its world's moderators' and the team's alone, whoever they moderate elsewhere.
     describe("the pins' right to read and to pin", () => {
       const TEAM = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -1927,7 +1927,7 @@ describe("the chat, as the server starts it", () => {
     });
   });
 
-  // Slice 9h: first words through the chat's own wiring. The unit tests hand firstWords to moderate() themselves; here the
+  // First words through the chat's own wiring. The unit tests hand firstWords to moderate() themselves; here the
   // line goes the way a line goes (Ergo, the bot's check, the verdict), and the signal comes out of the page's stream.
   describe("the chat's first words (9h)", () => {
     const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -2011,7 +2011,7 @@ describe("the chat, as the server starts it", () => {
   });
 });
 
-// 4g (docs/decisions.md, 2026-10-26): GET /api/verdicts through the chat's own wiring: the stream's rule of who
+// GET /api/verdicts through the chat's own wiring: the stream's rule of who
 // reads (mayRead, by the session), each visitor counted by its address.
 describe("the chat's verdicts route", () => {
   const CREW = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -2090,7 +2090,7 @@ describe("the chat's verdicts route", () => {
     expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
   });
 
-  // F877: an accounts room's lines go to any account and to no guest; a room's name in other letters is no room the
+  // An accounts room's lines go to any account and to no guest; a room's name in other letters is no room the
   // verdicts hold, so a members room's are never answered under it.
   it("answers an accounts room to an account alone, and a members room's lines under no other spelling", async () => {
     const ask = ready();
@@ -2104,7 +2104,7 @@ describe("the chat's verdicts route", () => {
     }
   });
 
-  // F872: behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
+  // Behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
   // from the proxy alone.
   it("counts each reader behind the trusted proxy by the address the proxy sets, and believes no other peer's", async () => {
     const ask = ready("10.0.0.2");

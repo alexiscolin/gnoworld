@@ -1,4 +1,4 @@
-// The loop's control (D401, P400, P102): when a frame is worked on, when the loop sleeps and what wakes it. What a frame does is the beat's
+// The loop's control: when a frame is worked on, when the loop sleeps and what wakes it. What a frame does is the beat's
 // (frame.ts); this holds the rules: the pace, the cap on a frame's step, the nap after a still view, the sleep while unseen, the buffer
 // freed after it, and every listener and timer, which go when `signal` aborts.
 import { gapFor } from "./pace.ts";
@@ -24,7 +24,7 @@ export interface Beat {
   work(step: { now: number; delta: number; slept: number; real: number }): Need;
   /** How long the loop may sleep after a frame that left `need`, `calm` ms after the last change; none, it stays awake. */
   nap(need: Need, calm: number): number | undefined;
-  /** Whether the loop is pacing a view with something moving (D13013): an input then brings the full pace back. */
+  /** Whether the loop is pacing a view with something moving: an input then brings the full pace back. */
   lively(): boolean;
   /** An input came (a pointer move, a key, the wheel, a touch): the view's minute of rest starts over. */
   rouse(): void;
@@ -88,7 +88,7 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     sleeper = undefined;
     beat.watch(now);
     const gap = gapFor(need, beat.focused());
-    // A view with something moving by itself is drawn at 15 fps, whether it naps between frames or not (D13013).
+    // A view with something moving by itself is drawn at 15 fps, whether it naps between frames or not.
     if (now - last < (need === "ambient" && beat.lively() ? Math.max(gap, LIVELY_MS) : gap) - 3) return true;
     need = frame(now);
     const nap = beat.nap(need, now - changed);

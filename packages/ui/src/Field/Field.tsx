@@ -35,7 +35,7 @@ export interface FieldProps {
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
 // Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word: Safari
-// sends that one after compositionend, isComposing false, keyCode 229 (F1713): the only mark it gives, deprecated
+// sends that one after compositionend, isComposing false, keyCode 229: the only mark it gives, deprecated
 // and still sent, so read by name.
 function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boolean): void {
   const { isComposing } = event.nativeEvent;

@@ -67,7 +67,7 @@ describe("an account's drafts on the device", () => {
   });
 
   it(`keeps a draft of ${String(DRAFT_LIMIT)} UTF-16 units at most; a longer one forgets the last, no older text to come back`, () => {
-    // A message of several lines goes at 4096 bytes: no draft the composer lets go is lost (the red pass's R12).
+    // A message of several lines goes at 4096 bytes: no draft the composer lets go is lost.
     expect(DRAFT_LIMIT).toBe(MULTILINE_BYTES);
     const device = storage();
     const mine = on(device, ALICE);
@@ -81,7 +81,7 @@ describe("an account's drafts on the device", () => {
     expect(device.kept.size).toBe(0);
   });
 
-  // G7 of the green pass: compose trims each line's end, so a draft whose trailing spaces alone pass the limit is still
+  // Compose trims each line's end, so a draft whose trailing spaces alone pass the limit is still
   // one the composer lets go; it is kept as compose reads it.
   it("keeps a draft the composer lets go though its trailing spaces pass the limit, as compose reads it", () => {
     const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -96,7 +96,7 @@ describe("an account's drafts on the device", () => {
     expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, () => text).join("\n"));
   });
 
-  // F1716 (CR4): compose trims each line's end as JavaScript's trimEnd does, so a no-break space and an ideographic
+  // Compose trims each line's end as JavaScript's trimEnd does, so a no-break space and an ideographic
   // space at a line's end were no text either.
   it("keeps a draft the composer lets go though the ends of its lines are no-break or ideographic spaces", () => {
     const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -110,12 +110,12 @@ describe("an account's drafts on the device", () => {
     expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, (_, at) => `line ${String(at)}`).join("\n"));
   });
 
-  // F1711 (S2): a run of spaces inside a line cost the square of its length each time the draft changed (20,000 spaces
+  // A run of spaces inside a line cost the square of its length each time the draft changed (20,000 spaces
   // 2.9 s, 40,000 5 s); the draft is read once, a line at a time.
   it("trims a draft of a long run of spaces inside a line at once, not by the square of its length", () => {
     const mine = on(storage(), ALICE);
     const draft = `a${" ".repeat(60_000)}b`;
-    // Structural, not timed (R4): the square came from a regex replace over the run, so none may be called.
+    // Structural, not timed: the square came from a regex replace over the run, so none may be called.
     const replace = vi.spyOn(String.prototype, "replace");
     const replaceAll = vi.spyOn(String.prototype, "replaceAll");
     expect(mine.set("#bubble", draft)).toBe(false);

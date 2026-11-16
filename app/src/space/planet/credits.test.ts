@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import mapFiles from "./mapFiles.json" with { type: "json" };
 import { FILED as CREDITS } from "./creditFiles.ts";
 
-// A texture with no credit breaks its licence (the plan's threat model): every file in the folder has its row, and a row's words name
+// A texture with no credit breaks its licence: every file in the folder has its row, and a row's words name
 // its author and its licence.
 const FOLDER = new URL("../../../public/textures", import.meta.url).pathname;
 const FILES = readdirSync(FOLDER, { recursive: true });

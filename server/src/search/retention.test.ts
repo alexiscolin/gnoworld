@@ -11,7 +11,7 @@ import { makeRetention } from "../retention/retention.ts";
 import { makeSearch } from "./index.ts";
 import { expireIndex } from "./retention.ts";
 
-// Slice 13, B1: the retention's tick takes the index's lines past 90 days and past its row cap, a batch at a time.
+// The retention's tick takes the index's lines past 90 days and past its row cap, a batch at a time.
 const DAY = 24 * 60 * 60_000;
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
@@ -140,7 +140,7 @@ describe("a removed text leaves the write-ahead log at the tick (F13705)", () =>
   });
 });
 
-// The surviving mutants of the day (slice 13): the budget a tick has left after the index's batch.
+// The surviving mutants of the day: the budget a tick has left after the index's batch.
 describe("expireIndex's budget", () => {
   const own = (expire: (limit: number) => number) => {
     const db = openDatabase(":memory:", migrations);

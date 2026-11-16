@@ -17,8 +17,7 @@ export function withFull(params: URLSearchParams, full: boolean): URLSearchParam
 
 const never = () => () => undefined;
 
-/** Whether the page draws its chat alone, full: the address asks it (?chat=full), and space and the plate stay out (Alexis,
- * 2026-11-07: "on ne sort jamais de là"). The build wrote the page from an address with no search, so the first draw of a page
+/** Whether the page draws its chat alone, full: the address asks it (?chat=full), and space and the plate stay out. The build wrote the page from an address with no search, so the first draw of a page
  * hydrated from it says no, as the file does, and the address's word comes right after (React's error #418 otherwise). */
 export function useChatAlone(): boolean {
   const asked = asksFull(useSearchParams()[0]);

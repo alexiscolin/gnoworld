@@ -20,8 +20,8 @@ import {
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { connectButton } from "./account.ts";
 
-// 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
-// recording, the hash followed to its block. Nothing shows as done before the chain's answer.
+// A realm's write function: the card under its row, the signature in a stand-in for Adena (../fakeAdena.ts),
+// the hash followed to its block. Nothing shows as done before the chain's answer.
 const card = (page: Page) => calls(page).getByRole("article");
 interface World {
   landing?: "now" | "never" | "later";
@@ -61,7 +61,7 @@ test.describe("a write function's call card", () => {
     chain.release();
     // The hash is short as an address is: its first six and last five.
     await expect(card(page)).toContainText(`Signed · tx ${shortAddress(HASH)}`);
-    await expect(card(page)).toContainText("55,414");
+    await expect(card(page)).toContainText("4,242");
     await expect(card(page)).toContainText("(42 int)");
     const sent = await page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));
     expect(sent).toContain('"func":"SetBio"');
@@ -80,7 +80,7 @@ test.describe("a write function's call card", () => {
     ).toBe("baseline");
   });
 
-  // F5952, F5953 (frame f0110): the block is one box with a 1 px edge, 16 px between a label and its value.
+  // Frame f0110: the block is one box with a 1 px edge, 16 px between a label and its value.
   test("draws its block with a 1 px edge and 16 px between a label and its value", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
@@ -94,7 +94,7 @@ test.describe("a write function's call card", () => {
     expect(look).toEqual({ edge: "1px", drawn: "solid", gap: "16px" });
   });
 
-  // F5954 (frame f0110): the sentence under the title is 13 px with a 1.5 leading.
+  // Frame f0110: the sentence under the title is 13 px with a 1.5 leading.
   test("draws its first sentence in the 13 px reading size", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
@@ -104,7 +104,7 @@ test.describe("a write function's call card", () => {
     expect(await lede.evaluate((el) => getComputedStyle(el).lineHeight)).toBe("19.5px");
   });
 
-  // F5735, F5967: frame f0110's Cancel border runs from row 630 to 673, the default control's 44 px.
+  // Frame f0110's Cancel border runs from row 630 to 673, the default control's 44 px.
   test("draws Sign in Adena and Cancel 44 px tall, as the frame does", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);

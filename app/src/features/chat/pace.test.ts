@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Pace } from "./pace.ts";
 
-// F2092 (AP3): the page's mirror of the server's two rates, 20 messages and 100 lines an account a minute
+// The page's mirror of the server's two rates, 20 messages and 100 lines an account a minute
 // (server/src/moderation/check.ts, rate.ts); a message past either is hidden there and costs a strike.
 const S = 1000;
 const sendAll = (pace: Pace, count: number, at: number) => {

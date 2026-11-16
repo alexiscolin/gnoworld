@@ -1,5 +1,5 @@
-// Space's lenses (D425): what a tag at the hero's foot lights. Live, the worlds with people in them now; Active, called on chain in the last
-// 7 days; each kind, as the search reads a realm's code (D373, styleOf); Following, the reader's. One at a time, kept here and written in the
+// Space's lenses: what a tag at the hero's foot lights. Live, the worlds with people in them now; Active, called on chain in the last
+// 7 days; each kind, as the search reads a realm's code (styleOf); Following, the reader's. One at a time, kept here and written in the
 // address (?lens=) with no navigation, so a pick moves nothing but the light.
 import { EARTH, REALM_PREFIX, realmRoom, STYLES, type StyleId } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";

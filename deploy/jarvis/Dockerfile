@@ -1,8 +1,8 @@
-# jarvis's own image (Alexis, 2026-11-04, "Son propre paquet et image"; ADR-0002 §5, §7): its workspace and the packages
+# jarvis's own image (ADR-0002 §5, §7): its workspace and the packages
 # it imports, with their production dependencies from the lockfile, its skills and the places' data,
 # then Node 24 alone in a distroless image, as 65533, a user no other service runs as. No server code, no script, no test
 # and no test helper (.dockerignore; jarvis/src/main.test.ts holds the list). No gnomcp: it runs in the reader's container
-# (deploy/jarvis-reader/Dockerfile, 10u-g2), which jarvis reaches over the network, so nothing jarvis runs can start it.
+# (deploy/jarvis-reader/Dockerfile), which jarvis reaches over the network, so nothing jarvis runs can start it.
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /repo
 RUN corepack enable

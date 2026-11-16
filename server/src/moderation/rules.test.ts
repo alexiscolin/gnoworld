@@ -160,8 +160,8 @@ describe("the rules' links and mentions", () => {
   });
 });
 
-// 4d: the page shows a mention (core/markdown) only where this count finds one, so the cap holds for every mention
-// a reader sees (F807): a mention the page draws and the count misses would pass any cap.
+// The page shows a mention (core/markdown) only where this count finds one, so the cap holds for every mention
+// a reader sees: a mention the page draws and the count misses would pass any cap.
 describe("the rules' mention count, against the mentions the page shows", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";

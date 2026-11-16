@@ -3,7 +3,7 @@
 // the text and the language so it serves every reader; readers asking at once share one call. The line reaches the
 // model inside an untrusted block; a translation that adds a link, an account, `@room` or a number, or that the wire
 // could not carry, is dropped and kept so: the original shows. A failure or a stop keeps nothing; a reader gone stops
-// nothing (S1). A translation lives a day: the door's record of a room holds no older line (D191).
+// nothing. A translation lives a day: the door's record of a room holds no older line.
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -70,14 +70,14 @@ const SYSTEM = [
 const OUTPUT_TOKENS = 8192;
 // A line of 8,192 code points takes 32 KiB at most: its block never cuts it.
 const BLOCK_BYTES = 32 * 1024;
-// How long a translation is kept: the door asks only for lines its record holds, a room's last 30 (D194).
+// How long a translation is kept: the door asks only for lines its record holds, a room's last 30.
 const LIFE_MS = 24 * 60 * 60_000;
 // The prompt's version, as a question's trace carries its own.
 const VERSION = createHash("sha256").update(SYSTEM).digest("hex");
 
 const translated = (text: string): Translated => ({ kind: "translated", text });
 
-// A row as the wire would carry it, or none: a row a deploy's tighter schema refuses is made again (V2).
+// A row as the wire would carry it, or none: a row a deploy's tighter schema refuses is made again.
 function keptOf(row: unknown): Translated | undefined {
   const parsed = z.object({ text: z.string().nullable() }).safeParse(row);
   if (!parsed.success) return undefined;
@@ -97,7 +97,7 @@ export function makeTranslator(parts: Parts) {
     ),
   };
   const bound = boundOf(parts.db, "translations", parts.keepBytes ?? CACHE_BYTES);
-  // A making sent finishes though its readers left, kept and paid its real cost (S1, Alexis): stopped, it cost its worst.
+  // A making sent finishes though its readers left, kept and paid its real cost stopped, it cost its worst.
   const shared = together<Translated>({ finishes: true });
   const keep = (hash: string, language: string, text: string | null): void => {
     const bytes = Buffer.byteLength(hash + language + (text ?? ""));

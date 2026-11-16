@@ -6,7 +6,7 @@ afterEach(cleanup);
 
 // jsdom draws no top layer and has no showModal: a dialog it opens is open, and closed by close(),
 // which says so with its close event, as the browser does. Its focus, Esc and scrim are the stories'
-// journeys' (docs/plans/slice-2cd.md).
+// journeys'.
 Object.assign(HTMLDialogElement.prototype, {
   showModal(this: HTMLDialogElement) {
     this.open = true;
@@ -19,7 +19,7 @@ Object.assign(HTMLDialogElement.prototype, {
 });
 
 // jsdom has no popover API, and its sheet hides every [popover]: a stand-in shows one by its trigger or its
-// methods, as Chromium 156 does: beforetoggle at once, toggle a later task, one for changes in a row (F924).
+// methods, as Chromium 156 does: beforetoggle at once, toggle a later task, one for changes in a row.
 // Light dismiss, Esc and the top layer are the journeys'.
 function popovers() {
   const queued = new WeakMap<HTMLElement, { oldState: string; newState: string }>();

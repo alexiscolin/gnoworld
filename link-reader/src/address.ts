@@ -1,6 +1,6 @@
 // Whether an address is one the reader may connect to: global unicast only. Private, loopback, link-local, carrier-grade, documentation,
 // multicast, reserved and every IPv6 embedding of one of them (mapped, NAT64, 6to4, Teredo) are refused, and so is anything that is not
-// an address (docs/plans/link-previews.md §4, "A link to a private address").
+// an address.
 import { isIPv6 } from "node:net";
 
 // IPv4 ranges that are not public: [first address, bits].

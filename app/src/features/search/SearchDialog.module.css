@@ -1,4 +1,4 @@
-/* The search palette (D355): the field on top; typing, the chips and the results at the start and the chosen place's preview at the end, in
+/* The search palette: the field on top; typing, the chips and the results at the start and the chosen place's preview at the end, in
    the dialog's large sheet (Discover is the empty field's, discover/); a phone keeps the first part alone. */
 @layer components {
   .palette {
@@ -18,8 +18,7 @@
   .body {
     /* layout: the results beside the preview */
     display: grid;
-    /* layout: the results take the room, the preview Discover's detail's measure, so the filters and the sort hold one line (Alexis,
-       2026-11-08: "sur une ligne … agrandis la colonne") */
+    /* layout: the results take the room, the preview Discover's detail's measure, so the filters and the sort hold one line */
     grid-template-columns: minmax(0, 1fr) var(--column-l);
     min-block-size: 0;
   }

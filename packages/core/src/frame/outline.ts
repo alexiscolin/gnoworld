@@ -1,4 +1,4 @@
-// A ball's true outline on a screen (7d6's review): seen off the view's axis, a ball draws as an oval stretched outward, not as the circle
+// A ball's true outline on a screen: seen off the view's axis, a ball draws as an oval stretched outward, not as the circle
 // its centre and its radius over its depth give. Along each screen axis its extremes are where the two lines from the eye touch it.
 
 /** A ball's outline on a screen, in pixels: its left, right, top and bottom edges. */

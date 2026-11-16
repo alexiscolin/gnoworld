@@ -25,7 +25,7 @@
     margin-block-start: var(--space-2xs);
   }
 
-  /* A paragraph's last line is shorter; a lone line, after a heading say, keeps its width (F375). */
+  /* A paragraph's last line is shorter; a lone line, after a heading say, keeps its width. */
   .lines > .skeleton:last-child {
     inline-size: 60%;
   }

@@ -1,5 +1,5 @@
-// The nodes the line reader makes (slice 4's 4c): a mark's, whether a label's show anything, a label's mentions made
-// text (4d), and a node added to those before it; and a walk of a message's tree, each inline node in order.
+// The nodes the line reader makes: a mark's, whether a label's show anything, a label's mentions made
+// text, and a node added to those before it; and a walk of a message's tree, each inline node in order.
 import type { Block, Inline } from "./types.ts";
 
 /** The node a mark of `mark`, `size` long, makes of what it holds: three stars make two; `~~` strikes, `++` underlines. */
@@ -12,7 +12,7 @@ export function wrap(mark: string, size: number, children: Inline[]): Inline {
 }
 
 // What draws nothing: spaces, format characters, the code points a renderer ignores (Hangul fillers, joiners,
-// variation selectors) and the braille blank (F781).
+// variation selectors) and the braille blank.
 const BLANK = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
 
 /** Whether a text draws nothing: spaces, format characters, ignorable code points, the braille blank. */

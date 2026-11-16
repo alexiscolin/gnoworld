@@ -1,4 +1,4 @@
-// The universe the page is in and the two chains a name is read on, from the data files (9f).
+// The universe the page is in and the two chains a name is read on, from the data files.
 import universes from "../../../data/universes.json" with { type: "json" };
 import { MAINNET_CHAIN, ONYX_CHAIN } from "../../lib/chain/names.ts";
 

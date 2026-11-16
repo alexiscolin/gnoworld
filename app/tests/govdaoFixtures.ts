@@ -1,5 +1,5 @@
 // What the unit tests of GovDAO's plate share: its realm's home page as RECORDED on onyx-1 (tests/chain/recorded, its first line the
-// recording's own comment), the realm's view, and GovDAO's pinned Vote as hubs.json holds it (D271).
+// recording's own comment), the realm's view, and GovDAO's pinned Vote as hubs.json holds it.
 export const HOME = Object.values(
   import.meta.glob<string>("./chain/recorded/onyx-1-gov-dao-home.md", {
     query: "?raw",

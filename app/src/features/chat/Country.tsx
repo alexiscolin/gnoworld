@@ -1,4 +1,4 @@
-// The country a person declares (+gnoworld/country, 7j), shared by a line's head, who is here and the person card: its code to the
+// The country a person declares (+gnoworld/country), shared by a line's head, who is here and the person card: its code to the
 // eye, as the video's frames 56 and 76 draw it, its name to a reader and a screen reader. Any client may write anything there:
 // what is no country draws nothing and counts for none.
 import type { Line } from "@gnoworld/core";

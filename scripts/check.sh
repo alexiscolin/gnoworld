@@ -1,5 +1,5 @@
 #!/bin/sh
-# check.sh: the commit gate (the harness overhaul, phase 3a; D13168). It checks what the change touches, in seconds when no test runs: Prettier and
+# check.sh: the commit gate. It checks what the change touches, in seconds when no test runs: Prettier and
 # ESLint read the change's files, TypeScript the types, Vitest the tests related to the change (scripts/related.py), gno its lint and
 # tests when a realm changed. A tree with no change, or a change of a config, the lockfile or a path no area places, is checked whole.
 # The harness, deploy/, evals/ and tools/ get no type check, and deploy/, tier 1, its related tests (related.py: prices.test.ts reads it
@@ -7,7 +7,7 @@
 # tools/agent-github/test.sh by hand). GitHub's gate judges each pull request by what
 # it calls for (.github/workflows/gate.yml, the base's detector), and the night runs the rest (nightly.yml). Its steps run in lanes side by side: a lane stops at its first
 # failure, every lane runs to its end, and the gate fails when one did, showing each. It takes no option, and runs in a repository:
-# the change is git's. A session runs it before committing code; pre-commit runs only the secret scan, Prettier and check_docs (D13173).
+# the change is git's. A session runs it before committing code; pre-commit runs only the secret scan, Prettier and check_docs.
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome (docs/DEVELOPMENT.md, "Toolchain"). Node comes
 # from .node-version, through nvm when the shell's own differs.
 set -eu
@@ -15,27 +15,27 @@ set -eu
 	echo "check.sh: no option since D13168 (the old --full, --merge, --tests-all and --everything): GitHub's gate judges a branch's pull request (.github/workflows/gate.yml)" >&2
 	exit 1
 }
-# ESLint over the whole project passed 4 GB once slice 9 joined (2026-11-06): every node of the gate gets 8 GB of heap.
+# ESLint over the whole project passes 4 GB: every node of the gate gets 8 GB of heap.
 export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=8192"
 started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # A failing run ends on its own last line, which branch.js reads: `check.sh: FAILED at <lane>:<step>`, on every exit path, signals
 # included. bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set on the last line, tells a
 # run that reached its end from one that died on the way. The lanes still running are stopped and waited for before their folder
-# goes (one writing in it while rm ran left it behind: gate run 43599405799, under dash): their subshells; a tool one started may
+# goes (one writing in it while rm ran left it behind, under dash): their subshells; a tool one started may
 # outlive it, so the race is narrowed, not closed.
 failed_at=main:start
 lanes= # the lanes started, which the trap stops: set before it, so a caller's own `lanes` never reaches its eval
 trap 'status=$?; for l in $lanes; do eval "kill \"\${pid_$l}\"" 2>/dev/null || :; done; wait 2>/dev/null || :; rm -rf "${logs:?}" || :; [ "$status" = 0 ] && [ "${finished:-}" = 1 ] || echo "check.sh: FAILED at $failed_at" >&2; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
-cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
+cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-# Nor a caller's: a common folder of its own would hold hooks of its choice (lot 1's security review, S5).
+# Nor a caller's: a common folder of its own would hold hooks of its choice.
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES
 unset COVERAGE_ALL CORE_CHROMIUM # vitest.config.ts's switches, which would change what its tests are
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "check.sh: no repository: the change it checks is git's" >&2; exit 1; }
-# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
+# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot.
 git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
 runs_from=$(git rev-parse --path-format=absolute --git-path hooks)
 if [ "$runs_from" != "$git_dir/hooks" ]; then
@@ -78,7 +78,7 @@ changed=$(
 whole=false ts=false tests=false gno=false code=false files=
 while IFS= read -r path; do
 	[ -n "$path" ] || continue
-	case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; *.md) continue ;; esac # prose; a recorded page under the sources is a fixture (F4812)
+	case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; *.md) continue ;; esac # prose; a recorded page under the sources is a fixture
 	code=true
 	case $path in
 	app/src/* | app/tests/* | app/data/* | app/lab/* | app/public/* | server/src/* | jarvis/src/* | link-reader/src/* | packages/*/src/*) ts=true ;;
@@ -92,7 +92,7 @@ done <<EOF
 $changed
 EOF
 $code || whole=true # no change, or prose alone, is checked whole
-# The tests, at a commit, for a tier-1 path alone (the speed plan, 2026-11-06, kept by D13168: a change of shared code ran 456 test files,
+# The tests, at a commit, for a tier-1 path alone (a change of shared code runs 456 test files,
 # 100 s; GitHub's unit job runs a pull request's tests when TypeScript or its config changed): docs/REVIEW.md's tier-1 rows, read by scripts/speeds.py --tier1, any doubt
 # being tier 1. A whole run runs every test.
 tier1=true
@@ -100,7 +100,7 @@ if ! $whole && [ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --ti
 
 # The tools run as package.json's scripts, the one place their commands are written. named <script> <option>...: the script, its last
 # word `.` (the whole repository) replaced by the change's files, each a word of its own, after `--` (a name that reads as an option is
-# a file: lot 1, S3); a script of another shape is refused, never run as it is.
+# a file); a script of another shape is refused, never run as it is.
 run() { sh -c "$(node -p "require('./package.json').scripts['$1']") ${2:-}"; }
 named() {
 	script=$(node -p "require('./package.json').scripts['$1']")
@@ -120,7 +120,7 @@ named() {
 	set +f
 	sh -c "${script% .} $options -- \"\$@\"" sh "$@"
 }
-# The type check builds incrementally (Alexis, 2026-11-04), from the worktree's own .claude/tmp/tsc, whatever a caller's TSC_CACHE
+# The type check builds incrementally, from the worktree's own .claude/tmp/tsc, whatever a caller's TSC_CACHE
 # says. TypeScript keys each file of its .tsbuildinfo on its text.
 TSC_CACHE=$PWD/.claude/tmp/tsc
 mkdir -p "$TSC_CACHE" && export TSC_CACHE
@@ -141,7 +141,7 @@ start() {
 }
 
 lane_lint() {
-	# The harness's floor, at every run: its docs name only files that exist, every script parses (F084: a broken one passed every
+	# The harness's floor, at every run: its docs name only files that exist, every script parses (a broken one would pass every
 	# commit), and a changed shell script reads as sh, every scripts/*.sh and .githooks/* on a whole run: Prettier and ESLint read none of them.
 	step scripts
 	python3 -I scripts/check_docs.py

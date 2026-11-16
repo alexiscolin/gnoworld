@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { integrity } from "./digest.ts";
 
 // The one spelling of a file's digest, the build's and the worker's both: subresource integrity's,
-// sha384 in base64 (F342). Each value is node's own createHash.
+// sha384 in base64. Each value is node's own createHash.
 test("writes a file's digest as subresource integrity does, sha384 in base64", async () => {
   expect(await integrity(new TextEncoder().encode("abc"))).toBe(
     "sha384-ywB1P0WjXou1oD1pmsZQBycsMqsO3tFjGotgWkP/W+2AhgcroefMI1i67KE0yCWn",

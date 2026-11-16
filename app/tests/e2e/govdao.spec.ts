@@ -6,7 +6,7 @@ import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { opened } from "./sceneStage.ts";
 
-// GovDAO, a world with a realm (docs/decisions.md, 2026-10-31): its page reads the realm's proposals from the chain, in the format
+// GovDAO, a world with a realm: its page reads the realm's proposals from the chain, in the format
 // RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own comment). The page states no threshold, so the
 // page draws none: no "of 66.66%", no ring. The plate is the realm plate's (its kicker, title, line, actions, figures, then its cards).
 async function chain(page: Page, { down = false }: { down?: boolean } = {}): Promise<void> {
@@ -140,7 +140,7 @@ test.describe("GovDAO at the video's size", () => {
   });
 });
 
-// An open proposal (Alexis, 2026-11-02, F4308): the ring and the pill show what the chain gives, its yes and its no, and no threshold where
+// An open proposal: the ring and the pill show what the chain gives, its yes and its no, and no threshold where
 // none exists; the scene's ring has no mark.
 test.describe("GovDAO with an open proposal", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });

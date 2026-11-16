@@ -1,7 +1,16 @@
 # Findings gitleaks may skip, one fingerprint each, every one declared in its commit.
-# Older commits that name the author's home folder or a service of the demo's host; they go with
-# the history rewrite before the repository opens (docs/decisions.md, 2026-10-17).
+# Older commits that name the author's home folder or a service of the demo's host: they go with the history rewrite before the
+# repository opens (docs/decisions.md, still standing).
 af07cab511dd43840c9124e4975f13f41b57fdb9:docs/review/findings.md:home-folder-path:41
 5a01da51183f40e09ef9cb866df846ea2e7544cd:docs/plans/slice-1.md:host-service:31
 20ff43a4ef5200fa20f3c008c297b201db60afd6:docs/plans/slice-1.md:host-service:30
 cc45b8c3a53b480f6668d14ffd37b1c8a520c6ba:adr/0002-validated-prototype.md:host-service:983
+# The answers Adena gave one account, committed once and left in history.
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:21
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:22
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:39
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:40
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:69
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:70
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:85
+79ba8e81357bb46a24c76423f84f2e79f67f7ce9:app/recording/adena-recording.json:adena-answer:86

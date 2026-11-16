@@ -1,4 +1,4 @@
-// Direct messages (slice 4's 4e): a PRIVMSG or a NOTICE to a nick, not a room, read as a room's line is (lineOf).
+// Direct messages: a PRIVMSG or a NOTICE to a nick, not a room, read as a room's line is (lineOf).
 // One is an account's to me, or mine to an account, as Ergo echoes it (echo-message); its partner, the other account,
 // keys the conversation. A guest has none: a line with no account tag naming its nick (force-nick-equals-account) is
 // no account's, and the page never shows it.

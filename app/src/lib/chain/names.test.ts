@@ -3,7 +3,7 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { readName, shownName, type Named } from "./names.ts";
 
-// 9f: an account's name on one chain, read live from r/sys/users with its height, and the name the page shows (mainnet's, Onyx's,
+// An account's name on one chain, read live from r/sys/users with its height, and the name the page shows (mainnet's, Onyx's,
 // else the short address). NOT recorded: written in the shape of the recorded `vm/qeval` texts (`("aeddi" string)`, `(true bool)`).
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const RPC = "https://rpc.onyx.testnets.gno.land:443";
@@ -49,7 +49,7 @@ describe("readName", () => {
     expect(expressions()).toEqual([DELETED]);
   });
 
-  // C14 of the review: a room's members are read together, so the block is asked once a chain, not once an account.
+  // A room's members are read together, so the block is asked once a chain, not once an account.
   it("takes the block it is given and asks the node for none, the name read at it", async () => {
     const { fetcher, expressions } = node({ [DELETED]: "(false bool)", [NAME]: '("aeddi" string)' });
     const read = await readName(RPC, { ...on, height: 55000 }, options(fetcher));

@@ -29,7 +29,7 @@ async function drawQueue(): Promise<void> {
   }
   const { thumbsOf } = chunk;
   while (queue.length > 0) {
-    // Each batch once the browser rests: never in the middle of a flight's frames or a fade (D428).
+    // Each batch once the browser rests: never in the middle of a flight's frames or a fade.
     await restsFor();
     const batch = queue.splice(0, BATCH);
     const drawn = await thumbsOf(batch);

@@ -1,4 +1,4 @@
-/* The frame a realm's form and its card share (5h). */
+/* The frame a realm's form and its card share. */
 @layer components {
   .frame {
     padding: var(--space-xs);

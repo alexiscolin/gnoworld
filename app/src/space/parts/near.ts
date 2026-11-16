@@ -1,4 +1,4 @@
-// The planets near enough to be seen as themselves (D401): the few largest on screen, once a few pixels across, are drawn as the
+// The planets near enough to be seen as themselves: the few largest on screen, once a few pixels across, are drawn as the
 // generated planets they are (the Earth as the hand-made one), at the same place and size, lit by their sun; their quad is hidden
 // meanwhile. A planet stands only once its maps came, went to the GPU one a frame, and its shaders compiled, so it never waits on screen
 // and never stalls the frame it comes in.
@@ -45,7 +45,7 @@ export class Near {
   // The frame's time, the page's planet and the one it frames close (-1 none), for the callbacks a frame runs.
   #seconds = 0;
   #alone = -1;
-  // How far the page has come over the sun (0 where the sun is drawn, 1 on a page): the Earth's sun is the star's till then (D13002).
+  // How far the page has come over the sun (0 where the sun is drawn, 1 on a page): the Earth's sun is the star's till then.
   #page = 0;
   #lit: ReadonlySet<string> | undefined;
   #close = -1;
@@ -58,11 +58,11 @@ export class Near {
   /** Whether a planet is still coming in from its skeleton: the scene must go on drawing, or the fade stops where it stands. */
   arriving = false;
 
-  /** The worlds a lens lights, by their ids: the others stay quads, which dim (D425); none, every one may be drawn as itself. */
+  /** The worlds a lens lights, by their ids: the others stay quads, which dim; none, every one may be drawn as itself. */
   only: ReadonlySet<string> | undefined;
-  // Each world's ground turned past its own spin, in seconds of it, so a bubble stands clear of the dock (D488, D565): kept when its page
+  // Each world's ground turned past its own spin, in seconds of it, so a bubble stands clear of the dock: kept when its page
   // goes, so the world keeps the angle it has on screen and turns on at its own pace, never unwound or reset.
-  // Each world's lean toward the eye too (D13916), laid over its look's own lean and tilt.
+  // Each world's lean toward the eye too, laid over its look's own lean and tilt.
   readonly #led = new Map<string, { ahead: number; leaned: Quaternion }>();
   // What a Near keeps for its planets, lent to the next (adopt.ts).
   readonly #kept = { held: this.#held, hidden: this.#hidden, once: this.#drawnOnce, led: this.#led };
@@ -97,7 +97,7 @@ export class Near {
   }
 
   /** A frame `seconds` on: the planets drawn as themselves stand where their quads would; with `alone` (a page's planet's index),
-   * that one alone; `close`, the planet a page frames close, its air's lit limb pushed (D458). */
+   * that one alone; `close`, the planet a page frames close, its air's lit limb pushed. */
   tick(
     seconds: number,
     view: {
@@ -208,7 +208,7 @@ export class Near {
   #place(planet: Planet, drawn: Drawn, seconds: number): void {
     placeOf(planet, seconds, this.#at);
     drawn.group.position.set(this.#at.x, this.#at.y, this.#at.z);
-    // As large as its quad (shaders/planets.ts): a home world drawn larger shrinks with it, never at once (D548).
+    // As large as its quad (shaders/planets.ts): a home world drawn larger shrinks with it, never at once.
     drawn.group.scale.setScalar(planet.radius * scaleOf(planet.index));
     const { place } = planet.system;
     drawn.setSun(this.#sun.set(place.x - this.#at.x, place.y - this.#at.y, place.z - this.#at.z).normalize());
@@ -223,7 +223,7 @@ export class Near {
       seconds,
       this.#fade.still,
     );
-    // A world a lens leaves unlit stays itself, darkened as the lens comes, never a flat quad (D502); the last lens's while it goes.
+    // A world a lens leaves unlit stays itself, darkened as the lens comes, never a flat quad; the last lens's while it goes.
     if (this.only !== undefined) this.#lit = this.only;
     drawn.setFar(this.#lit?.has(planet.id) === false ? this.#device.lens.value : 0);
     drawn.setClose(planet.index === this.#close ? 1 : 0);

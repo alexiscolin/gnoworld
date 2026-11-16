@@ -6,7 +6,7 @@ import { BOUNDS } from "./bounds.ts";
 /** Systems around what the eye looks at that a look keeps, nearest first. */
 export const NEAR_MOST = 128;
 
-/** A rock the home's view at rest lays in front of everything (7p), decor, not a world: its place on the stage, the way to its star from
+/** A rock the home's view at rest lays in front of everything, decor, not a world: its place on the stage, the way to its star from
  * there, its radius in map units, its shade and its turn, both from 0 to 1. */
 export interface Rock {
   readonly place: Point;
@@ -16,7 +16,7 @@ export interface Rock {
   readonly turn: number;
 }
 
-/** A Plan a view draws (7v), a system's or the Earth's: its plane, its worlds on their Plan's orbits, their names, and where a name goes
+/** A Plan a view draws, a system's or the Earth's: its plane, its worlds on their Plan's orbits, their names, and where a name goes
  * where the view knows it; the labels' chunk draws it, with the file's realms' pages. */
 export interface Planned {
   readonly system: StarSystem;
@@ -28,7 +28,7 @@ export interface Planned {
   readonly places: readonly Point[];
   readonly rings: readonly (readonly Point[])[];
   readonly ringOf: readonly number[];
-  /** The worlds it names; the others counted under a "+N" standing where one of them would be named, clear of every name (F5462). */
+  /** The worlds it names; the others counted under a "+N" standing where one of them would be named, clear of every name. */
   readonly named: ReadonlySet<string>;
   readonly more: { readonly id: string; readonly count: number } | undefined;
 }
@@ -47,9 +47,9 @@ export class Drawn {
   bodyCount = 0;
   dotCount = 0;
   nearCount = 0;
-  /** The home's rocks, which the view at rest lays at its looks and the cosmos's labels' chunk draws (7p): declared, so the cosmos's chunk
+  /** The home's rocks, which the view at rest lays at its looks and the cosmos's labels' chunk draws: declared, so the cosmos's chunk
    * carries nothing of them. */
   declare rocks?: readonly Rock[];
-  /** The Plan the view draws, whose ellipses and names the labels' chunk draws (7v): declared, as the rocks are. */
+  /** The Plan the view draws, whose ellipses and names the labels' chunk draws: declared, as the rocks are. */
   declare plan?: Planned | undefined;
 }

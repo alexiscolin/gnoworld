@@ -1,6 +1,6 @@
 // The inline scripts React Router 8.4.0 writes in a pre-rendered page of this app, copied from a build (a world's page
 // data cut short), to test the policy against the forms it must accept. An upgrade that changes one fails the build until the
-// pinned form in csp.ts is read again (F475): that is the point.
+// pinned form in cspForms.ts is read again: that is the point.
 export const SCROLL =
   '((storageKey, restoreKey) => {\n\t\tif (!window.history.state || !window.history.state.key) {\n\t\t\tlet key = Math.random().toString(32).slice(2);\n\t\t\twindow.history.replaceState({ key }, "");\n\t\t}\n\t\ttry {\n\t\t\tlet storedY = JSON.parse(sessionStorage.getItem(storageKey) || "{}")[restoreKey || window.history.state.key];\n\t\t\tif (typeof storedY === "number") window.scrollTo(0, storedY);\n\t\t} catch (error) {\n\t\t\tconsole.error(error);\n\t\t\tsessionStorage.removeItem(storageKey);\n\t\t}\n\t})("react-router-scroll-positions", null)';
 

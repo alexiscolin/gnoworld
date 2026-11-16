@@ -1,6 +1,6 @@
-// An address's face as numbers (docs/DESIGN-SYSTEM.md, "Avatar"; slice-2e.md §2): a 32-bit hash of
+// An address's face as numbers (docs/DESIGN-SYSTEM.md, "Avatar"): a 32-bit hash of
 // its letters seeds a stream of numbers in [0, 1), read in a fixed order. Pure: no clock, no chance,
-// no network, no cache: about a microsecond a face (F318).
+// no network, no cache: about a microsecond a face.
 
 /** A face's parts: in a 48-unit disc centred on (24, 24), the clouds as fractions of its box. */
 export interface Parts {

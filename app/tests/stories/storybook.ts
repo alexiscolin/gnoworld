@@ -74,7 +74,7 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
   const ids = (await entries(page)).map((entry) => entry.id);
   expect(ids.length).toBeGreaterThan(10);
   const chosen = ids.filter((id) => id.startsWith(prefix));
-  // A walk costs about a tenth of a second a story, and the stories grow with each slice: a test
+  // A walk costs about a tenth of a second a story, and the stories grow: a test
   // that walks them gets a second a story on top of Playwright's 30 s.
   test.setTimeout(30_000 + chosen.length * 1_000);
   return chosen;
@@ -110,7 +110,7 @@ export async function open(page: Page, id: string) {
 /** The longest an arrival or a fade is awaited: the latest figure's end (2.95 s, Figures' ring) rounded up. */
 const SETTLE_MS = 5_000;
 
-/** The page once what plays on it has played: the arrivals, fades and settles of D13969. What is not running is not awaited (a beat paused out
+/** The page once what plays on it has played: the arrivals, fades and settles of the design system's motion. What is not running is not awaited (a beat paused out
  * of view), nor what ends later (a live dot's beat runs a minute, a skeleton's breath never ends). What reads a colour, an opacity or a box
  * reads it here, never half way. */
 export async function settle(page: Page) {

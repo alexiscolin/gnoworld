@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChainFetch } from "./read.ts";
 import { readCallFees } from "./fees.ts";
 
-// Answer 9d-1: the fee line is an estimate from the last successful calls of one function, its block named. The wire is the
-// recording's field names (SHARED/recordings/README.md), not a recorded answer. The indexer's `order` and `limit` arguments were
-// read from its live schema (F5729), so the newest are still chosen here, by block, whatever order it answers in.
+// The fee line is an estimate from the last successful calls of one function, its block named. The wire is the
+// recorded field names, not a recorded answer. The indexer's `order` and `limit` arguments were
+// read from its live schema, so the newest are still chosen here, by block, whatever order it answers in.
 const INDEXER = "https://indexer.onyx.testnets.gno.land/graphql/query";
 const REALM = "gno.land/r/sys/namereg/v0";
 interface Over {

@@ -1,4 +1,4 @@
-// The galaxy's body (Alexis, 2026-11-09, the artifact's look, finer): a fine dense field of round grains that follows the saucer, bright
+// The galaxy's body (the artifact's look, finer): a fine dense field of round grains that follows the saucer, bright
 // and dense at the heart and thinning smoothly to the rim, laid on a jittered sunflower so it fills the disc with no clump and no hole;
 // many tiny, a few larger, their soft falls overlapping into one diffuse glow whose parallax gives the volume. Their colour comes from one
 // smooth field, as a spiral galaxy's: gold-white at the heart, blue-white to the rim, a touch of rose along two arms and of teal in places.
@@ -66,7 +66,7 @@ export function grainsOf({ home, scale }: Universe): BufferGeometry {
     places[slot * 3 + 1] = HEART.y + gauss() * saucerHeight(r * disc, disc) * 0.7;
     places[slot * 3 + 2] = HEART.z + Math.sin(turn) * r * disc;
     const tint = tintAt(r, turn, phase);
-    // The outer third fades to nothing, so the disc ends in a haze and never on a drawn edge (D494).
+    // The outer third fades to nothing, so the disc ends in a haze and never on a drawn edge.
     const light = (0.1 + 0.32 * Math.max(0, 1 - r) ** 1.5 + random() * 0.06) * (1 - smoothstep(0.62, 1.05, r));
     colours.set([tint[0] * light, tint[1] * light, tint[2] * light, 0.6 + random() ** 4 * 2.4], slot * 4);
   }

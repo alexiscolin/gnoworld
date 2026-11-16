@@ -42,7 +42,7 @@ interface Start {
   readonly reload: () => void;
   readonly report: (error: unknown) => void;
   /** Whether the host answers for the worker's script: a fetch of it that cannot reach the host,
-   * offline or on a network with no way out, is expected of an installed app (F343, F351). */
+   * offline or on a network with no way out, is expected of an installed app. */
   readonly reachable: () => Promise<boolean>;
   readonly onUpdate: (apply: () => void) => void;
 }
@@ -75,8 +75,8 @@ export async function startServiceWorker(start: Start): Promise<void> {
     reloaded = true;
     start.reload();
   };
-  // The click goes to the worker waiting then (a newer one may have set aside the one offered, F380), and every
-  // click sends the message: one may be lost, and the page cannot tell (F679).
+  // The click goes to the worker waiting then (a newer one may have set aside the one offered), and every
+  // click sends the message: one may be lost, and the page cannot tell.
   const apply = () => {
     const waiting = registration.waiting;
     // Another tab's click may have made it active already: there is nothing left to wait for.

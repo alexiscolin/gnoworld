@@ -1,4 +1,4 @@
-// A chain and its indexer as the worlds and preview jobs' tests build them (7c, 8f): one `send` that answers the RPC's abci_query reads
+// A chain and its indexer as the worlds and preview jobs' tests build them: one `send` that answers the RPC's abci_query reads
 // (vm/qpaths, vm/qdoc, vm/qfile, vm/qeval, vm/qrender) and the indexer's GraphQL POST, each from a function the test gives, and records what
 // was asked and how many requests were in flight at once. The envelope of an abci_query is QueryAnswer's (packages/schemas/src/chain.ts).
 import type { Send } from "@gnoworld/service/net";
@@ -56,7 +56,7 @@ export interface CallRow {
 /**
  * The indexer's answer to the worlds job's read of the chain's calls, as onyx-1 gives it (worlds/onyxIndexer.json): a block's rows when asked
  * its `height`, else the rows above `above` (from the first without it), at most `limit`, by height; an empty answer is null. A request with
- * neither a page's size nor a height is 7c's per-realm filter, which onyx-1 refused (422).
+ * neither a page's size nor a height is a per-realm filter, which onyx-1 refused (422).
  */
 export function pagedCalls(rows: readonly CallRow[]) {
   const sorted = [...rows].sort((a, b) => a.block_height - b.block_height);

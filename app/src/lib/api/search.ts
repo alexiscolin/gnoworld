@@ -1,4 +1,4 @@
-// The browser's client of the chat's search (server/src/search/routes.ts, mounted at /api/search; slice 13, C), through the one JSON
+// The browser's client of the chat's search (server/src/search/routes.ts, mounted at /api/search), through the one JSON
 // call of lib/api/http.ts. The words are checked as the server checks them before any is sent; the answer is read through the
 // schema and refused whole when a mark lies outside its text: a server answer is data, never trusted.
 import { SearchPage, SearchQuery } from "@gnoworld/schemas";

@@ -1,4 +1,4 @@
-// A message of several lines (IRCv3's draft/multiline; slice 4, docs/decisions.md row 255): Ergo relays it to a
+// A message of several lines (IRCv3's draft/multiline): Ergo relays it to a
 // reader with the capability as one batch, its opening line holding the message's id, time and account, each line a
 // PRIVMSG (or NOTICE) of the batch, a line continuing the one before marked draft/multiline-concat (irc/client.go,
 // composeMultilineBatch, v2.19.1). Read as one message, its lines joined by breaks. The relay is untrusted: a batch

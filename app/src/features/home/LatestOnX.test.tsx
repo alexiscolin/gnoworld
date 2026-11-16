@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
 import { LatestOnX } from "./LatestOnX.tsx";
 
-// The Earth's latest card (D13931): the blog's last post read on chain, with its day and its page on gno.land's gnoweb; a read that fails or
+// The Earth's latest card: the blog's last post read on chain, with its day and its page on gno.land's gnoweb; a read that fails or
 // holds no post draws nothing, not even its heading.
 const read = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/chain/rpc.ts", () => ({ readPage: read }));
@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe("the latest post of the blog", () => {
-  // D13015: a day is "30 Oct" in the current year, "30 Oct 2026" in another; the clock is the test's, so the year is.
+  // A day is "30 Oct" in the current year, "30 Oct 2026" in another; the clock is the test's, so the year is.
   it.each([
     ["2026-11-11T10:00:00Z", "30 Oct"],
     ["2027-01-05T10:00:00Z", "30 Oct 2026"],

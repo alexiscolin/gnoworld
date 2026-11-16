@@ -1,4 +1,4 @@
-// What the chain told of a world, given to the thread of its main room (slice 9g, frames 20 to 35): the page that holds the room gives the
+// What the chain told of a world, given to the thread of its main room: the page that holds the room gives the
 // calls and the place through these contexts (each a value that stands between renders), and the room's lines draw each call as a card
 // among the messages (chainEntries.ts), placed by the time it was heard. Only the contexts are here: the first screen holds no more of it.
 import { createContext } from "react";

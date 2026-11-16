@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { statusOrbit } from "./status.ts";
 
-// The status ring (ADR-0002 §1, "Status ring"; decision of 2026-10-31): a tilted orbit whose small moon, on its front half, marks what the
+// The status ring (ADR-0002 §1, "Status ring"): a tilted orbit whose small moon, on its front half, marks what the
 // realm reports. The front half runs from the orbit's left end (an angle of π) past the eye to its right end (0); the arc up to the moon is
 // lit, and a mark stands at the threshold.
 const share = fc.double({ min: 0, max: 1, noNaN: true });

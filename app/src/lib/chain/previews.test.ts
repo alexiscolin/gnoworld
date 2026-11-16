@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PREVIEWS_URL, readPreviews } from "./previews.ts";
 
-// The captures' file (8f), this site's own: the server's job wrote it from a chain, so it passes a size cap and a schema, and a read
+// The captures' file, this site's own: the server's job wrote it from a chain, so it passes a size cap and a schema, and a read
 // that fails is no capture, never a throw: no capture, no preview.
 const CAPTURE = { path: "gno.land/r/gov/dao", captured: "2026-11-05T10:00:00.000Z", text: "# GovDAO\n" };
 const FILE = { version: 1, universe: "onyx", updated: "2026-11-05T10:00:01.000Z", previews: [CAPTURE] };

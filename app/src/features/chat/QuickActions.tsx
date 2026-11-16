@@ -1,6 +1,6 @@
 // The quick actions, behind the composer's "/" (what they put in are commands and cards): an image, then the conversation's own,
 // the Earth's (Market chart, Poll, Jarvis), a world's with a realm (Proposal, Realm, Catch up, Jarvis, Market chart), a world's without (Play,
-// Catch up, Poll, Jarvis, Market chart), a direct message's (none: its cards need a room). What a later slice brings is greyed (ui's Menu).
+// Catch up, Poll, Jarvis, Market chart), a direct message's (none: its cards need a room). What is not built yet is greyed (ui's Menu).
 import { Menu, type MenuItem } from "@gnoworld/ui";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -21,7 +21,7 @@ export interface QuickActionsProps {
   realm?: string | undefined;
   /** Where Poll's dialog sends: the room, the account's nick and the composer's way to say a line; none, no Poll. */
   poll?: Omit<PollDialogProps, "open" | "onClose"> | undefined;
-  /** Opens Jarvis's panel over the room (10u-a); none while Jarvis is off or the room is none: Jarvis and Catch up stay greyed. */
+  /** Opens Jarvis's panel over the room; none while Jarvis is off or the room is none: Jarvis and Catch up stay greyed. */
   jarvis?: ((what: "intro" | "catch-up") => void) | undefined;
   /** Adds the market card to the room, the reader's alone; none where there is no room to hold it (a direct message). */
   market?: (() => void) | undefined;

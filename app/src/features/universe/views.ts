@@ -1,4 +1,4 @@
-// What the GUI reads of where space is (D401): how many worlds the system the camera rests at holds (none at home or far out). The door
+// What the GUI reads of where space is: how many worlds the system the camera rests at holds (none at home or far out). The door
 // to space writes it; the home's hero and rail read it, the system itself from the page's address.
 import { EARTH } from "@gnoworld/core";
 import { useSyncExternalStore } from "react";
@@ -31,7 +31,7 @@ export const views = new Views();
 /** The system the page shows, from its address (/s/<namespace>): none far out or at home. Known at the page's first render, before space
  * says where it rests, so nothing shows the last place's words for a frame. */
 export const useResting = (): string | undefined => useParams()["system"];
-/** Whether the world `id` is one of `system`'s: a system is a namespace, its worlds' ids its own (layout.ts); the Earth's (D401, D501) holds
+/** Whether the world `id` is one of `system`'s: a system is a namespace, its worlds' ids its own (layout.ts); the Earth's holds
  * the Earth and the worlds of every namespace that orbits it. */
 export const inSystem = (id: string, system: string): boolean =>
   isHome(system)

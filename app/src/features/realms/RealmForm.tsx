@@ -1,7 +1,7 @@
-// A realm page's form, drawn to be read and nothing else (5h): gnoweb's `<gno-form>` is a way to send a transaction, and
+// A realm page's form, drawn to be read and nothing else: gnoweb's `<gno-form>` is a way to send a transaction, and
 // a page we do not control must not look like one. So no control is drawn, no `<form>`, input, button or select: each
 // field is a name and what the page said of it, every attribute in view, a hidden field too, marked as hidden. Every
-// string is React's text, set left to right: a name or a value cannot read backwards (F786).
+// string is React's text, set left to right: a name or a value cannot read backwards.
 import { isBlank, type FormField } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import edge from "./frame.module.css";

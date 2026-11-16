@@ -5,7 +5,7 @@
 # Paths with a template variable or under .claude/tmp/ are skipped. It also checks the findings
 # ledger, docs/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
 # that no file git tracks or would, as staged or in the work tree, no name, link or commit message
-# of the branch holds a hidden character (F5053, F5087, F5089).
+# of the branch holds a hidden character.
 # Usage: check_docs.py [root]
 import os
 import pathlib
@@ -22,7 +22,7 @@ from repo_files import git, listed, listing
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
 STATUSES = {"claimed", "reproduced", "fixed", "rejected", "intended", "moot", "asked"}
-# The known limits slice 3's plan has the runbook say (its section 8; 3M-19), each by a phrase of its line.
+# The known limits the runbook says, each by a phrase of its line.
 LIMITS = [
     "evaded with a new address",
     "a connection already open lasts until it drops",
@@ -39,10 +39,10 @@ LIMITS = [
 
 
 # What an agent's brief or the review card must keep saying, which nothing else reads: a line cut from one stays green.
-# Every review agent never writes a worktree's git index (2026-10-26: one staged old files into wt-4dm's and failed the
+# Every review agent never writes a worktree's git index (a write there stages old files and fails the
 # next commit's gate); CLAUDE.md's review card ends with the change's risk and undo.
 AGENT_RULE = "Never run a git command that writes the index or the work tree"
-AGENTS = ("design-reviewer", "reviewer", "security-reviewer", "test-auditor")  # each must exist (CR2); the finding-verifier left (2026-11-04)
+AGENTS = ("design-reviewer", "reviewer", "security-reviewer", "test-auditor")  # each must exist
 CARD_ITEM = re.compile(r"^8\. Risk and undo:", re.M)
 
 
@@ -63,7 +63,7 @@ def lost_rules(root):
 
 
 # The instructions Claude Code reads beside the root's (its memory and skills pages): a subfolder's CLAUDE.md and CLAUDE.local.md, an
-# AGENTS.md where no CLAUDE.md stands, and a subfolder's .claude/rules and .claude/skills, each loaded once a file there is read (S2-3).
+# AGENTS.md where no CLAUDE.md stands, and a subfolder's .claude/rules and .claude/skills, each loaded once a file there is read.
 INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}
 ROOT_OWN = {("claude.md",), (".claude", "claude.md")}
 
@@ -84,13 +84,13 @@ def stray_instructions(root):
 
 
 # An image is no text: a file whose suffix names one and that starts with its format's own bytes is not read (a text so
-# named is). Any other file is UTF-8 text read for what hidden.py names (F5053), or is refused: a binary of another format
-# (a font, a video) wants its suffix and first bytes here first (F5082).
+# named is). Any other file is UTF-8 text read for what hidden.py names, or is refused: a binary of another format
+# (a font, a video) wants its suffix and first bytes here first.
 IMAGES = {".png": b"\x89PNG\r\n\x1a\n", ".jpg": b"\xff\xd8\xff", ".webp": b"RIFF"}  # a WebP is RIFF, then its size, then WEBP
 
 
 def messages(root):
-    """(short sha, message) of each commit since the branch left origin/main (F5079): none outside a repository (the
+    """(short sha, message) of each commit since the branch left origin/main: none outside a repository (the
     pre-commit's staged copy) or with no origin/main to say where the branch starts. A git that cannot run, or fails, raises:
     for-each-ref answers nothing for a missing ref, so a failure is never taken for one."""
     if not (root / ".git").exists():
@@ -102,7 +102,7 @@ def messages(root):
 
 
 def staged(root):
-    """{path: (bytes, whether a link)} of each blob the index holds, what a commit takes (F5087), a link's target its bytes:
+    """{path: (bytes, whether a link)} of each blob the index holds, what a commit takes, a link's target its bytes:
     none outside a repository (the pre-commit's staged copy, whose files are the index's). A gitlink (a submodule) holds no
     text. A git that cannot run, or fails, raises."""
     if not (root / ".git").exists():
@@ -127,7 +127,7 @@ def text_of(where, path, data):
 
 def hidden(root):
     """Each hidden character, and each file that is no UTF-8 text: of what a commit takes, the index's copy of each file and
-    link; of the work tree's copy where it differs, and of what git would track; of every name (F5089); and of the branch's
+    link; of the work tree's copy where it differs, and of what git would track; of every name; and of the branch's
     commit messages."""
     out = []
     try:
@@ -177,7 +177,7 @@ def ledger_problems(root):
     for line in ledger.read_text().splitlines():
         cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
         if line.lstrip().startswith("|") and re.fullmatch(r"F\d{3,}", cells[0]):
-            # A row of other than seven cells was skipped by every check below (1,992 rows read, 95 with more and 14 with fewer were not).
+            # A row of other than seven cells would be skipped by every check below.
             if len(cells) != 7:
                 out.append(f"{cells[0]}: {len(cells)} cells, not 7 (a pipe inside a cell is written \\|)")
                 continue
@@ -218,7 +218,7 @@ if rules:
     print("check_docs: a rule the review depends on is gone:", *rules, sep="\n  ", file=sys.stderr)
 if problems:
     print("check_docs: the findings ledger (docs/review/findings.md):", *problems, sep="\n  ", file=sys.stderr)
-# No instruction file below the root reaches a commit (7w3, S2-3): every commit runs this, prose alone included.
+# No instruction file below the root reaches a commit: every commit runs this, prose alone included.
 stray = stray_instructions(root)
 if stray:
     print("check_docs: instructions every session reading their folder would follow, past the root's CLAUDE.md:", *stray, sep="\n  ", file=sys.stderr)
@@ -227,9 +227,9 @@ tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$",
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
     print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)
-# The alerts the server logs are OPERATIONS.md's "Every alert", which ops matches, both ways (3n; F646): each
+# The alerts the server logs are OPERATIONS.md's "Every alert", which ops matches, both ways: each
 # log("alert", { ..., error: "x" }), however laid out, a test's none. An "alert" written otherwise (a template, a
-# constant) or a name no literal cannot be read: it fails (F637).
+# constant) or a name no literal cannot be read: it fails.
 event = re.compile(r"""[`"']alert[`"']""")
 named = re.compile(r"""log\(\s*["']alert["']\s*,\s*\{[^}]*?\berror:\s*["']([a-z_]+)["']""")
 sources = [p for p in listed(root, {".ts"}) if p.relative_to(root).parts[:2] == ("server", "src") and ".test." not in p.name]
@@ -253,9 +253,9 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
-# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways (F2530): pre-commit runs this on every commit,
+# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways: pre-commit runs this on every commit,
 # prose alone included, so a row the table gains or loses without the workflow stops at its own commit, which took a change of the
-# table for prose and ran no gate (7y's c160019e, F4928). The table is read as speeds.py reads it, one reader for both. The harness's
+# table for prose and ran no gate. The table is read as speeds.py reads it, one reader for both. The harness's
 # folders and gno/ are tier 1 by the harness's own rule: TIER1 must hold them; the realms' two folders are the table's `gno/r/` and
 # `gno/p/`. A comment in the list is no entry. A root with no tier-1 row (a test's) has none to compare.
 review = root / "docs/REVIEW.md"
@@ -272,7 +272,7 @@ drift += [f"branch.js's TIER1 holds {p}, which no tier-1 row of docs/REVIEW.md n
 drift += [f"docs/REVIEW.md names {p} as tier 1 in backticks, which branch.js's TIER1 lacks" for p in sorted(named - tier1) if tier1]
 if drift:
     print("check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", *drift, sep="\n  ", file=sys.stderr)
-# The coverage globs held at 100% (vitest.config.ts) are docs/REVIEW.md's tier-1 TypeScript paths (F5543): each such path under app/,
+# The coverage globs held at 100% (vitest.config.ts) are docs/REVIEW.md's tier-1 TypeScript paths: each such path under app/,
 # server/ or packages/ is in one, and each glob matches a file, as istanbul gives a glob with no file no percentage and so no failure.
 held = []
 for key, block in re.findall(r'"([^"]+)":\s*\{([^}]*)\}', (root / "vitest.config.ts").read_text() if (root / "vitest.config.ts").is_file() else ""):

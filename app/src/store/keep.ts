@@ -1,7 +1,7 @@
-// The keep slice of the store (slice 4's 4d; docs/decisions.md, 2026-10-26, "fields are added only"): what an account keeps
+// The keep slice of the store ("fields are added only"): what an account keeps
 // on its device, the lines it saved and, for each room, the reading place it asked to go back to. Read once at a
 // session's start (lib/keep), changed from the device's own state at each change, so another tab's saves are not
-// written over (R10), and never written over a device that could not be read.
+// written over, and never written over a device that could not be read.
 import { lineOf, placeBefore, type IrcMessage, type Line } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
@@ -18,7 +18,7 @@ interface Kept {
   readonly notKept: boolean;
 }
 
-/** What this device keeps for whoever uses it, guest or account (slice 8): it outlives a session. */
+/** What this device keeps for whoever uses it, guest or account: it outlives a session. */
 type DeviceKept = DeviceFields & {
   /** Whether the device was read at all: until then, and when it could not be, nothing is written to it. */
   readonly readable: boolean;
@@ -75,7 +75,7 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
     return { saved: read.saved ?? saved, unread: read.unread ?? unread, readable };
   };
   // Takes a change: the same object when nothing changed; the device written when it may be, `write` saying whether it
-  // took it (a device that refused, or could not be read, noted). The other field is the device's too (F1488); what the
+  // took it (a device that refused, or could not be read, noted). The other field is the device's too; what the
   // device holds and what the memory holds are judged apart, since another tab's change leaves them different.
   const commit = (next: Partial<Pick<Kept, "saved" | "unread">>, held: Held, write: () => boolean) => {
     const now = get().keep;

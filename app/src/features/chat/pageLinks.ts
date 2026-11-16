@@ -1,4 +1,4 @@
-// A line's link to a page that has a capture (8f), read as embeds.ts reads a player's: a realm's home on the default universe's gnoweb,
+// A line's link to a page that has a capture, read as embeds.ts reads a player's: a realm's home on the default universe's gnoweb,
 // exactly, and nothing else. The page never asks the address a line holds: the previews feature looks it up in the site's own file.
 import { inlines, type Block } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas/indexer";

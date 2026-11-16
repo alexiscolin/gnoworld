@@ -72,7 +72,7 @@
     }
   }
 
-  /* On a phone it stands where the offer stood, above the views' bar. */
+  /* On a phone it stands where the offer stands, above the views' bar. */
   @media (width < 900px) {
     .credits {
       inset-block-end: calc(var(--size-bar) + 3 * var(--space-s));
@@ -94,7 +94,7 @@
     color: var(--color-text);
   }
 
-  /* Where the rail stands (core's RAIL.from), the word is centred on the rail's column, under its See all (Alexis, 2026-11-10). */
+  /* Where the rail stands (core's RAIL.from), the word is centred on the rail's column, under its See all. */
   @media (width >= 900px) {
     :root:has([data-rail]) .credits {
       /* layout: the rail's own width (Rail.module.css) */

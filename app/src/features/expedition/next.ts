@@ -1,4 +1,4 @@
-// Where today's expedition goes next (slice 8): the day's stops, those this device reached and the first it has not; the next stop is read
+// Where today's expedition goes next: the day's stops, those this device reached and the first it has not; the next stop is read
 // from the device as the question comes, so another tab's visit counts.
 import { reachedOn, utcDay } from "@gnoworld/core";
 import { pageDevice } from "../../lib/keep/device.ts";

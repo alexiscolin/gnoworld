@@ -1,5 +1,5 @@
-// What the chat says of a place (moved out of places.ts, then into the chat's own chunk, which every page with a chat loads): its header's kicker, its column of worlds, its info panel's links out and
-// its quick actions' row (8d), from the data files.
+// What the chat says of a place, in the chat's own chunk (every page with a chat loads it): its header's kicker, its column of worlds,
+// its info panel's links out and its quick actions' row, from the data files.
 import type { UniverseView } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 

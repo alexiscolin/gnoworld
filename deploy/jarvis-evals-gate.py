@@ -1,4 +1,4 @@
-# The gate to switching Jarvis on (10u-g2, D13987): the last evals result must pass, and be of this code. Run as
+# The gate to switching Jarvis on: the last evals result must pass, and be of this code. Run as
 #   python3 -I deploy/jarvis-evals-gate.py <evals/results> <evals/cases> <fingerprint>
 # where <fingerprint> is what `node evals/fingerprint.ts` prints for the checkout to deploy (deploy/jarvis-on.sh runs it).
 # It prints "ok" and exits 0, or prints why not and exits 1. It fails closed: no result, a result of other code or with no

@@ -1,7 +1,7 @@
 import type { Page } from "../e2e/fixtures.ts";
 
-// 5k: the public indexer answered in a journey as a browser would get it, so a realm's view never reaches the real network.
-// The answer has the shape onyx-1's indexer gave a realm's deploy (onyxRealmDeploy.json, 8g); its facts are this file's own.
+// The public indexer answered in a journey as a browser would get it, so a realm's view never reaches the real network.
+// The answer has the shape onyx-1's indexer gave a realm's deploy (onyxRealmDeploy.json); its facts are this file's own.
 const INDEXER = "https://indexer.onyx.testnets.gno.land/**";
 const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
 

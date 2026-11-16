@@ -1,4 +1,4 @@
-// The aiming tags' arrival (D411): they wait out of sight while a flight runs, and come as a page's words do once it has landed.
+// The aiming tags' arrival: they wait out of sight while a flight runs, and come as a page's words do once it has landed.
 import { gsap } from "gsap";
 import { motionOf } from "../../space/motion.ts";
 import { all, EMPHASIZED, LABEL_MS, MOVED, OUT4, WORDS } from "./arrivalBase.ts";
@@ -9,7 +9,7 @@ const FADE = LABEL_MS / 1000;
 // Whether the flight has landed: the tags that aim at the planet (data-tag) wait out of sight till then, and come as the page's words do.
 let landed = false;
 
-// The aiming tags rise as a page does (D411): the panel's ground first, then its title, then the rest of its lines 0.05 s apart.
+// The aiming tags rise as a page does: the panel's ground first, then its title, then the rest of its lines 0.05 s apart.
 // A tween over no element is logged by GSAP ("target not found"), so each waits for its element.
 function tagsIn(root: ParentNode): gsap.core.Timeline {
   const timeline = gsap.timeline();
@@ -54,7 +54,7 @@ export function enterTag(tag: Element): void {
   else tagsIn(tag.parentElement ?? document);
 }
 
-/** The flight has landed, the planet in its frame: the aiming tags rise, as a page's words do (D411), never before. */
+/** The flight has landed, the planet in its frame: the aiming tags rise, as a page's words do, never before. */
 export function landTags(): void {
   landed = true;
   const tags = all(document, TAGS);

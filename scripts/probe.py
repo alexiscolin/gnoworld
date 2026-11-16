@@ -29,10 +29,10 @@ LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 +
 with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
-# The network and the device's storage, which the app reaches only from lib and the worker (F378).
-# No state at a module's top in a workspace's source (F412): every test shares it, and StrykerJS ignores what builds it.
+# The network and the device's storage, which the app reaches only from lib and the worker.
+# No state at a module's top in a workspace's source: every test shares it, and StrykerJS ignores what builds it.
 MODULE = "no-restricted-syntax: A Map, WeakMap or Set at a module's top"
-# What runs on a frame makes nothing (ADR-0002 §9, backlog row 7): the collector's pause is a dropped frame.
+# What runs on a frame makes nothing (ADR-0002 §9): the collector's pause is a dropped frame.
 FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
@@ -72,7 +72,7 @@ LINT = [
     ("chance.ts", "export function roll(): number {\n  return Math.random();\n}\n", "no-restricted-properties: 'Math.random'"),
     ("perf.ts", "export function tick(): number {\n  return performance.now();\n}\n", "no-restricted-properties: 'performance.now'"),
     ("long.ts", LONG, "max-lines-per-function"),
-    # A u regex's class right before `$`: V8 14.6 misreads a character past the BMP there (F816, F821).
+    # A u regex's class right before `$`: V8 14.6 misreads a character past the BMP there.
     ("class_at_end.ts", "export const wordy = (s: string): boolean => /[\\p{L}_]$/u.test(s);\n", "no-restricted-syntax: A character class right before `$`"),
     ("alternation_at_end.ts", "export const wordy = (s: string): boolean => /(?:\\p{L}|_)$/u.test(s);\n", None),
     ("eval.ts", "export function run(code: string): unknown {\n  return eval(code);\n}\n", "no-eval"),
@@ -92,7 +92,7 @@ LINT = [
     ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("skip_if.test.ts", 'import { test } from "vitest";\n\ntest.skipIf(true)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("run_if.test.ts", 'import { test } from "vitest";\n\ntest.runIf(false)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
-    # A bench switched off measures nothing, as a test switched off checks nothing (security-S1): the bench files too.
+    # A bench switched off measures nothing, as a test switched off checks nothing: the bench files too.
     ("skipped.bench.ts", 'const describe = { skip: (name: string, f: () => void): string => name + String(f) };\n\ndescribe.skip("x", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
     ("focused.bench.tsx", 'const bench = { only: (name: string, f: () => void): string => name + String(f) };\n\nbench.only("x [1 ms]", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
     ("clean.bench.ts", 'const bench = (name: string, f: () => void): string => name + String(f);\n\nbench("x [1 ms]", () => undefined);\n', None),
@@ -164,7 +164,7 @@ seen = set()
 
 
 # What vitest.config.ts reads to load, copied into a probe's copy: one list, so a file the config comes to read
-# (lint/shared.config.ts in b4a33fa, the compiled project in a633d92) breaks no copy for want of it (F1747).
+# (lint/shared.config.ts, the compiled project) breaks no copy for want of it.
 VITEST_CONFIG = ("vitest.config.ts", "lint/shared.config.ts", "app/vitest.compiled.config.ts")
 
 
@@ -270,9 +270,9 @@ try:
     if part("pinned_node"):
         # Every Vitest run is on the Node .node-version pins, whatever it runs: vitest.config.ts refuses another Node as every
         # run reads it (a whole run, one project, `list`; StrykerJS's dry run and `bench` start Vitest the same way, through
-        # createVitest). Another V8 reads some regexes otherwise (F816 came from StrykerJS on Homebrew's Node 26). Probed on a
+        # createVitest). Another V8 reads some regexes otherwise (StrykerJS on Homebrew's Node 26 does). Probed on a
         # copy of the config with a pin of its own: .node-version, which check.sh reads for its PATH and the sandbox keeps from
-        # a command, stays as it is even when this run is killed (G10).
+        # a command, stays as it is even when this run is killed.
         with open(".node-version") as f:
             pinned = f.read()
         refusal = "Vitest runs on Node"
@@ -298,8 +298,8 @@ try:
 
     if part("bench_files"):
         # Vitest runs the benches vitest.config.ts names, the form `*.bench.ts(x)` that ESLint's BENCHES and BENCH_FILE
-        # (bench.py, check_regressions.py) read, and no other: its own default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran
-        # a `room.benchmark.tsx` or an `x.bench.mts` no guard named, switched off or not (CR3). On a copy of the config
+        # (bench.py, check_regressions.py) read, and no other: its own default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, would run
+        # a `room.benchmark.tsx` or an `x.bench.mts` no guard named, switched off or not. On a copy of the config
         # (and the lint's shared names it imports), with one bench of each form.
         forms = {"a.bench.ts": True, "b.bench.tsx": True, "c.benchmark.ts": False, "d.bench.mts": False, "e.benchmark.tsx": False}
         with tempfile.TemporaryDirectory() as copy:
@@ -324,7 +324,7 @@ try:
 
     if part("core_chromium"):
         # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than
-        # Node's (F816, F817), and only when CORE_CHROMIUM is set: a planted test that passes on
+        # Node's, and only when CORE_CHROMIUM is set: a planted test that passes on
         # Node fails there while a clean one passes beside it, a failure writes nothing beside the code, and with no
         # CORE_CHROMIUM, `vitest list` (check_regressions.py) lists core's tests on Node alone, opening no browser.
         tests = {"engine.test.ts": ("outside a page", 'expect(typeof document).toBe("undefined")'), "clean.test.ts": ("anywhere", "expect(1 + 1).toBe(2)")}
@@ -366,7 +366,7 @@ try:
         shutil.rmtree(HERE)
 
     if part("outside_core"):
-        # Outside core as in it: `fails` is refused (no pairing since slice 4), and a swallowed error too.
+        # Outside core as in it: `fails` is refused, and a swallowed error too.
         lint = dict((n, c) for n, c, _ in LINT)
         lint_cases([("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: A test is never switched off"),
                     ("log_catch.ts", lint["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
@@ -428,7 +428,7 @@ try:
 
     if part("ui_lint"):
         # The design system: React's rules as in the app, and it imports nothing but itself. Its app target is routes.ts,
-        # the one app file no slice renames: a target that does not resolve is no violation (5c renamed worlds.ts).
+        # the one app file no change renames: a target that does not resolve is no violation.
         ui = [
             ("clean.tsx", "export function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n}\n", None),
             ("manual_memo.tsx", 'import { useMemo } from "react";\n\nexport function Card({ n }: { n: number }) {\n  const twice = useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n}\n',
@@ -440,10 +440,10 @@ try:
             ("passes_app_on.ts", 'export { default } from "../../../../app/src/routes.ts";\n', "import-x/no-restricted-paths"),
             ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/routes.ts");\n}\n', "import-x/no-restricted-paths"),
             ("raw_html.tsx", "export function Card({ n }: { n: string }) {\n  return <p dangerouslySetInnerHTML={{ __html: n }} />;\n}\n", "@eslint-react/dom-no-dangerously-set-innerhtml"),
-            # A link drawn past the slot would reload the app on the site's own paths (F259, F317).
+            # A link drawn past the slot would reload the app on the site's own paths.
             ("raw_anchor.tsx", "export function Card({ href }: { href: string }) {\n  return <a href={href}>Go</a>;\n}\n",
              "no-restricted-syntax: A link in ui is an Anchor"),
-            # Nor by createElement, React's or imported, nor a form, which navigates too (F360).
+            # Nor by createElement, React's or imported, nor a form, which navigates too.
             ("create_anchor.tsx", 'import { createElement } from "react";\n\nexport function Card({ href }: { href: string }) {\n  return createElement("a", { href }, "Go");\n}\n',
              "no-restricted-syntax: A link in ui is an Anchor"),
             ("react_anchor.tsx", 'import React from "react";\n\nexport function Card({ href }: { href: string }) {\n  return React.createElement("a", { href }, "Go");\n}\n',
@@ -460,9 +460,9 @@ try:
             ("module_map.tsx", "const seen = new WeakMap<object, string>();\n\nexport function Card({ n }: { n: object }) {\n  return <p>{seen.get(n)}</p>;\n}\n", MODULE),
             ("module_set.ts", "export const SEEN = new Set<string>();\n", MODULE),
             ("module_set.test.tsx", 'import { expect, it } from "vitest";\n\nconst seen = new Set<string>();\n\nit("x", () => {\n  expect(seen.size).toBe(0);\n});\n', None),
-            # A control keeps the system's colours under forced colours: only the avatar's face may not (F319, F349).
+            # A control keeps the system's colours under forced colours: only the avatar's face may not.
             ("forced.css", FORCED, "css/use-baseline"),
-            # field-sizing and resize are the box of lines' alone (F1729): anywhere else they are refused, the avatar's included.
+            # field-sizing and resize are the box of lines' alone: anywhere else they are refused, the avatar's included.
             ("sizing.css", SIZING, "css/use-baseline"),
             ("resize.css", RESIZE, "css/use-baseline"),
         ]
@@ -474,7 +474,7 @@ try:
         shutil.rmtree(FIELD)
 
     if part("app_folders"):
-        # The app's folders (docs/ARCHITECTURE.md, F378), each case planted where its rule reaches: the
+        # The app's folders (docs/ARCHITECTURE.md), each case planted where its rule reaches: the
         # worker imports only itself, a feature another only through its index.ts, a route never the
         # scene; the network and storage only in lib and the worker; console nowhere.
         src = "app/src"
@@ -487,7 +487,7 @@ try:
             ("sw/__probe__/sw_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
             ("sw/__probe__/sw_fetch.ts", reach('fetch("/sw.js")'), None),
             ("sw/__probe__/sw_tested.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(1).toBe(1);\n});\n', None),
-            # A package is refused by its name, installed or not, wherever node_modules sits (F385);
+            # A package is refused by its name, installed or not, wherever node_modules sits;
             # a path out of the folder by the zone.
             ("sw/__probe__/sw_package.ts", uses(name="precacheAndRoute", path="workbox-precaching"), "no-restricted-imports"),
             ("sw/__probe__/sw_scoped.ts", uses(name="precache", path="@workbox/precaching"), "no-restricted-imports"),
@@ -512,7 +512,7 @@ try:
             ("features/__probe__/cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
             ("features/__probe__/beacon.ts", reach('navigator.sendBeacon("/x")'), f"no-restricted-properties: 'navigator.sendBeacon' is restricted from being used. {net}"),
             ("features/__probe__/opfs.ts", reach("navigator.storage"), f"no-restricted-properties: 'navigator.storage' is restricted from being used. {net}"),
-            # The worker's folder keeps fetch and caches, nothing else of the network or storage (F395).
+            # The worker's folder keeps fetch and caches, nothing else of the network or storage.
             ("sw/__probe__/sw_caches.ts", reach('caches.open("x")'), None),
             ("sw/__probe__/sw_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
             ("sw/__probe__/sw_cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
@@ -522,7 +522,7 @@ try:
             ("features/__probe__/peeks.test.ts", 'import { expect, test } from "vitest";\nimport { UpdatePrompt } from "../update/UpdatePrompt.tsx";\n\ntest("x", () => {\n  expect(UpdatePrompt).toBeDefined();\n});\n', None),
             ("lib/__probe__/lib_fetch.ts", reach('fetch("/x")'), None),
             # lib is the boundaries: core, Zod, the schemas; never React, the design system, a feature, the scene,
-            # a route or the store (docs/ARCHITECTURE.md, slice 4's 4a).
+            # a route or the store (docs/ARCHITECTURE.md).
             ("lib/__probe__/lib_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
             ("lib/__probe__/lib_zod.ts", 'import { z } from "zod";\n\nexport const used: unknown = z;\n', None),
             ("lib/__probe__/lib_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
@@ -665,7 +665,7 @@ try:
         shutil.rmtree(src)
 
     if part("jarvis"):
-        # Jarvis's own workspace (D110): linted as the server is (no browser package, no console, fetch in a test alone, no
+        # Jarvis's own workspace: linted as the server is (no browser package, no console, fetch in a test alone, no
         # state at a module's top), type-checked with Node's types by the gate's own script, its tests found, knip reading it.
         src = "jarvis/src/__probe__"
         uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
@@ -700,7 +700,7 @@ try:
         shutil.rmtree(src)
 
     if part("service"):
-        # What the server and Jarvis share (D111): linted as they are, fetch in its net.ts alone, the one way out.
+        # What the server and Jarvis share: linted as they are, fetch in its net.ts alone, the one way out.
         src = "packages/service/src/__probe__"
         uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
         lint = dict((n, c) for n, c, _ in LINT)
@@ -719,7 +719,7 @@ try:
         typecheck_reaches(src, "the service package")
 
     if part("chain"):
-        # The chain-read package (D112), held as the app's lib was: no React, design system or store, no console, no state at
+        # The chain-read package, held as the app's lib was: no React, design system or store, no console, no state at
         # a module's top; type-checked by the gate's own script, with the browser's API.
         src = "packages/chain/src/__probe__"
         uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
@@ -737,7 +737,7 @@ try:
         typecheck_reaches(src, "the chain package")
 
     if part("walls"):
-        # Jarvis apart (Alexis, decision-isolation.md; D110): jarvis/ imports nothing of server/, server/ nothing of jarvis/, and
+        # Jarvis apart (decision-isolation.md): jarvis/ imports nothing of server/, server/ nothing of jarvis/, and
         # the two packages they share nothing of either or of the app, whatever the form: a name, a type, a re-export, a dynamic
         # import, a path that climbs out and back, a disable comment (inline config is off, so it is read as nothing).
         uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
@@ -767,12 +767,12 @@ try:
                     ("server_test.test.ts", tested(name="wallet", path="../../../server/src/testing/signer.ts"), zone),
                     # A package whose name only starts like a banned one is another package.
                     ("serverless.ts", uses(name="x", path="@gnoworld/serverless"), None),
-                    # A module in another extension, which the walls would read as nothing (S1, F5277), and a require made by
-                    # hand (S4, F5278).
+                    # A module in another extension, which the walls would read as nothing, and a require made by
+                    # hand.
                     ("bridge.mts", again(name="loadConfig", path="../../../server/src/config.ts"), other),
                     ("bridge.js", 'export const path = "vm/qeval";\n', other),
                     ("bridge.tsx", 'export const path = "vm/qeval";\n', other),
-                    # An import at run time of a computed name, which no wall can read (F5282).
+                    # An import at run time of a computed name, which no wall can read.
                     ("computed.ts", "export function load(where: string): Promise<unknown> {\n  return import(where);\n}\n", "gnoworld/named-import"),
                     ("templated.ts", "export function load(name: string): Promise<unknown> {\n  return import(`../../../server/src/${name}.ts`);\n}\n", "gnoworld/named-import"),
                     ("named.ts", 'export function load(): Promise<unknown> {\n  return import("./node.ts");\n}\n', None),
@@ -787,7 +787,7 @@ try:
                     ("testing/jarvis_helper.ts", uses(name="kit", path="../../../../jarvis/src/testing/kit.ts"), zone)],
                    "server/src/__probe__", "walls server")
         shutil.rmtree("server/src/__probe__")
-        # Each package apart from the other: the chain package runs in the browser too, so no Node module either (D112).
+        # Each package apart from the other: the chain package runs in the browser too, so no Node module either.
         own = {
             # The schemas by a path, which resolves in any tree, where their name may not (harness_mutate's worktrees).
             "service": [("chain_name.ts", uses(name="readChain", path="@gnoworld/chain/read"), name),
@@ -831,7 +831,7 @@ try:
         shutil.rmtree("link-reader/src/__probe__")
 
     if part("chain_reads"):
-        # Every read of a chain's node or the indexer goes through packages/chain (Alexis, decision-onchain.md; D113): outside
+        # Every read of a chain's node or the indexer goes through packages/chain (decision-onchain.md): outside
         # it, no module holds a read's words, however written (a literal, a template, strings joined, a raw template); a
         # comment, a node's bare address, a route of our own and a test are free, as is the package itself.
         rule = "gnoworld/chain-read"
@@ -855,7 +855,7 @@ try:
             ("prose.ts", 'export const why = "Jarvis reads vm/qfuncs through the server.";\n', rule),
             ("helpers.ts", 'import { statusEnvelope } from "@gnoworld/chain/testing/envelopes";\n\nexport const used: unknown = statusEnvelope;\n', rule),
             ("hushed.ts", '// eslint-disable-next-line gnoworld/chain-read\nexport const path = "vm/qeval";\n', rule),
-            # The security review's words (S3, F5275): a JSON-RPC call's method, a route given to URL, GraphQL's shorthand, an
+            # More ways a read is spelled: a JSON-RPC call's method, a route given to URL, GraphQL's shorthand, an
             # ABCI path URL-encoded.
             ("rpc_post.ts", 'export const body = { jsonrpc: "2.0", id: 1, method: "status" };\n', rule),
             ("rpc_text.ts", 'export const body = \'{"jsonrpc":"2.0","method":"block","params":{}}\';\n', rule),
@@ -871,13 +871,13 @@ try:
             ("indexer.ts", 'export const indexer = "https://indexer.onyx.example/graphql/query";\n', None),
             ("route.ts", 'export const route = "/status";\n', None),
             ("word.ts", 'export const word = "the status of a block";\n', None),
-            # A sum made by `+=` (10h's review, V4): its left side is a value, as a sum's unknown side is.
+            # A sum made by `+=`: its left side is a value, as a sum's unknown side is.
             ("assigned.ts", 'export function url(rpc: string): string {\n  let url = rpc;\n  url += "/status";\n  return url;\n}\n', rule),
             ("assigned_route.ts", 'export function route(): string {\n  let route = "";\n  route = "/status";\n  return route;\n}\n', None),
-            # Known gaps (D113, D124): an address joined from a route alone and a base, by a call, reads as no read here.
+            # Known gaps: an address joined from a route alone and a base, by a call, reads as no read here.
             ("joined_call.ts", 'export function url(rpc: string): string {\n  return [rpc, "status"].join("/");\n}\n', None),
             ("concat_call.ts", 'export function url(rpc: string): string {\n  return rpc.concat("/", "status");\n}\n', None),
-            # Free: a test helper's own imports of another (S2, F5276), as under testing/ a fake may build on a fake.
+            # Free: a test helper's own imports of another, as under testing/ a fake may build on a fake.
             ("testing/fakes.ts", 'import { path } from "./fake.ts";\n\nexport const used: unknown = path;\n', None),
             ("free.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect("vm/qfuncs").toMatch(/qfuncs/);\n});\n', None),
             ("free.spec.ts", 'export const path = "vm/qfuncs";\n', None),
@@ -887,7 +887,7 @@ try:
         for where in ("app/src/__probe__", "server/src/__probe__", "jarvis/src/__probe__", "packages/schemas/src/__probe__", "packages/service/src/__probe__"):
             lint_cases(reads, where, f"chain reads in {where}")
             shutil.rmtree(where)
-        # A test helper reached from product code, by a path or by the package's name (S2, F5276): the helpers are free of the
+        # A test helper reached from product code, by a path or by the package's name: the helpers are free of the
         # rule only while no module of the product imports them.
         helpers = "gnoworld/test-helpers"
         lint_cases([("helper.ts", 'import { kit } from "../testing/kit.ts";\n\nexport const used: unknown = kit;\n', helpers),
@@ -898,7 +898,7 @@ try:
                     ("kit.test.ts", 'import { kit } from "../testing/kit.ts";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(kit).toBeDefined();\n});\n', None)],
                    "jarvis/src/__probe__", "test helpers in Jarvis")
         shutil.rmtree("jarvis/src/__probe__")
-        # The one expression sender (S5, F5279): readEvaluated, imported by the app's rpc.ts (evalCall's) and the door's names.ts.
+        # The one expression sender: readEvaluated, imported by the app's rpc.ts (evalCall's) and the door's names.ts.
         lint_cases([("evaluates.ts", 'import { readEvaluated } from "@gnoworld/chain/node";\n\nexport const used: unknown = readEvaluated;\n', "gnoworld/chain-eval"),
                     ("renamed.ts", 'import { readEvaluated as run } from "@gnoworld/chain/node";\n\nexport const used: unknown = run;\n', "gnoworld/chain-eval"),
                     ("whole.ts", 'import * as node from "@gnoworld/chain/node";\n\nexport const used: unknown = node.readEvaluated;\n', "gnoworld/chain-eval"),
@@ -921,7 +921,7 @@ try:
         shutil.rmtree("packages/chain/src/__probe__")
 
     if part("chain_words"):
-        # Each of a read's words alone (10h's review, V5), in one folder, as chain_reads proves the rule's reach: every route of
+        # Each of a read's words alone, in one folder, as chain_reads proves the rule's reach: every route of
         # a node's RPC (tm2/pkg/bft/rpc/core/routes.go at c4c72fdd, its two ABCI ones the first word's) after an address, each
         # ABCI query and path, each GraphQL operation. harness_mutate drops each from lint/words.config.ts: one must fail.
         rule = "gnoworld/chain-read"
@@ -993,7 +993,7 @@ try:
         plant({f"copy_{x}.ts": f"export function sum_{x}(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n" for x in "ab"})
         out = run(["node_modules/.bin/jscpd", HERE])
         expect(out.returncode != 0, "jscpd refuses a copied block")
-        # git's own folder is no source: the hooks installed there are copies of the repository's (F129).
+        # git's own folder is no source: the hooks installed there are copies of the repository's.
         os.makedirs(os.path.join(HERE, ".git"))
         os.rename(os.path.join(HERE, "copy_b.ts"), os.path.join(HERE, ".git", "copy_b.ts"))
         out = run(["node_modules/.bin/jscpd", HERE])
@@ -1055,7 +1055,7 @@ try:
         expect(out.returncode == 0, "check_comments reads no node_modules outside a repository")
         # The staged copy borrows node_modules through links, which Node 24's recursive readdir
         # follows (3 million entries, 85 s): the walk enters no link, as git lists a link to a
-        # folder and nothing in it; a link to a file it lists, and its text is read (F171).
+        # folder and nothing in it; a link to a file it lists, and its text is read.
         shutil.rmtree(os.path.join(folder, "node_modules"))
         elsewhere = tempfile.mkdtemp()
         with open(os.path.join(elsewhere, "g.ts"), "w") as f:

@@ -8,7 +8,7 @@ import type { Ergo } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
 import { makeKit } from "./accountKit.ts";
 
-// 7j, amended by D395: the country tag going out (ADR-0001 §7). It says where a person speaks from, so it rides only on a person's own new
+// The country tag going out (ADR-0001 §7). It says where a person speaks from, so it rides only on a person's own new
 // line, only while they show a country (the one they chose, else their time zone's, none once they hid it), and only in a room the list
 // says anyone may read. The time zone is Tokyo's for every test, so the default is the same wherever it runs.
 const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -135,7 +135,7 @@ describe("a line and the country its speaker declares", () => {
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
   });
 
-  // The list is what the page asked as it opened; the reconciler moves a room's modes every 60 s (docs/decisions.md, 3m): +R is an account's
+  // The list is what the page asked as it opened; the reconciler moves a room's modes every 60 s: +R is an account's
   // room, +i a member's. An open tab hears them, and no new list comes.
   it.each(["+i", "+R", "+Mi", "+MR", "+m+i", "+b-m+i", "-m+R"])(
     "carries none once the room is heard closing, by %s, while the list still says open",

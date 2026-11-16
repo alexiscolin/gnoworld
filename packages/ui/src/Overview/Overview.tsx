@@ -70,7 +70,7 @@ function Text() {
 
 function Flashes() {
   return (
-    // One at a time, in the top layer at the top of the screen, as the page shows them (F331).
+    // One at a time, in the top layer at the top of the screen, as the page shows them.
     <Flash
       message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
       onClose={() => undefined}

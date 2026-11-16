@@ -1,5 +1,4 @@
-// What a plate is given ahead of the click (slice 13; Alexis, 2026-11-10: "des stratégies de preload pendant l'animation, dès qu'on survole le
-// lien de la planète, et mise en cache"). Two small doors here, which the first screen holds; what they bring is in warm.ts, a chunk of its own,
+// What a plate is given ahead of the click (preloaded while the animation plays, from the moment a planet's link is hovered, and cached). Two small doors here, which the first screen holds; what they bring is in warm.ts, a chunk of its own,
 // asked only when one of them fires:
 //  - the view's: once the page's space has drawn its first frame, and the browser is idle, the plate's code and the rollup files of the worlds in view;
 //  - the reader's intent: a pointer resting on a link to a realm (150 ms), its focus, a press or a touch, whatever the device: the realm's reads.

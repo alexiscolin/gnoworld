@@ -1,4 +1,4 @@
-// The shelves, the filters and the sorts of Discover (D373), as rules over the store's rows. What changes while the palette is open (who is
+// The shelves, the filters and the sorts of Discover, as rules over the store's rows. What changes while the palette is open (who is
 // here, what this device visited) comes in as the `Ground`, so the rows are built once and a filter or a sort is one pass over them.
 import type { StoreRow, Store } from "./rows.ts";
 import { STYLES, type StyleId } from "./styles.ts";

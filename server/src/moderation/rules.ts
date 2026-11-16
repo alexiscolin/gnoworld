@@ -1,8 +1,8 @@
-// A world's own rules, run before any provider (decision 159): banned words, links and mentions per
+// A world's own rules, run before any provider: banned words, links and mentions per
 // message, and fewer links for a new account. Words compare as people read them, so a full-width or an
 // accented spelling is the same word; a banned word matches whole, never inside a longer one.
 // Compatibility forms to their plain letters, accents and invisible format characters dropped, lower case: core's
-// fold, the one the page reads mentions with (F809).
+// fold, the one the page reads mentions with.
 import { ADDRESS_BODY, fold, mentionList } from "@gnoworld/core";
 import type { Rules } from "../roles/roles.ts";
 
@@ -16,8 +16,8 @@ export type RuleReason =
   | "links"
   | "mentions";
 
-// All the words in one pass over the line: a pass a word grew with both (the complexity review, F530). A
-// word of a script written without spaces has no edge to find: it matches anywhere (F521).
+// All the words in one pass over the line: a pass a word would grow with both. A
+// word of a script written without spaces has no edge to find: it matches anywhere.
 function banned(folded: string, words: readonly string[]): boolean {
   const unspaced = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]/u;
   const plain = words
@@ -39,11 +39,11 @@ interface Flags {
   newAccount: boolean;
   tooFast?: boolean;
   foreignEdit?: boolean;
-  // An edit of a line it never checked: hidden, its owner unknown, and no strike (F549).
+  // An edit of a line it never checked: hidden, its owner unknown, and no strike.
   unknownEdit?: boolean;
 }
 
-// A line too fast, then an edit of a line not its author's (3k), before any rule of the world.
+// A line too fast, then an edit of a line not its author's, before any rule of the world.
 export function ruleVerdict(text: string, rules: Rules, flags: Flags): RuleReason | undefined {
   if (flags.tooFast === true) return "too_fast";
   if (flags.foreignEdit === true) return "not_their_edit";

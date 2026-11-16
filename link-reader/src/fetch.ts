@@ -1,4 +1,4 @@
-// One guarded fetch: a page's head or a picture's bytes (docs/plans/link-previews.md §4): the URL rule at every hop, the DNS answer
+// One guarded fetch: a page's head or a picture's bytes: the URL rule at every hop, the DNS answer
 // checked at every hop and the connection made to the address checked, three redirects at most (same host, https, 443), 200 only, no
 // content encoding, a byte cap and a time cap for the whole call, body included.
 import { isPublicAddress } from "./address.ts";

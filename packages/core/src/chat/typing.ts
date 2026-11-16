@@ -1,4 +1,4 @@
-// Who is typing in a room (slice 4's 4f), from IRCv3's +typing client tag on a TAGMSG
+// Who is typing in a room, from IRCv3's +typing client tag on a TAGMSG
 // (ircv3.net/specs/client-tags/typing): a receiver keeps a nick typing 6 s after its active, 30 s after its paused,
 // until its done, its line in the room, or its leaving. The times are the page's clock, never the line's time tag.
 import type { IrcMessage } from "../irc/irc.ts";
@@ -55,7 +55,7 @@ function told(typing: Typing, message: IrcMessage, at: TypingAt): Typing {
  * line, PART, KICK, QUIT or NICK ends it; my PART or KICK ends all. A replay changes nothing; the same value comes back
  * when nothing changed, and the nicks whose time is past are dropped whenever it is written. */
 export function typingAfter(typing: Typing, message: IrcMessage, at: TypingAt): Typing {
-  // No one typing: a TAGMSG alone changes that, a QUIT over every room asking nothing more (E3).
+  // No one typing: a TAGMSG alone changes that, a QUIT over every room asking nothing more.
   if (message.tags.has("batch") || (typing === undefined && message.command !== "TAGMSG")) return typing;
   if (message.command === "TAGMSG") return told(typing, message, at);
   const gone = ended(message, at.room);

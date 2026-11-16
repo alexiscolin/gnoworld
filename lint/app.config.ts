@@ -1,6 +1,6 @@
-// The app's folders (docs/ARCHITECTURE.md, "Which way dependencies point"; F378): the worker imports
+// The app's folders (docs/ARCHITECTURE.md, "Which way dependencies point"): the worker imports
 // only itself; a feature reaches another only through its index.ts; a route never imports the scene;
-// lib and the store never React, the design system, a feature, the scene or a route (slice 4); the
+// lib and the store never React, the design system, a feature, the scene or a route; the
 // network and storage only in lib and the worker; console nowhere, until the logger. A part of the
 // lint config, which eslint.config.ts composes.
 import { readdirSync } from "node:fs";

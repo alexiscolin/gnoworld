@@ -3,14 +3,14 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { axeOf } from "./axe.ts";
 
-// The search palette (D355): ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
+// The search palette: ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
 // typing sends no request (the places are in the page); arrows, Enter and Escape work, and the focus goes back to the opener.
 const control = (page: Page) => page.getByRole("button", { name: /^Search/ });
 const palette = (page: Page) => page.getByRole("dialog", { name: "Search" });
 const choices = (page: Page, name?: RegExp) =>
   page.getByRole("listbox", { name: "Places" }).getByRole("option", name === undefined ? {} : { name });
 const field = (page: Page) => page.getByRole("combobox", { name: "Search places" });
-// The empty field is Discover (D373): its shelves stand where the results come once words are typed.
+// The empty field is Discover: its shelves stand where the results come once words are typed.
 const shelves = (page: Page) => page.getByRole("listbox", { name: "Shelves" });
 
 async function ready(page: Page, path = "/earth") {
@@ -158,7 +158,7 @@ test.describe("⌘K", () => {
 
   test("typing in it sends no request", async ({ page }) => {
     await ready(page, "/w/bubble");
-    // The arrival's code and the expedition's come a second after load (Later.tsx), past a networkidle some runs (8i): its
+    // The arrival's code and the expedition's come a second after load (Later.tsx), past a networkidle some runs: its
     // pill says both came, so neither lands in the count.
     await expect(page.getByRole("status").getByText("Stamped · Bubble")).toBeVisible();
     // The dock's chat asks the world's rooms once it comes: it is drawn before the count starts.
@@ -215,14 +215,14 @@ test.describe("⌘K", () => {
     test("the header's control is as tall as the pill's links, 34 px", async ({ page }) => {
       await ready(page);
       const box = await control(page).boundingBox();
-      // The pill's links are 34 px inside its 44: the button fills the same height, round (Alexis, 2026-11-07).
+      // The pill's links are 34 px inside its 44: the button fills the same height, round.
       expect(box?.width).toBeGreaterThanOrEqual(34);
       expect(box?.height).toBeGreaterThanOrEqual(34);
     });
   });
 });
 
-// Rooms and people beside the places (search.md part A): what the chat lists and knows, found with no request of their own.
+// Rooms and people beside the places: what the chat lists and knows, found with no request of their own.
 test.describe("rooms and people", () => {
   test("a listed room is found under Rooms and opens; a person in it has Message, which opens the direct message", async ({
     page,

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeHeard } from "./heard.ts";
 
-// D13985 point 6: the accounts the server has heard speak in the chat (a line moderation let through, any room), in memory.
+// The accounts the server has heard speak in the chat (a line moderation let through, any room), in memory.
 describe("the accounts heard in the chat", () => {
   it("knows an account once it has spoken, and no other", () => {
     const heard = makeHeard(10);

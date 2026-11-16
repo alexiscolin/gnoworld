@@ -6,7 +6,7 @@
     background: var(--color-space);
     color: var(--color-text);
     font: var(--font-body);
-    /* The site is controls and space, not a document: no blue spreads over the page under a drag or a click (Alexis, 2026-11-08). */
+    /* The site is controls and space, not a document: no blue spreads over the page under a drag or a click. */
     user-select: none;
   }
 
@@ -20,7 +20,7 @@
     user-select: text;
   }
 
-  /* No scroll bar anywhere (Alexis, 2026-11-07, D379): every box still scrolls by wheel, touch and keyboard; a cut list shows itself by
+  /* No scroll bar anywhere: every box still scrolls by wheel, touch and keyboard; a cut list shows itself by
      its fade (the rail, Discover's rows). */
   * {
     scrollbar-width: none;
@@ -48,7 +48,7 @@
     color: inherit;
   }
 
-  /* An underlined word (the composer's U, 8k): its line in the muted grey, a step under the words (prototype
+  /* An underlined word (the composer's U): its line in the muted grey, a step under the words (prototype
      index.html:220, `.body u`); a link's line is the words' own colour, at the font's place. */
   u {
     text-decoration-color: var(--color-text-muted);
@@ -56,7 +56,7 @@
     text-underline-offset: 2px;
   }
 
-  /* Code and a mention sit on a fill; a mention of the reader in amber, "about me" (slice 4's 4d). */
+  /* Code and a mention sit on a fill; a mention of the reader in amber, "about me". */
   code,
   [data-mention] {
     padding-inline: var(--space-3xs);
@@ -78,7 +78,7 @@
     border-block-start: var(--line-width) solid var(--color-line);
   }
 
-  /* A modal dialog holds the page behind it still, under the wheel and the keys as under the pointer (F373). */
+  /* A modal dialog holds the page behind it still, under the wheel and the keys as under the pointer. */
   :root:has(dialog:modal) {
     overflow: hidden;
   }

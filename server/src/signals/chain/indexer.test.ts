@@ -11,7 +11,7 @@ import {
 } from "./indexer.ts";
 import { readChainRow } from "./message.ts";
 
-// Slice 9g (red pass): the only two reads of the indexer's untrusted HTTP answers, driven by a fake `send`: the query they
+// The only two reads of the indexer's untrusted HTTP answers, driven by a fake `send`: the query they
 // ask, the schema every answer goes through, the timeout, and a cap on every size and every loop.
 const ACCESS = "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";

@@ -12,7 +12,7 @@ vi.mock("../../space/motion.ts", () => ({
   }),
 }));
 
-// P408B: what rises in under the loader is not drawn while the loader covers it, so what loads into it (a count, a style sheet) shifts
+// What rises in under the loader is not drawn while the loader covers it, so what loads into it (a count, a style sheet) shifts
 // nothing the browser counts; it is drawn again the moment the loader goes.
 const page = (): void => {
   const other = document.createElement("p");

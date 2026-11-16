@@ -19,8 +19,7 @@ const BASE = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
-  // 4g: the accepted services' players, each on a click (docs/decisions.md, 2026-10-26), by their players' paths
-  // (F885); Imgur's not read yet.
+  // The accepted services' players, each on a click, by their players' paths; Imgur's not read yet.
   "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/",
   "base-uri 'none'",
   "form-action 'self'",
@@ -154,7 +153,7 @@ describe("inlineScripts", () => {
     expect(inlineScripts("<script>x = '</script>';</script>")).toEqual(["x = '"]);
   });
 
-  // F2455: the shapes a tag's attributes take, as the HTML parser reads them: an empty quoted value is a value.
+  // The shapes a tag's attributes take, as the HTML parser reads them: an empty quoted value is a value.
   it.each([
     ["an empty double-quoted attribute", `<script data-a="">x</script>`, ["x"]],
     ["an empty single-quoted attribute", `<script data-a=''>x</script>`, ["x"]],
@@ -206,10 +205,10 @@ describe("pagePolicies", () => {
     expect(Math.max(...lengths)).toBeLessThan(2000);
   });
 
-  // F475: the build hashed any inline script it found, so a script planted in a page was allowed.
+  // A script planted in a page is none of React Router's: the build refuses it, never hashes it.
   it.each([
     ["a planted script", `<script>alert(1)</script>`],
-    // F2360, tier 1: a type read inside another attribute's value made the script a data block, neither pinned nor hashed.
+    // A type named inside another attribute's value must not make the script a data block, which is neither pinned nor hashed.
     [
       "a planted script hiding a JSON-LD type in an attribute's value",
       `<script data-x=" type=application/ld+json">alert(1)</script>`,
@@ -256,7 +255,7 @@ describe("pagePolicies", () => {
     await expect(one(`<html>${planted}</html>`)).rejects.toThrow(/^csp: /);
   });
 
-  // F456 and F475, tier 1: a form is pinned at its anchors and its middle, not only its end. Every change of the text that is
+  // A form is pinned at its anchors and its middle, not only its end. Every change of the text that is
   // fixed, a character deleted, replaced or a statement put before it, must fail the build; the payload (a JSON, a string,
   // an asset's name, the blank run between two statements) is free.
   const free = (text: string, patterns: RegExp[]): boolean[] => {
@@ -308,8 +307,8 @@ describe("pagePolicies", () => {
     expect(accepted).toEqual([]);
   });
 
-  // F2450: the pin read each script alone, so a second well-formed one (another context, another loader data, a repeat of the
-  // close) was hashed and allowed. A page holds React Router's scripts once each, in its order.
+  // Each script is not read alone: a second well-formed one (another context, another loader data, a repeat of the
+  // close) would be hashed and allowed. A page holds React Router's scripts once each, in its order.
   const planted = (...texts: string[]): string =>
     page().replace("</body>", `${texts.map((text) => `<script>${text}</script>`).join("")}</body>`);
   it.each([
@@ -337,7 +336,7 @@ describe("pagePolicies", () => {
     await expect(one(html)).rejects.toThrow(/^csp: index\.html holds .* twice or out of order/s);
   });
 
-  // The fallback page of a real build: no scroll restoration (read from a build, 2026-10-30).
+  // The fallback page of a real build: no scroll restoration (read from a build).
   it("takes the fallback page's set: the context, the module script, the loader data and the close", async () => {
     const fallback = [CONTEXT, `<MODULE>`, ENQUEUE, CLOSE]
       .map((text) =>
@@ -347,7 +346,7 @@ describe("pagePolicies", () => {
     await expect(one(fallback)).resolves.toBeDefined();
   });
 
-  // F2362: the text of a JSON-LD block closes it at the first closing tag; what follows is a script of the page.
+  // The text of a JSON-LD block closes it at the first closing tag; what follows is a script of the page.
   it("fails the build on a JSON-LD whose text closed its own tag and opened a script", async () => {
     const hostile = page(MODULE, ENQUEUE, `{"description":"</script><script>alert(1)</script>"}`);
     await expect(one(hostile)).rejects.toThrow(/^csp: .*script/s);
@@ -415,7 +414,7 @@ describe("pagePolicies", () => {
     await expect(good("<!-- the style=bold rule -->")).resolves.toBeDefined();
   });
 
-  // F2455: the pages are read in code-unit order, so the tag named in the error is the same on every machine.
+  // The pages are read in code-unit order, so the tag named in the error is the same on every machine.
   it("stops on the first bad page in code-unit order, whatever order the pages came in", async () => {
     const bad = (mark: string) => page().replace("</body>", `<p style="${mark}">x</p></body>`);
     const first = { "z/index.html": bad("z"), "a/index.html": bad("a") };
@@ -424,7 +423,7 @@ describe("pagePolicies", () => {
     await expect(pagePolicies(second)).rejects.toThrow(/<p style="a">/);
   });
 
-  // F2455: what a module script may hold: a route id with a $ (`routes/w.$slug`), a route of several files, and at least one
+  // What a module script may hold: a route id with a $ (`routes/w.$slug`), a route of several files, and at least one
   // import before the routes' table.
   it.each([
     ["a route id with a dollar", MODULE.replace('"routes/world"', '"routes/w.$slug"')],
@@ -449,7 +448,7 @@ describe("pagePolicies", () => {
     await expect(one(page(module))).rejects.toThrow(/^csp: index\.html holds a script that is none of React Router's/);
   });
 
-  // F2455: the context's JSON is an object; a string, a number, null or a boolean is none of React Router's.
+  // The context's JSON is an object; a string, a number, null or a boolean is none of React Router's.
   it.each([['"text"'], ["5"], ["null"], ["true"]])(
     "fails the build on a context script whose JSON is %s, not an object",
     async (json) => {
@@ -464,7 +463,7 @@ describe("pagePolicies", () => {
     },
   );
 
-  // F2455: the loader data is a string literal of JSON, handed to the stream, and nothing else.
+  // The loader data is a string literal of JSON, handed to the stream, and nothing else.
   it.each([
     ["a JSON object", 'window.__reactRouterContext.streamController.enqueue({"a":1});'],
     ["a number", "window.__reactRouterContext.streamController.enqueue(5);"],
@@ -477,7 +476,7 @@ describe("pagePolicies", () => {
     );
   });
 
-  // F2455: the message cuts the script's text at 40 characters, not 39 or 41, and says whether it is none of React Router's or a second.
+  // The message cuts the script's text at 40 characters, not 39 or 41, and says whether it is none of React Router's or a second.
   it("names a planted script cut at 40 characters, and a second form likewise", async () => {
     const text = `alert(${"1".repeat(60)})`;
     await expect(one(`<script>${text}</script>`)).rejects.toThrow(
@@ -491,7 +490,7 @@ describe("pagePolicies", () => {
     );
   });
 
-  // F2455: a data block's text is no markup, whatever the case of its tag and however many blocks there are: the markup check
+  // A data block's text is no markup, whatever the case of its tag and however many blocks there are: the markup check
   // strips every script, in capitals too, before it reads a tag.
   it.each([
     ["one JSON-LD block", [`<script type="application/ld+json">{"a":"<a onclick=x>"}</script>`]],
@@ -510,12 +509,12 @@ describe("pagePolicies", () => {
 
 // The policies as a host takes them. A page is a file under build/client; its addresses are the ones a host answers it at.
 describe("outputs", () => {
-  // Built inside each test: a value a test asserts is computed there, never at collection time (F2356).
+  // Built inside each test: a value a test asserts is computed there, never at collection time.
   const sample = () => {
     const ok = policy([`'sha256-${"A".repeat(43)}='`]);
     const other = policy([`'sha256-${"B".repeat(43)}='`]);
     const fallback = policy([`'sha256-${"C".repeat(43)}='`]);
-    // What a path no page names gets (F2451): the home's scripts and the fallback's, so either document runs there.
+    // What a path no page names gets: the home's scripts and the fallback's, so either document runs there.
     const any = policy([`'sha256-${"A".repeat(43)}='`, `'sha256-${"C".repeat(43)}='`]);
     return {
       ok,
@@ -594,7 +593,7 @@ describe("outputs", () => {
       ["/w/bubble", other],
       ["/w/bubble/", other],
       ["/__spa-fallback.html", fallback],
-      // F2451: a path the build did not pre-render is served a document that runs the app, so it has a policy too.
+      // A path the build did not pre-render is served a document that runs the app, so it has a policy too.
       ["/w/other", any],
       ["/nowhere", any],
       ["/w/Bubble", any],
@@ -622,7 +621,7 @@ describe("outputs", () => {
   });
 
   // Only a document or a worker obeys a policy. The worker's script is the one file of the build that is neither a page nor
-  // inert: a _headers host gives it the policy with no hash (decisions, 2026-10-30); the manifest, the icons, the assets and
+  // inert: a _headers host gives it the policy with no hash; the manifest, the icons, the assets and
   // the data files run nowhere, and have none there. (nginx sends the bare policy on every other answer, below.)
   it("gives the service worker's script the bare policy in _headers, and any other file the catch-all's", () => {
     const { any, policies } = sample();
@@ -641,7 +640,7 @@ describe("outputs", () => {
     for (const line of headers.split("\n")) expect(line.length).toBeLessThan(2000);
   });
 
-  // F2211: the cap was measured, never enforced. The line a host counts is "  Content-Security-Policy: " (27) and the policy.
+  // The cap is enforced, not only measured. The line a host counts is "  Content-Security-Policy: " (27) and the policy.
   it.each([
     [1999, true],
     [2000, false],
@@ -658,7 +657,7 @@ describe("outputs", () => {
       );
   });
 
-  // F2705: the catch-all `/*` names the scripts of both documents, so it can pass the cap where each page does; its error names it.
+  // The catch-all `/*` names the scripts of both documents, so it can pass the cap where each page does; its error names it.
   it("names /* when the catch-all's header, made of both documents' hashes, passes in each page but not together", () => {
     const hashes = (letter: string, count: number) =>
       Array.from({ length: count }, (_, n) => `'sha256-${letter.repeat(42)}${String.fromCharCode(65 + n)}='`);
@@ -667,7 +666,7 @@ describe("outputs", () => {
     expect(() => outputs(pages)).toThrow(/^csp: the policy of \/\* makes a header of \d+ characters/);
   });
 
-  // F2452: Cloudflare Pages takes at most 100 header rules (developers.cloudflare.com/pages/configuration/headers). The
+  // Cloudflare Pages takes at most 100 header rules (developers.cloudflare.com/pages/configuration/headers). The
   // catch-all is one; a file that is no directory index is one rule.
   it.each([
     [99, true],
@@ -703,7 +702,7 @@ describe("outputs", () => {
 
   // nginx: a map of the decoded path, which the server's add_header reads ($csp). Each page is keyed at the paths a visitor
   // asks (a 401 answers before try_files) and at the $uri try_files leaves: its file, and for a slashed address the file
-  // joined without merging slashes (F2460).
+  // joined without merging slashes.
   const table = nginxTable;
 
   it("writes an nginx map from each address of a page to its policy, and a bare default", () => {
@@ -772,8 +771,8 @@ describe("outputs", () => {
     if (slug === 40) expect(longest).toBeGreaterThanOrEqual(99);
   });
 
-  // F2454: a bucket of one element leaves no size free of collisions past a few dozen keys, so nginx warned 'could not build
-  // optimal map_hash' at every start (48 worlds). The port is ngx_hash_init of nginx 1.30 (ngx_hash.c); until harness-c's `nginx -t`, it judges.
+  // A bucket of one element leaves no size free of collisions past a few dozen keys, so nginx warns 'could not build
+  // optimal map_hash' at every start (48 worlds). The port is ngx_hash_init of nginx 1.30 (ngx_hash.c).
   describe("nginx's hash for the table (ngx_hash_init)", () => {
     const POINTER = 8;
     const MASK = (1n << 64n) - 1n;
@@ -833,7 +832,7 @@ describe("outputs", () => {
       return "warns";
     }
 
-    // The pages of a build of `worlds` worlds: each at /w/ and at its canonical address, the way slice 5's 5d writes them.
+    // The pages of a build of `worlds` worlds: each at /w/ and at its canonical address, the way the build writes them.
     const build = (worlds: number, width: number) => {
       const { ok } = sample();
       const pages: Record<string, string> = { "index.html": ok, "__spa-fallback.html": ok, "net/onyx/index.html": ok };
@@ -926,7 +925,7 @@ describe("outputs", () => {
     });
   });
 
-  // F2455: the cases the mutants of csp.ts left alive.
+  // The cases the mutants of csp.ts left alive.
   it("writes nginx's csp.conf whole: the two sizes, the default, then each key in code-unit order", () => {
     const { ok, other, fallback, policies } = sample();
     const bare = policy([]);
@@ -975,7 +974,7 @@ describe("outputs", () => {
 });
 
 // The demo's web image builds the app from the workspaces it imports; one it leaves out fails only in Docker, which
-// the gate never runs (F2133: slice 4's runtime imports of core and schemas reached Alexis's deploy/test.sh alone).
+// the gate never runs.
 // csp.ts writes the nginx file that image serves; the image is tested here, beside it.
 it("the web image copies each workspace the app imports, its package.json before the install and its src", () => {
   const app = z
@@ -996,7 +995,7 @@ it("the web image copies each workspace the app imports, its package.json before
 });
 
 // The data files' embed allowlist (packages/schemas) is a second copy of frame-src: one drifting from the other would let
-// a page carry an embed the browser blocks, or the policy allow a player no file may name (F885).
+// a page carry an embed the browser blocks, or the policy allow a player no file may name.
 describe("the policy's frame-src and the data files' embeds", () => {
   it("name the same player paths", () => {
     const frame = policy([])
@@ -1006,8 +1005,7 @@ describe("the policy's frame-src and the data files' embeds", () => {
   });
 });
 
-// nginx reads the build's table (csp.conf) in its http block and sets the header of each answer from it: before this, one
-// policy for all pages in the server block. The image keeps copying the build's csp.conf to /etc/nginx/csp.conf.
+// nginx reads the build's table (csp.conf) in its http block and sets the header of each answer from it. The image keeps copying the build's csp.conf to /etc/nginx/csp.conf.
 describe("the web image's nginx", () => {
   const conf = readFileSync(new URL("../../deploy/web/nginx.conf", import.meta.url), "utf8");
   const dockerfile = readFileSync(new URL("../../deploy/web/Dockerfile", import.meta.url), "utf8");
@@ -1030,15 +1028,15 @@ describe("the web image's nginx", () => {
     expect(dockerfile).toContain("--from=build /repo/app/build/csp.conf /etc/nginx/csp.conf");
   });
 
-  // F2459: the http block's first map sets the map module's hash sizes to their defaults (ngx_http_map_module.c:190-200),
-  // so the table's own map_hash_max_size after it was a duplicate, and nginx did not start.
+  // The http block's first map sets the map module's hash sizes to their defaults (ngx_http_map_module.c:190-200),
+  // so a map_hash_max_size of the table's own after it would be a duplicate, and nginx would not start.
   it("reads the table before any other map, which would set the hash sizes first", () => {
     expect(conf.search(/^\s*map /m)).toBeGreaterThan(conf.indexOf("include /etc/nginx/csp.conf;"));
   });
 
-  // F2460: try_files joins `$uri/index.html` without merging slashes (ngx_http_try_files_module.c:270-271), so `/w/bubble/`,
-  // a directory, is served from `/w/bubble//index.html`, the $uri the table is read with: without that key the page got
-  // the bare policy, and none of its scripts ran.
+  // Try_files joins `$uri/index.html` without merging slashes (ngx_http_try_files_module.c:270-271), so `/w/bubble/`,
+  // a directory, is served from `/w/bubble//index.html`, the $uri the table is read with: without that key the page would get
+  // the bare policy, and none of its scripts would run.
   it("keys each address of a page at the $uri that the root location's try_files leaves", () => {
     // The table is keyed for this line: a change to it changes the keys.
     expect(/location \/ \{\s*try_files ([^;]+);/.exec(conf)?.[1]).toBe("$uri $uri/index.html =404");
@@ -1143,11 +1141,11 @@ describe("nginxTable", () => {
 });
 
 // StrykerJS runs the tests in a sandbox whose sources it has instrumented (every string reads as a mutant switch): a test that
-// reads a source file reads the real one, outside the sandbox (F2703).
+// reads a source file reads the real one, outside the sandbox.
 const read = (path: string) =>
   readFileSync(new URL(path, import.meta.url.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/")), "utf8");
 
-// F2457, DRY (Alexis's explicit rule): nothing is written twice. The parsers are read in one file (tests/e2e/cspFiles.mjs);
+// Nothing is written twice. The parsers are read in one file (tests/e2e/cspFiles.mjs);
 // the files that read the build's output import them, and hold no reading of their own, in any shape.
 describe("the readers of the build's output", () => {
   const OWN_READERS = [
@@ -1171,9 +1169,9 @@ describe("the readers of the build's output", () => {
   });
 });
 
-// F2457: serve.mjs rewrote the inline scripts of a release with a looser rule (/ld\+json/i): a script whose data-type said
-// application/ld+json went unhashed there, and ran in the journeys where the build's policy refuses it (F2360's class). It
-// also wrote the policy a second time (`script-src 'self'`): it takes both from csp.ts.
+// serve.mjs must not rewrite the inline scripts of a release with a looser rule (/ld\+json/i): a script whose data-type said
+// application/ld+json would go unhashed there, and run in the journeys where the build's policy refuses it. Nor may it
+// write the policy a second time (`script-src 'self'`): it takes both from csp.ts.
 describe("serve.mjs's policy of a release", () => {
   const source = read("../tests/e2e/serve.mjs");
   it("takes the scripts to hash, their hashes and the policy from csp.ts: inlineScripts, sha256 and policy", () => {
@@ -1192,8 +1190,8 @@ describe("serve.mjs's policy of a release", () => {
   });
 });
 
-// F2456: StrykerJS never mutates a module-level constant (ignoreStatic), so a guard built at the top of csp.ts is a guard no
-// test is measured against (.claude/rules/typescript.md, F412). Each is built inside the function that applies it: a top-level
+// StrykerJS never mutates a module-level constant (ignoreStatic), so a guard built at the top of csp.ts is a guard no
+// test is measured against (.claude/rules/typescript.md). Each is built inside the function that applies it: a top-level
 // constant is one string, one number, a list of strings or a function, nothing else (a pattern, however it is written, a joined text too).
 describe("csp.ts's guards", () => {
   // The policy's guards live in three files (the forms' constants in cspForms.ts, the origins' in cspOrigins.ts): the guard reads all three.
@@ -1227,8 +1225,8 @@ describe("csp.ts's guards", () => {
   });
 });
 
-// Slice 5 part 2, 5g: the browser reads the chain, so connect-src names the universes' RPC origins, from the data and
-// nothing else (the plan's §3: "a data file's rpc naming a host that reads visitors" shows in the CSP, an http: one stops the build).
+// The browser reads the chain, so connect-src names the universes' RPC origins, from the data and nothing else: a data
+// file's rpc naming a host that reads visitors shows in the CSP, an http: one stops the build.
 const ONYX = "https://rpc.onyx.testnets.gno.land";
 const GNOLAND = "https://rpc.gno.land";
 const connectOf = (csp: string): string =>
@@ -1314,8 +1312,7 @@ describe("pagePolicies' and outputs' connect-src", () => {
     const headers = headerRules(out.headers);
     // The catch-all `/*`, `/`, `/w/bubble` and its slash, `/sw.js`.
     expect(headers.size).toBeGreaterThanOrEqual(5);
-    // The worker's script is the one exception: it fetches no RPC (page code does), so its rule keeps 'self' alone
-    // (docs/decisions.md, 2026-10-31).
+    // The worker's script is the one exception: it fetches no RPC (page code does), so its rule keeps 'self' alone.
     for (const [path, csp] of headers)
       expect(connectOf(csp), path).toBe(path === "/sw.js" ? "connect-src 'self'" : want);
     const table = nginxTable(out.nginx);

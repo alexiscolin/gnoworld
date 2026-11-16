@@ -117,7 +117,7 @@ describe("defaultUniverse", () => {
   });
 });
 
-// 7t3: the trends read a hub's rooms and its realms as one world, so the server knows each hub's world from the data the app is built from,
+// The trends read a hub's rooms and its realms as one world, so the server knows each hub's world from the data the app is built from,
 // hubs.json beside the universes' file, through the data's own schema; a bad file stops the server at boot, naming the file alone.
 describe("hubWorlds", () => {
   const HUB = {
@@ -171,7 +171,7 @@ describe("hubWorlds", () => {
     expect(() => hubWorlds(file)).toThrow("hubs.json");
   });
 
-  // The pages the preview job captures (8f): the realms the team's data lists for the default universe, and no other.
+  // The pages the preview job captures: the realms the team's data lists for the default universe, and no other.
   it("lists every realm of the default universe's hubs for the preview job, each once, by its path; another universe's none", () => {
     const hubs = [
       { ...HUB, slug: "bubble", universe: "onyx" },
@@ -190,7 +190,7 @@ describe("hubWorlds", () => {
   });
 });
 
-// The egress proxy's list gains the default universe's RPC host from the data, and nothing else (decision of 2026-10-31). Docker is
+// The egress proxy's list gains the default universe's RPC host from the data, and nothing else. Docker is
 // refused in this sandbox, so these read the files as text; deploy/test.sh and its `--mutants` rows are the run against the stack.
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
 const acl = read("deploy/egress/acl.yaml");
@@ -206,7 +206,7 @@ const OTHER_HOSTS = data.filter((universe) => universe.default !== true).map((un
 /** The hosts the list allows, as test.sh reads them: each `- name` line, quotes dropped. */
 const allowed = [...acl.matchAll(/^\s+-\s*"?([^"\s#]+)"?\s*$/gm)].map((match) => match[1]);
 
-// The node the door reads a mainnet name on (JARVIS_NAMES_RPC, D120), by the door's own default, never a copy of it.
+// The node the door reads a mainnet name on (JARVIS_NAMES_RPC), by the door's own default, never a copy of it.
 const namesHost = () => new URL(z.object(doorSettings()).parse({}).JARVIS_NAMES_RPC).hostname;
 
 describe("the way out's list", () => {
@@ -229,7 +229,7 @@ describe("the way out's list", () => {
     expect(namesHost()).toBe("rpc.gno.land");
   });
 
-  // The indexers are let out, each by its full name (the worlds job, 7c): the describe below holds them, so only the gnoweb pages stay out here.
+  // The indexers are let out, each by its full name (the worlds job): the describe below holds them, so only the gnoweb pages stay out here.
   it("lets no other universe's RPC out but the names' node, no gnoweb, nor a domain by a wildcard", () => {
     expect(OTHER_HOSTS.length).toBeGreaterThan(0);
     for (const host of OTHER_HOSTS.filter((other) => other !== namesHost())) expect(allowed).not.toContain(host);
@@ -312,7 +312,7 @@ describe("the way out for the indexers", () => {
     ["gno.land's indexer's whole domain let out", "the way out lets six hosts out"],
   ])("has the mutant %j, killed by %j, which the stack's check also says", (label, wanted) => {
     expect(script).toContain(`mutant "${label}" "${wanted}"`);
-    // Once in the mutant, once in the check itself (F695).
+    // Once in the mutant, once in the check itself.
     expect(script.split(wanted.replace(/ indexer\.[a-z.]+$/, " $indexer_host")).length - 1).toBeGreaterThanOrEqual(1);
   });
 
@@ -323,7 +323,7 @@ describe("the way out for the indexers", () => {
   });
 });
 
-// The worlds file (7c) rides the volume the prices timer writes: the server writes it, web serves it read-only at /worlds.json
+// The worlds file rides the volume the prices timer writes: the server writes it, web serves it read-only at /worlds.json
 // beside /markets.json, with the same minute of cache. Docker is refused in the sandbox, so the files are read as text.
 const nginx = read("deploy/web/nginx.conf");
 
@@ -335,7 +335,7 @@ describe("worlds.json's way to the page", () => {
   });
 });
 
-// The preview job's captures (8f) go the same way: written in that folder, served beside markets.json.
+// The preview job's captures go the same way: written in that folder, served beside markets.json.
 describe("previews.json's way to the page", () => {
   it("tells the server to write it in the folder of markets.json, the volume web mounts read-only", () => {
     const folder = /^\s+MARKETS_FILE: (\/\S+)\/markets\.json\s*$/m.exec(compose)?.[1];
@@ -362,7 +362,7 @@ describe("previews.json's way to the page", () => {
   });
 });
 
-// Its count (7n2), written beside it in the same pass, which the home's hero reads, goes the same way.
+// Its count, written beside it in the same pass, which the home's hero reads, goes the same way.
 describe.each(["worlds.json", "worlds-count.json", "previews.json"])("%s's way to the page", (file) => {
   it("serves it from that folder beside markets.json, with no listing and no link followed, under the same password", () => {
     const block = nginx.split(`location = /${file} {`)[1]?.split("}")[0] ?? "";

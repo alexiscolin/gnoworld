@@ -1,4 +1,4 @@
-// How much of a halo a star keeps at a distance from the eye, in world units (7d6's halos; 7d3's arrival): whole to the first distance, a
+// How much of a halo a star keeps at a distance from the eye, in world units: whole to the first distance, a
 // point of a few pixels by the second; and how wide a sun stands, its halo shown. One place for the scene, which draws them, and the
 // arrival, which keeps them off a postcard.
 import type { StarSystem } from "../cosmos/system.ts";
@@ -8,7 +8,7 @@ import { smoothstep } from "../space/smooth.ts";
 const HALO_NEAR = 40;
 /** Past this a star is a point. */
 export const HALO_FAR = 120;
-// A star whose halo is three quarters whole or more glows, a second sun beside the main light (7d3).
+// A star whose halo is three quarters whole or more glows, a second sun beside the main light.
 const SECOND_SUN = 0.75;
 // A star's point, its radius on the screen in pixels.
 const POINT_PIXELS = 10;
@@ -48,8 +48,7 @@ export interface SunSight {
 }
 
 /** A sun's reach on the map, its halo shown over its point: the main light's own up to its widest, any other's eased under `most` times
- * its distance, so two suns at different distances never draw one size, the nearer the larger (the chief, 2026-11-03, after Alexis's
- * not-a-planetarium rule). */
+ * its distance, so two suns at different distances never draw one size, the nearer the larger. */
 export function sunReach(system: StarSystem, { distance, focal, halo, most }: SunSight): number {
   const own = reachOf(system);
   const full =

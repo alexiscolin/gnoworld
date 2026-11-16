@@ -1,4 +1,4 @@
-// A room's reading place (slice 4's 4f): the time of the last line the account read there, which Ergo keeps for it
+// A room's reading place: the time of the last line the account read there, which Ergo keeps for it
 // and tells each of its sessions (draft/read-marker, ircv3.net/specs/extensions/read-marker; irc/handlers.go v2.19.1),
 // and the line marked New while the room is open: the first past the place when the room opened.
 import type { IrcMessage } from "../irc/irc.ts";
@@ -41,7 +41,7 @@ export function firstUnread(lines: readonly Line[], read: string | undefined, me
 
 /** The line marked New while a room is open: none decided while the room holds no line or no place is known;
  * then the first line past the place, kept as it is until the room closes, but for a place the reader asks to go back
- * to (4d: Mark unread), `unread`, the device's place the mark was last decided from. */
+ * to (Mark unread), `unread`, the device's place the mark was last decided from. */
 export type NewMark = { readonly id: string | undefined; readonly unread?: string | undefined } | undefined;
 
 /** The reading place that leaves the line at `time` and all after it unread: the millisecond before it, in Ergo's one

@@ -1,4 +1,4 @@
-// The words of the chain a page draws (slice 9g), the second wall after the stream's schemas: text and nothing else, an address by its two ends.
+// The words of the chain a page draws, the second wall after the stream's schemas: text and nothing else, an address by its two ends.
 
 import { cutText } from "@gnoworld/core/bubbles";
 import { shortAddress } from "@gnoworld/schemas";

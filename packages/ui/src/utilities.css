@@ -37,7 +37,7 @@
     text-transform: none;
   }
 
-  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are (7v). */
+  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are. */
   .dot {
     display: inline-block;
     inline-size: var(--size-dot);
@@ -66,7 +66,7 @@
   }
 
   /* A bar of controls over the page and the scene: a pill with a line round it, four pixels in, the night at 45% behind it (the prototype's
-     #hnav .links): the header's views, and space's two views apart from them on a phone (F4691). No blur until the scene has a sky. */
+     #hnav .links): the header's views, and space's two views apart from them on a phone. No blur until the scene has a sky. */
   .control-bar {
     box-sizing: border-box;
     /* four pixels between the pill's edge and its controls */
@@ -89,7 +89,7 @@
   }
 
   /* A control whose press covers its whole card: its box drawn over the card, which places it (position: relative); a column's item, a
-     page's capture (8f). */
+     page's capture. */
   .covers::after {
     position: absolute;
     inset: 0;
@@ -151,12 +151,12 @@
   .scroll-row {
     display: flex;
     gap: var(--space-2xs);
-    /* No bar: base.css's `*` has none anywhere (D379). */
+    /* No bar: base.css's `*` has none anywhere. */
     overflow: auto hidden;
     /* Room inside the clip for a chip's focus ring, taken back outside, so the ring is never cut and the row keeps its place. */
     padding: calc(var(--focus-width) + var(--focus-offset));
     margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
-    /* A row cut by its edge fades out there (D379), so a cut chip reads as more to scroll, not as broken. */
+    /* A row cut by its edge fades out there, so a cut chip reads as more to scroll, not as broken. */
     /* raw: the fade over the last 32 px, half a chip */
     mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - 32px), transparent);
   }
@@ -165,7 +165,7 @@
     flex: none;
   }
 
-  /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit (8g's plates). */
+  /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit. */
   .nowrap {
     white-space: nowrap;
   }

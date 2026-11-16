@@ -15,8 +15,8 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     rings: 0.05,
   },
   // The Earth's own plants off its day map, wet to dry: a forest greyed to frame 4's chroma, Europe's and India's farmland, Kenya's
-  // savanna; the same forest, the cerrado, Mongolia's steppe. Most green land is farmland, lighter than the sea, as the Earth's (7b8).
-  // Its sea Alexis's teal, lit as light as the Earth's navy, a thin shelf lighter still (7b8).
+  // savanna; the same forest, the cerrado, Mongolia's steppe. Most green land is farmland, lighter than the sea, as the Earth's.
+  // Its sea a teal, lit as light as the Earth's navy, a thin shelf lighter still.
   temperate: {
     maps: ["venus", "mars"],
     palettes: [ramp(0x3d472a, 0x626a40, 0x847e5e), ramp(0x3d472a, 0x6e6846, 0x948469)],
@@ -62,7 +62,7 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
     glow: { colour: LAVA, level: [0.5, 0.58] },
-    // Warmed by its own light (Alexis, 2026-11-03, "réchauffer"): frame 4's Music's limb.
+    // Warmed by its own light, as frame 4's Music's limb shows.
     rim: {
       colours: [rgb(0xedc3ad), rgb(0xedc3ad)],
       thickness: [0.016, 0.026],

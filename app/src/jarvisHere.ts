@@ -1,5 +1,5 @@
-// What the page's parts share of Jarvis (10u-a), between parts that import nothing of each other (as pageAsks.ts): the chat in view tells
-// the room Jarvis could read now, once Jarvis is on; Jarvis's cards, the asker's alone (D1017), are kept here for the chat to draw among
+// What the page's parts share of Jarvis, between parts that import nothing of each other (as pageAsks.ts): the chat in view tells
+// the room Jarvis could read now, once Jarvis is on; Jarvis's cards, the asker's alone, are kept here for the chat to draw among
 // its lines, and the panel's host (features/jarvis) registers how they are drawn. Memory only: a reload takes them.
 import type { JarvisAnswer, JarvisQuestion, JarvisState } from "@gnoworld/schemas";
 import { useQuery } from "@tanstack/react-query";

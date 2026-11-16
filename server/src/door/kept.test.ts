@@ -12,7 +12,7 @@ import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 import { makeServed, servedKey } from "./served.ts";
 import { EXPLAIN_MS, explainKey, HERE_MS, hereKey, KEPT_MAX, KEPT_TABLES, keptKey, keysOf, makeKept } from "./kept.ts";
 
-// D13920: the kept answers. Each test is named after the fault it guards; written first, red against the stub.
+// The kept answers. Each test is named after the fault it guards.
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const CHAIN = "gnoland-1";
 const REALM = "gno.land/r/gov/dao";
@@ -783,7 +783,7 @@ describe("a room's `here` when a line of the room is taken", () => {
   });
 });
 
-// The surviving mutants of the day (slice 13): each test is named after the fault it guards.
+// The surviving mutants of the day: each test is named after the fault it guards.
 describe("the keys, held at their ends", () => {
   it("makes no explanation key for a realm that only contains a gno.land path", () => {
     expect(explainKey(CHAIN, `x ${REALM}`, "Vote")).toBeUndefined();

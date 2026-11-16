@@ -11,7 +11,7 @@ import {
 import { keep } from "../lib/keep/keep.ts";
 import { createAppStore } from "./index.ts";
 
-// The keep slice (slice 4's 4d; docs/decisions.md, 2026-10-26: "fields are added only"): what an account keeps on its
+// The keep slice ("fields are added only"): what an account keeps on its
 // device, the lines it saved and, for each room, the reading place it asked to go back to; read once at its session's
 // start, written back on change, never over a device that could not be read.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -199,7 +199,7 @@ describe("marking a line unread", () => {
     expect(Object.hasOwn(t.now().unread, "#world-100")).toBe(true);
   });
 
-  // A room marked again is the newest marked: it outlasts those marked before it when the bound comes (4d's R16).
+  // A room marked again is the newest marked: it outlasts those marked before it when the bound comes.
   it("takes a room marked again as the newest, so it is not the one that goes first", () => {
     const t = setup();
     t.begin(t.device());
@@ -275,7 +275,7 @@ describe("a device that fails", () => {
   });
 });
 
-// Which key could not be read decides nothing: written over, it would lose what it held (G2).
+// Which key could not be read decides nothing: written over, it would lose what it held.
 describe("a device with one key it cannot read", () => {
   const GOOD = [{ room: "#bubble", id: "m1", time: T(1), from: BOB, text: "precious" }];
   it.each([
@@ -315,7 +315,7 @@ describe("a device with one key it cannot read", () => {
   });
 });
 
-// The warning that the device kept nothing shows only when that is so (G3).
+// The warning that the device kept nothing shows only when that is so.
 describe("the warning that the device did not keep", () => {
   const actions: [string, (t: ReturnType<typeof setup>) => void][] = [
     [
@@ -378,7 +378,7 @@ describe("marking a room's place again", () => {
   });
 });
 
-// A guest has no device: nothing it does is kept or throws, whatever an account left on the same device (G9).
+// A guest has no device: nothing it does is kept or throws, whatever an account left on the same device.
 describe("a guest", () => {
   it("changes nothing by marking, unsaving or reading through, and the state read is its own", () => {
     const t = setup();
@@ -403,7 +403,7 @@ describe("a guest", () => {
 });
 
 // A room that is no room's, a direct message among them, has no device to keep a line on, nor has a line that is no plain
-// message: a saved one would vanish at the next reading, or lose what made it an /me (4d's R12).
+// message: a saved one would vanish at the next reading, or lose what made it an /me.
 describe("what is saved is a plain message of a room", () => {
   it.each([
     ["a direct message's partner", "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", line("m1")],
@@ -421,7 +421,7 @@ describe("what is saved is a plain message of a room", () => {
 });
 
 // Two tabs of one account on one device: each starts from what it read, and a write of its whole list would drop what
-// the other saved since (4d's R10).
+// the other saved since.
 describe("two sessions of one account on one device", () => {
   it("keep every line each saved: the device holds both", () => {
     const kept = new Map<string, string>();
@@ -468,7 +468,7 @@ describe("two sessions of one account on one device", () => {
 });
 
 // The memory of a session can equal the lines it writes while the device holds others: a write skipped for "no change"
-// would leave the device without them (F1488, the code review's CR7).
+// would leave the device without them.
 describe("a session whose memory is behind the device", () => {
   const tabs = () => {
     const kept = new Map<string, string>();
@@ -512,7 +512,7 @@ describe("a session whose memory is behind the device", () => {
   });
 
   // The device is right and the memory behind: a change that alters neither still brings the memory up to the device
-  // (R7 of redpass2-4dx), or the list shows lines the next change would find gone.
+  // or the list shows lines the next change would find gone.
   it("takes the device's lines into its memory when a change changes nothing on the device", () => {
     const { a, b, device } = tabs();
     b.getState().keepActions.save("#bubble", line("m2"));
@@ -528,7 +528,7 @@ describe("a session whose memory is behind the device", () => {
 });
 
 // A logout ends the session's memory, never the device's: the lines stay for the account's next login, which the list's own
-// words say ("Saved on this device only", 4d's R20).
+// words say ("Saved on this device only").
 describe("a session's end", () => {
   it("leaves the account's saved lines and places on its device", () => {
     const t = setup();
@@ -555,7 +555,7 @@ const heard = (line: string): IrcMessage => {
   return parsed.message;
 };
 
-// F2090 (AP1): the device is read for a REDACT or an edit alone, never for each live line of a busy room.
+// The device is read for a REDACT or an edit alone, never for each live line of a busy room.
 describe("a live line heard by the keep slice", () => {
   const said = `@msgid=m9;time=${T(2)};account=${BOB} :${BOB}!u@h PRIVMSG #bubble :hello`;
   it("reads the device for no line that is no REDACT and no edit", () => {
@@ -586,7 +586,7 @@ describe("a live line heard by the keep slice", () => {
   });
 });
 
-// The device slice of the store (slice 8; lib/keep's rule): every field read at the page's start and again when another tab changes it;
+// The device slice of the store (lib/keep's rule): every field read at the page's start and again when another tab changes it;
 // a change made from what the device holds now, so another tab's change is kept; never written over a device that could not be read.
 function fake() {
   const fields: Partial<DeviceFields> = {};

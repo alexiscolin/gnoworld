@@ -3,9 +3,9 @@ import type { Send } from "@gnoworld/service/net";
 import { fakeChain, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
 import { makeOwnerReaders, makeOwners } from "./owners.ts";
 
-// Part 1 of the owners' moderation (docs/plans/owners-moderation.md, sections 3, 6, 7): who holds a namespace, read on the chain the server
+// Who holds a namespace, read on the chain the server
 // is configured with, cached 60 s. The expression is one string (`gno.land/r/sys/users.func() string {...}()`), so an answer is `("g1..." string)`,
-// the address, or `("" string)`, nobody (vm/qeval prints a result as `rtv.String()`, gno.land/pkg/sdk/vm/keeper.go QueryEval; gno_eval on onyx-1, 2026-11-11).
+// the address, or `("" string)`, nobody (vm/qeval prints a result as `rtv.String()`, gno.land/pkg/sdk/vm/keeper.go QueryEval; gno_eval on onyx-1).
 const ALEXIS = "g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq";
 const OTHER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const MINUTE = 60_000;
@@ -364,7 +364,7 @@ describe("the reads at the chain", () => {
   });
 });
 
-// The rights review (owners-sec-rights.md, medium): the lists a page shows and the acts a person makes read through two pools of their own
+// The lists a page shows and the acts a person makes read through two pools of their own
 // over one cache, so a flood of lists never refuses an owner's pin.
 describe("the display pool and the action pool", () => {
   const pair = (eval_: Routes["eval"], options: { perHour?: number; perVisitor?: number } = {}) => {
@@ -412,7 +412,7 @@ describe("the display pool and the action pool", () => {
   });
 });
 
-// The surviving mutants of the first StrykerJS run (slice 13, owners-mutants.md).
+// Mutants a first StrykerJS run left alive.
 describe("lookup, the reader that tells nobody from a failure", () => {
   it("says null for a name the chain gives to nobody and for a text that is no name, undefined for a read that failed", async () => {
     const answers: Given[] = [NOBODY, new Response("boom", { status: 503 })];

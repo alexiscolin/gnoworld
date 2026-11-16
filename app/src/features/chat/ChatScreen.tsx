@@ -31,7 +31,8 @@ import { Worlds } from "./Worlds.tsx";
 import styles from "./ChatScreen.module.css";
 
 // The rooms of a narrow chat (a dock's, a phone's) sit behind a control and a drawer, whose code is asked once the box is
-// narrow: a wide one never carries it (the first screen's budget, ADR-0001 §12). A chunk that cannot be fetched leaves the
+// narrow: a wide one never carries it (the first screen's budget, ADR-0001 §12). A chunk that cannot be fetched leaves a
+// notice that the rooms could not load.
 const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
   waiting: null,
   failed: <EmptyState look="failed" urgent line="The rooms could not load." />,
@@ -59,10 +60,10 @@ export interface ChatPlace {
   realms?: readonly string[] | undefined;
   /** The realm this place is the page of: the panel links it on gnoweb, and its pills stay a hub's. */
   realm?: string | undefined;
-  /** The page's room, whose newest words the full chat's planet shows as bubbles, as the page's planet does (D565); none on the Earth. */
+  /** The page's room, whose newest words the full chat's planet shows as bubbles, as the page's planet does; none on the Earth. */
   room?: string | undefined;
   universe: Pick<UniverseView, "id" | "isDefault" | "gnoweb">;
-  /** The calls the world's team pins (D271): their pills in the quick actions, and the cards they open over them. */
+  /** The calls the world's team pins: their pills in the quick actions, and the cards they open over them. */
   pinned?: Pinned | undefined;
 }
 

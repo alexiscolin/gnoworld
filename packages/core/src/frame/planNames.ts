@@ -1,4 +1,4 @@
-// The names a Plan stands under its worlds (part 7v; F5462): each name's room on the screen, and which worlds a Plan names when it has no room
+// The names a Plan stands under its worlds: each name's room on the screen, and which worlds a Plan names when it has no room
 // for all, the largest first.
 import type { Orbiter, StarSystem } from "../cosmos/system.ts";
 import { looksFrom, placeOf, type cameraTowards } from "./restLook.ts";
@@ -59,8 +59,8 @@ const under = ({ x, y, radius }: Spot): Box => ({
 });
 
 /** Every world named where the Plan is readable; where it is `crowded`, as many as there is room for, the largest first, each whose name's
- * room meets no world nor a name kept before it (F5462); and the world whose name's place its "+N" takes: under the largest unnamed world it
- * stands clear under, else with the smallest named world gone into the count, till it stands clear or no name is left (G2, the chief). */
+ * room meets no world nor a name kept before it; and the world whose name's place its "+N" takes: under the largest unnamed world it
+ * stands clear under, else with the smallest named world gone into the count, till it stands clear or no name is left. */
 export function namesOf(
   system: StarSystem,
   worlds: readonly Orbiter[],

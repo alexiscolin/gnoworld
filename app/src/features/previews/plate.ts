@@ -1,4 +1,4 @@
-// The realm a world's plate shows the capture of (8f), apart from the previews' reader: the plate is on the first screen, and this rule
+// The realm a world's plate shows the capture of, apart from the previews' reader: the plate is on the first screen, and this rule
 // costs it a few bytes where the reader would cost it its schema.
 import type { UniverseView } from "../../places.ts";
 

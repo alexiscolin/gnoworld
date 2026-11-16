@@ -1,4 +1,4 @@
-# jarvis's reader (10u-g2, D13987): gnomcp 0.11.0 alone, in its own release image (by digest, GitHub's provenance
+# jarvis's reader: gnomcp 0.11.0 alone, in its own release image (by digest, GitHub's provenance
 # attestation names it), with the bridge and the relay of deploy/jarvis-reader/main.go (the standard library alone: no
 # module is fetched) and the stack's probe for its health check. No Node, no secret, no volume: it is only gnomcp
 # and the two small programs that give it a port and a way out. Its profiles are deploy/jarvis/gnomcp.toml.

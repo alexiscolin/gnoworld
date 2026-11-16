@@ -58,7 +58,7 @@
 
   .lines > li {
     /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (nine
-       small controls and its inset) and the times' column it keeps clear, so the bar covers no word (U1) and no time. */
+       small controls and its inset) and the times' column it keeps clear, so the bar covers no word and no time. */
     --_gutter: calc(9 * var(--control-xs) + var(--chat-times));
     /* layout: the line holds its bar (LineActions), placed over its end */
     position: relative;
@@ -136,7 +136,7 @@
 
   .groupTime {
     position: absolute;
-    /* layout: at the row's far end, where its head's time stands, so every time of the room is in one column (Alexis, 2026-11-07) */
+    /* layout: at the row's far end, where its head's time stands, so every time of the room is in one column */
     inset-inline-end: 0;
     /* layout: on the text's first line, which the row's padding and the text's hair put under the row's top */
     inset-block-start: calc(var(--space-3xs) + var(--space-3xs) / 2);
@@ -166,7 +166,7 @@
   }
 
   /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
-     author in the text's own colour and bolder: the prototype's quote (4d). */
+     author in the text's own colour and bolder: the prototype's quote. */
   .replying {
     overflow: hidden;
     white-space: nowrap;
@@ -252,7 +252,7 @@
     color: var(--color-text-muted);
   }
 
-  /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word (4d). */
+  /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word. */
   .lines > li[data-about-me] {
     padding-inline-start: var(--space-2xs);
     border-inline-start: var(--line-width) solid var(--color-warm);
@@ -269,7 +269,7 @@
   }
 
   /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
-     whole in its title (UX review U2, U8). */
+     whole in its title. */
   .typing {
     padding-inline: var(--chat-inset);
     /* layout: one line of this font, which no token names */
@@ -282,7 +282,7 @@
   }
 
   /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
-     in the label style and a rule running on, so the times stay in one column (UX review U4). */
+     in the label style and a rule running on, so the times stay in one column. */
   .divider {
     /* layout: the word and its rule side by side, the rule taking what the word leaves */
     display: flex;
@@ -292,7 +292,7 @@
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
-  /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view (D13922). */
+  /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view. */
   .lines > li.day {
     /* held at the top over its day's lines by `held-top` (utilities.css) */
     /* layout: no step above, which a held label would leave open to the lines under it */

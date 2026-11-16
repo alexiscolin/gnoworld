@@ -81,7 +81,7 @@ export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./g
 export { LineTranslations, TRANSLATIONS_ASKED, TRANSLATIONS_WAIT_MS, TranslationEvent } from "./translations.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
-// The worlds' count (7n2), which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind
+// The worlds' count, which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind
 // indexer.ts's door), and a module both the first screen and the scene's chunk import would be a chunk that every lazy chunk names.
 export { WORLDS_COUNT_MAX_BYTES, WorldsCount } from "./worldsHead.ts";
 

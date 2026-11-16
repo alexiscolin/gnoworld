@@ -11,9 +11,8 @@ import { Shell } from "./shell.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
 import { levelsOf } from "./shellWays.tsx";
 
-// Slice 5r (O1, O4): the header as the video's frames 1, 20 and 37 show it: the logo, the views Universe, System and Earth, the
-// network named, "Testnet" on a testnet, search. Slice 8: the middle view says "Universe" (Alexis), Jarvis is coming soon, the chat and
-// the passport's counter are controls.
+// The header as the video's frames 1, 20 and 37 show it: the logo, the views, the network named, "Testnet" on a testnet, search;
+// the chat is a control, and the passport's counter is not one.
 const inShell = (Page: () => React.JSX.Element) => () => (
   <Shell>
     <Page />
@@ -59,8 +58,8 @@ describe("the header", () => {
     expect(link.replace(/<[^>]*>/g, "")).toBe("gnoworld");
   });
 
-  // D424, D444: the views' pill is Galaxy, then the System and the World, each named by the place it leads to (the page's own, else the
-  // Earth's home), then the full chat of that world; no List (D344). D501, D561: the Earth's system is /s/gnoland, never the home's first screen.
+  // The views' pill is Galaxy, then the System and the World, each named by the place it leads to (the page's own, else the
+  // Earth's home), then the full chat of that world; no List. The Earth's system is /s/gnoland, never the home's first screen.
   const text = (html: string) => html.replace(/<[^>]*>/g, "");
   const pillLinks = (html: string) => {
     const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
@@ -85,8 +84,7 @@ describe("the header", () => {
     },
   );
 
-  // 7v (Alexis, 2026-11-03, the GUI board's option B): two icons after the pill's views say how one looks at space, once the page wakes
-  // (F4692): the page as written holds none, so a not-found path, served the fallback written at /, hydrates as its own page.
+  // Two icons after the pill's views say how one looks at space, once the page wakes: the page as written holds none, so a not-found path, served the fallback written at /, hydrates as its own page.
   test.each(["/", "/net/gnoland"])(
     "%s: offers no views of space in the page as written, before it wakes",
     async (path) => {
@@ -99,7 +97,7 @@ describe("the header", () => {
     const html = await header(path);
     expect(html).not.toMatch(/Views of space|Dynamic view|Plan view/);
   });
-  // ADR-0003 §2, 2c: each view says what it holds to a screen reader alone, as its description; nothing is drawn under the tabs.
+  // Each view says what it holds to a screen reader alone, as its description; nothing is drawn under the tabs.
   test.each(["/", "/earth", "/net/gnoland"])(
     "%s: describes each view to screen readers, and draws no word of it",
     async (path) => {
@@ -134,13 +132,13 @@ describe("the header", () => {
     expect(current(await header("/net/gnoland"))).toEqual(["Systemgno.land"]);
   });
 
-  // D501: the default universe's home is the Earth's first screen, no level of the header in view.
+  // The default universe's home is the Earth's first screen, no level of the header in view.
   test("marks no level on the home's first screen", async () => {
     expect(current(await header("/"))).toEqual([]);
     expect(await header("/")).not.toContain("aria-current");
   });
 
-  // F3270: the addresses `canonical` and `og:url` publish are /net/onyx/ and /net/onyx/earth, and a person can arrive on them.
+  // The addresses `canonical` and `og:url` publish are /net/onyx/ and /net/onyx/earth, and a person can arrive on them.
   test("/net/onyx/earth, a canonical address, marks the World level, named Earth, as the current one", async () => {
     expect(current(await header("/net/onyx/earth"))).toEqual(["WorldEarth"]);
   });
@@ -155,7 +153,7 @@ describe("the header", () => {
     expect(html).toContain("Testnet");
   });
 
-  // F3268: "Testnet" is a use of the static chip, in the caution tone with the warning icon (DESIGN-SYSTEM.md, "Severity").
+  // "Testnet" is a use of the static chip, in the caution tone with the warning icon (DESIGN-SYSTEM.md, "Severity").
   test("says Testnet in the static chip, warm, with the warning icon beside it", async () => {
     const html = await header("/");
     expect(html).toMatch(/<span [^>]*data-tone="warm"[^>]*data-size="xs"[^>]*>Testnet<\/span>/);
@@ -169,7 +167,7 @@ describe("the header", () => {
     expect(mainnet).not.toContain("Testnet");
   });
 
-  // F3265: the video's search is the last of the views' pill, after a divider.
+  // The video's search is the last of the views' pill, after a divider.
   test("keeps search inside the views' pill, after the levels and the chat, and the wide one in the account's row", async () => {
     const html = await header("/earth");
     const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
@@ -180,8 +178,8 @@ describe("the header", () => {
     expect(html.match(/aria-label="Search"/g)).toHaveLength(2);
   });
 
-  // D444 (after D366): the chat full of the world in view, or of the Earth, is a control beside the World level, named for its world; no
-  // Jarvis till its slice lands, and the passport the account menu's alone (D329, D342).
+  // The chat full of the world in view, or of the Earth, is a control beside the World level, named for its world; no
+  // Jarvis, and the passport the account menu's alone.
   test("shows the full chat as a control named for its world, and neither Jarvis nor a passport counter", async () => {
     const html = await header("/");
     expect(html).toMatch(
@@ -223,7 +221,7 @@ test.each([
   expect(world?.name).toBe(name);
 });
 
-// O4: "Testnet" says what the data says of a universe, not what a name or a default says. The real data has one testnet and it is
+// "Testnet" says what the data says of a universe, not what a name or a default says. The real data has one testnet and it is
 // the default one (Onyx), so this site is planted: its default is no testnet, and its second universe, not the default, is one.
 describe("the header's Testnet, on a planted site", () => {
   const planted = siteOf(PLANTED);

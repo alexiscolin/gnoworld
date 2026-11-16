@@ -2,7 +2,7 @@ import type { Line } from "@gnoworld/core";
 import { describe, expect, it, vi } from "vitest";
 import { menuPoint, nextLine, stopOf } from "./lineFocus.ts";
 
-// The green pass (G5): the moves among a room's lines, read apart from the page (the app's tests render on the
+// The moves among a room's lines, read apart from the page (the app's tests render on the
 // server, where no key is pressed).
 const press = (key: string, held: Partial<Record<"altKey" | "ctrlKey" | "metaKey" | "shiftKey", boolean>> = {}) => ({
   key,
@@ -52,7 +52,7 @@ describe("the line a key moves the focus to", () => {
   });
 });
 
-// The green pass (G7): the list's one tab stop, whatever became of the line chosen.
+// The list's one tab stop, whatever became of the line chosen.
 const line = (id: string): Line => ({ id, time: "2026-10-25T10:00:00.000Z", from: "n", text: id, kind: "message" });
 const LINES = [line("a"), line("b"), line("c")];
 

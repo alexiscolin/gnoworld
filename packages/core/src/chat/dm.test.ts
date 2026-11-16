@@ -13,7 +13,7 @@ const read = (line: string): IrcMessage => {
 const tags = (id: string, account?: string) =>
   `@msgid=${id};time=${T0}${account === undefined ? "" : `;account=${account}`}`;
 
-// 4e (docs/plans/slice-4.md §7): a direct message is a PRIVMSG or a NOTICE to a nick, not a room: from an account to
+// A direct message is a PRIVMSG or a NOTICE to a nick, not a room: from an account to
 // me, or mine to an account, as Ergo echoes it (echo-message). Its partner keys the conversation.
 describe("dmOf: a direct message and who it is with", () => {
   test("reads an account's message to me, with that account as the partner", () => {
@@ -44,7 +44,7 @@ describe("dmOf: a direct message and who it is with", () => {
     expect(dmOf(read(`${tags("e", ALICE)} :${ALICE}!u@h PRIVMSG ${ME.toUpperCase()} :hi`), ME)?.partner).toBe(ALICE);
   });
 
-  // Guests have no direct messages (the plan's scope): a line with no account tag, a guest's, is none.
+  // Guests have no direct messages: a line with no account tag, a guest's, is none.
   test.each([
     ["a guest's message, with no account tag", `${tags("f")} :guest-ab12cd!u@h PRIVMSG ${ME} :hi`],
     ["a message whose account tag is not its nick's", `${tags("g", ALICE)} :guest-ab12cd!u@h PRIVMSG ${ME} :hi`],
@@ -55,9 +55,9 @@ describe("dmOf: a direct message and who it is with", () => {
     ["a CTCP other than ACTION", `${tags("k", ALICE)} :${ALICE}!u@h PRIVMSG ${ME} :\u0001VERSION\u0001`],
     ["a TAGMSG", `${tags("l", ALICE)} :${ALICE}!u@h TAGMSG ${ME}`],
     ["a message to me from me", `${tags("m", ME)} :${ME}!u@h PRIVMSG ${ME} :note to self`],
-    // StrykerJS on 4e: my own line in a room is the room's, never a direct message to it.
+    // My own line in a room is the room's, never a direct message to it.
     ["my own message to a room", `${tags("n", ME)} :${ME}!u@h PRIVMSG #bubble :hi all`],
-    // 4e's late test audit (T8): Ergo's echo of a line to a room's ranks (STATUSMSG) keeps their prefix.
+    // Ergo's echo of a line to a room's ranks (STATUSMSG) keeps their prefix.
     ["my own message to a room's operators", `${tags("q", ME)} :${ME}!u@h PRIVMSG @#bubble :ops only`],
     [
       "my own message to a room's ranks, prefixes stacked",

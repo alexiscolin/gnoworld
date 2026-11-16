@@ -1,4 +1,4 @@
-// One line of a room by its id, as Ergo holds it (slice 4's 4d, pins): CHATHISTORY AROUND <room> msgid=<id> 1 answers
+// One line of a room by its id, as Ergo holds it (for the pins): CHATHISTORY AROUND <room> msgid=<id> 1 answers
 // that line alone, or an empty batch when Ergo holds none (tried on v2.19.1). Ergo answers its commands in order and a
 // batch is never split, so a batch is a question's by its place among the history requests sent, which the link
 // keeps; its lines then go to the question alone, never to the checks and counts a heard line goes to.

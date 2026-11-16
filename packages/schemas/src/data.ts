@@ -1,4 +1,4 @@
-// The data files' schemas (slice 5's 5c; ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
+// The data files' schemas (ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
 import { hasHidden } from "./hidden.ts";
@@ -30,7 +30,7 @@ const Origin = z
   .string()
   .check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?$/));
 
-/** The players a news item may embed, each by its own path (F885: csp.ts's frame-src names the same prefixes). */
+/** The players a news item may embed, each by its own path (csp.ts's frame-src names the same prefixes). */
 export const EMBED_PREFIXES = [
   "https://www.youtube-nocookie.com/embed/",
   "https://player.vimeo.com/video/",
@@ -123,7 +123,7 @@ const Label = text(PROPOSAL_ARGS_CAPS.label).check(
   z.refine((label) => labelKey(label) !== "who's here", "a label is not the bar's Who's here"),
 );
 
-/** A call the team pins in a world (D271): the realm one of the world's own, checked against vm/qfuncs before it shows. */
+/** A call the team pins in a world: the realm one of the world's own, checked against vm/qfuncs before it shows. */
 const PinnedAction = z.strictObject({
   label: Label,
   realm: RealmPath,
@@ -140,14 +140,14 @@ const World = z
     name: text(DATA_CAPS.name),
     description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
     universe: Key,
-    /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
+    /** The realms the world is about, the first the one its page reads proposals from. */
     realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
-    /** What the world is, its plate's crumb (8g, frames 22 and 104: "UNIVERSE › DAO", "UNIVERSE › GAMES › DAPP"): a hub unless the team says; a
-     * station round the Earth (8l) is a world of its own kind. */
+    /** What the world is, its plate's crumb ("UNIVERSE › DAO", "UNIVERSE › GAMES › DAPP"): a hub unless the team says; a
+     * station round the Earth is a world of its own kind. */
     kind: z.optional(z.enum(WORLD_KINDS)),
     /** The genre it belongs to, a slug of genres.json, the crumb's step before its kind. */
     genre: z.optional(Key),
-    /** Up to 3 calls the team pins, shown in the world's chat bar and on its page (D271). */
+    /** Up to 3 calls the team pins, shown in the world's chat bar and on its page. */
     actions: z.optional(z.array(PinnedAction).check(z.minLength(1), z.maxLength(3))),
   })
   .check(
@@ -179,9 +179,9 @@ export const Events = byId(
     title: text(DATA_CAPS.title),
     start: z.iso.datetime(),
     link: Link,
-    /** The world it happens in, by its hub's slug or the Earth's ("earth"), for the calendar and the bell by world (Alexis, slice 8). */
+    /** The world it happens in, by its hub's slug or the Earth's ("earth"), for the calendar and the bell by world. */
     world: z.optional(Key),
-    /** What it is, in a word, as the ticker and a world's label say it ("AMA", frames 4 and 6); unsaid, an event (Alexis, 8p). */
+    /** What it is, in a word, as the ticker and a world's label say it ("AMA"); unsaid, an event. */
     kind: z.optional(z.string().check(z.regex(/^[A-Za-z][A-Za-z ]{0,11}$/))),
   }),
 );
@@ -189,9 +189,9 @@ export { BubbleRules } from "./bubbleRules.ts";
 
 const degrees = (limit: number) => z.number().check(z.gte(-limit), z.lte(limit));
 
-/** What turns round the Earth (7v; Alexis, 2026-11-03): a project the team adds by hand, even with no realm, by its name and its own
+/** What turns round the Earth: a project the team adds by hand, even with no realm, by its name and its own
  * address, the hub whose page it links to where it has one, and its station's size, 0 a small satellite (none) to 1 an artificial world,
- * a sign the team sets (Alexis, 2026-11-04); a name once. */
+ * a sign the team sets; a name once. */
 export const EarthOrbit = unique(
   list(
     z.strictObject({
@@ -242,7 +242,7 @@ const Universe = z.strictObject({
   default: z.optional(z.literal(true)),
 });
 
-/** The networks the site shows; exactly one is the build's default (docs/decisions.md, 2026-10-29: Onyx). */
+/** The networks the site shows; exactly one is the build's default. */
 export const Universes = z.array(Universe).check(
   z.maxLength(DATA_CAPS.universes),
   z.check((ctx) => {

@@ -1,4 +1,4 @@
-// The automatic mute (decision 146; slice 3's plan, 3k): an account muted in every room of a world with
+// The automatic mute: an account muted in every room of a world with
 // Ergo's m: extban, through SAMODE, for a time a table keeps, so a restart puts the live ones back and lifts
 // the ended ones. The account is kept in clear while it is muted: the extban names it.
 import type { DatabaseSync } from "node:sqlite";
@@ -17,7 +17,7 @@ export interface Mutes {
   tick: () => void;
   // When the link is back: the live mutes put on again, the ended ones lifted.
   reapply: () => void;
-  // A room made in a world: that world's live mutes put on it, and on no other room (F588).
+  // A room made in a world: that world's live mutes put on it, and on no other room.
   putOn: (room: string, world: string) => void;
 }
 

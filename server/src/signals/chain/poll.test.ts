@@ -5,7 +5,7 @@ import { indexerReaders, MAX_BYTES, PAGE, type Page } from "./indexer.ts";
 import type { ChainRead } from "./message.ts";
 import { PAGES, pollChain, POLL_MS, SEEN, timer, type PollOptions } from "./poll.ts";
 
-// Slice 9g: the one poll of a universe's public indexer, once a block (answer 9g-4, by Alexis). Every test drives a fake clock
+// The one poll of a universe's public indexer, once a block. Every test drives a fake clock
 // (a timer runs when the test fires it, never by itself) and fake reads, and waits on the poll's own events, never on time.
 const ACCESS = "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access";
 

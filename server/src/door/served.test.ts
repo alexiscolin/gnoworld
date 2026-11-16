@@ -2,7 +2,7 @@ import type { JarvisAnswer, JarvisQuestion } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { makeServed, SERVED_MAX, servedKey } from "./served.ts";
 
-// D13985 point 2: an answer kept 10 minutes and served to anyone who asks the same at the same place; memory only, bounded.
+// An answer kept 10 minutes and served to anyone who asks the same at the same place; memory only, bounded.
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const ANSWER = (markdown = "It closes today."): JarvisAnswer => ({ status: "answered", markdown, buttons: [] });
 const REALM = "gno.land/r/demo/boards";

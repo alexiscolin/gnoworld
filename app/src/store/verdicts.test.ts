@@ -19,7 +19,7 @@ const store = () => {
   };
 };
 
-// 4g: the verdicts' stream tells which line a link's player may open on: "checked", or "hidden" for good.
+// The verdicts' stream tells which line a link's player may open on: "checked", or "hidden" for good.
 describe("the store's verdicts", () => {
   it("starts with none", () => {
     expect(createAppStore().getState().verdicts).toEqual({});
@@ -54,7 +54,7 @@ describe("the store's verdicts", () => {
     expect(kept.at(-1)).toBe(`m${String(VERDICTS_KEPT)}`);
   });
 
-  // F880: JavaScript orders a key of digits before the others, so an object's order is not the verdicts' order.
+  // JavaScript orders a key of digits before the others, so an object's order is not the verdicts' order.
   it("drops a room's oldest verdict, not its newest, when the newest msgid is digits", () => {
     const t = store();
     for (let n = 0; n < VERDICTS_KEPT; n += 1) t.judged({ msgid: `m${String(n)}`, room: "#bubble", state: "checked" });
@@ -66,7 +66,7 @@ describe("the store's verdicts", () => {
     expect(t.of("#bubble")).not.toHaveProperty("7");
   });
 
-  // F880: the server's answer, asked before the hide, can come after the stream's "hidden"; a hide is for good.
+  // The server's answer, asked before the hide, can come after the stream's "hidden"; a hide is for good.
   it("keeps a hidden line hidden: a later checked changes nothing and notifies no one", () => {
     const t = store();
     t.judged({ msgid: "a", room: "#bubble", state: "hidden" });
@@ -76,7 +76,7 @@ describe("the store's verdicts", () => {
     expect(t.notified()).toBe(before);
   });
 
-  // F880: a line whose verdict changes is one line, not two, in the count the cap reads.
+  // A line whose verdict changes is one line, not two, in the count the cap reads.
   it("counts a line once though its verdict changed, keeping every line up to the cap", () => {
     const t = store();
     t.judged({ msgid: "m0", room: "#bubble", state: "checked" });
@@ -86,8 +86,8 @@ describe("the store's verdicts", () => {
     expect(Object.keys(t.of("#bubble") ?? {})).toHaveLength(VERDICTS_KEPT);
   });
 
-  // F880: the order that picks the verdict to drop holds no more than the verdicts it orders.
-  // F1057 (C2): a server's answer of 100 verdicts went in one by one, the room copied and the store set 100 times.
+  // The order that picks the verdict to drop holds no more than the verdicts it orders.
+  // A server's answer of 100 verdicts is taken in one update, not one by one with the room copied and the store set 100 times.
   it("takes a server's answer in one update, its room kept to its newest", () => {
     const t = store();
     const events = Array.from({ length: VERDICTS_KEPT + 5 }, (_, n) => ({

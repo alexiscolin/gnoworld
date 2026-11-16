@@ -1,6 +1,6 @@
-# Ergo's configuration for gnoworld (slice 3b): only the keys gnoworld relies on, each set here rather
+# Ergo's configuration for gnoworld: only the keys gnoworld relies on, each set here rather
 # than left to a default. The server's tests render it with folders and ports of their own
-# (server/src/testing/ergo.ts), and the stack's image renders the same file (3e). Each name in double
+# (server/src/testing/ergo.ts), and the stack's image renders the same file. Each name in double
 # braces is filled at render, as a JSON value; a key's meaning is in Ergo's default.yaml at the tag (deploy/ergo/VERSION).
 network:
   name: gnoworld
@@ -17,9 +17,9 @@ server:
   proxy-allowed-from: {{PROXY_FROM}}
   websockets:
     allowed-origins: {{ORIGINS}}
-  # Ergo's defaults (slice 3's max review): a visitor's address, as web passes it, has 16 connections at once
+  # Ergo's defaults: a visitor's address, as web passes it, has 16 connections at once
   # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address, which
-  # the inside network's exemption leaves alone (F720).
+  # the inside network's exemption leaves alone.
   ip-limits:
     count: true
     max-concurrent-connections: 16
@@ -37,7 +37,7 @@ server:
     cidr-len-ipv4: 32
     cidr-len-ipv6: 64
     num-bits: 64
-  # The bot says a guest's line as anon/<name> (RELAYMSG, D430): a guest is no account, so no direct message reaches it
+  # The bot says a guest's line as anon/<name> (RELAYMSG): a guest is no account, so no direct message reaches it
   # (irc/handlers.go:2457) and none can take a nick with the separator (client_lookup_set.go:161). A room's operator
   # may not relay: only the bot's class, below.
   relaymsg:
@@ -57,15 +57,15 @@ accounts:
     enabled: true
     duration: 1m
     max-attempts: 3
-  # Invisible by default: a room's members are listed to its members alone (slice 3's max review). And +R: no
+  # Invisible by default: a room's members are listed to its members alone. And +R: no
   # direct message from a connection with no account, a guest's (irc/handlers.go:2552), set at each connection's
-  # registration (irc/server.go:445) so none arrives before it; decided by Alexis in 4e (docs/decisions.md).
+  # registration (irc/server.go:445) so none arrives before it.
   default-user-modes: +iR
   nick-reservation:
     enabled: true
     method: strict
     # A connection with no account is renamed Guest-<nick> (guest-nickname-format's default), so a guest can
-    # never hold the bot's nick, before the bot's first login either (F722; v2.19.1 irc/client_lookup_set.go:136).
+    # never hold the bot's nick, before the bot's first login either (v2.19.1 irc/client_lookup_set.go:136).
     force-guest-format: true
     force-nick-equals-account: true
   # force-nick-equals-account requires it: one account, several connections (a tab each).
@@ -87,7 +87,7 @@ accounts:
     max-concurrency: 64
 channels:
   # +M: only accounts speak, and +i: none joins, from a room's first line, before the server's reconciler
-  # opens the open ones (3m, slice 3's max review).
+  # opens the open ones.
   default-modes: +ntCMi
   # A visitor's rooms (ADR-0001); the bot, an operator, is in every room of every world past it (client.go).
   max-channels-per-client: 100
@@ -99,8 +99,8 @@ channels:
 oper-classes:
   server-admin:
     title: Server Admin
-    # The bot's needs alone (slice 3's max review): rooms made (chanreg, with operator-only-creation), joined and
-    # set whatever their modes, their history read, unpaced, and a guest's line relayed (D430).
+    # The bot's needs alone: rooms made (chanreg, with operator-only-creation), joined and
+    # set whatever their modes, their history read, unpaced, and a guest's line relayed.
     capabilities: [sajoin, samode, chanreg, history, nofakelag, relaymsg]
 opers:
   admin:
@@ -121,7 +121,7 @@ limits:
   kicklen: 390
   topiclen: 390
   chan-list-modes: 100
-  # draft/multiline (slice 4, docs/decisions.md row 255): a message of several lines, its breaks counted, 4096 bytes
+  # draft/multiline: a message of several lines, its breaks counted, 4096 bytes
   # (Ergo's own default) and 40 lines (its default 100 would let one message fill half the 200 lines a page keeps).
   # core's MULTILINE_BYTES and MULTILINE_LINES say the same, as the composer's caps (deploy/test.sh checks both).
   multiline:
@@ -132,14 +132,14 @@ history:
   channel-length: 2048
   client-length: 256
   chathistory-maxmessages: 1000
-  # One time for every room and message (decision 154's 90 days; Ergo v2.19.1 has no time for messages alone).
+  # One time for every room and message (90 days; Ergo v2.19.1 has no time for messages alone).
   restrictions:
     expire-time: 90d
   persistent:
     enabled: true
     unregistered-channels: true
     registered-channels: opt-out
-    # Not kept until slice 4 makes them a product: decision 154's 30 days cannot be set apart from rooms'.
+    # Not kept: a shorter time for them cannot be set apart from rooms'.
     direct-messages: disabled
   retention:
     allow-individual-delete: true
@@ -149,7 +149,7 @@ history:
     default: false
     whitelist: ["+draft/react", "+react", "+draft/unreact"]
 # On, as in Ergo's defaults, but set by an oper with the metadata capability alone, which none holds (the
-# bot's class): nobody sets metadata until a slice needs it.
+# bot's class): nobody sets metadata until a feature needs it.
 metadata:
   enabled: true
   operator-only-modification: true

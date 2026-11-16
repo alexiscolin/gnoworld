@@ -1,4 +1,4 @@
-// The chat's search panel (slice 13, C), in the info panel's place as a thread's is: the field, the filters, the results by day, and the
+// The chat's search panel, in the info panel's place as a thread's is: the field, the filters, the results by day, and the
 // states of the canvas's States frame (before typing, nothing found, a conversation that is not searched). A result opens its room at the
 // message (the caller's `onOpen`). Public rooms of one world at a time: the server answers for what the reader may read.
 import type { SearchHit } from "@gnoworld/schemas";

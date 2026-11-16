@@ -1,4 +1,4 @@
-// The call cards' slice of the store (9d): its actions move a card only along the course, preview, signing, landing, done, so nothing is
+// The call cards' slice of the store: its actions move a card only along the course, preview, signing, landing, done, so nothing is
 // done before the chain has answered (ADR-0002 section 4). It joins the page's store when a realm view draws its first card, and is
 // kept out of store/, whose files vite.config.ts puts in the first screen's chunk: the first screen's budget has no room for it.
 import type { StoreApi } from "zustand/vanilla";
@@ -9,14 +9,14 @@ import { without } from "../../store/record.ts";
 /** A store that has the calls' slice. */
 export type CallsStore = StoreApi<AppState & CallsSlice>;
 
-/** A failure the card may sign again: none that may have been sent, or that has a hash (F5728, F5747). */
+/** A failure the card may sign again: none that may have been sent, or that has a hash. */
 export const retryable = (state: CardState): boolean =>
   state.kind === "failed" &&
   state.hash === undefined &&
   state.reason !== "maybe-sent" &&
   state.reason !== "declined-maybe-sent";
 
-/** The state with the calls' slice, or nothing before a card was drawn: the one way to read it (F5726). */
+/** The state with the calls' slice, or nothing before a card was drawn: the one way to read it. */
 export function callsIn(state: AppState): (AppState & CallsSlice) | undefined {
   return Object.hasOwn(state, "callsActions") ? (state as AppState & CallsSlice) : undefined;
 }

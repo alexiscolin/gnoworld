@@ -1,4 +1,4 @@
-// The chain's feed loaded on its first event (slice 9g): a page whose stream never tells the chain never loads the feed's chunk (its schemas
+// The chain's feed loaded on its first event: a page whose stream never tells the chain never loads the feed's chunk (its schemas
 // and its batching), which keeps it out of the first screen (budgets.spec.ts). Events wait for the chunk in their order.
 import type { ChainFeed } from "./chainFeed.ts";
 

@@ -1,4 +1,4 @@
-// JSON at a boundary (D121, D122): the value of a text, or nothing for a text that is no JSON, which the boundary's schema
+// JSON at a boundary: the value of a text, or nothing for a text that is no JSON, which the boundary's schema
 // then refuses by its place; and where a fault sits in a data file, written the same way by the app's build and Jarvis.
 
 /** The value a JSON text writes; undefined for a text that is no JSON, never an error (JSON writes no undefined). */

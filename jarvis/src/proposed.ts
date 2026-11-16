@@ -1,4 +1,4 @@
-// A proposal's check (backlog row 10: "a proposal for a function that does not exist shows nothing"; ADR-0002 §4, "Proposed
+// A proposal's check (ADR-0002 §4, "Proposed
 // actions"): the action passes its schema, names a write function of the realm's `vm/qfuncs` and gives exactly that
 // function's other parameters, each of a type a call carries as text. Anything else is none, a value and never a throw,
 // so a planted message cannot forge a button. The client checks the arguments' values against their types.

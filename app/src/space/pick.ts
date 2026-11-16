@@ -1,4 +1,4 @@
-// What is under a point of the screen (D401, the demo's pick): a planet once its system is large enough to tell them apart, else the
+// What is under a point of the screen (the demo's pick): a planet once its system is large enough to tell them apart, else the
 // system; within a fingertip's reach of what it aims at. Read at an event, never on a frame.
 import { placeOf, type Planet, type System, type Universe } from "./layout.ts";
 import type { Seen } from "./see.ts";
@@ -6,7 +6,7 @@ import type { Place } from "./place.ts";
 
 export type Hit = { readonly planet: Planet } | { readonly system: System };
 
-// raw: how wide a planet stands on screen, in pixels across its radius, before a wheel over it in the Map dives into it (D498)
+// raw: how wide a planet stands on screen, in pixels across its radius, before a wheel over it in the Map dives into it
 const DIVE_PX = 26;
 
 // Whether `planet` stands large enough on screen, as `seen`, `seconds` on, for a wheel over it to dive in from the Map.
@@ -21,7 +21,7 @@ interface Diving {
   readonly seconds: number;
 }
 
-/** Whether a wheel in over `hit` dives there: a planet of a system, not the page's own; from the Map once it stands large (D498). */
+/** Whether a wheel in over `hit` dives there: a planet of a system, not the page's own; from the Map once it stands large. */
 export const divesInto = (hit: Hit, { place, planet, plan, see, seconds }: Diving): boolean =>
   "planet" in hit &&
   place?.kind !== "universe" &&
@@ -41,7 +41,7 @@ interface Aim {
   readonly y: number;
   readonly seen: Seen;
   readonly seconds: number;
-  /** The worlds a tag lights (D425): the others answer no aim; none, every world does. */
+  /** The worlds a tag lights: the others answer no aim; none, every world does. */
   readonly only?: ReadonlySet<string> | undefined;
   /** The system whose planets are drawn: the others' answer no aim. */
   readonly open: System | undefined;

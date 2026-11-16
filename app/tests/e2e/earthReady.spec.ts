@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hydrated, test } from "./fixtures.ts";
 
-// The Earth's page opened from its URL (2026-11-11): when its header shows, when the scene says its planet is itself, each in ms since the
+// The Earth's page opened from its URL: when its header shows, when the scene says its planet is itself, each in ms since the
 // page began, and the first frames' gaps; one JSON line to `EARTH_READY_OUT`. `EARTH_FIXED_TIME=1` freezes the clock as onEarth does: GSAP
-// reads Date.now, so the header's fade never moves and it stays hidden (the cause of the hang the journeys saw).
+// reads Date.now, so the header's fade never moves and it stays hidden.
 declare const process: { env: Record<string, string | undefined> };
 const OUT = process.env["EARTH_READY_OUT"] ?? join(tmpdir(), "earthReady.jsonl");
 const HOUR = new Date("2026-11-02T21:30:00.000Z");

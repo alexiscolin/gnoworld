@@ -1,4 +1,4 @@
-// A world's rooms by section, each a link to its address, the one shown marked (slice 4's 4b): the part of the rooms'
+// A world's rooms by section, each a link to its address, the one shown marked: the part of the rooms'
 // navigation a visitor has too. An account's direct messages and notices are RoomsView's.
 import type { RoomList as Rooms } from "@gnoworld/schemas";
 import { Disclosure, Icon, NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
@@ -37,7 +37,7 @@ export function Folding({ name, action, children }: { name: string; action?: Rea
 export interface RoomSectionsProps {
   sections: Rooms["sections"];
   current: string | undefined;
-  /** What says the rooms could not load, in their place (CR8). */
+  /** What says the rooms could not load, in their place. */
   failed?: ReactNode;
   /** What a room holds unseen, at the end of its item: none for none. */
   badge?: ((room: string) => NavItemProps["badge"]) | undefined;
@@ -45,7 +45,7 @@ export interface RoomSectionsProps {
   action?: ReactNode;
 }
 
-// Who is in a room now, at its row's end as a person and a figure (Alexis, 2026-11-08: "le 1 here est moche"); its messages of the
+// Who is in a room now, at its row's end as a person and a figure; its messages of the
 // last day said with it to a screen reader alone, the list's order already showing the busiest first.
 const hereOf = (here: number | undefined, messages: number | undefined) =>
   here === undefined || here <= 0

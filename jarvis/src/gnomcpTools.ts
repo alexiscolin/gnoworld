@@ -1,7 +1,7 @@
 // gnomcp 0.11.0's seven reads (ADR-0002 §5) as the allowlist offers them: no field gnomcp lacks, each string capped,
 // gnomcp's own patterns kept, and `profile` required, one of the chains Jarvis's own gnomcp names, so no call lands on
 // gnomcp's default. The indexer's two reads take only the profiles that have one, and gno_activity no time bounds,
-// which 0.11.0 answers with an error (its docs/tools.md). The caps are D52's.
+// which 0.11.0 answers with an error (its docs/tools.md).
 import { z } from "zod";
 
 export interface Profiles {

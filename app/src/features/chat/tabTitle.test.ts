@@ -3,7 +3,7 @@ import { titled } from "./tabTitle.ts";
 
 const BASE = "Bubble · gno.world";
 
-// 4f-n: the count of what the account has not seen, in the tab's title, which a tab in the background still shows.
+// The count of what the account has not seen, in the tab's title, which a tab in the background still shows.
 describe("titled: a page's title with the count of what is unseen", () => {
   it("is the title itself while nothing is unseen", () => {
     expect(titled(BASE, 0)).toBe(BASE);
@@ -14,7 +14,7 @@ describe("titled: a page's title with the count of what is unseen", () => {
     expect(titled(BASE, 99)).toBe(`(99) ${BASE}`);
   });
 
-  // G9 (F1510): one is the least count that shows.
+  // One is the least count that shows.
   it("shows a count of one", () => {
     expect(titled(BASE, 1)).toBe(`(1) ${BASE}`);
   });
@@ -39,7 +39,7 @@ describe("titled: a page's title with the count of what is unseen", () => {
     expect(titled("(2024) Review", 0)).toBe("(2024) Review");
     expect(titled("(2024) Review", 2)).toBe("(2) (2024) Review");
     expect(titled("(3)Bubble", 0)).toBe("(3)Bubble");
-    // R20: past 99 the prefix is never ours ("(99+)" stands there), nor is one with another mark.
+    // Past 99 the prefix is never ours ("(99+)" stands there), nor is one with another mark.
     expect(titled("(100) Review", 0)).toBe("(100) Review");
     expect(titled("(5+) X", 0)).toBe("(5+) X");
   });

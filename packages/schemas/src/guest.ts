@@ -1,4 +1,4 @@
-// The guest chat's API (D430): a name and a cookie, then a line the server judges before the bot says it.
+// The guest chat's API: a name and a cookie, then a line the server judges before the bot says it.
 import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
 

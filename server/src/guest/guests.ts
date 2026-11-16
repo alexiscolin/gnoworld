@@ -1,4 +1,4 @@
-// The guests (D430): a visitor with no account who speaks through the server. A row holds a name, the SHA-256 of
+// The guests: a visitor with no account who speaks through the server. A row holds a name, the SHA-256 of
 // its cookie's value (never the value), its visitor as the verdicts keep an address (an HMAC), and its two times;
 // a guest unused for 24 hours is purged. A strike is kept per guest and visitor, a mute per visitor and world.
 import { createHash, randomBytes } from "node:crypto";

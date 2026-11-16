@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { blocksQuery, catchUpQuery, deploysQuery, placeQuery } from "./transactions.ts";
 
-// Slice 9g: the words of the indexer's GraphQL the server's reads send, from the live schema of the Onyx indexer (2026-11-06).
+// The words of the indexer's GraphQL the server's reads send, from the live schema of the Onyx indexer.
 describe("the indexer's queries for the chain's rooms", () => {
   it("asks the transactions of the realms, a realm's path a quoted string, and no args, memo or events", () => {
     const query = catchUpQuery(["gno.land/r/a/b", 'x"y'], { after: { height: 1 }, tip: 9 }, 5);

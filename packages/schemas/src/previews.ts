@@ -1,4 +1,4 @@
-// The file the server's preview job writes and every client reads (8f, slice 7's 7l): each captured page by its realm's path, the time it
+// The file the server's preview job writes and every client reads: each captured page by its realm's path, the time it
 // was captured, and its first part as the chain rendered it, which the moderation check read before it was written. All of it came from a
 // chain, so every text is capped and every path is a realm's. Behind the indexer's door (indexer.ts): only a page that draws a preview reads it.
 import { RealmPath } from "./realmPath.ts";

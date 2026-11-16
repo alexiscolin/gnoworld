@@ -1,4 +1,4 @@
-// The panel of a thread open beside a room (4d's threads), a lazy chunk of its own like the thread's body: a page that opens no
+// The panel of a thread open beside a room, a lazy chunk of its own like the thread's body: a page that opens no
 // thread never loads it (ADR-0001 §12), nor the core's reading of a thread's root.
 import { foldEdits, threadsOf, type Line } from "@gnoworld/core";
 import { lazy, Suspense, useEffectEvent, useLayoutEffect, useState } from "react";
@@ -35,9 +35,9 @@ export function ThreadPanel({
   const members = state?.members ?? [];
   const root = rootOf(state?.lines ?? [], open.from);
   const slot = `${session.kind === "in" ? session.address : ""} ${open.from}`;
-  // The field takes the focus only if the reader was an account as the panel opened: a login later takes none (CR4).
+  // The field takes the focus only if the reader was an account as the panel opened: a login later takes none.
   const [focus] = useState(session.kind === "in");
-  // A room switch takes the panel away with the focus in it: it goes back to the list, as a close gives it back (CR5).
+  // A room switch takes the panel away with the focus in it: it goes back to the list, as a close gives it back.
   const places = useEffectEvent(() => [open.from, root]);
   useLayoutEffect(
     () => () => {

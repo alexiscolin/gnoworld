@@ -11,7 +11,7 @@ import { GNO_LAND, starDraws, starWarmth } from "./warmth.ts";
 export { GNO_LAND };
 /** How far a system reaches from its star: two systems stand a cell apart at the least. */
 export const ROOM = CELL / 2;
-/** Where a far belt's room starts: no world goes past it, a postcard's widened ones included (7d3). */
+/** Where a far belt's room starts: no world goes past it, a postcard's widened ones included. */
 export const BELT_INNER = 0.84 * ROOM;
 /** Where its rocks start: half a unit past it, so no rock stands near a world's ground, for dust is a sign (ADR-0002 §10). */
 export const ROCKS_FROM = BELT_INNER + 0.5;
@@ -43,7 +43,7 @@ const CLUMP = 0.62;
 const BELTS = 1 / 3;
 const SPIN_LEAST = 0.05;
 const SPIN_SPAN = 0.1;
-// A plane leans 15 to 45 degrees off the disc's: none lies in it, and none stands face on to the rest's 15-degree slant (7d6).
+// A plane leans 15 to 45 degrees off the disc's: none lies in it, and none stands face on to the rest's 15-degree slant.
 const TILT_LEAST = Math.PI / 12;
 const TILT_SPAN = Math.PI / 6;
 
@@ -59,7 +59,7 @@ export interface WorldHeld {
 export interface Orbiter {
   readonly id: string;
   readonly radius: number;
-  /** Its own size, its use's, where its system's room makes its radius another: a Plan draws it so (7v's design review, F4470). */
+  /** Its own size, its use's, where its system's room makes its radius another: a Plan draws it so. */
   readonly own?: number;
   readonly orbit: number;
   readonly phase: number;
@@ -68,7 +68,7 @@ export interface Orbiter {
 export interface StarSystem {
   readonly id: string;
   readonly place: SystemPlace;
-  /** Where its worlds' light comes from, when not from its own place: the Earth's projects are lit by the great star (7v). */
+  /** Where its worlds' light comes from, when not from its own place: the Earth's projects are lit by the great star. */
   readonly litBy?: Point;
   readonly star: number;
   /** From red to white, 0 to 1. */
@@ -125,7 +125,7 @@ function scattered(id: string, { orbit, phase }: Pick<Orbiter, "orbit" | "phase"
   };
 }
 
-// A world's radius, and its own size where its system's room makes the radius another: a Plan draws it so (7v's design review, F4470).
+// A world's radius, and its own size where its system's room makes the radius another: a Plan draws it so.
 const sized = (own: number, radius: number) => (own === radius ? { radius } : { radius, own });
 
 function latticeOf(

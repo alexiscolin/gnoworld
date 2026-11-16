@@ -1,4 +1,4 @@
-// An account's strikes and its own share of Jarvis's cost, each per UTC day, in the server's database (D13985): a strike
+// An account's strikes and its own share of Jarvis's cost, each per UTC day, in the server's database: a strike
 // for each question declined, three pause the account until the next day; the cost of each answer in millionths of a
 // dollar, 250,000 (0.25 $) caps it. The day is the question's, whenever its answer lands. A share is read before an answer
 // is paid for, so questions in flight past the cap overshoot it by at most the rate's few.

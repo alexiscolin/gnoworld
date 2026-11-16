@@ -16,7 +16,7 @@ export interface ComingSoonProps {
   children?: ReactNode;
 }
 
-/** What a later slice brings, shown where the video draws it: greyed, inert, "Coming soon" under the pointer and the focus, and said so to
+/** What is not built yet, shown where the video draws it: greyed, inert, "Coming soon" under the pointer and the focus, and said so to
  * a screen reader. It stays focusable, so the keyboard finds it too; a click does nothing. */
 export function ComingSoon({ name, icon, words, size = "m", children }: ComingSoonProps) {
   const face =

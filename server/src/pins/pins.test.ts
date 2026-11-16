@@ -5,7 +5,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import type { Fetched, Said } from "../irc/link.ts";
 import { makePins, PIN_TABLES } from "./pins.ts";
 
-// Slice 4's 4d (docs/plans/slice-4.md §7): a room's pins, kept in the server's database, not in Ergo's channel
+// A room's pins, kept in the server's database, not in Ergo's channel
 // metadata, which Ergo keeps for registered channels alone (irc/channel.go:191-201 and 279-288, v2.19.1) and the
 // server's rooms are not registered. A pin is the line as Ergo held it when it was pinned, never what the page said.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -84,7 +84,7 @@ describe("a room's pins", () => {
     expect(pins.list("#bubble/games")).toEqual([]);
   });
 
-  // Ergo not answering is not Ergo saying the line is gone: a moderator in a blip is told to try again (4d's R7).
+  // Ergo not answering is not Ergo saying the line is gone: a moderator in a blip is told to try again.
   it("says it could not ask, not that the line is gone, when Ergo did not answer", async () => {
     const { pins } = setup({ lines: { "#bubble/games m1": "unanswered" } });
     expect(await pins.add("#bubble/games", "m1", MOD)).toBe("unavailable");
@@ -185,10 +185,10 @@ describe("a room's pins", () => {
   });
 });
 
-// A pin ends with its line (docs/decisions.md, 2026-10-27).
+// A pin ends with its line.
 describe("a pin and its line leaving the room", () => {
   // The line is asked of Ergo, a REDACT of it comes while the answer is awaited, and the answer still holds it: it must
-  // not be pinned after it was deleted (4d's R3).
+  // not be pinned after it was deleted.
   it("never pins a line deleted while Ergo was being asked, whichever the answer", async () => {
     const release: (() => void)[] = [];
     const { pins } = setup({
@@ -228,7 +228,7 @@ describe("a pin and its line leaving the room", () => {
   });
 
   // Ergo keeps a replaced line at its msgid (an edit is only a tag), so a pin of the older version would publish what
-  // its author took back (F1480, F1481).
+  // its author took back.
   it("never pins a line its author's edit replaced, heard before the ask or while Ergo is asked", async () => {
     const release: (() => void)[] = [];
     const held = setup({
@@ -262,7 +262,7 @@ describe("a pin and its line leaving the room", () => {
     expect(await pins.add("#bubble/games", "m3", MOD)).toBe("not_found");
   });
 
-  // The correcting line is the newest version until its author edits again: then it is the older one (F1480).
+  // The correcting line is the newest version until its author edits again: then it is the older one.
   it("drops the pin of a correcting line the author's next edit replaced, and pins only the newest", async () => {
     const edits = Object.fromEntries([said("m2", { edits: "m1" }), said("m3", { edits: "m1" })]);
     const { pins } = setup({ lines: { ...LINES, ...edits } });
@@ -274,8 +274,8 @@ describe("a pin and its line leaving the room", () => {
     expect(await pins.add("#bubble/games", "m3", MOD)).toBe("pinned");
   });
 
-  // The edits heard are remembered 2,000 at most, the oldest forgotten first, and one heard again is the newest (R8 of
-  // redpass2-4dx): a restart or the bound makes an old line pinnable again, which the decision states.
+  // The edits heard are remembered 2,000 at most, the oldest forgotten first, and one heard again is the newest:
+  // a restart or the bound makes an old line pinnable again.
   describe("the edits it remembers", () => {
     const editAll = (pins: ReturnType<typeof setup>["pins"], count: number) => {
       for (let n = 0; n < count; n += 1) pins.edited("#bubble/games", `e${String(n)}`, ALICE);
@@ -299,7 +299,7 @@ describe("a pin and its line leaving the room", () => {
     });
   });
 
-  // A delete heard while the link was down is seen only by asking Ergo again, at the link's ready (R5).
+  // A delete heard while the link was down is seen only by asking Ergo again, at the link's ready.
   describe("checking each pin again", () => {
     it("drops the pins Ergo says it holds no more, and keeps the others", async () => {
       const gone = new Set<string>();

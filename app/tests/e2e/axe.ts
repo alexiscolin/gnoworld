@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "./fixtures.ts";
 
 /** axe on the page, the plate's atlas caption left out: it is pure decoration, hidden from assistive technology, which WCAG 1.4.3's
- * incidental exception exempts from contrast; once its plate's fill became an element, axe could read its background and asked. */
+ * incidental exception exempts from contrast, though axe reads its background and asks. */
 export const axeOf = (page: Page) => new AxeBuilder({ page }).exclude("[data-caption]");
 
 /** What axe finds once the page's entrances have faded in: its colours are read mid-fade (a header at 7 % opacity reads 1:1), so it is

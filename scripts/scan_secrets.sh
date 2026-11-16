@@ -1,11 +1,11 @@
 #!/bin/sh
 # scan_secrets.sh [--staged | --range <revision>...]: gitleaks over what is staged, over the commits the revisions name (a commit,
-# ^commit, A..B; what a push sends, what a pull request adds: D13184, D13190), or over the whole history. Its rules
+# ^commit, A..B; what a push sends, what a pull request adds), or over the whole history. Its rules
 # are scripts/gitleaks.toml, then gitleaks-private.toml (names a public repository must not hold),
 # both files Claude cannot edit, and --config takes precedence over GITLEAKS_CONFIG(_TOML); a root
 # .gitleaksignore and gitleaks:allow comments, which could turn the scan off, are refused or ignored.
 # Git hands gitleaks every change as text, whatever an attribute, a NUL byte, a diff driver or a
-# replace ref would show instead (F130, F132).
+# replace ref would show instead.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 if [ -e .gitleaksignore ]; then # gitleaks reads it at the root whatever --gitleaks-ignore-path says
@@ -34,26 +34,77 @@ case ${1:-} in
 	;;
 esac
 export GIT_NO_REPLACE_OBJECTS=1
+# What only adds output to git's stderr (the traces, a verbose curl or merge) makes gitleaks read no history, and pass: none reaches it.
+for var in $(env | sed -n 's/^\(GIT_TRACE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$var"; done
+unset GIT_CURL_VERBOSE GIT_MERGE_VERBOSITY
+# Config that changes what git log prints (colour, no diff for a root commit) does the same, in silence: git is given these afresh.
+# They sit above the repository's config but below a -c of the caller's, which git reads after them (GIT_CONFIG_PARAMETERS, what
+# `git -c ... push` hands its hooks), so that is dropped: the scan's own entries are then the last command-line config git reads.
+unset GIT_CONFIG_PARAMETERS
+export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=never GIT_CONFIG_KEY_1=log.showRoot GIT_CONFIG_VALUE_1=true
 text="--text --no-ext-diff --no-textconv"
 # Names live in text: an image's or a font's compressed bytes can spell one by chance (docs/harness.png
-# did), so the private rules skip those files; the secret rules read every file (F139).
+# did), so the private rules skip those files; the secret rules read every file.
 binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
-found=0 # both rule sets run, so a secret does not hide a private name beside it (F120)
+# What a merge adds in its resolution is a diff against neither parent, shown by no plain git log: --remerge-diff shows it, against the
+# merge git would make again (the other parent's side is no addition, as against the first parent alone). It skips an octopus merge,
+# saying so on stderr, so a scan that holds one is refused.
+merges="--remerge-diff"
+if [ "$mode" != staged ]; then
+	# A grafts file, which git still reads from the common folder (a linked worktree's own holds none) or where GIT_GRAFT_FILE points,
+	# makes git show a push another history, as a replace ref does; nothing in a scan that reads history can tell.
+	[ -z "${GIT_GRAFT_FILE:-}" ] || { echo "scan_secrets: grafts (GIT_GRAFT_FILE) would show git another history than the one pushed: unset it" >&2; exit 1; }
+	grafts=$(git rev-parse --path-format=absolute --git-common-dir)/info/grafts
+	[ ! -e "$grafts" ] || { echo "scan_secrets: grafts ($grafts) would show git another history than the one pushed: remove the file" >&2; exit 1; }
+	scope=--all
+	[ "$mode" = all ] || scope=$revs
+	octopus=$(set -f && git rev-list --min-parents=3 --full-history $scope | head -n 1)
+	[ -z "$octopus" ] || { echo "scan_secrets: an octopus merge ($octopus) in what is scanned: --remerge-diff skips it, so nothing would read what it adds; merge two branches at a time" >&2; exit 1; }
+fi
+# An annotated tag is pushed as its own object, whose message git log never shows: the text of each tag a revision names, and of each
+# tag that tag points at, is read as text too, by the object's type, whatever ref it is pushed to.
+tag_text() {
+	for rev in $revs; do
+		case $rev in \^*) continue ;; esac
+		rev=${rev##*..}
+		[ "$rev" != HEAD ] || continue
+		while [ "$(git cat-file -t "$rev" 2>/dev/null)" = tag ]; do
+			git cat-file tag "$rev"
+			rev=$(git cat-file tag "$rev" | sed -n 's/^object //p')
+		done
+	done
+}
+tags=""
+[ "$mode" != range ] || tags=$(tag_text)
+found=0 # both rule sets run, so a secret does not hide a private name beside it
 for config in gitleaks.toml gitleaks-private.toml; do
 	paths="" # every file, but for the private rules
 	[ "$config" = gitleaks.toml ] || paths="-- . $binaries"
+	[ -z "$tags" ] || printf '%s\n' "$tags" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1
 	if [ "$mode" = staged ]; then
 		# set -f: the pathspecs reach git as written; a failure stops the scan rather than scan nothing.
 		staged=$(set -f && git diff --cached -U0 $text $paths)
 		printf '%s\n' "$staged" | gitleaks stdin --no-banner --redact --config "$here/$config" --ignore-gitleaks-allow || found=1
 	else
 		# --log-opts replaces gitleaks's own log options, so they are given again before the text ones.
-		opts="--full-history --all --diff-filter=tuxdb $text${paths:+ $paths}"
-		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $text${paths:+ $paths}"
-		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first (F140).
-		(set -f && git log -1 $opts >/dev/null) || { echo "scan_secrets: git cannot read the history with $opts" >&2; exit 1; }
-		gitleaks git --no-banner --redact --config "$here/$config" --gitleaks-ignore-path "$here" --ignore-gitleaks-allow \
-			--log-opts="$opts" . || found=1
+		opts="--full-history --all --diff-filter=tuxdb $merges $text${paths:+ $paths}"
+		[ "$mode" = all ] || opts="--full-history$revs --diff-filter=tuxdb $merges $text${paths:+ $paths}"
+		# gitleaks scans nothing, and passes, when git refuses its options: git reads them first.
+		err=$(set -f && git log -1 $opts 2>&1 >/dev/null) || { echo "scan_secrets: git cannot read the history with $opts" >&2; exit 1; }
+		# gitleaks reads git's stderr as a failure of git, logs it, and scans nothing: with its own exit code 0.
+		[ -z "$err" ] || { echo "scan_secrets: git writes to its stderr over this history, which gitleaks takes for no history: $err" >&2; exit 1; }
+		rc=0
+		out=$(gitleaks git --no-banner --redact --config "$here/$config" --gitleaks-ignore-path "$here" --ignore-gitleaks-allow \
+			--log-opts="$opts" . 2>&1) || rc=$?
+		printf '%s\n' "$out" >&2
+		[ "$rc" = 0 ] || found=1
+		printf '%s\n' "$out" | grep -q "stderr is not empty" && { echo "scan_secrets: gitleaks found git's stderr not empty, and read no history" >&2; exit 1; }
+		scanned=$(printf '%s\n' "$out" | grep -Eo '[0-9]+ commits scanned' | grep -Eo '^[0-9]+' | tail -n 1) || :
+		# A commit with no change is no commit to gitleaks, so a history of those alone scans none; one with a change must.
+		if [ "${scanned:-0}" = 0 ] && [ -n "$(set -f && git log -p -U0 --format= $opts | head -c 1)" ]; then
+			echo "scan_secrets: gitleaks scanned no commit of a history that has changes" >&2
+			exit 1
+		fi
 	fi
 done
 exit "$found"

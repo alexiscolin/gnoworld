@@ -1,5 +1,5 @@
 // A fake Ergo for the IRC link's tests: a TCP server that records each connection's lines and lets the
-// test answer, as 3b's table says the real one does. The real Ergo's tests are testing/ergo.test.ts.
+// test answer, as the real one does. The real Ergo's tests are testing/ergo.test.ts.
 import { once } from "node:events";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import { afterEach } from "vitest";
@@ -68,8 +68,8 @@ export const fakeErgo = async (at = 0) => {
   return { port, peer, peers };
 };
 
-// Registered, up to Ergo's welcome, the capabilities asked acknowledged (3b); its account by SASL when the
-// link asks one (the max review), which the operator's password logs in.
+// Registered, up to Ergo's welcome, the capabilities asked acknowledged; its account by SASL when the
+// link asks one, which the operator's password logs in.
 export const register = async (peer: Peer): Promise<void> => {
   const asked = await peer.next(/^CAP REQ /);
   peer.say(`:ergo.test CAP * ACK :${asked.replace(/^CAP REQ :?/, "")}`);
@@ -82,7 +82,7 @@ export const register = async (peer: Peer): Promise<void> => {
   peer.say(":ergo.test 001 gnoworld :Welcome");
 };
 
-// Registered, an operator, in its rooms: the conversation Ergo holds with a new client (3b). Ergo answers a
+// Registered, an operator, in its rooms: the conversation Ergo holds with a new client. Ergo answers a
 // JOIN with the bot's own JOIN of each room it is in; echo false holds that back.
 export const welcome = async (peer: Peer, { echo = true } = {}): Promise<void> => {
   await register(peer);

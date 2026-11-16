@@ -1,5 +1,5 @@
-// A hit's text for the page (slice 13, B2): the line cut to 240 characters around the first word found, and the words' ranges as
-// offsets into that text. Plain text: the page draws it, the server never builds HTML (plan T5). Offsets are UTF-16 units.
+// A hit's text for the page: the line cut to 240 characters around the first word found, and the words' ranges as
+// offsets into that text. Plain text: the page draws it, the server never builds HTML. Offsets are UTF-16 units.
 import { SEARCH_SNIPPET } from "@gnoworld/schemas";
 import { prefixed, wordsOf } from "./query.ts";
 

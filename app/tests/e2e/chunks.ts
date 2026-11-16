@@ -2,10 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
-// The late chunks' weights, read from the built files with no page (Alexis, 2026-11-04: "Oui, les deux"): a page busy with the scene on
+// The late chunks' weights, read from the built files with no page: a page busy with the scene on
 // a software GPU timed their journeys out at a load of 60. Node's gzip is the browser's: /list's first screen weighed 156,696 B both ways.
 
-/** A text's hashed names of other files (`scene-B9x_Qa1z.js`): a chunk renamed moved another's weight 1 to 3 B (7p2's review). */
+/** A text's hashed names of other files (`scene-B9x_Qa1z.js`): a chunk renamed moved another's weight 1 to 3 B. */
 export const HASHED = /-[\w-]{8}\.(js|css|woff2)\b/;
 const steady = (text: string) => text.replace(new RegExp(HASHED.source, "g"), "-xxxxxxxx.$1");
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
@@ -14,23 +14,18 @@ export const STATIC_IMPORT = /(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/;
 export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 
 /** Each late chunk by its name, the chunks a page holds before it (their closures are not its weight), and its cap in bytes. `after`
- * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
-// D401's rebuild left four rows: `scene` (D13952; three is in the `earth` chunk it imports), `Rail`, `thumbs` and `generated`; the other
-// 17 chunks (mountUniverse, cosmos, web, restSearch, flights, part...) are no file of the build. Raised on 2026-11-09 to the weights, 256 B ahead
-// (D386, provisional); the first screen of every page that shows space holds `root` and `universe`.
+ * absent: the chunk alone. */
+// Four chunks are capped: `scene` (three is in the `earth` chunk it imports), `Rail`, `thumbs` and `generated`. Each cap is the measured
+// weight and 256 B; the first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 190,507 B measured on 2026-11-12, 194,353 B on
-  // 2026-11-13, 256 B ahead (D13948, provisional till the hardening; its history D386 and D13961).
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 194,353 B measured, 256 B ahead.
   { chunk: "scene", after: ["root", "universe"], cap: 194_609 },
-  // On the home's first screen now, not behind the cosmos (7i): 7,293 B on 2026-11-07 beyond the scene and the cosmos (D386); 16,007 B beyond
-  // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B); 19,370 B
-  // measured on 2026-11-13, 256 B ahead (D13948, provisional till the hardening).
+  // On the home's first screen: 19,370 B measured beyond `root` and `universe` (its worlds, their thumbs, the home's views and the follow
+  // chunks it imports), 256 B ahead.
   { chunk: "Rail", after: ["root", "universe"], cap: 19_626 },
-  // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 347 B alone (D386); 2,436 B alone on 2026-11-09,
-  // 256 B ahead (+2,089 B over D386's 603 B).
+  // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 2,436 B alone, 256 B ahead.
   { chunk: "thumbs", cap: 2692 },
-  // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
-  // cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave. 9,441 B on 2026-11-09: no raise.
+  // The temperate worlds' coasts, shapes and climates and the cream veins.
   { chunk: "generated", cap: 10_189 },
 ];
 

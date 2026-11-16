@@ -1,4 +1,4 @@
-// The link's side of opening a room at a found message (slice 13, C): the jump asked, its window given to the store, the way back.
+// The link's side of opening a room at a found message: the jump asked, its window given to the store, the way back.
 import type { IrcMessage } from "@gnoworld/core";
 import type { createAppStore } from "../../../store/index.ts";
 import { HISTORY_LINES } from "../history.ts";

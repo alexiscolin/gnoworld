@@ -1,4 +1,4 @@
-// The chain's rooms on the server (slice 9g): for each universe of the data with a public indexer, one poll once a block (poll.ts),
+// The chain's rooms on the server: for each universe of the data with a public indexer, one poll once a block (poll.ts),
 // its catch-up and its 24 h count (indexer.ts, count.ts), relayed on the stream (relay.ts). Nothing is stored; a universe whose
 // indexer has no https address is skipped, said. Stopped with the server: every timer cancelled, no round delivers after it.
 import { jsonOf } from "@gnoworld/core";
@@ -14,7 +14,7 @@ import { secure, watchOf } from "./watch.ts";
 
 type Universe = ReturnType<typeof Universes.parse>[number];
 
-export interface ChainOptions {
+interface ChainOptions {
   universes: Universe[];
   hubs: ReturnType<typeof Hubs.parse>;
   stream: RelayOptions["stream"];

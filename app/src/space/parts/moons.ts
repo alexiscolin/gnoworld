@@ -1,4 +1,4 @@
-// The moons round a planet a page frames close (D490, ADR-0002 §3 "Rooms as moons"): the world's busiest rooms, four at most (the Earth one),
+// The moons round a planet a page frames close (ADR-0002 §3 "Rooms as moons"): the world's busiest rooms, four at most (the Earth one),
 // each a rocky world of the product's own look (moonLook.ts), the size of its room's activity on a log scale, flaring when it speaks. The
 // first stands on the orbit the page draws, near the camera and in front of the planet, for depth; the others stand farther out, leaning.
 // A frame moves their angles alone, held under reduced motion. No room, no moon.
@@ -53,7 +53,7 @@ export class Moons {
   #seconds = 0;
   #spin = 0;
 
-  /** `ring`: the page's orbit line, whose look each other moon's orbit line takes (D490). */
+  /** `ring`: the page's orbit line, whose look each other moon's orbit line takes. */
   constructor(maps: Maps, ring: LineSegments) {
     this.#lines = this.#slots.map(() => new LineSegments(ring.geometry, ring.material));
     this.group.add(...this.#lines.slice(1));
@@ -185,7 +185,7 @@ export class Moons {
     this.#orbitLine(at, { planet, turn: view.turn }, slot.alpha);
     this.#to.applyQuaternion(view.turn);
     drawn.group.position.set(this.#at.x + this.#to.x, this.#at.y + this.#to.y, this.#at.z + this.#to.z);
-    // A moon grows into its place as its light comes (D517), never popping whole.
+    // A moon grows into its place as its light comes, never popping whole.
     drawn.group.scale.setScalar(sizeOf(slot.rate) * planet.radius * (1 + 0.1 * slot.flare) * (0.6 + 0.4 * slot.alpha));
     const shown = slot.alpha * this.#clear(planet, view.eye, sizeOf(slot.rate) * planet.radius);
     const { place } = planet.system;

@@ -5,7 +5,7 @@ import { defineConfig, type Plugin } from "vite";
 import { glslSpaces } from "./src/glsl.ts";
 import { parsed, workshopHosts, workshopServer } from "./vite.config.ts";
 
-// The realism page (lab/realism.html), built beside the site for the journeys and on its own for Alexis's eye, and served by the workshop's
+// The realism page (lab/realism.html), built beside the site for the journeys and on its own for looking at, and served by the workshop's
 // dev server (docs/DEVELOPMENT.md), held as the app's is (vite.config.ts's workshopServer). LAB_STATIC, an absolute folder, builds a
 // static `index.html` with relative paths.
 const folder = process.env["LAB_STATIC"];
@@ -36,7 +36,7 @@ export default defineConfig({
   },
   // The dev server scans its entry from the lab's root, where the build's `lab/realism.html` (from app/) is not.
   optimizeDeps: { entries: ["realism.html"] },
-  // Its own dependency cache, under the app's: sharing the app's, its optimization overwrote the app's and the app answered 504.
+  // Its own dependency cache, under the app's: shared with the app's, its optimization would overwrite the app's and the app would answer 504.
   cacheDir: fileURLToPath(new URL("node_modules/.vite/lab", import.meta.url)),
   server: workshopServer(),
   preview: { host: "127.0.0.1", port: 5199, strictPort: true, allowedHosts: workshopHosts() },

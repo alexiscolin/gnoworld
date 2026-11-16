@@ -18,8 +18,8 @@ import { labOf, NO_TURN } from "./palette.ts";
 import { planetRecipe, seededRecipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 
-// core/planet, its realism part (slice 7, 7b; ADR-0002 §3): a look is a pure function of a path, through
-// sha256("gnoworld/planet/v1" ‖ path). The anchor is given here: choosing it from the seed is 7b2.
+// core/planet (ADR-0002 §3): a look is a pure function of a path, through
+// sha256("gnoworld/planet/v1" ‖ path). The anchor is given here: choosing it from the seed is choice.test.ts's.
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 const TURN = Math.PI * 2;
@@ -200,8 +200,8 @@ describe("the anchors", () => {
   });
 });
 
-// Each new anchor reads as its reference by colour (7b4): both its ramps' mid colours in Lab, and Iapetus's two faces by its low and high.
-// Dark carbon reads dark but visible (the chief, 7b5; F4225, F4242): at L* 4 its lit ground fell under 8-bit rounding and the grade's toe.
+// Each new anchor reads as its reference by colour: both its ramps' mid colours in Lab, and Iapetus's two faces by its low and high.
+// Dark carbon reads dark but visible: at L* 4 its lit ground fell under 8-bit rounding and the grade's toe.
 type Span = readonly [number, number];
 const REFERENCE: Record<string, { l: Span; a?: Span; b?: Span; chroma?: Span }> = {
   "dark carbon": { l: [14, 22], chroma: [0, 10] },
@@ -246,7 +246,7 @@ describe("the anchors' colours", () => {
       }
   });
 
-  // A glow on a banded world hides its night's lights (2e76ee19): no row may have both.
+  // A glow on a banded world hides its night's lights: no row may have both.
   it("gives no banded world a glow", () => {
     for (const anchor of ANCHORS)
       expect(ROWS[anchor].banded === true && ROWS[anchor].glow !== undefined, anchor).toBe(false);
@@ -289,7 +289,7 @@ describe("planetLook", () => {
     );
   });
 
-  // The plan's bound on near-identical neighbours (section 6): realms named one after the other are not one world twice.
+  // The bound on near-identical neighbours: realms named one after the other are not one world twice.
   it("keeps neighbours apart: a path a digit away moves at least four of the six angles and offsets by 1%", () => {
     const shares = (look: PlanetLook) => [
       ...look.spin.map((turn) => turn / TURN),
@@ -394,8 +394,8 @@ describe("planetLook", () => {
     );
   });
 
-  // A glowing world's air is warmed by its own light (Alexis, 2026-11-03, 16:4x, "réchauffer"): frame 4's Music's limb, #edc3ad, as 7b6
-  // showed it; every other air keeps the Earth's dimness in its own colour.
+  // A glowing world's air is warmed by its own light: frame 4's Music's limb, #edc3ad;
+  // every other air keeps the Earth's dimness in its own colour.
   it("keeps every air as thin as the Earth's, and as dim but a glowing world's, warm as frame 4's Music's limb", () => {
     for (const anchor of ANCHORS)
       for (const path of paths(100)) {
@@ -411,8 +411,8 @@ describe("planetLook", () => {
       }
   });
 
-  // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre"): its sea a teal, shallow and deep,
-  // within 20 degrees of the hue he chose (-140 in Lab), 20 or more in Lab from the frames' navy, which the ocean keeps.
+  // A temperate world is never the Earth: its sea a teal, shallow and deep,
+  // within 20 degrees of the chosen hue (-140 in Lab), 20 or more in Lab from the frames' navy, which the ocean keeps.
   it("gives an ocean world the frames' seas, and a temperate world a teal sea of its own, never the Earth's navy", () => {
     const byte = ([red, green, blue]: readonly number[]) =>
       (red ?? 0) * 255 * 65536 + (green ?? 0) * 255 * 256 + (blue ?? 0) * 255;
@@ -468,8 +468,8 @@ describe("planetLook", () => {
   });
 });
 
-// What 7b5 draws (ADR-0002 §3): the recipe carries the surface, so the look keeps only what is still drawn from it, every byte of the
-// seed still feeds a value before anything hashes it again (F3476), and no generated world shows the Earth's map (F4223).
+// What the look draws (ADR-0002 §3): the recipe carries the surface, so the look keeps only what it draws from the seed, every byte of the
+// seed feeds a value before anything hashes it again, and no generated world shows the Earth's map.
 describe("a look, as 7b5 draws it", () => {
   const RETIRED = ["second", "secondShare", "contrast", "caps", "clouds", "rifts", "cracks"];
   const flipped = (seed: Uint8Array, at: number): Uint8Array =>

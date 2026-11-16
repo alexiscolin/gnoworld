@@ -1,6 +1,6 @@
-// Jarvis's cards in the chat column (10u-a): its introduction with the fixed asks and a field for a question of one's own (500 code points,
+// Jarvis's cards in the chat column: its introduction with the fixed asks and a field for a question of one's own (500 code points,
 // Enter sends), then each ask as a card below: the answer, or one plain line for a guard, with the forms that need no model where Jarvis
-// cannot answer (spent, off, an error). They are the asker's alone and the room never hears them (D1017).
+// cannot answer (spent, off, an error). They are the asker's alone and the room never hears them.
 import type { ReadOptions } from "@gnoworld/chain/read";
 import type { JarvisAnswer, JarvisQuestion } from "@gnoworld/schemas";
 import { Button, Card, Cluster, Field, Stack } from "@gnoworld/ui";
@@ -10,7 +10,7 @@ import { pointsOf, QUESTION_CHARS } from "../../lib/api/jarvis.ts";
 import { AnswerCard, type DrawMarkdown } from "./AnswerCard.tsx";
 import type { CallPlace } from "../realms/index.ts";
 
-// What each guard says, in one plain line (D13985); `spent`, `off` and a failure also give the forms below.
+// What each guard says, in one plain line; `spent`, `off` and a failure also give the forms below.
 const LINES = {
   declined: "Jarvis only answers about gno.land, gnoworld and this place.",
   paused: "Jarvis is paused for you until tomorrow.",

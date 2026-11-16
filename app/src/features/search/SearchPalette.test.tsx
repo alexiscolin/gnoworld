@@ -8,7 +8,7 @@ import { site } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { SearchButton, SearchPalette } from "./SearchPalette.tsx";
 
-// The search palette (D355): opened by its button, the chord, the slash and an event, closed four ways, its groups, ranking, prefixes,
+// The search palette: opened by its button, the chord, the slash and an event, closed four ways, its groups, ranking, prefixes,
 // chips, preview and keys. Where the browser's own focus, top layer and Esc are needed, the journeys walk it.
 vi.mock("../../topPill.tsx", () => import("../../../tests/pills.ts"));
 const seen = vi.hoisted(() => ({

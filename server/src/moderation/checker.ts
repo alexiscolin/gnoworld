@@ -1,5 +1,5 @@
-// The chat's moderation as it starts: the check of each line (3i), its world's rules, then OpenAI when a key is set, or the alert that
-// none is; and the mutes with the strikes that call them (3k).
+// The chat's moderation as it starts: the check of each line, its world's rules, then OpenAI when a key is set, or the alert that
+// none is; and the mutes with the strikes that call them.
 import type { DatabaseSync } from "node:sqlite";
 import type { Config } from "../config.ts";
 import type { Command } from "../irc/lines.ts";
@@ -17,7 +17,7 @@ interface Checked {
   worlds: ReadonlyMap<string, World>;
   moderation: Config["moderation"];
   spared?: (account: string) => boolean;
-  // The rules of a world the roles file does not list (D430): a room the server made in such a world is judged by them.
+  // The rules of a world the roles file does not list: a room the server made in such a world is judged by them.
   defaults?: Rules | undefined;
 }
 
@@ -49,7 +49,7 @@ export function providerOf({ moderation }: Checked, { provider, log, now = Date.
   return client === undefined ? undefined : Object.assign(withBreaker(client, { now, log }), { raw: client });
 }
 
-/** The check of a room's name, as the line's check reads a message: its world's rules, then the provider (D394). */
+/** The check of a room's name, as the line's check reads a message: its world's rules, then the provider. */
 export function nameCheckerFor(settings: Checked, options: Told) {
   return makeNameChecker({
     rulesOf: (world) => settings.worlds.get(world)?.rules,

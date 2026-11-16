@@ -4,7 +4,7 @@ import { logger } from "@gnoworld/service/log";
 import { allowlist } from "./allowlist.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 
-// gnomcp 0.11.0's reads as its server lists them (ToolSearch, 2026-11-04): ours have no other field, `profile` required.
+// gnomcp 0.11.0's reads as its server lists them (ToolSearch): ours have no other field, `profile` required.
 // gno_activity's `since` and `until` are left out: gnomcp 0.11.0 answers either with an error (its docs/tools.md), and
 // ADR-0002 §5 counts windows by block height.
 const GNOMCP = {

@@ -130,7 +130,7 @@ describe("a cell's stream", () => {
   });
 });
 
-// One way to measure how far two places are, for the ladder, the disc and the nebulae alike (F3580).
+// One way to measure how far two places are, for the ladder, the disc and the nebulae alike.
 describe("distanceOf", () => {
   const coordinate = fc.double({ min: -1e12, max: 1e12, noNaN: true });
   const place = fc.record({ x: coordinate, y: coordinate, z: coordinate });

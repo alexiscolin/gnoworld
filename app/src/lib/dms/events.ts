@@ -1,4 +1,4 @@
-// The conversation a direct message's reaction or delete belongs to, and what one does to it (4d's DM bar): a TAGMSG or a
+// The conversation a direct message's reaction or delete belongs to, and what one does to it (the DM bar): a TAGMSG or a
 // REDACT to a nick, which dmOf, reading lines, does not take. Ergo names the target as the sender wrote it, so the line
 // of mine echoed names my partner and the partner's names me.
 import {
@@ -51,7 +51,7 @@ function afterReaction(held: Held, message: IrcMessage, cap: number): Held {
 }
 
 /** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing.
- * Core's redactedLines (CR3, F1958); forbiddenBy first, for a conversation has no moderators. */
+ * Core's redactedLines; forbiddenBy first, for a conversation has no moderators. */
 export function afterAct(held: Held, message: IrcMessage, cap: number): Held {
   if (message.command === "TAGMSG") return afterReaction(held, message, cap);
   const target = message.params[0] ?? "";

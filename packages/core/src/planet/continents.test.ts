@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CONTINENTS_SEA, ofContinents, readsMinorMap } from "./continents.ts";
 
-// F4586 (7b9): one rule for whether a world's program reads its minor map, which the program, the kit's maps and the rail's portraits all
+// One rule for whether a world's program reads its minor map, which the program, the kit's maps and the rail's portraits all
 // ask: a minor that shows (past 0.002), on a ground with no bands, never on a world of continents, whose minor is its bare ground.
 describe("readsMinorMap", () => {
   const ground = { sea: 0, bands: 0 };

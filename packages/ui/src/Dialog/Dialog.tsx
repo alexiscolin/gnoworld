@@ -59,7 +59,7 @@ interface TitleRowProps extends Pick<DialogProps, "title" | "onClose"> {
   hideClose: boolean;
 }
 
-// The title wraps its own words beside Close, which keeps the row's end at any width (U6). A drawer's title is for assistive technology alone.
+// The title wraps its own words beside Close, which keeps the row's end at any width. A drawer's title is for assistive technology alone.
 function TitleRow({ headingRef, id, title, hideClose, onClose, side }: TitleRowProps) {
   return (
     <Sidebar side="end" space="s" align="center">
@@ -85,7 +85,7 @@ function TitleRow({ headingRef, id, title, hideClose, onClose, side }: TitleRowP
 /** The native modal dialog, over its scrim: its first field the browser can focus takes the focus, or
  * its title, never a button; Esc, Close and a press beside it ask the page to close it, and the browser gives
  * the focus back to the opener. */
-// A field hidden by CSS or disabled refuses the focus: the next one is tried (F367); none takes it, the heading does.
+// A field hidden by CSS or disabled refuses the focus: the next one is tried; none takes it, the heading does.
 function focusFirst(shown: HTMLElement, heading: HTMLElement | null) {
   const focused = [...shown.querySelectorAll<HTMLElement>(FIELD)].some((field) => {
     field.focus();
@@ -141,9 +141,9 @@ export function Dialog({
   const kickerShown = kicker !== undefined && kicker !== "";
   const describedBy = ids(kickerShown ? kickerId : undefined, description === undefined ? undefined : descriptionId);
   // Each close the browser made itself: the page is told, and while it keeps the dialog open the
-  // dialog shows again (F330).
+  // dialog shows again.
   const [closes, setCloses] = useState(0);
-  // Its own close() fires a close event too, which the browser queues: that one is not the browser's (F361).
+  // Its own close() fires a close event too, which the browser queues: that one is not the browser's.
   const ownCloseRef = useRef(false);
   const pressBeside = usePressBeside(onClose);
   useEffect(() => {
@@ -166,7 +166,7 @@ export function Dialog({
       aria-labelledby={titleId}
       aria-describedby={describedBy || undefined}
       // Esc would close it in the browser: the page is asked instead, and keeps it open if it chooses.
-      // A cancel from a control inside it (a file picker dismissed) is that control's (F332).
+      // A cancel from a control inside it (a file picker dismissed) is that control's.
       onCancel={(event) => {
         if (event.target !== event.currentTarget) return;
         event.preventDefault();
@@ -174,7 +174,7 @@ export function Dialog({
       }}
       {...pressBeside}
       // Closed by the browser itself (a second Esc, a form's dialog method), not by the page; a dialog
-      // inside it closing is that dialog's (F352).
+      // inside it closing is that dialog's.
       onClose={(event) => {
         if (event.target !== event.currentTarget) return;
         if (ownCloseRef.current) {

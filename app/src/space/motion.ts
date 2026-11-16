@@ -3,7 +3,7 @@ import { FULL_MOVE } from "../fullChat.ts";
 // The reader's reduced-motion setting, apart from the scene's listeners: the home's rise reads it with no 3D engine loaded.
 const MOTION = "(prefers-reduced-motion: reduce)";
 
-/** Reduced motion, as the reader asks it: the system's word, or this device's setting, which the page marks on the root (slice 8). */
+/** Reduced motion, as the reader asks it: the system's word, or this device's setting, which the page marks on the root. */
 export interface Motion {
   readonly matches: boolean;
   /** Calls `changed` when either changes, until `signal` aborts. */

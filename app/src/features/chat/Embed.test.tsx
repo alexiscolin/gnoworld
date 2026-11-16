@@ -28,9 +28,9 @@ const said = (html: string) =>
 // An attribute's value as the frame's markup writes it, or none.
 const attribute = (html: string, name: string) => new RegExp(` ${name}="([^"]*)"`).exec(html)?.[1];
 
-// 4g: a link's player waits for the moderation's "checked", then for a click: no third party is reached before.
+// A link's player waits for the moderation's "checked", then for a click: no third party is reached before.
 describe("Embed", () => {
-  // F897 (U2): a disabled button said the wait, dim and passed over by Tab; now words do, and Play comes once checked.
+  // Words say the wait (a disabled button would be dim and passed over by Tab), and Play comes once checked.
   it("says it waits for the moderation's check, in words a reader hears, offers no Play, and loads nothing", () => {
     const html = renderToStaticMarkup(<Embed embed={YOUTUBE} verdict={undefined} />);
     expect(said(html)).toContain("YouTube");
@@ -48,7 +48,7 @@ describe("Embed", () => {
     expect(html).not.toContain("youtube-nocookie");
   });
 
-  // F870: the frame's every permission pinned; a token more (allow-same-origin above all) would hand the player
+  // The frame's every permission is pinned; a token more (allow-same-origin above all) would hand the player
   // this page's origin, its cookie and its storage.
   it("frames the player in a sandbox of its scripts, its full screen and its links out alone", () => {
     const html = renderToStaticMarkup(<PlayerFrame embed={YOUTUBE} />);
@@ -63,7 +63,7 @@ describe("Embed", () => {
     expect(attribute(html, "allowFullScreen")).toBe("");
   });
 
-  // F886 (Alexis, 2026-10-26): the site sends no referrer (F682), and its players none either: YouTube's terms ask
+  // The site sends no referrer, and its players none either: YouTube's terms ask
   // for one, so a player that refuses to play in the demo brings the question back.
   it.each([
     YOUTUBE,
@@ -77,7 +77,7 @@ describe("Embed", () => {
     expect(renderToStaticMarkup(<Embed embed={YOUTUBE} verdict="hidden" />)).toBe("");
   });
 
-  // The player is a state of its own, kept across what the line shows (CR1/S1 of the room edit): a reader pressed Play on a
+  // The player is a state of its own, kept across what the line shows: a reader pressed Play on a
   // checked link, then the author's correction brought the line another verdict.
   describe("once playing", () => {
     const host = document.createElement("div");
@@ -89,7 +89,7 @@ describe("Embed", () => {
     };
     const play = () => {
       act(() => {
-        // The player's button: the author's name before it opens their card (8d).
+        // The player's button: the author's name before it opens their card.
         host.querySelector<HTMLButtonElement>("button:not([aria-haspopup])")?.click();
       });
     };

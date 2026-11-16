@@ -1,4 +1,4 @@
-// After a login, an address that is linked to others says so once (owners' moderation, part 5): the identity's other addresses, shortened, and an
+// After a login, an address that is linked to others says so once: the identity's other addresses, shortened, and an
 // Unlink of this one, which the login just made fresh enough to ask. Nothing is shown for an address with no link.
 import { shortAddress, type Address } from "@gnoworld/schemas";
 import { useEffect } from "react";

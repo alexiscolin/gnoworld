@@ -16,7 +16,7 @@ for (const width of [1280, 768, 320]) {
     // screen: an empty one keeps an approved picture, blank, which one drawing by mistake fails.
     const whole = new Set([...(await tagged(page, "empty")), ...(await tagged(page, "viewport"))]);
     const ids = await stories(page, only);
-    // A prefix no story has would compare nothing and pass: it fails (F1190).
+    // A prefix no story has would compare nothing and pass: it fails.
     expect(ids.length, `a story whose id starts with "${only}"`).toBeGreaterThan(0);
     for (const id of ids) {
       await open(page, id);

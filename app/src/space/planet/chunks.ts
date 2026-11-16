@@ -1,8 +1,8 @@
 // What the planet's shaders share. The lattice is integer arithmetic, so a world's warp is the same on every GPU, where a sine's hash is not.
 
 /** A smooth random vector of position, each component about -1 to 1. */
-/** A dimmed world's last touch, after its light and before the grade: a little of its own grey and much dark, `faraway` 0 to 1 (7d6); a
- * world a lens leaves unlit keeps its ground, air and light, only deep in shade (D502). */
+/** A dimmed world's last touch, after its light and before the grade: a little of its own grey and much dark, `faraway` 0 to 1; a
+ * world a lens leaves unlit keeps its ground, air and light, only deep in shade. */
 export const FARAWAY =
   "gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722))), 0.3 * faraway) * (1.0 - 0.82 * faraway);";
 

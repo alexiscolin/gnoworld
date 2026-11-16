@@ -8,11 +8,11 @@ import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
 import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import { CHAIN, CUR, field, typed, warnsMembers } from "../../../tests/callFixtures.ts";
-import { recordedAdena } from "../../../tests/recordedAdena.ts";
+import { fakeAdena } from "../../../tests/fakeAdena.ts";
 import { RealmWrites } from "./RealmWrites.tsx";
 
-// 9d, widened by 9e: every write function a call can carry is a "Call" row that opens the card under it, never a modal (frame
-// 33): any count of fields, none too (D254); a type a call does not carry gets a way to gnoweb. NOT recorded: the function list is
+// Every write function a call can carry is a "Call" row that opens the card under it, never a modal: any count of fields,
+// none too; a type a call does not carry gets a way to gnoweb. NOT recorded: the function list is
 // written in the shape of vm/qfuncs.
 const REALM = "gno.land/r/demo/profile";
 const FUNCTIONS = [
@@ -28,7 +28,7 @@ const FUNCTIONS = [
   { FuncName: "TotalSupply", Params: null, Results: [field(".res.0", "int64")] },
   { FuncName: "Render", Params: [field("path", "string")], Results: [field(".res.0", "string")] },
   { FuncName: "Foo.Bar", Params: [CUR, field("x", "string")], Results: null },
-  // No field: a click that signs with nothing to fill (D254, 9e).
+  // No field: a click that signs with nothing to fill.
   { FuncName: "Deposit", Params: [CUR], Results: null },
 ];
 const chain = (functions: unknown = FUNCTIONS) =>
@@ -52,7 +52,6 @@ const listed = (box: HTMLElement) =>
   all(box, "button").flatMap((b) => (b.textContent.startsWith("Call ") ? [b.textContent.slice(5)] : []));
 
 describe("a realm's write functions, with the call card inline", () => {
-  // 9e changes this test (it said "no 3 fields, no 0 fields"): the card is for every write a call can carry.
   it("lists every write function a call can carry, each a Call button: three fields and none too, and no read, no type a call does not carry, no hostile name", async () => {
     expect(listed(await panel())).toEqual(["SetBio", "SetProfile", "SetThree", "Deposit"]);
   });
@@ -293,16 +292,16 @@ describe("a realm's write functions, with the call card inline", () => {
 });
 
 // GovDAO's vote (frames 28 to 33): the realm card's Call on the vote function, then the card. Nothing shows as voted before the
-// chain's own answer; the course holds that (9d), here the vote's card must keep to it. NOT recorded: written in qfuncs' shape.
+// chain's own answer; the course holds that, here the vote's card must keep to it. NOT recorded: written in qfuncs' shape.
 describe("a vote on GovDAO", () => {
   const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
-  // tm2's ResultTx for the recording's hash, a call that landed at block 55414 (written from the source, as chain's tx.test is).
+  // tm2's ResultTx for the signed call's hash, a call that landed at block 4242 (written from the source, as chain's tx.test is).
   const TX = {
     jsonrpc: "2.0",
     id: "",
     result: {
-      hash: "eFwYnlgr7KfDvMsmr6ntZ5vCoe/JcHLddE0pzi+D0Fg=",
-      height: "55414",
+      hash: "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=",
+      height: "4242",
       index: 0,
       tx_result: {
         ResponseBase: { Error: null, Data: null, Events: null, Log: "ok", Info: "" },
@@ -354,7 +353,7 @@ describe("a vote on GovDAO", () => {
         ? Promise.resolve(new Response(JSON.stringify(statusEnvelope(55420, "2026-11-05T05:00:00Z", "onyx-1"))))
         : held.promise,
     );
-    Object.defineProperty(globalThis, "adena", { value: recordedAdena({ account: ME }).adena, configurable: true });
+    Object.defineProperty(globalThis, "adena", { value: fakeAdena({ account: ME }).adena, configurable: true });
     try {
       click(button(box, "Call MustVoteOnProposalSimple"));
       const [pid, option] = all(one(box, "article"), "input") as HTMLInputElement[];

@@ -1,4 +1,4 @@
-// A world is a product (decision of 2026-11-01, 11): the realms of one product under it, found from paths alone. A world is a namespace and
+// A world is a product: the realms of one product under it, found from paths alone. A world is a namespace and
 // the first folder under it, the text before its first `_` (memba_feed_v1 and memba_gov are `memba`), a trailing `/vN` version dropped. Under
 // a generic folder (`x`, `demo`) the whole path minus its version stands: one namespace there holds hundreds of unrelated realms. A realm
 // that is its namespace alone is a world of its own. The server's job groups by it, and a world's page draws the planet of the same id.
@@ -17,11 +17,10 @@ export function worldIdOf(path: string): string {
   return `${namespace}/${unversioned[1]?.split("_")[0] ?? ""}`;
 }
 
-/** The Earth's id, as the cosmos holds it. A realm alone in the namespace earth is a world of that id, which the page's Earth is not
- * (F4550). */
+/** The Earth's id, as the cosmos holds it. A realm alone in the namespace earth is a world of that id, which the page's Earth is not. */
 export const EARTH = "earth";
 
-/** A hub's world (decision of 2026-11-01, 11): the world its first realm groups into, so its page draws the planet the cosmos does and the
+/** A hub's world: the world its first realm groups into, so its page draws the planet the cosmos does and the
  * server's trends score its rooms and its realms as one; a hub with no realm is a world of its own, by its slug. */
 export const hubWorldOf = ({
   slug,

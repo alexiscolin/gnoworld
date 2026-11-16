@@ -5,7 +5,7 @@ import { createAppStore } from "../../store/index.ts";
 import { signInPage } from "./signPage.ts";
 import { ensureCalls } from "./slice.ts";
 
-// F5727: the parts a click on "Sign in Adena" loads come from lazy chunks; one that fails to load is a state with its next step,
+// The parts a click on "Sign in Adena" loads come from lazy chunks; one that fails to load is a state with its next step,
 // not a click that does nothing.
 vi.mock("../../lib/adena/adena.ts", () => {
   throw new Error("Failed to fetch dynamically imported module");

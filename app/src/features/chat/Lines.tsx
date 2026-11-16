@@ -1,6 +1,5 @@
-// A room's lines (slice 4's 4b, moved out of RoomView.tsx): the newest the store holds (the window), held at the
-// newest while the reader is there; a line's text is Markdown (4c), built into elements from an allowlist
-// (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
+// A room's lines: the newest the store holds (the window), held at the newest while the reader is there; a line's
+// text is Markdown, built into elements from an allowlist (Message.tsx); one that mentions the reader says so. The
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
 import { foldEdits, reactionsOn, threadsOf, type Line, type Reacting } from "@gnoworld/core";
 import { useEntries } from "./chainEntries.ts";
@@ -40,11 +39,11 @@ const LINES = [styles["lines"], styles["fill"]].join(" ");
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
-  // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664). Folded here, in a
+  // The room's lines as shown: each corrected by its author's newest edit, the edits gone. Folded here, in a
   // component with no hook, as the compiler leaves a fold among hooks unmemoized: a pointer over a line folded the room
-  // again (F1221).
+  // again.
   const { shown: lines, folded, newest } = foldEdits(props.lines);
-  // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
+  // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects.
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
   // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects. A direct
@@ -53,7 +52,7 @@ export function Lines(props: LinesProps) {
   const repliesOf = threaded ? threadsOf(lines, lineOf).repliesOf : NO_REPLIES;
   const onThread = threaded ? props.onThread : undefined;
   const byId = new Map(lines.map((line) => [line.id, line]));
-  // Each line's chips as a string a line compares by value (F1222).
+  // Each line's chips as a string a line compares by value.
   const votes = votesOf({ lines, reactions: props.reactions ?? [], me: props.me, lineOf });
   const chips = chipsOn(shown, votes);
   // Here, not in the list a pointer redraws: the grouping is read once as the lines change.
@@ -130,7 +129,7 @@ function List(props: ListProps) {
         onScroll={onScroll}
         {...on}
         aria-label="Messages"
-        // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).
+        // How the keyboard moves among the lines, which nothing else tells a screen reader.
         aria-description="Up and down arrows move between messages; Tab reaches a message's actions."
         aria-live="polite"
         aria-relevant="additions"

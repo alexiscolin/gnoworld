@@ -17,7 +17,7 @@ function RealmView(props: Omit<RealmViewProps, "state">) {
   return <View {...props} state={state} />;
 }
 
-// 5h: a realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the
+// A realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the
 // failed read's state, each with the link to the realm on gnoweb. The answers are the recorded ones (chainFixture.ts: PAGES).
 const COINS = PAGES.find((row) => row.realm === "gno.land/r/gnoland/coins");
 const WUGNOT = PAGES[1];
@@ -63,19 +63,19 @@ async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", ch
 
 describe("a realm's view", () => {
   test("shows the realm's page, the block height it was read at and the link to gnoweb", async () => {
-    // A day is "30 Oct" in the current year (D13015): the clock is the test's.
+    // A day is "30 Oct" in the current year: the clock is the test's.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-12T12:00:00Z"));
     const box = await view(chain(WUGNOT?.body ?? null));
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(box.textContent).toContain("Total supply");
-    // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
+    // The line is the last of the page itself; the read functions' panel, with its own text, follows it.
     expect(
       all(box, "p").some((p) =>
         /^Read at block 786,661, 30 Oct, 23:43 UTC, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
       ),
     ).toBe(true);
-    // The page card's own link is the one inside it; the functions' failed states carry theirs (D13905).
+    // The page card's own link is the one inside it; the functions' failed states carry theirs.
     const links = all(box, "a").filter(
       (a) =>
         a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot" && a.closest("#page") !== null,
@@ -98,7 +98,7 @@ describe("a realm's view", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     vi.useRealTimers();
-    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click.
+    // The read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click.
     expect(fetcher).toHaveBeenCalledTimes(3);
     const urls = fetcher.mock.calls.map(([url]) => url);
     expect(urls.filter((url) => url.includes("/status"))).toHaveLength(1);
@@ -170,7 +170,7 @@ describe("a realm's view", () => {
     // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page stands.
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(functions.querySelector('[role="status"]')).not.toBeNull();
-    // A failed list names the way out: the realm on gnoweb (D13905).
+    // A failed list names the way out: the realm on gnoweb.
     expect(all(functions, "a").map((a) => a.textContent)).toEqual(["Open on gnoweb"]);
   });
 
@@ -179,7 +179,7 @@ describe("a realm's view", () => {
     expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
     const functions = one(box, '[aria-label="Read functions"]');
     expect(one(functions, '[role="status"]').textContent).toMatch(/\S/);
-    // A failed list names the way out: the realm on gnoweb (D13905).
+    // A failed list names the way out: the realm on gnoweb.
     expect(all(functions, "a").map((a) => a.textContent)).toEqual(["Open on gnoweb"]);
   });
 
@@ -189,7 +189,7 @@ describe("a realm's view", () => {
     expect(box.textContent).toContain("The block height could not be read.");
   });
 
-  // R-F3 (F2906, F2952): the two addresses are the chain's own, read from the data it is given, never from a table by chain id.
+  // The two addresses are the chain's own, read from the data it is given, never from a table by chain id.
   test("links gnoweb where the chain's data says, whatever the chain's id", async () => {
     const fetcher = chain(WUGNOT?.body ?? null);
     const other = {
@@ -215,7 +215,7 @@ describe("a realm's view", () => {
 // The call cards: the form's, after its figure, and the write rows'.
 const CARDS = "figure + article, #functions [aria-label='Write functions'] article";
 
-// 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
+// A page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
 describe("a realm's view, with a form on its page", () => {
   const WRITES = [{ FuncName: "SetBio", Params: [CUR, { Name: "bio", Type: "string" }], Results: null }];
   const form = (exec: string) =>
@@ -278,7 +278,7 @@ describe("a realm's view, with a form on its page", () => {
   });
 });
 
-// 9e (reviewer-1-1, security-1-2): a view that moves to another realm shows nothing of the first realm's functions, whatever
+// A view that moves to another realm shows nothing of the first realm's functions, whatever
 // the order the two reads answer in.
 describe("a realm's view that moves from one realm to another", () => {
   const A = "gno.land/r/demo/realma";

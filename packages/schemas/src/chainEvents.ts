@@ -1,4 +1,4 @@
-// What the server tells a page of the chain (slice 9g, D260 to D269), on the stream's own events `chain` and `realms`. Every
+// What the server tells a page of the chain, on the stream's own events `chain` and `realms`. Every
 // text is a name the chain's own rules bound (an address, a realm's path, a function's name), and no text of a transaction's
 // args or memo ever travels: what a stranger wrote reaches a room as bounded names or not at all. The height is the block a
 // fact stands at, so a reader sees where a gap is; nothing is a time, a transaction having none.

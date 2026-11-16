@@ -1,4 +1,4 @@
-// Putting a pass's reads together (slice 7, 7c): what was read, the last file it builds on, and the rows of the new file. A fact
+// Putting a pass's reads together: what was read, the last file it builds on, and the rows of the new file. A fact
 // this pass could not read is the last file's, else nothing (null, or an empty list), never a zero.
 import { natureOf } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
@@ -25,7 +25,7 @@ export interface Gathered {
 }
 
 // The facts of the realms the last file already read: a realm with no deployer, function and import was not read, and nor, while its
-// world has no nature yet, was one with no name, whose lists the file may have shed (F4109): it is read again, once.
+// world has no nature yet, was one with no name, whose lists the file may have shed: it is read again, once.
 export function knownFacts(
   lastRealms: ReadonlyMap<string, RealmRow>,
   lastWorlds: ReadonlyMap<string, WorldRow>,
@@ -75,7 +75,7 @@ function rowOf(path: string, read: Gathered): RealmRow {
   };
 }
 
-// A world's nature (F4109): the last file's, else read from its realms' own names once every one was read this pass or is known with
+// A world's nature: the last file's, else read from its realms' own names once every one was read this pass or is known with
 // names, before the file is shed; a known realm with none may be one whose lists were shed, and knownFacts has it read again. Kept once
 // read, so a flood that sheds lists and a new realm move no class; a world the file dropped whole reads its nature anew when it returns.
 function natureFor(before: WorldRow | undefined, rows: readonly RealmRow[], read: Gathered): WorldRow["nature"] {

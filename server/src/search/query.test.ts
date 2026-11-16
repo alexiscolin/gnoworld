@@ -7,7 +7,7 @@ import type { Typed } from "../rooms/types.ts";
 import { makeSearch, SEARCH_TABLES } from "./index.ts";
 import type { Query } from "./query.ts";
 
-// Slice 13, B2: `query` of the index (docs/plans/search.md §3 B; B1's security review, "For B2 (binding)" 2, 4 and 6): the words are
+// `query` of the index: the words are
 // quoted, the room list and the match bound, `line_edits` never read, no `count(*)` or `OFFSET` without a bound.
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";

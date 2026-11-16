@@ -6,7 +6,7 @@ import { roomActs } from "./roomActs.ts";
 // What the composer composed of a draft.
 const composed = (text: string) => compose("#bubble/games", text, "me");
 
-// /code-review on 4d's DM bar (CR4), a room's as a conversation's: a refusal told stayed until dismissed.
+// A refusal told stays until dismissed, so each act of a room dismisses it first, as a conversation's do.
 describe("a room's acts", () => {
   it("dismiss what Ergo refused before sending a delete or a reaction", () => {
     const sent: string[] = [];
@@ -27,7 +27,7 @@ describe("a room's acts", () => {
     expect(calls).toEqual(["#bubble/games", "#bubble/games", "#bubble/games"]);
   });
 
-  // slice-4-room-edit: a line goes out with the reply it answers, or as the correction of the line it corrects.
+  // A line goes out with the reply it answers, or as the correction of the line it corrects.
   it("say a line through the link, with its reply or as its correction, and nothing with no link", () => {
     const calls: unknown[] = [];
     const link = {

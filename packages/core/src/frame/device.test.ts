@@ -3,7 +3,7 @@ import { isWeakGpu, pixelRatioFor, sceneOffer } from "./device.ts";
 
 describe("isWeakGpu", () => {
   it.each([
-    // What Playwright's Chromium answers on this machine, read on 2026-11-01.
+    // What Playwright's Chromium answers on this machine.
     "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
     "Google SwiftShader",
     "llvmpipe (LLVM 15.0.7, 256 bits)",

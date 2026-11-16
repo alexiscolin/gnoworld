@@ -8,7 +8,7 @@ import { plantsOf, planetRecipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 
-// Layer 3 (slice 7, 7b4; ADR-0002 §3): a world's palette is its anchor's two real ramps interpolated in Lab, its lightness and chroma
+// Layer 3 (ADR-0002 §3): a world's palette is its anchor's two real ramps interpolated in Lab, its lightness and chroma
 // graded by the seed, never past its sources' chroma, and turned by its namespace's hue, at most 12 degrees, the same for a whole
 // system. The formulas are restated here with Math's own cube root and power; the code reaches them with + - * / alone.
 type Rgb = readonly [number, number, number];
@@ -76,7 +76,7 @@ describe("Lab", () => {
     );
   });
 
-  // The values published for sRGB's primaries under D65 (Bruce Lindbloom's tables), to two digits: not read in this session.
+  // The values published for sRGB's primaries under D65 (Bruce Lindbloom's tables), to two digits.
   it.each([
     [
       [1, 0, 0],

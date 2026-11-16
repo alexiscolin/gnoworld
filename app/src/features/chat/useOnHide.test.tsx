@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useOnHide } from "./useOnHide.ts";
 
-// The page hiding (slice 4's 4f, F940): its callback runs each time the page goes hidden, and no longer once the
+// The page hiding: its callback runs each time the page goes hidden, and not again once the
 // component is gone.
 function Probe({ onHide }: { onHide: () => void }) {
   useOnHide(onHide);

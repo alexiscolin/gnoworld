@@ -1,4 +1,4 @@
-// What this device keeps for whoever uses it, guest or account (slice 8; ADR-0002 §1, "Device"): the settings, the passport's stamps and
+// What this device keeps for whoever uses it, guest or account (ADR-0002 §1, "Device"): the settings, the passport's stamps and
 // the worlds charted here, the streak, today's expedition, the quests, the worlds and people followed and the notifications read. Nothing of it leaves the
 // device. Each field is one key, read through its schema: an entry that is none is dropped and kept aside (a newer page's, written back),
 // another shape forgets the key, and a device that refuses (blocked, full) is read as unreadable, which the store then never writes over.
@@ -22,11 +22,11 @@ const STAMPS_KEPT = 10_000;
 const Key = z.string().check(z.minLength(1), z.maxLength(256), z.regex(/^[^\s\0-\x1f\x7f]+$/));
 const Count = z.int().check(z.minimum(0), z.maximum(100_000));
 
-/** A field no page keeps any more (the reminders), its key removed on the device's first read. */
+/** A retired field (the reminders): its key is removed on the device's first read. */
 const RETIRED = "gnoworld:device:reminders";
 
 const Quality = z.enum(["auto", "high", "low"]);
-/** The settings (ADR-0002 §1, Menu and settings): each has its default when the device holds none. Fields of later slices are added. */
+/** The settings (ADR-0002 §1, Menu and settings): each has its default when the device holds none. */
 const SETTINGS = {
   /** Auto, High or Low (ADR-0002 §9, rendering). */
   quality: Quality,
@@ -196,7 +196,7 @@ export function readPassportFile(text: string): Pick<DeviceFields, "stamps" | "c
   if (!isRecord(raw) || raw["gnoworld"] !== "passport" || raw["version"] !== 1) return undefined;
   const stamps = CODECS.stamps.read(raw["stamps"]);
   const charted = CODECS.charted.read(raw["charted"]);
-  // Whole when every key of the file was read: an entry set aside under "__proto__" would leave no key to count (8h).
+  // Whole when every key of the file was read: an entry set aside under "__proto__" would leave no key to count.
   const whole = (read: { value: object } | undefined, held: unknown) =>
     read !== undefined && isRecord(held) && Object.keys(read.value).length === Object.keys(held).length;
   if (stamps === undefined || charted === undefined || !whole(stamps, raw["stamps"]) || !whole(charted, raw["charted"]))

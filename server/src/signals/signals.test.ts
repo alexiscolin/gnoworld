@@ -12,7 +12,7 @@ import { moderate } from "../moderation/way.ts";
 import { makeStream } from "../stream/stream.ts";
 import { firstSignals, firstWords, makeSignals, SIGNAL_TABLES, type Signals } from "./signals.ts";
 
-// Slice 9h (D210 to D219): who charted a world first and who spoke first, recorded once a world by a unique key in
+// Who charted a world first and who spoke first, recorded once a world by a unique key in
 // SQLite, a migration of its own. The store is the truth; the routes and the stream only tell it.
 const T0 = Date.parse("2026-11-05T12:00:00.000Z");
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -212,7 +212,7 @@ describe("first words", () => {
     expect(signals.firsts("bubble").words).toBeNull();
   });
 
-  // D214: the record is told to anyone on the stream and drawn as a banner, so only a line said to everyone in an
+  // The record is told to anyone on the stream and drawn as a banner, so only a line said to everyone in an
   // open, listed room is first words: never a line to the operators alone, an edit, or a room that is not open to all.
   it("takes no line said to the operators alone, no edit, and no line of a room that is not public: the next one is first", () => {
     const told: unknown[] = [];

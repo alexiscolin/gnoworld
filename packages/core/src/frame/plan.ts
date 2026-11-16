@@ -1,4 +1,4 @@
-// A system's Plan (part 7v; Alexis, 2026-11-03), seen from above its plane: the only view that draws its orbits, as ellipses, to pick a
+// A system's Plan, seen from above its plane: the only view that draws its orbits, as ellipses, to pick a
 // world more simply. Its star at the screen's centre, each world of a body's size on an orbit of its own, in the order of its real one but
 // spread so each stands clear with room for its name under it, at a size that keeps their order; whole on both screens, none on the star's
 // heart. Its worlds hold still. The address picks the turn the views are tried from, so the same address gives the same Plan. The Earth's
@@ -12,8 +12,8 @@ import type { Planned } from "../lod/drawn.ts";
 import { boxOf, MARGIN, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
-// A Plan's own lens, in degrees (the chief, 2026-11-04): a chart, its orbits round their star, where the home's 42.5 degrees put the outer
-// ellipse's centre 122 px under it; the offset falls with the lens's tangent, 17 px here at the video's screen (7v's design review, F4470).
+// A Plan's own lens, in degrees: a chart, its orbits round their star, where the home's 42.5 degrees put the outer
+// ellipse's centre 122 px under it; the offset falls with the lens's tangent, 17 px here at the video's screen.
 const PLAN_LENS = 7;
 // How many turns of its camera are tried: the spin of the Plan on the screen, from its address's first.
 const TURNS = 24;
@@ -21,15 +21,15 @@ const TURNS = 24;
 const SPAN_HEIGHT = 0.86;
 const LARGEST = 0.14;
 // The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii: a disc's width and air, so which
-// ring a world is on reads (the design review's second pass, F4470); the gaps growing an eighth a ring outward, the mock-up's 130 to 180 px.
+// ring a world is on reads; the gaps growing an eighth a ring outward, the mock-up's 130 to 180 px.
 const INNER = 0.5;
 const GAP = 2.2;
 const GROW = 1.12;
 // At most this many orbits a Plan draws, the mock-up's five: its worlds share them, nearest the star first, so a Plan of any size reads as a
-// few rings, never one ring a world at like gaps (7v's open 6, the planetarium's tell), nor thousands of lines (Alexis, 2026-11-04, scale).
+// few rings, never one ring a world at like gaps (the planetarium's tell), nor thousands of lines.
 const RINGS_MOST = 5;
 // A world's radius, its share of the most used world's own size to this power: worldSize's whole span stands 3.5 times apart, the mock-up's 26
-// to 92 px (7v's open 6: gnoswap's twelve stood within 1.4 times of one size); worlds of one use stand one size.
+// to 92 px (gnoswap's twelve would otherwise stand within 1.4 times of one size); worlds of one use stand one size.
 const SIZE_POWER = Math.log(3.5) / Math.log(WORLD_MOST / WORLD_LEAST);
 // Worlds sharing a ring stand this share of an even share of the turn apart at the least: nudged from their own phases, never laid evenly.
 const APART = 0.6;
@@ -39,7 +39,7 @@ const LEAST = 0.02;
 const SHRINK = 0.9;
 const NEAR_BEST = 0.8;
 
-// A world's own size, its use's, before its system's room caps it (7v's design review, F4470: gnoswap's 16 stood at their crowd's cap).
+// A world's own size, its use's, before its system's room caps it (else gnoswap's 16 would stand at their crowd's cap).
 const sizeOf = ({ radius, own }: Orbiter) => own ?? radius;
 
 /** The worlds a Plan of `system` draws: the bodies its dynamic view stands (`only`, the same set in both views), else its bodies, the largest
@@ -89,7 +89,7 @@ function apart(phases: readonly number[]): number[] {
 
 // The Plan's orbits, outer at 1 or past: each band at its worlds' real orbits' share as the area they round (a lattice's slots are laid by
 // area), on a scale whose steps grow `GROW` a ring outward as the mock-up's; or past the one before by the names' room, `GAP` of their radii
-// growing `GROW` a ring: never evenly (F4470). The most used world `size` of the outer orbit, each other by its own size to `SIZE_POWER`.
+// growing `GROW` a ring: never evenly. The most used world `size` of the outer orbit, each other by its own size to `SIZE_POWER`.
 function spread(worlds: readonly Orbiter[], size: number): Orbiter[] {
   const bands = bandsOf(worlds);
   const area = (band: readonly Orbiter[]) => band.reduce((sum, { orbit }) => sum + orbit ** 2, 0) / band.length;
@@ -144,7 +144,7 @@ function readable(
   });
 }
 
-/** A Plan: its view, the worlds it names, and the one whose name's place its "+N" takes, if it names not all (F5462). */
+/** A Plan: its view, the worlds it names, and the one whose name's place its "+N" takes, if it names not all. */
 export interface Plan extends Arrival {
   readonly named: ReadonlySet<string>;
   readonly host: string | undefined;

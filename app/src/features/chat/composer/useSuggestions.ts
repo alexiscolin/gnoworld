@@ -1,4 +1,4 @@
-// The list of suggestions and the keys of the field (D13904): it opens while the word being typed may become something, the caret
+// The list of suggestions and the keys of the field: it opens while the word being typed may become something, the caret
 // ends the draft and is out of code; Up and Down move in it, Enter and Tab take the picked one, Escape closes it. With none open
 // Enter sends (Shift+Enter, or Enter on a finger's keyboard, adds a line: a paragraph, as every line is one), Tab moves on and
 // Escape leaves the field as it is, for the reply or the edit's own Escape.

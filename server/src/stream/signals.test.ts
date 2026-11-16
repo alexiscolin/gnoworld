@@ -4,7 +4,7 @@ import { makeApp } from "../app.ts";
 import { logger } from "@gnoworld/service/log";
 import { makeStream, type Stream } from "./stream.ts";
 
-// Slice 9h: the first signals reach a page on the server's existing stream as their own event, `signal`, to the
+// The first signals reach a page on the server's existing stream as their own event, `signal`, to the
 // readers who follow the world's rooms and may read them; kept in the ring, so a page that opens just after still
 // hears it. The verdicts' frames are unchanged.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");

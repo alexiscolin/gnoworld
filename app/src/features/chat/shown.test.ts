@@ -22,8 +22,8 @@ const dms = (partner?: string): Dms => ({
 const acts = roomActs({ current: undefined }, "", () => undefined);
 const room = (id: string): Room => ({ id, state: undefined, acts });
 
-// /code-review (CR10): the view's key was "room" or "dm", so going from one conversation to another of the same kind
-// kept the last one's view, its scroll and whether its reader was at the end with it.
+// The view's key is one a conversation, not "room" or "dm": going from one conversation to another of the same kind
+// would keep the last one's view, its scroll and whether its reader was at the end with it.
 describe("shownOf: the conversation in view", () => {
   it("keys each conversation apart: two direct messages, two rooms, and a room from a direct message", () => {
     const keys = [
@@ -36,7 +36,7 @@ describe("shownOf: the conversation in view", () => {
     expect(new Set(keys).size).toBe(4);
   });
 
-  // StrykerJS on CR10 and CR1: who is here goes beside a room by its kind; a refusal is said by why Ergo refused.
+  // Who is here goes beside a room by its kind; a refusal is said by why Ergo refused.
   it("says its kind, a direct message or a room", () => {
     expect(shownOf(dms(ALICE), room("#bubble"), PAGE)?.kind).toBe("dm");
     expect(shownOf(dms(), room("#bubble"), PAGE)?.kind).toBe("room");
@@ -62,7 +62,7 @@ describe("shownOf: the conversation in view", () => {
   });
 });
 
-// 4f-n: a conversation is seen as its reader reaches its end, as a room is read: the same hook, given a way out.
+// A conversation is seen as its reader reaches its end, as a room is read: the same hook, given a way out.
 describe("shownOf: a direct message seen", () => {
   const line = (id: string, time: string): Line => ({
     id,
@@ -101,7 +101,7 @@ describe("shownOf: a direct message seen", () => {
   });
 });
 
-// 4d-dm-bar: a direct message's view carries the bar's acts, through the page's own, to its partner.
+// A direct message's view carries the bar's acts, through the page's own, to its partner.
 describe("shownOf: a direct message's bar", () => {
   const reaction = { id: "r1", time: "2026-10-25T10:00:00.000Z", to: "m1", emoji: "👍", who: BOB, on: true };
   const calls: string[] = [];
@@ -177,7 +177,7 @@ describe("shownOf: a direct message's bar", () => {
   });
 });
 
-// slice-4-room-edit: a room's lines are corrected through the link, as its answers are: one say, its tags told.
+// A room's lines are corrected through the link, as its answers are: one say, its tags told.
 describe("shownOf: a room's edits", () => {
   it("says a line through the link, a reply or a correction as each is", () => {
     const said: unknown[] = [];

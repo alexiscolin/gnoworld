@@ -1,4 +1,4 @@
-// An account's notification modes, on the device (slice 4's 4f-n; ADR-0002 §1, notifications a setting of the device): for
+// An account's notification modes, on the device (ADR-0002 §1, notifications a setting of the device): for
 // each room the reader chose, all, mentions or none; the default is not kept. What the device gives back is checked: rooms'
 // ids and the three modes, at most MODES_KEPT, else nothing, and forgotten. A device that refuses keeps nothing and says so.
 import { NOTICE_MODES, type NoticeMode } from "@gnoworld/core";

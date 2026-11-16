@@ -1,12 +1,12 @@
-# The gate on GitHub's machines (the harness overhaul, phase 2: docs/plans/harness-overhaul.md). One job, `changes`, reads what
+# The gate on GitHub's machines. One job, `changes`, reads what
 # the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
-# at most but deploy/test.sh's; `gate-ok`, the one check main will require (D13165), reads every result with the base commit's
+# at most but deploy/test.sh's; `gate-ok`, the one check main will require, reads every result with the base commit's
 # scripts/ci_gate_ok.py. It reads the repository, and after a failure gate-ok's last step reads the repository's Actions data
-# to write each failed job's end as an annotation with the base's scripts/ci_annotate.py (D13179: after the verdict, in a job
+# to write each failed job's end as an annotation with the base's scripts/ci_annotate.py (after the verdict, in a job
 # already failed, so it can never pass a run); it holds no secret, pins every action and download, and runs on a pull request
 # to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only token and no
 # secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
-# The first run after this file lands judges against a base that has no ci_gate_ok.py: gate-ok fails it, by design; a run by
+# A run judged against a base that has no ci_gate_ok.py fails gate-ok, by design; a run by
 # hand then judges against the base that has it.
 name: gate
 on:
@@ -26,7 +26,7 @@ env:
   NODE_OPTIONS: --max-old-space-size=8192 # check.sh's heap, for every node of the gate
   GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
   GNOROOT: /home/runner/.cache/gno-toolchain/src
-  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
+  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1
 jobs:
   # The only job that reads the change. A failure here fails every job that needs it, and gate-ok: closed.
   changes:
@@ -148,7 +148,7 @@ jobs:
           BASE: ${{ needs.changes.outputs.base }}
         run: sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"
 
-  # zizmor over the workflows (D13144), after proving it refuses what it must: the red team's test 13.
+  # zizmor over the workflows, after proving it refuses what it must.
   zizmor:
     needs: [changes]
     runs-on: ubuntu-24.04
@@ -220,7 +220,7 @@ jobs:
         run: node app/node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium
       - name: core's tests in Chromium
         run: CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium
-      # The flash's test compares two renders pixel for pixel, which Linux's software rendering does not keep equal (F13161):
+      # The flash's test compares two renders pixel for pixel, which Linux's software rendering does not keep equal:
       # it runs by hand on the Mac (docs/DEVELOPMENT.md, "The gate").
       - name: The stories' invariants and behaviours (axe, CSS), never pictures
         if: needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'
@@ -246,7 +246,7 @@ jobs:
       - name: The journeys, no picture compared, one retry
         run: |
           set -eu
-          ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (F2543)
+          ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --reporter=dot app/tests/e2e/login.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/search.spec.ts
       - name: Traces of a failed journey, kept a week
         if: failure()
@@ -355,12 +355,12 @@ jobs:
         run: python3 -I "$RUNNER_TEMP/base/scripts/patch_coverage.py" "$BASE"
 
   # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate); a cap
-  # reached fails the job.
+  # reached fails the job. 120 minutes: a branch of many changed tier-1 lines runs past an hour on GitHub's four cores (D13206).
   risk:
     needs: [changes]
     if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 120
     steps:
       - *checkout-history
       - *go
@@ -407,7 +407,7 @@ jobs:
         run: python3 -I "$RUNNER_TEMP/base/scripts/check_migrations.py" "$BASE"
 
   # deploy/test.sh, the demo's proofs, when deploy/ changes: its own budget (18 to 30 minutes on the Mac), never counted in the 15.
-  # Two of its checks fail on GitHub's Linux runner today (F13163): a deploy/ change waits for their fix or an admin.
+  # Two of its checks fail on GitHub's Linux runner: a deploy/ change waits for their fix or an admin.
   deploy-stack:
     needs: [changes]
     if: needs.changes.outputs.deploy == 'true'
@@ -415,6 +415,10 @@ jobs:
     timeout-minutes: 40
     steps:
       - *checkout
+      - *node
+      - *pnpm
+      - name: The stack's static proofs, read as text (Vitest's job runs on a change of code alone, and these tests read deploy/)
+        run: pnpm exec vitest run jarvis/src/config.test.ts link-reader/src/main.test.ts
       - name: The Docker the runner has (test.sh needs Engine 28 or later)
         run: docker version && docker compose version
       - name: htpasswd, which test.sh needs and the runner lacks

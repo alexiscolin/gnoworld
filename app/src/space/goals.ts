@@ -1,6 +1,6 @@
-// Where each place puts the camera (D401, the demo's poses): the whole universe from above; a system from above its own plane,
+// Where each place puts the camera (the demo's poses): the whole universe from above; a system from above its own plane,
 // keeping the heading the camera has (the shortest turn); a planet at the distance that fills the page's circle, its night side
-// toward the plate and its sun on the right, or lit at three quarters toward the plate where the page frames it close (D458), met where its
+// toward the plate and its sun on the right, or lit at three quarters toward the plate where the page frames it close, met where its
 // orbit has it each frame.
 import type { Space } from "./scene.ts";
 import type { Goal } from "./rig/flight.ts";
@@ -17,27 +17,27 @@ export interface Circle {
   readonly height: number;
   /** The room the plate and the dock leave free between them, in x: where the Map centres a system. */
   readonly free?: { readonly left: number; readonly right: number } | undefined;
-  /** The planet framed close, larger than the window, and lit at three quarters (D458, D459). */
+  /** The planet framed close, larger than the window, and lit at three quarters. */
   readonly close?: boolean | undefined;
 }
 
 const FOV = 50;
 // In front of the heart and right of it: the saucer, larger near than far, stands in the middle of what the rail leaves free.
 const UNIVERSE_LOOK: Vec = { x: 300, y: 0, z: 700 };
-// The Map's, from above, as it was.
+// The Map's, from above.
 const UNIVERSE_PLAN_LOOK: Vec = { x: -260, y: 0, z: 120 };
 const UNIVERSE_AWAY = 6200;
-// The 3D view's own, nearer (D496): the disc fills more of the window, the wheel takes the eye out to the far reach (9000).
+// The 3D view's own, nearer: the disc fills more of the window, the wheel takes the eye out to the far reach (9000).
 const UNIVERSE_NEAR = 4700;
 // raw: the page's room round a system: the rail's width and its step at the right (kept at the left too), the header and the crumb above
 const SIDE_ROOM = 230;
 const TOP_ROOM = 150;
 const MIN_ROOM = 120;
 // raw: a step of room past the outer orbit, and the near side of a lowered disc, which perspective draws larger
-// The Map fits a system large (D505, D507): its outer orbit a little past the room, its worlds spread wide; the wheel takes it out.
+// The Map fits a system large: its outer orbit a little past the room, its worlds spread wide; the wheel takes it out.
 const FIT_MARGIN = 0.68;
 const FIT_MARGIN_3D = 0.42;
-// 28° above the disc, low enough that the saucer reads in perspective, its thickness and depth seen (Alexis, 2026-11-09).
+// 28° above the disc, low enough that the saucer reads in perspective, its thickness and depth seen.
 const UNIVERSE_WAY = { x: 0, y: Math.sin((28 * Math.PI) / 180), z: Math.cos((28 * Math.PI) / 180) };
 // The Map's way over the universe, as the plan's over a system (0.17 across, 0.985 above), and how much farther the whole disc stands in it.
 const UNIVERSE_PLAN_WAY = { x: 0, y: 0.985, z: 0.17 };
@@ -107,7 +107,7 @@ export function systemGoal(
   const level = way.x * n.x + way.y * n.y + way.z * n.z;
   const flat = unit({ x: way.x - n.x * level, y: way.y - n.y * level, z: way.z - n.z * level });
   // From above its plane, a little tilted (the plan); or low over it, about 12°, near and large, the sun in the middle and the near worlds
-  // big in front (D483, Alexis's capture 16.56.37).
+  // big in front.
   const [across, above] = plan ? [0.17, 0.985] : [0.978, 0.208];
   const from = unit({
     x: flat.x * across + n.x * above,
@@ -142,15 +142,15 @@ function centre(out: Pose, page: Circle): void {
 }
 
 // How far a system is seen so its outer orbit, `reach`, fills the room the page leaves it (the header and the crumb above, the rail at the
-// right, kept as wide on the left so it stays in the middle), whatever its size (Alexis, 2026-11-08: "tenir au plus large dans la
-// fenêtre"): seen `above` its plane, its disc is a circle from over it and flattens as the view lowers, so it may then reach higher.
+// right, kept as wide on the left so it stays in the middle), whatever its size, as wide as the
+// window allows: seen `above` its plane, its disc is a circle from over it and flattens as the view lowers, so it may then reach higher.
 function fitOf(
   reach: number,
   above: number,
   { screen: { width, height }, page }: { screen: Screen; page?: Circle | undefined },
 ): number {
   // From above the orbits drawn fill it; in 3D the camera stands well inside that, the outer orbits past the window's edges and the near
-  // planets large in front (Alexis, 2026-11-08, his reference: "beaucoup plus proche").
+  // planets large in front.
   const margin = above > 0.9 ? FIT_MARGIN : FIT_MARGIN_3D;
   const aspect = width / Math.max(height, 1);
   // The lens's half height at a distance of 1, as the rig widens it on a tall screen.
@@ -218,7 +218,7 @@ export function planetGoal(
   };
 }
 
-/** The home's goal (D459): the Earth close while its page frames it so, else `seen`, its system, as from above; read each frame, as the
+/** The home's goal: the Earth close while its page frames it so, else `seen`, its system, as from above; read each frame, as the
  * page's circle comes. */
 export function homeGoal(
   earth: Planet,

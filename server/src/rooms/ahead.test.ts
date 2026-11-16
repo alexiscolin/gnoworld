@@ -14,7 +14,7 @@ import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE, type Rooms, makeRoo
 import { ROOM_TABLES, ensureRooms, listRooms, realmPaths, roomWorld, worldOf } from "./rooms.ts";
 import { z } from "zod";
 
-// D413: the room of every realm the worlds job lists, and every hub's main room, exist before anyone opens a page.
+// The room of every realm the worlds job lists, and every hub's main room, exist before anyone opens a page.
 const T0 = Date.parse("2026-11-08T12:00:00.000Z");
 const PATHS = readFileSync(new URL("../worlds/onyxPaths.txt", import.meta.url), "utf8")
   .split("\n")
@@ -83,7 +83,7 @@ const setup = ({
 }: { realmMax?: number; hubs?: typeof HUBS; perSecond?: number; seeded?: boolean; send?: boolean } = {}) => {
   const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   opened.push(db);
-  // The hubs as the process has them before this part: chat.ts makes a main room for every world of the roles file.
+  // The hubs as the process has them: chat.ts makes a main room for every world of the roles file.
   ensureRooms(db, seeded ? ["earth", ...HUBS.map(({ slug }) => slug)] : ["earth"], T0);
   const timeline: Timeline = { events: [], waits: [] };
   const sent: string[] = [];
@@ -174,7 +174,7 @@ describe("rooms made ahead from the worlds job's list", () => {
   it("records the realm of each room it makes, and tells a room made before the path was kept (a backfill)", async () => {
     const { db, rooms, start } = setup();
     const golf = realmRoom("gno.land/r/gnogolf/golf_a/v2", []).room;
-    // Made as the version before this one made it: a row with no path.
+    // A room made before the column has a row with no path.
     rooms.realm("#leon");
     await start(written(["gno.land/r/leon", "gno.land/r/gnogolf/golf_a/v2"])).check();
     expect(realmPaths(db, "leon")).toEqual(new Map([["#leon", "gno.land/r/leon"]]));
@@ -677,7 +677,6 @@ describe("stopping while the pass waits", () => {
   });
 });
 
-// Moved here from realmRoom.test.ts: a test sits beside the file it tests.
 describe("realmRoom over the onyx realm paths (D413)", () => {
   // The realm paths gno_packages lists on onyx (server/src/worlds/onyxPaths.txt).
   const PATHS = readFileSync(new URL("../worlds/onyxPaths.txt", import.meta.url), "utf8")

@@ -1,5 +1,5 @@
-// ⌘K, "/" and the header's search buttons, which open the search palette (D355) over the places the page holds; a full Plan's "+N" and the
-// rail's second tab open it too, by an event (F5462). The palette is a chunk of its own, fetched once the page rests (D504) and kept
+// ⌘K, "/" and the header's search buttons, which open the search palette over the places the page holds; a full Plan's "+N" and the
+// rail's second tab open it too, by an event. The palette is a chunk of its own, fetched once the page rests and kept
 // after, so its first opening is at once; a new page closes it (a place chosen, Go explore).
 import { IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState } from "react";

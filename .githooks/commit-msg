@@ -1,7 +1,7 @@
 #!/bin/sh
 # Refuse a subject that is not conventional (`type(scope)!: what`, 72 characters at most; git's
 # own merge and revert subjects pass), and co-author or AI attribution lines, a session's link
-# included (F591). Comment lines and the diff that `git commit -v` appends below the scissors line
+# included. Comment lines and the diff that `git commit -v` appends below the scissors line
 # are not part of the message.
 msg=$(sed '/^# -* >8 -*$/,$d' "$1" | grep -v '^#')
 subject=$(printf '%s\n' "$msg" | sed -n '1p')
@@ -12,7 +12,7 @@ case $subject in
 		echo "commit-msg: the subject is 'type(scope): what', type one of feat fix docs test refactor perf build ci chore style revert." >&2
 		exit 1
 	fi
-	# characters, in any locale; a python3 that cannot count them refuses (F5080): `[ "" -gt 72 ]` is no answer
+	# characters, in any locale; a python3 that cannot count them refuses: `[ "" -gt 72 ]` is no answer
 	length=$(printf '%s' "$subject" | python3 -I -c 'import sys; print(len(sys.stdin.buffer.read().decode()))') || {
 		echo "commit-msg: python3 cannot count the subject's characters" >&2
 		exit 1
@@ -28,7 +28,7 @@ if printf '%s\n' "$msg" | grep -qiE '^(co-authored|assisted)-by:|^claude-session
 	exit 1
 fi
 # The repository will be public, messages included: gitleaks scans files, so the message here,
-# with both rule sets and no `gitleaks:allow` way out (F090, F113).
+# with both rule sets and no `gitleaks:allow` way out.
 command -v gitleaks >/dev/null || { echo "commit-msg: gitleaks is not installed (docs/DEVELOPMENT.md)" >&2; exit 1; }
 for config in gitleaks.toml gitleaks-private.toml; do
 	if ! printf '%s\n' "$msg" | gitleaks stdin --no-banner --redact --log-level error --ignore-gitleaks-allow \
@@ -38,9 +38,9 @@ for config in gitleaks.toml gitleaks-private.toml; do
 	fi
 done
 # A hidden character in a message shows nothing or changes how it reads, and scripts parse messages (a `Removed-test:` line
-# shown as one name and read as another, F5079). In Claude Code's sandbox, whose tools once wrote one raw, the staged
-# scripts/hidden.py reads each message as it is written, a merge's and an amend's included (F5085), as pre-commit runs the
-# staged scripts there; outside, nothing of the repository runs (F076), and check_docs reads the branch's messages at the
+# shown as one name and read as another). In Claude Code's sandbox, whose tools can write one raw, the staged
+# scripts/hidden.py reads each message as it is written, a merge's and an amend's included, as pre-commit runs the
+# staged scripts there; outside, nothing of the repository runs, and check_docs reads the branch's messages at the
 # next gate. With no staged rule, or a python3 that fails, nothing proves the message clean.
 if [ -n "${SANDBOX_RUNTIME:-}" ]; then
 	rule=$(git show :scripts/hidden.py 2>/dev/null) && [ -n "$rule" ] || {

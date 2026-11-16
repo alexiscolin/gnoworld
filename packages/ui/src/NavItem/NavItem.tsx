@@ -18,7 +18,7 @@ interface Shared {
   /** A quiet fact at its end, before the badge: an icon and a figure (a room's people here), `said` for assistive technology. */
   meta?: { icon: IconName; value: string; said: string } | undefined;
 }
-/** `soon`: what a later slice brings, greyed and inert, "Coming soon" under the pointer and the focus (as `ComingSoon`). */
+/** `soon`: what is yet to come, greyed and inert, "Coming soon" under the pointer and the focus (as `ComingSoon`). */
 export type NavItemProps = Shared &
   (
     | { href: string; onClick?: never; soon?: never }
@@ -97,7 +97,7 @@ export function NavItem({ children, current = false, lead, badge, meta, href, on
       <span className="truncate">{children}</span>
     </>
   );
-  // The whole pill is the link, its sides and its count too (review 25 of 5q): ui's `covers`.
+  // The whole pill is the link, its sides and its count too: ui's `covers`.
   return (
     <div
       className={["column-item", styles["item"]].join(" ")}

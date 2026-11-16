@@ -1,4 +1,4 @@
-// The first signals (9h) and the chain in the rooms (9g), made once as the server starts: both tell on the one stream.
+// The first signals and the chain in the rooms, made once as the server starts: both tell on the one stream.
 import type { Hono } from "hono";
 import type { openDatabase } from "@gnoworld/service/db";
 import type { logger } from "@gnoworld/service/log";

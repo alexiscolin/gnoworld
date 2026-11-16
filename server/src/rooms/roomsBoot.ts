@@ -1,6 +1,6 @@
-// The rooms' routes as the process wires them: a realm's (D390, D413), from the realms the worlds job lists, the default universe's hubs and
+// The rooms' routes as the process wires them: a realm's, from the realms the worlds job lists, the default universe's hubs and
 // the visitor by the proxy's header, none without the job's file, with the chain read for an unlisted path on the universe's own RPC;
-// the rooms made ahead from the same file and the hubs, checked each minute; then a world's moderators' (3l).
+// the rooms made ahead from the same file and the hubs, checked each minute; then a world's moderators'.
 import type { Hono } from "hono";
 import type { Send } from "@gnoworld/service/net";
 import { send as netSend } from "@gnoworld/service/net";

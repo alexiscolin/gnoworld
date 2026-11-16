@@ -1,4 +1,4 @@
-// The worlds the home's first screen draws larger, each its own size (D549): up to three layers, the nearest the biggest. The shader reads
+// The worlds the home's first screen draws larger, each its own size: up to three layers, the nearest the biggest. The shader reads
 // `boosts` (a world's index, how many times larger, three times); a detailed planet reads `scaleOf` to stay in step with its quad.
 const FEATURED = 3;
 

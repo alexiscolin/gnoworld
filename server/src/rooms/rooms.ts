@@ -1,5 +1,5 @@
-// The rooms the server makes (slice 3's plan, 3h; decision 147): each world of the roles file has its main
-// room, the Earth its general one, and no other is made here; a moderator's rooms are 3l's. A room is
+// The rooms the server makes: each world of the roles file has its main
+// room, the Earth its general one, and no other is made here; a moderator's rooms are made in create.ts. A room is
 // never removed at start: a world gone from the file keeps its history.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
@@ -14,7 +14,7 @@ export interface Room {
   world: string;
 }
 
-/** A world's main room; a moderator's further rooms will be `#<slug>/<room>` (3l). */
+/** A world's main room; a moderator's further rooms will be `#<slug>/<room>`. */
 export const mainRoom = (slug: string): string => `#${slug}`;
 
 export function ensureRooms(db: DatabaseSync, worlds: readonly string[], now: number): void {
@@ -25,7 +25,7 @@ export function ensureRooms(db: DatabaseSync, worlds: readonly string[], now: nu
   );
 }
 
-/** Rooms by name, as the roles file types them (3m): made once, never removed. */
+/** Rooms by name, as the roles file types them: made once, never removed. */
 export function ensureNamed(db: DatabaseSync, rooms: readonly Room[], now: number): void {
   const add = db.prepare("INSERT OR IGNORE INTO rooms (name, world, created_at) VALUES (?, ?, ?)");
   for (const { name, world } of rooms) add.run(name, world, now);

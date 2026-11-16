@@ -1,7 +1,7 @@
-// A system's dynamic view (part 7v; Alexis, 2026-11-03, "exactement cette idée"), the view a system shows by default: its star at the
+// A system's dynamic view, the view a system shows by default: its star at the
 // screen's centre, its worlds round it at many depths, the nearest cut by the frame and the largest, the others whole, each 1.5 times the
 // next farther; no orbit is drawn. Its worlds hold still, so the near one stays cut as the view at rest's close world does. The address
-// picks the slant and the turn the angles are tried in, so the same address gives the same view. Built on 7d3's postcards (7p's depth).
+// picks the slant and the turn the angles are tried in, so the same address gives the same view. Built on postcard.ts's postcards and depth.ts.
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { onPlane } from "./disc.ts";
@@ -22,7 +22,7 @@ import {
 } from "./restLook.ts";
 
 /** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there; a Plan's own
- * lens in degrees, plane's up (7v): the home's lens and the map's up where none. */
+ * lens in degrees, plane's up: the home's lens and the map's up where none. */
 export interface Arrival {
   readonly eye: Point;
   readonly look: Point;
@@ -49,7 +49,7 @@ const FILL = 0.6;
 // stands within twice a system's room of its star, so nothing past a halo's reach counts.
 const OUTSIDE = ROOM + 1;
 const NEAR = HALO_FAR + 2 * ROOM;
-// The most worlds a dynamic view draws: the mock-up's six (Alexis, 2026-11-03, the views page, 14:09), held still, where the home's
+// The most worlds a dynamic view draws: six, held still, where the home's
 // postcards keep frame 4's four.
 const MOST_WORLDS = PLAN_MOST;
 /** What an address picks: the slant and the turn the angles start from. */
@@ -143,7 +143,7 @@ function firstHolding(system: StarSystem, worlds: readonly Orbiter[], asked: Ask
 }
 
 // The counts and ways tried, in order: the most worlds with the nearest cut by the frame and two others whole at the least, down to three,
-// as the mock-up Alexis approved draws it (the chief, after the design review's second pass); the most whole, down to two; two, one cut,
+// the most whole, down to two; two, one cut,
 // then one whole.
 function triesOf(most: number): (readonly [count: number, cut: boolean])[] {
   const down = (cut: boolean, least: number) =>
@@ -163,7 +163,7 @@ export function arrivalOf(system: StarSystem, systems: readonly StarSystem[], mu
     const found = firstHolding(system, postcardWorldsWith(system, count, must), { pick, around, cut });
     if (found !== undefined) return found;
   }
-  // Framed whole by its star and far belt, as 7d3 framed it: the ball's height a share of the screen's.
+  // Framed whole by its star and far belt, as a postcard is framed: the ball's height a share of the screen's.
   const still = { ...system, spin: 0 };
   const reach = reachOf(system, []);
   const cameras = anglesOf(pick).map((angle) => cameraOf(still, angle, reach * (1 + (2 * focalOf(1)) / FILL)));

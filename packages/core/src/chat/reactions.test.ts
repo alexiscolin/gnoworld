@@ -29,8 +29,8 @@ const reaction = (over: Partial<Reaction> = {}): Reaction => ({
 const second = (n: number) => new Date(Date.parse(T0) + n * 1000).toISOString();
 const frozen = <T>(list: T[]): readonly T[] => Object.freeze([...list]);
 
-// 4d: a reaction is a TAGMSG naming the line it answers (draft/react; Ergo stores it: ircd.yaml.tmpl's tagmsg-storage).
-// It comes from anyone in the room, so each part is checked by hand (docs/decisions.md, 2026-10-26): one emoji of
+// A reaction is a TAGMSG naming the line it answers (draft/react; Ergo stores it: ircd.yaml.tmpl's tagmsg-storage).
+// It comes from anyone in the room, so each part is checked by hand: one emoji of
 // RGI's set, a msgid of one word a tag may carry, an account Ergo vouches for.
 describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
   test("reads a reaction: its msgid, time, the line it answers, its emoji, its account, added", () => {
@@ -49,7 +49,7 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
     expect(reactionOf(tagmsg("+draft/react=👍;+reply=m1", { room: "#Bubble" }), "#bubble")).toEqual(reaction());
   });
 
-  // Each name read in its order, the first that holds a value of its kind winning (R14).
+  // Each name read in its order, the first that holds a value of its kind winning.
   test.each([
     ["+draft/react before +react", "+draft/react=👍;+react=😂;+reply=m1", { emoji: "👍" }],
     ["+react when +draft/react holds no emoji", "+draft/react=nice;+react=😂;+reply=m1", { emoji: "😂" }],
@@ -60,7 +60,7 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
   });
 
   // Emoji are sequences: a selector, a skin tone, a ZWJ family or couple, a flag's letters, a subdivision's tags, a
-  // keycap (R9).
+  // keycap.
   test.each([
     "❤️",
     "☺️",
@@ -95,7 +95,7 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
     expect(reactionOf(tagmsg(`+draft/react=${escapeTagValue(value)};+reply=m1`), "#bubble")).toBeUndefined();
   });
 
-  // The msgid a reaction answers: one word a tag may carry back, of 64 characters at most (R14).
+  // The msgid a reaction answers: one word a tag may carry back, of 64 characters at most.
   test.each([
     ["nothing", ""],
     ["a space", "m 1"],
@@ -155,9 +155,9 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
   });
 });
 
-// A room keeps one reaction an account, a line and an emoji: the newest, added or taken back (R2), so an account
+// A room keeps one reaction an account, a line and an emoji: the newest, added or taken back, so an account
 // repeating itself evicts no one else's; then the newest `cap` of those, in time order.
-// The green pass (G2, G3): what the page sends, built in core: one RGI emoji, a msgid a tag carries back, or nothing.
+// What the page sends, built in core: one RGI emoji, a msgid a tag carries back, or nothing.
 describe("reactionLine: the TAGMSG that adds or takes back a reaction", () => {
   test("adds a reaction, and takes one back, labelled, to the msgid it answers", () => {
     expect(reactionLine({ to: "m1", emoji: "👍", on: true }, "#bubble", "r1")).toBe(
@@ -240,7 +240,7 @@ describe("addReactions: a room's reactions, the newest of each, in time order, t
     expect(kept.map(({ id }) => id)).toEqual(["other", "f9999"]);
   });
 
-  // The security review (S3): one account's reactions to lines no one sees fill no one else's place.
+  // One account's reactions to lines no one sees fill no one else's place.
   test("keeps an account's newest fifth of the window, its flood evicting no one else's", () => {
     const alice = reaction({ id: "alice", who: ALICE, to: "m1", time: T0 });
     const flood = Array.from({ length: 1000 }, (_, n) =>
@@ -263,7 +263,7 @@ describe("addReactions: a room's reactions, the newest of each, in time order, t
     expect(kept.at(-1)?.id).toBe("r1199");
   });
 
-  // The green pass (G3): a full window still takes a newer reaction, its oldest let go.
+  // A full window still takes a newer reaction, its oldest let go.
   test("takes a newer reaction into a full window, letting its oldest go", () => {
     const held = frozen([
       reaction({ id: "a", time: second(1), who: "a" }),
@@ -314,7 +314,7 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ]);
   });
 
-  // The security review (S4): one account's 20 lone emoji put no shared one behind "+N more".
+  // One account's 20 lone emoji put no shared one behind "+N more".
   test("shows the emoji most accounts reacted with first, then each in the order first reacted", () => {
     const lone = ["😀", "😁", "😂"].map((emoji) => on("m1", emoji, "mallory"));
     const shared = ["a", "b", "c"].map((who) => on("m1", "👍", who));
@@ -325,14 +325,14 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ).toEqual(["👍3", "😀1", "😁1", "😂1"]);
   });
 
-  // The code review (CR5): an account's reactions to a line and to its folded edit count once on the line.
+  // An account's reactions to a line and to its folded edit count once on the line.
   test("counts an account once on a line whatever msgid of it each reaction names", () => {
     expect(reactionsOn([on("m1", "👍", ALICE), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
       { emoji: "👍", count: 1, mine: false },
     ]);
   });
 
-  // F1185 (the simplify pass's E1): each reaction's line is what `lineOf` says of its msgid, the app handing its folded
+  // Each reaction's line is what `lineOf` says of its msgid, the app handing its folded
   // edits' own, in the loop that counts: no copy of the reactions first.
   test("reads each reaction's line through lineOf, a folded edit's msgid counted on its line, once an account", () => {
     const lineOf = (id: string) => (id === "e1" ? "m1" : id);
@@ -341,7 +341,7 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     expect(shown.has("e1")).toBe(false);
   });
 
-  // The green pass (G1): mine whoever reacted after me with it.
+  // Mine whoever reacted after me with it.
   test("keeps an emoji mine when another account reacts with it after me", () => {
     expect(reactionsOn([on("m1", "👍", ME), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
       { emoji: "👍", count: 2, mine: true },

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "./index.ts";
 import { PinList, PinnedLine, PinRequest, PINS_MAX } from "./pins.ts";
 
-// Slice 4's 4d: a room's pins, GET /api/pins's answer and POST /api/pins's body (docs/plans/slice-4.md §7). A pin is
+// A room's pins, GET /api/pins's answer and POST /api/pins's body. A pin is
 // the line as Ergo held it when a moderator pinned it: its id, time, author's account and text.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const pin = (over: Record<string, unknown> = {}) => ({
@@ -90,7 +90,7 @@ describe("PinRequest", () => {
   });
 });
 
-// A room holding its most is not a limit on the reader's requests: the page words them apart (4d's R8).
+// A room holding its most is not a limit on the reader's requests: the page words them apart.
 describe("the cap's own error code", () => {
   it("is one the server answers, beside too_many", () => {
     expect(ApiError.safeParse({ error: "full" }).success).toBe(true);

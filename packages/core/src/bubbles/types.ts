@@ -1,4 +1,4 @@
-// What the bubbles' pick takes and gives (docs/plans/slice-6.md §7).
+// What the bubbles' pick takes and gives.
 import type { LatLon } from "./farSide.ts";
 import type { Rules } from "./rules.ts";
 
@@ -11,7 +11,7 @@ export interface BubbleMessage {
   readonly text: string;
   /** The speaker's declared country (two capitals), or none: it is never guessed. */
   readonly country?: string;
-  /** A world's line (D565): `country` is only the key of its speaker's own spot, so none needs to be a country's code. */
+  /** A world's line: `country` is only the key of its speaker's own spot, so none needs to be a country's code. */
   readonly spot?: boolean;
   readonly visibility: "public" | "private" | "dm";
   readonly joined: boolean;

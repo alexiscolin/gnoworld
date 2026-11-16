@@ -1,4 +1,4 @@
-// A room's lines as the rules read them (7f2): the seam between the store and `pickBubbles`. It decides what a bubble may be made of, so it
+// A room's lines as the rules read them: the seam between the store and `pickBubbles`. It decides what a bubble may be made of, so it
 // fails shut: a room is public only when its list says so.
 import { hasAt } from "../chat/notice.ts";
 import type { Line } from "../chat/room.ts";

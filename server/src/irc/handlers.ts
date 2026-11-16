@@ -1,13 +1,12 @@
 // The lines Ergo sends that the link answers or keeps in its state: its LIST, its login by SASL, the refusals that
-// close it, who joins its rooms, the rooms that refuse it and the kick that puts it out (slice 3's plan, 3h, 3l,
-// 3m and its max review).
+// close it, who joins its rooms, the rooms that refuse it and the kick that puts it out.
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "@gnoworld/service/log";
 import { line, NICK } from "./lines.ts";
 import type { State } from "./session.ts";
 
-// Ergo's LIST, its channels kept to 10,000, handed on at its end (3l).
+// Ergo's LIST, its channels kept to 10,000, handed on at its end.
 export function listing(
   state: State,
   onChannels: ((names: readonly string[]) => void) | undefined,
@@ -26,7 +25,7 @@ export function listing(
 }
 
 // Its account by SASL PLAIN, the operator's password as its passphrase, which the server's auth script takes
-// for gnoworld alone (slice 3's max review); an ACK without sasl sends no password, and a refusal closes.
+// for gnoworld alone; an ACK without sasl sends no password, and a refusal closes.
 export function sasl(
   password: string,
   refused: (s: Socket, error: string) => void,
@@ -73,8 +72,8 @@ export function refusals(
   };
 }
 
-// Ergo's JOIN: the bot's own takes a room it asked as joined (3l); another's, in one of its rooms, is
-// handed on (3m).
+// Ergo's JOIN: the bot's own takes a room it asked as joined; another's, in one of its rooms, is
+// handed on.
 export function joined(
   state: State,
   onJoin: (room: string) => void,
@@ -99,7 +98,7 @@ export function kicked(state: State, log: Log): (s: Socket, message: IrcMessage)
   };
 }
 
-// A room of its own that refuses the bot (3m: +i, +R, or an operator's +l, +k or +b) is joined by
+// A room of its own that refuses the bot (+i, +R, or an operator's +l, +k or +b) is joined by
 // SAJOIN, which Ergo grants an operator whatever the room's modes (irc/channel.go:786-792, v2.19.1).
 export function rejoins(state: State): Record<string, (s: Socket, message: IrcMessage) => void> {
   const rejoin = (s: Socket, { params: [, room = ""] }: IrcMessage): void => {

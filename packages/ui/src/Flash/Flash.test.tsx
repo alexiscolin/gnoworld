@@ -75,7 +75,7 @@ describe("Flash", () => {
     vi.useRealTimers();
   });
 
-  // F2165: the body's room for a flash was claimed by every flash, so a timed one shifted the page twice.
+  // The body's room for a flash was claimed by every flash, so a timed one shifted the page twice.
   it("marks only a flash that stays (one with an action) as one the page makes room for", () => {
     const { rerender } = render(<Flash message={saved} onClose={vi.fn()} />);
     expect(document.querySelector(".flash[data-stays]")).toBeNull();
@@ -117,7 +117,7 @@ describe("Flash", () => {
     endsIn5s(onClose);
   });
 
-  // WCAG 2.2.1: the keyboard and touch can end or keep what the pointer can (Alexis, F260).
+  // WCAG 2.2.1: the keyboard and touch can end or keep what the pointer can.
   it("ends a flash with no action at once from its Close", () => {
     const onClose = vi.fn();
     render(<Flash message={saved} onClose={onClose} />);
@@ -249,7 +249,7 @@ describe("Flash", () => {
   });
 
   // The action's button leaves with the flash it ends, and a removed element may fire no blur (jsdom
-  // fires none; Chromium 156 does): where the focus is decides the hold, whatever moved it (F308, F316).
+  // fires none; Chromium 156 does): where the focus is decides the hold, whatever moved it.
   // Each case: the focus's way back before the page changes it, and after.
   it.each([
     ["the focus came to it from nowhere", () => null],
@@ -321,7 +321,7 @@ describe("Flash", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
   });
 
-  // Its way back is for the focus it took (F307): from nowhere, from inside itself, or gone elsewhere since.
+  // Its way back is for the focus it took: from nowhere, from inside itself, or gone elsewhere since.
   it("closes from its Close when the focus came to it from nowhere", () => {
     const onClose = vi.fn();
     render(<Flash message={saved} onClose={onClose} />);

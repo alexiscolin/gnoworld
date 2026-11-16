@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { chainKey } from "./chain.ts";
 import { createAppStore } from "./index.ts";
 
-// Slice 9g: the chain's slice, from the stream's events alone (ADR-0002 §4: nothing is optimistic). A room's line exists only
+// The chain's slice, from the stream's events alone (nothing is optimistic). A room's line exists only
 // once its chain event has come; each is kept with its height; what a room keeps is bounded.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, world = "govdao"): ChainEvent => ({

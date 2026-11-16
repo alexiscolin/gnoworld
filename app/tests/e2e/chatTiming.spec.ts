@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { record, stop } from "./smoothness.ts";
 
-// The chat's timing against the camera (2026-11-11): per frame, whether the camera is flying and the dock's opacity and place, across a
+// The chat's timing against the camera: per frame, whether the camera is flying and the dock's opacity and place, across a
 // flight to a world's page. One JSON line a flow to `CHAT_OUT`: the chat must not show before the flight has ended.
 declare const process: { env: Record<string, string | undefined> };
 const OUT = process.env["CHAT_OUT"] ?? join(tmpdir(), "chatTiming.jsonl");

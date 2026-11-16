@@ -48,7 +48,7 @@ export const $isMentionNode = (node: LexicalNode | null | undefined): node is Me
 // What each editor's chips say of its members: names by address.
 const named = new WeakMap<LexicalEditor, ReadonlyMap<string, string>>();
 
-/** Tells the editor the members' names, which a chip made from now on says in place of the short address. */
+/** Tells the editor the members' names, which a chip made afterwards says in place of the short address. */
 export function setMentionNames(editor: LexicalEditor, names: ReadonlyMap<string, string>): void {
   named.set(editor, names);
 }

@@ -49,7 +49,7 @@ describe("a page opened full, hydrated from the file the build wrote", () => {
   });
 });
 
-// 5q's fix pass, review 1: the full chat lives in the address (?chat=full), and every link that changes the room keeps it.
+// The full chat lives in the address (?chat=full), and every link that changes the room keeps it.
 describe("the full chat in the address", () => {
   it("is asked for by ?chat=full alone", () => {
     expect(asksFull(new URLSearchParams("chat=full"))).toBe(true);

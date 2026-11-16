@@ -9,7 +9,7 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, "localStorage");
 });
 
-// 4f-n: an account's notification modes live in the page's localStorage, as its direct-message choices do.
+// An account's notification modes live in the page's localStorage, as its direct-message choices do.
 describe("the page's notification modes", () => {
   it("keeps an account's modes in the page's localStorage, under its key", () => {
     const kept = new Map<string, string>();

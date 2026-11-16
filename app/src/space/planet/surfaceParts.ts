@@ -1,5 +1,5 @@
 // What both surface programs declare and call, apart from their main(): the Earth's (real maps as they are) and every other world's
-// (generated, generatedShader.ts). The light is one, word for word on both: Alexis approved it on the Earth (21b00fc8).
+// (generated, generatedShader.ts). The light is one, word for word on both.
 
 /** The ground turned about the pole by `angle`: a world's surface and what lies on its ground turn alike. */
 export const TURNED = /* glsl */ `vec3 turned(vec3 v, float angle) {
@@ -82,7 +82,7 @@ float ringShade() {
 }
 `;
 
-// The light Alexis approved: the day fading into the night over a wide arc, softened towards the terminator, more with air; no colour of
+// The shared light: the day fading into the night over a wide arc, softened towards the terminator, more with air; no colour of
 // the star's own; the sea's glint; clouds and their shadows; air lifting the day side's edge into its colour, or a thin edge of sunlight
 // where there is none; and a night with air keeping a deep blue and the ground's faint form.
 export const SHADE = /* glsl */ `

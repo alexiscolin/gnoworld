@@ -1,7 +1,7 @@
 // The header: the logo at the left; in the middle where one is, Galaxy, System and World, each named by the place it leads to, that world's
-// chat, and beside them how one looks at it, Space or Map (D424, D444, shellWays.tsx); at the right the network ("Testnet" when it is one), the search,
-// the bell (8c's slot) and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
-// the page written at /, which must hydrate as the path's own (F4692). The bars stay over the full chat, which they open and close.
+// chat, and beside them how one looks at it, Space or Map (shellWays.tsx); at the right the network ("Testnet" when it is one), the search,
+// the bell and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
+// the page written at /, which must hydrate as the path's own. The bars stay over the full chat, which they open and close.
 import { Cluster, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
@@ -32,8 +32,8 @@ function Account({ universe }: { universe: UniverseView }) {
   );
 }
 
-// A level: its mark, colourless (stars, a sun, a planet), its word and the name of the place it leads to, in a pill of its own (D444);
-// in the full chat the name folds into the word, the bar steady as rooms and worlds change (D503). One past the level in view is a place
+// A level: its mark, colourless (stars, a sun, a planet), its word and the name of the place it leads to, in a pill of its own;
+// in the full chat the name folds into the word, the bar steady as rooms and worlds change. One past the level in view is a place
 // this tab saw, not one that holds it: dimmed, its mark hollow.
 function LevelLink({
   level,
@@ -80,7 +80,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
   const full = asksFull(new URLSearchParams(search));
   const current = full ? undefined : site.viewAt(universe, pathname);
   const woken = useWoken();
-  // The session known, the account's pill or the way in names the network (D330, D340): the header's own row waits for it alone.
+  // The session known, the account's pill or the way in names the network: the header's own row waits for it alone.
   const pilled = useApp(({ login }) => login.session.kind !== "unknown");
   const barRef = useRef<HTMLElement>(null);
   useViewsIndicator(barRef, full ? "chat" : current, woken);
@@ -97,7 +97,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
           <span className={styles["fill"]} aria-hidden="true" />
           {levels.map((level, index) => (
             // Drawn anew once the page wakes: a path served the page written at / hydrates the light that page holds, as hydration
-            // patches no attribute (react-dom 19.3.1), and a new link takes the path's own (F4880).
+            // patches no attribute (react-dom 19.3.1), and a new link takes the path's own.
             <Fragment key={`${level.view}:${String(woken)}`}>
               {index === 0 ? null : <span className={styles["chevron"]} aria-hidden="true" />}
               <LevelLink level={level} current={current} beyond={at !== -1 && index > at} bare={full} />
@@ -108,7 +108,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
           <span className={`${styles["divider"] ?? ""} ${styles["phoneSearch"] ?? ""}`} aria-hidden="true" />
           <SearchButton className={`round-controls ${styles["phoneSearch"] ?? ""}`} emphasis="plain" />
         </nav>
-        {/* Drawn anew once the page wakes, as the levels are (F4880). */}
+        {/* Drawn anew once the page wakes, as the levels are. */}
         <Ways key={String(woken)} world={current === "world"} />
       </div>
       <SearchPalette universe={universe} />

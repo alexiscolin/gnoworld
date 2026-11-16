@@ -1,4 +1,4 @@
-// The browser's client of the first signals (server/src/signals/routes.ts, mounted at /api/signals; slice 9h), through the
+// The browser's client of the first signals (server/src/signals/routes.ts, mounted at /api/signals), through the
 // one JSON call of lib/api/http.ts: POST to chart a world; who is first comes on the stream. The answer must name the world asked.
 import { ChartAnswer, ChartRequest } from "@gnoworld/schemas";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";

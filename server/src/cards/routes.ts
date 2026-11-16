@@ -1,6 +1,7 @@
-// The link cards' routes (docs/plans/link-previews.md §3 steps 5 and 6; §4 "Removal abuse"): GET /api/cards for the cards of lines older than
-// the stream's replay, GET /api/cards/<key> and its /picture for a card's content, POST /api/cards/remove. None of the GETs fetches: the
-// routes hold no reader at all. The right to remove is the line's author, or whoever may pin in its room, as the pins' route has it.
+// The link cards' routes: GET /api/cards for the cards of lines older than the stream's replay,
+// GET /api/cards/<key> and its /picture for a card's content, POST /api/cards/remove. None of the
+// GETs fetches: the routes hold no reader at all. The right to remove is the line's author, or
+// whoever may pin in its room, as the pins' route has it.
 import { createHash } from "node:crypto";
 import { CardRemove, RoomId, VerdictId, VERDICTS_ASKED, type Address, type LinkCard } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";

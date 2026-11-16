@@ -1,6 +1,6 @@
-// The cap on what a room is told (slice 9g): 4 events a second a room at most, in any window of a second, the first four kept
+// The cap on what a room is told: 4 events a second a room at most, in any window of a second, the first four kept
 // (a refused event leaves a gap the heights show: the chain is the truth, never a queue to grow), and one of an actor, so an
-// account at the head of each block cannot fill a room alone (F5792).
+// account at the head of each block cannot fill a room alone.
 const PER_SECOND = 4;
 const WINDOW_MS = 1000;
 const ROOMS = 10_000;

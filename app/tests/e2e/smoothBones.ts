@@ -1,7 +1,7 @@
 import { installFramePump } from "./earthStage.ts";
 import type { Page } from "./fixtures.ts";
 
-// The skeletons' orientation, frame by frame (2026-11-11): each skeleton showing, where it stands, its gain and its world turn beside the
+// The skeletons' orientation, frame by frame: each skeleton showing, where it stands, its gain and its world turn beside the
 // turn of the drawn planet at that place, and which planets stand as themselves. `bonesTurns` reads it: the angle each skeleton turns
 // between two frames, against the planet's own.
 export type Quat = [number, number, number, number];

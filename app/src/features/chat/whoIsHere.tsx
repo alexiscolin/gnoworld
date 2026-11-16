@@ -1,5 +1,5 @@
-// Who is here in an account's chat (moved out of Loaded.tsx): each a button to write to them, which opens the conversation and
-// gives its composer the focus (U12), with the country each declared.
+// Who is here in an account's chat: each a button to write to them, which opens the conversation and
+// gives its composer the focus, with the country each declared.
 import type { Line } from "@gnoworld/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
@@ -7,8 +7,8 @@ import { asksFull } from "./full.ts";
 import { dmParams } from "./names.ts";
 import { People } from "./People.tsx";
 
-// The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
-// in view, `partner` the one in view, never again once the reader left it (CR6).
+// The conversation opened from who is here, whose composer takes the focus as its button goes: asked while it is
+// in view, `partner` the one in view, never again once the reader left it.
 export function useOpened(partner: string | undefined) {
   const [opened, setOpened] = useState<{ partner: string; seen: boolean }>();
   if (opened?.seen === false && partner === opened.partner) setOpened({ ...opened, seen: true });

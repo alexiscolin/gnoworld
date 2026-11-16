@@ -1,7 +1,7 @@
-// The ambient rocks of a system's dynamic view (part 7p for the home, 7v for a system; Alexis, 2026-11-03, "roches d'ambiance"): a few rocks
+// The ambient rocks of a system's dynamic view: a few rocks
 // in front of everything, decor as the field of stars is, not worlds: no name, no click, nothing that claims data. They stand in space from
 // the view's own seed, so the same view sees the same rocks, the nearer larger; never over a body or the
-// room of its label. The home's Earth view has none (Alexis, 2026-11-04, "Le retirer").
+// room of its label. The home's Earth view has none.
 import { PLACE } from "../lod/place.ts";
 import type { Point } from "../space/cell.ts";
 import { Draws } from "../station/draws.ts";
@@ -10,7 +10,7 @@ import type { Lent } from "./lent.ts";
 import { STAR_HEART, type Look, type Seen } from "./restLook.ts";
 
 // One near, 4 to 6 units ahead, 30 to 60 pixels in radius on the video's screen, its centre 0.2 to 0.95 of that inside the frame's left or
-// bottom edge, so the frame cuts some of it, the ticker's band no more (the design review of 7p, after the references). Then pebbles, a
+// bottom edge, so the frame cuts some of it, the ticker's band no more. Then pebbles, a
 // cluster round one place 8 to 16 units ahead (frame 4's debris): 3 to 12 pixels there, the nearer larger, within 100 of it.
 const MOST = 7;
 const TRIES = 60;
@@ -54,7 +54,7 @@ interface Seeing {
 }
 
 // The rocks of a view whose eye is `view`'s, read through `judge`, from the view's own seed, on the map, their depths `scale` of the home's
-// once were, so they stand in front of its nearer worlds.
+// own, so they stand in front of its nearer worlds.
 function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): Laid[] {
   const { looks, balls, focal, spots } = judge;
   const [first] = looks;
@@ -106,7 +106,7 @@ function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): L
   return rocks;
 }
 
-/** The rocks of a system's dynamic view (7v; Alexis, 2026-11-03, "the ambient rocks" among its depth cues), from its own seed as the home's:
+/** The rocks of a system's dynamic view, from its own seed as the home's:
  * off each world it draws and its label's room, and off its own star's heart, which stands as one more room at the screen's centre. */
 export function rocksAt(arrival: Arrival, lent: Lent): Laid[] {
   const { cameraTowards, drawnOf, focalOf, looksFrom, placeOf } = lent;

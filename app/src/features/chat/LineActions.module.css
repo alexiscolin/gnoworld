@@ -1,15 +1,14 @@
-/* A line's bar (4c's message menu): over the line's end, astride its top edge as the prototype's and Slack's are, so the pointer
-   crosses into it inside the row and the newest line's bar stays inside the list; a floating surface's look, at every width, so no line moves as it comes. One compact row of 24 px icons, as Slack's
-   (D376). */
+/* A line's bar: over the line's end, astride its top edge as the prototype's and Slack's are, so the pointer
+   crosses into it inside the row and the newest line's bar stays inside the list; a floating surface's look, at every width, so no line moves as it comes. One compact row of 24 px icons, as Slack's. */
 @layer components {
   .bar {
     position: absolute;
     /* astride the row's top edge, as Slack's: half over the row, so the pointer reaches it without leaving the row */
     inset-block-start: calc(-1 * var(--space-s));
-    /* layout: at the row's far end, as Slack's, over the line's time (Alexis, 2026-11-07: "tout à droite comme sur slack") */
+    /* layout: at the row's far end, as Slack's, over the line's time */
     inset-inline-end: var(--space-s);
     border: var(--line-width) solid var(--color-line-strong);
-    /* room for More's focus ring inside the frame, which it would paint over (U16) */
+    /* room for More's focus ring inside the frame, which it would paint over */
     padding: var(--space-3xs);
     border-radius: var(--radius-m);
     background: var(--color-surface);
@@ -34,7 +33,7 @@
     line-height: 1;
   }
 
-  /* Its line at the top of the list that scrolls: inside the line, never past the list's edge (U10). */
+  /* Its line at the top of the list that scrolls: inside the line, never past the list's edge. */
   .bar[data-inside] {
     inset-block-start: var(--space-3xs);
   }

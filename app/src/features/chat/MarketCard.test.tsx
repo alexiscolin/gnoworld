@@ -5,7 +5,7 @@ import type { MarketsRead } from "../../lib/api/markets.ts";
 import { markup } from "../../../tests/mount.tsx";
 import { MarketCardView } from "./MarketCard.tsx";
 
-// The market card (restored from the home's prices row, its tests made to pass): the tokens in the video's order with their price, 24 hour
+// The market card: the tokens in the video's order with their price, 24 hour
 // change and day's chart; a token with no price is left out; a file missing or unreadable is a state in words, never a gap or a number.
 const NOW = new Date("2026-10-31T06:07:00.000Z");
 const file = (overrides: Partial<Markets> = {}): MarketsRead => ({

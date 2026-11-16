@@ -1,7 +1,7 @@
 // The services' folders (docs/ARCHITECTURE.md, "Which way dependencies point"): the server, Jarvis and what they share
 // (packages/service) import core, schemas, Node and their own dependencies, never the browser's code nor each other
-// (decision-isolation.md, D110): a wall holds tests too. fetch only in packages/service's net.ts, whose helper sets the
-// timeout; console nowhere, the logger writes. The network's real boundary is the egress proxy (slice 3e), not this list.
+// (decision-isolation.md): a wall holds tests too. fetch only in packages/service's net.ts, whose helper sets the
+// timeout; console nowhere, the logger writes. The network's real boundary is the egress proxy, not this list.
 // A part of the lint config, which eslint.config.ts composes.
 import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
@@ -16,8 +16,8 @@ const LINK_READER =
 const SERVICE =
   "The service package imports core, schemas, Node and its dependencies, never the server, Jarvis, the app or the chain package (D111).";
 const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "link-reader/**/*.ts", "packages/service/**/*.ts"];
-// By name, so the ban holds wherever node_modules sits (F385): the browser's code, the workspaces a folder never imports, and
-// a require made by hand, which crosses the zones unread (D123, F5278).
+// By name, so the ban holds wherever node_modules sits: the browser's code, the workspaces a folder never imports, and
+// a require made by hand, which crosses the zones unread.
 const banned = (workspaces: string, message: string): Linter.RuleEntry => [
   "error",
   {

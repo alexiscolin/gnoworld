@@ -1,4 +1,4 @@
-// What a realm can do, from its imports alone (D567: no gnoscope): a token, an NFT, a vote. Absent when its imports say none.
+// What a realm can do, from its imports alone: a token, an NFT, a vote. Absent when its imports say none.
 export interface Capability {
   label: string;
   /** What says it, in the realm's own imports. */

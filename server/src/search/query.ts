@@ -1,6 +1,5 @@
-// What a reader's search asks of the index (slice 13, B2): the words as quoted FTS5 terms, never the typed text as syntax (B1
-// security, for B2: 2); the rooms and the match bound, never concatenated; `line_edits` never read; pages by (time, row), a bounded
-// count. The work is bounded by the asked rooms' lines: the rooms come first, the match is asked of those rows alone (F13756).
+// What a reader's search asks of the index: the words as quoted FTS5 terms, never the typed text as syntax); the rooms and the match bound, never concatenated; `line_edits` never read; pages by (time, row), a bounded
+// count. The work is bounded by the asked rooms' lines: the rooms come first, the match is asked of those rows alone.
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { z } from "zod";
 import { worldOf } from "../rooms/rooms.ts";
@@ -29,9 +28,9 @@ export interface Found {
 /** The most words a query holds, and the most lines it counts. */
 const WORDS_MOST = 8;
 const TOTAL_MOST = 1000;
-/** The newest matches the filters and the order run over (F13770). */
+/** The newest matches the filters and the order run over. */
 const MATCHES_MOST = 5000;
-/** A word of fewer characters is exact: a prefix of one letter would walk the whole index (F13770). */
+/** A word of fewer characters is exact: a prefix of one letter would walk the whole index. */
 const PREFIX_FROM = 3;
 export const prefixed = (word: string): boolean => Array.from(word).length >= PREFIX_FROM;
 

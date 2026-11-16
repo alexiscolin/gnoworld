@@ -1,4 +1,4 @@
-// What a recipe's surface makes the program draw, one rule for the program and for the maps the cosmos asks (F4586): a small module, so
+// What a recipe's surface makes the program draw, one rule for the program and for the maps the cosmos asks: a small module, so
 // the cosmos's chunk carries it without the recipe.
 import type { Surface } from "./surface.ts";
 

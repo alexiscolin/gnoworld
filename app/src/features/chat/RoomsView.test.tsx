@@ -33,7 +33,7 @@ describe("RoomsView", () => {
   it("lists the rooms by section, in the server's order, under a navigation named Rooms", () => {
     const html = view();
     expect(html).toMatch(/^<nav[^>]*aria-label="Rooms"/);
-    // 4e's UX review (U16): an account's navigation holds its direct messages too, and says so.
+    // An account's navigation holds its direct messages too, and says so.
     expect(
       view({
         dms: { world: "bubble", partners: [], current: undefined },
@@ -44,7 +44,7 @@ describe("RoomsView", () => {
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
   });
 
-  // G9 (F1510): the navigation takes the focus by code alone (the list's Clear), never into the tab order.
+  // The navigation takes the focus by code alone (the list's Clear), never into the tab order.
   it("is reached by code and not by the tab key: tabindex -1", () => {
     expect(view()).toMatch(/^<nav[^>]*tabindex="-1"/);
   });
@@ -88,8 +88,8 @@ describe("RoomsView", () => {
     expect(said(view({ sections }))).toBe("Search rooms No room here yet.");
   });
 
-  // /code-review on 4e (CR8): with the rooms failed and a direct message in view, the navigation said "No room here
-  // yet." beside "The rooms could not load.".
+  // With the rooms failed and a direct message in view, the navigation says "The rooms could not load." and not also
+  // "No room here yet.".
   it("says the rooms' failure in their place, never that there is no room", () => {
     const html = view({ sections: [], failed: <p role="alert">The rooms could not load.</p> });
     expect(said(html)).toBe("Search rooms The rooms could not load.");
@@ -108,7 +108,7 @@ describe("RoomsView", () => {
   });
 });
 
-// 4e: an account's direct messages, under the rooms: each conversation a link to its page, the one shown marked.
+// An account's direct messages, under the rooms: each conversation a link to its page, the one shown marked.
 describe("RoomsView: direct messages", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
@@ -123,7 +123,7 @@ describe("RoomsView: direct messages", () => {
     // A conversation in view: no room is.
     const html = view({ current: undefined, dms: dms({ current: CAROL }) });
     expect(headings(html)).toEqual(["Talk", "Rooms", "Direct messages"]);
-    // 4e's UX review (U6), 5q: the rows are the partner's nebula and short address; that they are not encrypted is said once,
+    // The rows are the partner's nebula and short address; that they are not encrypted is said once,
     // in the small grey note under the list, as the video's note is.
     expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
     expect(html.match(/data-kind="person"/g)).toHaveLength(2);
@@ -133,7 +133,7 @@ describe("RoomsView: direct messages", () => {
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
   });
 
-  // Review 8 of 5q: both words sat behind the room menu's chevron, where nobody reads them before writing.
+  // Both words stand under the list, not behind the room menu's chevron, where nobody reads them before writing.
   it("says in view that these lines are kept only while the page is open, beside that they are not encrypted", () => {
     expect(said(view({ current: undefined, dms: dms() }))).toContain(
       "Not encrypted: the server can read these. Kept only while this page is open.",
@@ -141,7 +141,7 @@ describe("RoomsView: direct messages", () => {
   });
 
   it("says when there is none yet, and has no section for a guest", () => {
-    // 4e's UX review (U4): the empty list says how to start one.
+    // The empty list says how to start one.
     expect(said(view({ dms: dms({ partners: [] }) })).replaceAll("&#x27;", "'")).toContain(
       "No direct messages yet Pick someone in Who's here to start one.",
     );
@@ -149,7 +149,7 @@ describe("RoomsView: direct messages", () => {
   });
 });
 
-// 4f-n: what the account has not seen, on each row, and what it was told in a list of its own.
+// What the account has not seen, on each row, and what it was told in a list of its own.
 describe("RoomsView: notifications", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const BOB = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
@@ -215,7 +215,7 @@ describe("RoomsView: notifications", () => {
           list: [note("mention", "#bubble/games"), note("group", "#bubble/news", BOB)],
         }),
       });
-      // The notice's row is the room's link's last: the list comes after the rooms (U4).
+      // The notice's row is the room's link's last: the list comes after the rooms.
       expect(rowAt(html, "/w/bubble?room=games", true)).toContain("g10gh7…3y5tv mentioned you #games");
       expect(rowAt(html, "/w/bubble?room=news", true)).toContain("g1f6dc…fsksl mentioned the room #news");
     });
@@ -255,7 +255,7 @@ describe("RoomsView: notifications", () => {
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
     });
 
-    // U4: a first notice came in above the rooms and pushed every row down; it comes in after them.
+    // A first notice comes in after the rooms, so it pushes no row down.
     it("puts the list after the rooms and the direct messages, so a notice moves no row", () => {
       const html = view({ dms, notices: notices({ list: [note("mention", "#bubble")] }) });
       expect(headings(html)).toEqual(["Talk", "Rooms", "Direct messages", "Notifications"]);
@@ -297,7 +297,7 @@ describe("RoomsView: notifications", () => {
   });
 });
 
-// G11 (F1511): what a screen reader is told of a notice: who did what, and where; a conversation has no "in".
+// What a screen reader is told of a notice: who did what, and where; a conversation has no "in".
 describe("noticeSaid", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const at = (kind: "mention" | "group" | "reply" | "dm", by: string, where: string) => ({

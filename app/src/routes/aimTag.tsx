@@ -1,4 +1,4 @@
-// The home's first screen's aiming tag (D459, D540): a name pill of the world labels' family, a step larger, on a fine leader to a ring on the
+// The home's first screen's aiming tag: a name pill of the world labels' family, a step larger, on a fine leader to a ring on the
 // Earth's lit limb: "Earth" and one live fact the hero already reads, left out while unknown. It links to the Earth, named by its words.
 import { Cluster, grouped, Icon } from "@gnoworld/ui";
 import { Link } from "react-router";

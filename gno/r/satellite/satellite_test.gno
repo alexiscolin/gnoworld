@@ -26,12 +26,12 @@ var (
 const (
 	t0     = 1800000000 // 2027-01-15 08:00:00 UTC, when every test starts
 	oneDay = 86400
-	p0     = 2000000 // ugnot a day at deploy (D3)
+	p0     = 2000000 // ugnot a day at deploy
 )
 
 // fresh puts the realm as a deploy by adm leaves it, with renting opened and
 // mod named operator, at t0. Every test starts with it, so none depends on
-// another's state (F061). It sets no caller: testing.SetRealm only holds in
+// another's state. It sets no caller: testing.SetRealm only holds in
 // the test function that calls it.
 func fresh() {
 	rentals, payers = avl.Tree{}, avl.Tree{}
@@ -112,10 +112,10 @@ func TestRentFromCodeRefused(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, rentals.Size())
 }
 
-// F5056: a rent is the message's own call, as unsafe.OriginSend's doc asks beside
+// A rent is the message's own call, as unsafe.OriginSend's doc asks beside
 // IsUserCall. A realm holding `var Rent = satellite.Rent` gets the coins of a call
-// to it, while IsUserCall still holds in Rent; the keeper refuses that message
-// today, as no code of the paid realm read them, a check its own comment calls no
+// to it, while IsUserCall still holds in Rent; the keeper refuses that message,
+// as no code of the paid realm read them, a check its own comment calls no
 // access-control boundary. Here a wallet's call reaches Rent through a closure.
 func TestRentNotTheMessagesOwnCallRefused(cur realm, t *testing.T) {
 	fresh()
@@ -194,7 +194,7 @@ func TestRentTextIsOneToFortyCodePointsWithNoControl(cur realm, t *testing.T) {
 	}
 }
 
-// F5040: no text steers or hides what it shows. Render's sanitizer strips bidi and
+// No text steers or hides what it shows. Render's sanitizer strips bidi and
 // zero-width characters only in part, and the Rent event carries the text raw.
 // Refused: control, format (bidi marks, zero-width, word joiner, soft hyphen,
 // tags), line and paragraph separators, other default-ignorable code points
@@ -219,8 +219,8 @@ func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	uassert.Equal(t, heart, got)
 }
 
-// F5041: a satellite shows something: spaces, marks and the Braille blank alone
-// are no text (a lone variation selector, U+180B or U+2800 passed).
+// A satellite shows something: spaces, marks and the Braille blank alone
+// are no text (a lone variation selector, U+180B and U+2800 included).
 func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -238,7 +238,7 @@ func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	uassert.Equal(t, " a ", got)
 }
 
-// D5: three live satellites per address; an ended one no longer counts, and
+// Three live satellites per address; an ended one no longer counts, and
 // the next rent closes it.
 func TestRentFourthLiveSatelliteRefused(cur realm, t *testing.T) {
 	fresh()
@@ -333,7 +333,7 @@ func TestRentalEndsAfterItsDays(cur realm, t *testing.T) {
 	uassert.False(t, ok)
 }
 
-// Anyone closes an ended rental; storage then holds nothing of it (D2).
+// Anyone closes an ended rental; storage then holds nothing of it.
 func TestCloseFreesAnEndedRental(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -428,7 +428,7 @@ func TestTakedownByOwnerOrOperatorOnly(cur realm, t *testing.T) {
 	uassert.Equal(t, p0, held) // the second rental's day begun: the first was closed by it
 }
 
-// F5042: a takedown ends the rental now, kept for its days begun, rather than
+// A takedown ends the rental now, kept for its days begun, rather than
 // deleting it: gno refunds a storage deposit to whoever frees the bytes, so the
 // one taking it down would earn the payer's. Whoever closes it gets the deposit,
 // as for any rental that ended: anyone, or the payer's own next rent.
@@ -463,8 +463,8 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, "jupiter", payers.Get(alice.String()))
 }
 
-// F5312 (G1, Alexis): a taken-down world stays empty until the end it was paid
-// for, its payer included, who could else put the text taken down back at once.
+// A taken-down world stays empty until the end it was paid for, its payer
+// included, who could else put the text taken down back at once.
 func TestTakedownKeepsTheWorldEmptyFromItsPayerToo(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -485,7 +485,7 @@ func TestTakedownKeepsTheWorldEmptyFromItsPayerToo(cur realm, t *testing.T) {
 	uassert.Equal(t, "again", text)
 }
 
-// F5057: until the end it was paid for, a taken-down rental is closed by its
+// Until the end it was paid for, a taken-down rental is closed by its
 // payer only, who so gets its storage deposit back: the one taking it down, like
 // anyone else, waits for that end, as for any rental.
 func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
@@ -519,7 +519,7 @@ func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, rentals.Size())
 }
 
-// D12: the whole days not yet begun come back to the payer at once; the day
+// The whole days not yet begun come back to the payer at once; the day
 // under way counts as begun from its first second.
 func TestTakedownRefundsTheWholeDaysNotBegun(cur realm, t *testing.T) {
 	for _, c := range []struct{ days, after, refund int }{

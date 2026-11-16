@@ -42,14 +42,14 @@ export interface Recipe {
 /** A world of continents' bare ground, the Earth's own off its day map, cold to hot: Patagonia's cold steppe, the outback's ochre, the
  * Sahara's sand; the Gobi, the outback's west, the Sahara's east. */
 export const BARE: readonly [Ramp, Ramp] = [ramp(0x72624f, 0x927461, 0xe8d2b8), ramp(0x9f8b75, 0x96765f, 0xdfc5aa)];
-/** A temperate world's other plants by its star's warmth, red to white (Alexis, 2026-11-03, "surtout naturel"): near black under a
+/** A temperate world's other plants by its star's warmth, red to white: near black under a
  * dim red star, purple, then rust; each no more saturated than the Earth's own greens (Lab chroma 25), its lightness theirs or under. */
 const OTHER_PLANTS: readonly (readonly [Ramp, Ramp])[] = [
   [ramp(0x131311, 0x22211d, 0x3e3b33), ramp(0x151312, 0x26221f, 0x443d36)],
   [ramp(0x2e2634, 0x56475d, 0x796c7c), ramp(0x28232c, 0x4c4452, 0x756d79)],
   [ramp(0x3e2a1e, 0x765040, 0x93745e), ramp(0x3a2a1e, 0x70503a, 0x957a62)],
 ];
-/** About one temperate world in four grows other plants (Alexis, 2026-11-03): its second hash's byte 31, the last free one. */
+/** About one temperate world in four grows other plants: its second hash's byte 31, the last free one. */
 const OTHER_SHARE = 0.25;
 const OTHER_BYTE = 31;
 const MAX_MINOR = 0.4;
@@ -107,7 +107,7 @@ const BLUE = [
   [0.6691, -0.7431],
 ] as const;
 
-// A minor brings a colour of gas or rock (Alexis, 2026-11-03, "les retirer"): its dominant's kind, no sea world's, no green past a grey,
+// A minor brings a colour of gas or rock: its dominant's kind, no sea world's, no green past a grey,
 // no saturated blue under a world not blue itself; under a sea world or a dark giant (whose minor the program matches in light at 0.6
 // only), each ramp within 25 of its dominant's lightness, or it reads as ice taken for cloud, a black pit, or a pock.
 function fitsUnder(dominant: Anchor): (minor: Anchor) => boolean {
@@ -125,7 +125,7 @@ function fitsUnder(dominant: Anchor): (minor: Anchor) => boolean {
     ROWS[minor].palettes.every(([, centre], ramp) => fits(labOf(centre), ramp));
 }
 
-// A world's sea turns by its system's hue as its palettes do (Alexis, 2026-11-03, "bleu-vert variant").
+// A world's sea turns by its system's hue as its palettes do.
 function seaOf(anchor: Anchor, turn: Turn): Recipe["sea"] {
   const sea = ROWS[anchor].sea;
   if (sea === undefined) return null;

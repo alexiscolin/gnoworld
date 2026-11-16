@@ -22,7 +22,7 @@ From D13170 (no backlog row: the decision is the row), with D13169, D13171, D131
 
 ## 2. Out of scope
 The automatic deploy and previews (D13172, the part after this one); any product feature or change of behaviour; git's history
-(D13169: never rewritten); `docs/prototype/` (the frozen reference); `docs/plans/` and the registers (history, kept as written).
+(D13169 leaves it alone for the Adena file only: the file goes from the code, not from the history; the history is rewritten once, just before the repository opens, `docs/decisions.md`, 2026-10-17); `docs/prototype/` (the frozen reference); `docs/plans/` and the registers (history, kept as written).
 
 ## 3. Threat model
 - **A deletion that switches off a guard nobody tests:** the double check, the whole gate, `harness_mutate` and probe.py on every

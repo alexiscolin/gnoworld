@@ -1,4 +1,4 @@
-/* A phone cannot log in (U6): a coarse pointer gets the words, a computer the button; once logged in, a phone writes. */
+/* A phone cannot log in: a coarse pointer gets the words, a computer the button; once logged in, a phone writes. */
 @layer components {
   .phone {
     display: none;

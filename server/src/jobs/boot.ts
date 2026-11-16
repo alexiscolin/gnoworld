@@ -24,14 +24,14 @@ type Universes = NonNullable<Config_["universes"]>;
 const withUniverse = <T>(universes: Config_["universes"], make: (universe: Universes) => T): T | undefined =>
   universes === undefined ? undefined : make(universes);
 
-// CoinGecko's prices every five minutes into the file MARKETS_FILE names (5l); without it, no timer. With UNIVERSES_FILE the
+// CoinGecko's prices every five minutes into the file MARKETS_FILE names; without it, no timer. With UNIVERSES_FILE the
 // same read takes the default universe's block height from its RPC, so a visitor's browser asks no chain.
 const bootPrices = ({ markets, universes }: Config_, log: Boot["log"]) =>
   markets === undefined
     ? undefined
     : startPrices({ file: markets, log, ...(universes === undefined ? {} : { universe: defaultUniverse(universes) }) });
 
-// The worlds job (7c, every half hour, WORLDS_FILE) and the previews job (8f, every six hours, PREVIEWS_FILE, each page read by the
+// The worlds job (every half hour, WORLDS_FILE) and the previews job (every six hours, PREVIEWS_FILE, each page read by the
 // moderation check) read the default universe alone: with no chain, or for previews no check, the server stops rather than run.
 function refuseWithout({ worlds, previews, universes, moderation }: Config_): void {
   if ((worlds !== undefined || previews !== undefined) && universes === undefined)
@@ -64,7 +64,7 @@ export function bootJobs({ config, db, log }: Boot) {
             file,
             log,
             universe: defaultUniverse(all),
-            // Each realm's rollup (13a): its state in the database, its files in a folder beside the worlds' file, which nginx serves.
+            // Each realm's rollup: its state in the database, its files in a folder beside the worlds' file, which nginx serves.
             rollup: { db, dir: join(dirname(file), "rollups") },
             ...(tokens === undefined ? {} : { tokens }),
             trending: (made) => {

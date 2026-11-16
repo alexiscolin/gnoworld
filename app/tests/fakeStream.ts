@@ -1,8 +1,8 @@
-// The page's EventSource, stood in for a test that wants the real stream client behind it (slice 9g): each source the page opens is kept
+// The page's EventSource, stood in for a test that wants the real stream client behind it: each source the page opens is kept
 // with its url and its listeners, `emit` gives it a frame as the server would send it, and `close` is counted.
 import { vi } from "vitest";
 
-export class FakeSource {
+class FakeSource {
   static opened: FakeSource[] = [];
   closed = 0;
   readyState = 1;

@@ -5,14 +5,14 @@ import { SITE } from "./tests/e2e/sites.ts";
 // host serves it (tests/e2e/serve.mjs), with a real server and a real Ergo behind it.
 export default defineConfig({
   testDir: "tests/e2e",
-  // The journeys alone: crowd.test.mjs is node:test's, and listed here it printed before the JSON check_regressions reads (F13189).
+  // The journeys alone: crowd.test.mjs is node:test's, and listed here it printed before the JSON check_regressions reads.
   testMatch: "**/*.spec.ts",
   forbidOnly: true,
   fullyParallel: true,
   use: {
     baseURL: SITE,
     // ponytail: in Claude Code's sandbox, one process, since the sandbox refuses Chromium's Mach
-    // port for its children; everywhere else, Chromium as it ships. 1b-2's benches run outside it.
+    // port for its children; everywhere else, Chromium as it ships. Benches run outside it.
     launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

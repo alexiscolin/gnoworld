@@ -1,4 +1,4 @@
-// The camera's rig (D401, docs/plans/dive.md): it alone moves the view. A flight or the reader's hand change its pose; the lens
+// The camera's rig: it alone moves the view. A flight or the reader's hand change its pose; the lens
 // shift slides a page's planet into the page's circle (sine.inOut 1.7 s in, 0.8 s out); it stands the camera at the eye.
 import { Vector3, type PerspectiveCamera } from "three";
 import { Flight, type Goal } from "./flight.ts";

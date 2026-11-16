@@ -1,4 +1,4 @@
-// The rollup's state (slice 13a) in the server's database, for one universe: per realm its calls, callers, days, functions and last calls,
+// The rollup's state in the server's database, for one universe: per realm its calls, callers, days, functions and last calls,
 // and the height every call is counted up to, so a pass reads only what is new and a restart resumes. Every list is bounded: 100 calls a
 // realm, the chain's newest 400 days; the callers and functions grow with the transactions alone, each of which paid its fee.
 import { ExportedName, PERSON_CAPS, ROLLUP_CAPS, type RealmRollup } from "@gnoworld/schemas/indexer";
@@ -103,7 +103,7 @@ function writers(db: DatabaseSync) {
       if (day === undefined) throw new Failure("shape");
       for (const each of row.calls) one(row, each, { day, time: dated.times.get(row.height) ?? null });
     },
-    keepCalls: db.prepare(
+    trimCalls: db.prepare(
       `DELETE FROM rollup_calls WHERE realm = ? AND id <= (SELECT id FROM rollup_calls WHERE realm = ? ORDER BY id DESC LIMIT 1 OFFSET ${String(ROLLUP_CAPS.last)})`,
     ),
     state: db.prepare(
@@ -122,7 +122,7 @@ function anchorOf(rows: readonly Row[], dated: Dated): { height: number; time: s
 }
 
 // The days kept: the newest 400 of the chain's, counted from `newest`, the newest day read (rows come in height order, so no stored day is later).
-function keepDays(db: DatabaseSync, newest: string): void {
+function pruneDays(db: DatabaseSync, newest: string): void {
   const cutoff = new Date(Date.parse(newest) - (ROLLUP_CAPS.days - 1) * DAY_MS).toISOString().slice(0, 10);
   for (const table of ["rollup_days", "rollup_day_callers"])
     db.prepare(`DELETE FROM ${table} WHERE day < ?`).run(cutoff);
@@ -179,16 +179,16 @@ export function rollupStore(db: DatabaseSync, universe: string): RollupStore {
   const height = (): number | undefined => heightIn(db, "rollup_state", universe);
   const write = writers(db);
   const add = (rows: readonly Row[], dated: Dated, through: number): void => {
-    const kept = height() ?? -1;
-    const fresh = rows.filter((row) => row.height > kept && row.calls.length > 0);
+    const counted = height() ?? -1;
+    const fresh = rows.filter((row) => row.height > counted && row.calls.length > 0);
     transaction(db, () => {
       for (const row of fresh) write.row(row, dated);
       for (const path of new Set(fresh.flatMap(({ calls }) => calls.map((call) => call.path))))
-        write.keepCalls.run(path, path);
+        write.trimCalls.run(path, path);
       const newest = [...dated.days.values()].sort().at(-1) ?? "";
-      if (newest > pruned) keepDays(db, (pruned = newest));
+      if (newest > pruned) pruneDays(db, (pruned = newest));
       const anchor = anchorOf(fresh, dated);
-      if (through > kept) write.state.run(universe, through, anchor?.height ?? null, anchor?.time ?? null);
+      if (through > counted) write.state.run(universe, through, anchor?.height ?? null, anchor?.time ?? null);
     });
   };
   return {

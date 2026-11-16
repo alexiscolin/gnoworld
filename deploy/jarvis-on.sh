@@ -1,5 +1,5 @@
 #!/bin/sh
-# deploy/jarvis-on.sh: switches Jarvis on (10u-g2, D13987), and only when the last evals result passes the gate
+# deploy/jarvis-on.sh: switches Jarvis on, and only when the last evals result passes the gate
 # (deploy/jarvis-evals-gate.py). It writes JARVIS=on in deploy/.env (or the file named as $1); never edit that line by hand.
 #   sh deploy/jarvis-on.sh
 # Exit: 0 switched on, 1 the gate refused (its reason is printed, the file untouched), 2 a tool is missing or fails.

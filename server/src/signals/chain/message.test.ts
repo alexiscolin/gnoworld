@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { call, deploy, NAMEREG, registration, rowOf } from "../../testing/chainRecorded.ts";
 import { readChainRow, type ChainContext } from "./message.ts";
 
-// Slice 9g: one transaction row of the indexer's answer (recorded as a frame, Onyx, 2026-11-05) becomes the room's events, from the recorded frames (Onyx, 2026-11-05). The
+// One transaction row of the indexer's answer, from frames recorded on Onyx, becomes the room's events. The
 // filter the server asks the indexer for lets other messages through (183 returned, 77 of them `UnexpectedMessage`), so each
 // message's realm and function are checked again here, and a call that failed is no vote.
 const ACCESS = "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access";
@@ -103,7 +103,7 @@ describe("a recorded call", () => {
     }
   });
 
-  // Red pass: not the actor, not the realm's path, not the height may carry what a stranger wrote to the room.
+  // Not the actor, not the realm's path, not the height may carry what a stranger wrote to the room.
   it.each([
     ["a caller that is markup", (tx: Record<string, unknown>) => (valueOf(tx)["caller"] = "<script>alert(1)</script>")],
     ["a caller of 10 KB", (tx: Record<string, unknown>) => (valueOf(tx)["caller"] = `g1${"a".repeat(10_000)}`)],

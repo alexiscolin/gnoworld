@@ -1,4 +1,4 @@
-// The messages a pick reads: the newest ones, each id once (docs/plans/slice-6.md §4).
+// The messages a pick reads: the newest ones, each id once.
 import { centreOf } from "./countries.ts";
 import type { BubbleMessage } from "./types.ts";
 

@@ -1,4 +1,4 @@
-// A line that is one gnoweb tag and nothing else (5h): `<gno-input name="a" type='text' />`, read once left to right, an
+// A line that is one gnoweb tag and nothing else: `<gno-input name="a" type='text' />`, read once left to right, an
 // attribute's value quoted either way or bare. Anything else about the line, an attribute twice, a quote never closed, a
 // word after the tag, is none: the page shows that line as text, so no attribute, however it is written, stays out of view.
 

@@ -17,7 +17,7 @@
     gap: var(--chat-item-gap);
   }
 
-  /* A pin and a saved line, each set apart on its own card (4d). */
+  /* A pin and a saved line, each set apart on its own card. */
   .card {
     border-radius: var(--radius-m);
     background: var(--color-fill);

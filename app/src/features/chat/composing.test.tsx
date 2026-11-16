@@ -11,8 +11,8 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
   return { ...real, foldEdits: vi.fn(real.foldEdits) };
 });
 
-// 4d-dm-bar: what the composer is told of the line it answers or corrects, in a direct message and in a room.
-// The reader's account, which wrote the lines but "theirs" (m2).
+// What the composer is told of the line it answers or corrects, in a direct message and in a room.
+// The reader's account, which wrote the lines but "theirs".
 const ME = "g1reader";
 const line = (id: string, text: string, account = ME): Line => ({
   id,
@@ -131,8 +131,8 @@ describe("useComposing", () => {
     expect(vi.mocked(foldEdits)).not.toHaveBeenCalled();
   });
 
-  // The complexity review of the room edit: the composer found its line by folding the whole conversation on each render
-  // while a reply or an edit was open, a second fold beside the list's own.
+  // The composer finds its line without folding the whole conversation on each render while a reply or an edit is open:
+  // that would be a second fold beside the list's own.
   it("folds no conversation either while a reply or an edit is open, a line coming in", () => {
     draw();
     act(() => now().view.onEdit?.("m1"));
@@ -196,7 +196,7 @@ describe("useComposing", () => {
     expect(now().writer.focus).toBeUndefined();
   });
 
-  // slice-4-room-edit (docs/decisions.md, 2026-10-28): a room's lines are corrected as a direct message's are.
+  // A room's lines are corrected as a direct message's are.
   const edit = (id: string) => {
     act(() => now().view.onEdit?.(id));
   };
@@ -228,7 +228,7 @@ describe("useComposing", () => {
     expect(now().writer.editing?.text).toBe("my words");
   });
 
-  // R6 (redpass-red): the menu offers Edit on the reader's own lines alone, and the composer holds the same line: an
+  // The menu offers Edit on the reader's own lines alone, and the composer holds the same line: an
   // edit asked for another's line, by a buggy caller, would send a correction Ergo's bot hides as not_their_edit, a
   // strike against its sender.
   it.each(["dm", "room"] as const)("opens no edit of a line that is not the reader's, in a %s", (kind) => {
@@ -249,8 +249,8 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
   });
 
-  // CR5 of the room edit: the menu held the kind rule alone; `onEdit` checked ownership only, so an action of the reader's,
-  // which a correction turns into a message nothing can turn back, opened an edit through any other caller.
+  // The menu's kind rule is not enough alone: `onEdit` checks it too, so an action of the reader's, which a correction
+  // turns into a message nothing can turn back, opens no edit through any other caller.
   it.each(["dm", "room"] as const)("opens no edit of the reader's own action or notice, in a %s", (kind) => {
     draw(kind, [
       { ...line("m3", "waves"), kind: "action" },
@@ -262,8 +262,8 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
   });
 
-  // CR3 of the room edit: the edit was derived from the lines, never cleared: a line that went (a bot's hide, a delete
-  // from another device) took the bar and the typed words with it without a word, and its return reopened the bar.
+  // The edit is cleared, not derived from the lines: a line that goes (a bot's hide, a delete from another device) takes
+  // the bar and the typed words with it only with a word said, and its return does not reopen the bar.
   it("closes an edit whose line went, says so, and does not reopen it when the line comes back", () => {
     draw("room");
     edit("m1");
@@ -312,8 +312,8 @@ describe("useComposing", () => {
     expect(now().writer.focus).toBeUndefined();
   });
 
-  // /code-review on 4d's DM bar (CR7): Reply asked during an edit was stored and hidden by the writer, then came back
-  // over the next composer, on a line the reader may have forgotten.
+  // A Reply asked during an edit is not stored and hidden by the writer to come back over the next composer, on a line
+  // the reader may have forgotten.
   it("ends an edit when a reply is asked, and sends the answer without the correction", () => {
     draw();
     act(() => now().view.onEdit?.("m1"));
@@ -332,8 +332,8 @@ describe("useComposing", () => {
     expect(now().writer.focus).toBeUndefined();
   });
 
-  // /code-review on 4d's DM bar (CR5): a line with `edits` set is an orphan correction, whose original left the window:
-  // a correction of it would name a line nothing folds into, and show as a new one.
+  // A line with `edits` set is an orphan correction, whose original left the window: a correction of it would name a
+  // line nothing folds into, and show as a new one.
   it("offers no edit of an orphan correction", () => {
     const orphan: Line = { ...line("m3", "a correction"), edits: "m9" };
     draw("dm", [...LINES, orphan]);
@@ -341,8 +341,8 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
   });
 
-  // /code-review on 4d's DM bar (CR6): the line's text is what compose sent after its one-slash escape; the box showed it
-  // as it is, where a changed "/x2" reads as an unknown command and an unchanged "/x" was a plain "/x".
+  // The line's text is what compose sent after its one-slash escape; the box must not show it as it is, where a changed
+  // "/x2" reads as an unknown command and an unchanged "/x" is a plain "/x".
   it("shows a line that starts with a slash as the box needs it, and sends it escaped again when changed", () => {
     draw("dm", [line("m1", "/x"), line("m2", "theirs")]);
     act(() => now().view.onEdit?.("m1"));
@@ -363,8 +363,8 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
   });
 
-  // /code-review on 4d's DM bar (CR2): a refused correction came back as a plain draft, and the next Send posted it as a
-  // new message beside the original; a refused reply lost its link to the line.
+  // A refused correction must not come back as a plain draft, which the next Send would post as a new message beside the
+  // original; a refused reply keeps its link to the line.
   it("takes a refused correction up again: its line edited, its box the draft put back, its refusal told", () => {
     draw();
     draw("dm", LINES, refusal(1, { edit: "m1" }));
@@ -410,8 +410,8 @@ describe("useComposing", () => {
     expect(now().writer.editing).toEqual({ text: "my words", asked: 1 });
   });
 
-  // The second red pass on the DM bar (R7): a refusal heard while another conversation was in view was dropped as its own
-  // came in view, and the next Send posted a new message. Decided: it is taken up as its conversation comes into view.
+  // A refusal heard while another conversation was in view is not dropped as its own comes in view, or the next Send would
+  // post a new message: it is taken up as its conversation comes into view.
   it("takes up a refusal heard while another conversation was in view, as its own comes into view", () => {
     drawWith("a");
     drawWith("b", refusal(1, { edit: "m1" }));

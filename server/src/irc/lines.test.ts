@@ -8,7 +8,7 @@ describe("the link's own lines (3j's green pass)", () => {
   const word = fc.oneof(
     fc.constantFrom(
       ...["#bubble", "#a,#b", "+b", "-b", "+o+b", "+o", "m:g1a", "x:m:g1a", "m:*", "g1a", "", " ", "a b"],
-      // 3l's and 3m's forms: the flags, invites, voices, powers and a KICK's reason.
+      // The forms: the flags, invites, voices, powers and a KICK's reason.
       ...["+M", "-m", "+i", "-R", "+I", "-I", "+v", "-o", "-q", "*!*@*", "gnoworld", "not on this list"],
     ),
     fc.string({ unit: "binary", maxLength: 30 }),

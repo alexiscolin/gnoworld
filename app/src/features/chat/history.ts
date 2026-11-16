@@ -1,7 +1,6 @@
-// A room's history read past its other items (slice 4's 4d, R1; the code review's CR1): Ergo counts a stored reaction,
-// and a JOIN, PART or QUIT, as a history item, so a page may hold few lines or none; while a full page leaves the
-// room's window short of lines, the link asks for the items before the page's oldest, as long as Ergo's ring of the
-// room holds more, a room and a connection (docs/decisions.md, 2026-10-26).
+// A room's history read past its other items: Ergo counts a stored reaction, and a JOIN, PART or QUIT, as a history item,
+// so a page may hold few lines or none; while a full page leaves the room's window short of lines, the link asks for the
+// items before the page's oldest, as long as Ergo's ring of the room holds more, a room and a connection.
 import type { IrcMessage } from "@gnoworld/core";
 import { LINES_KEPT } from "../../store/chat.ts";
 

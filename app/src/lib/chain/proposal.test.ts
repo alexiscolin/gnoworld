@@ -6,7 +6,7 @@ import type { ChainFetch, ReadOptions } from "@gnoworld/chain/read";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
 import { proposalsOf, readProposals, votesOf } from "./proposal.ts";
 
-// 5k2, a GovDAO home page to its proposals, against pages RECORDED through gnomcp (F2951): app/tests/chain/recorded/, each file's first
+// A GovDAO home page to its proposals, against pages RECORDED through gnomcp: app/tests/chain/recorded/, each file's first
 // line naming its chain, height and date. What the real pages state is read; what they do not state (a threshold) stays absent.
 // The synthetic pages below only build a proposer's attack from a recorded page's own pieces.
 const RPC = "https://rpc.onyx.testnets.gno.land:443";
@@ -28,7 +28,7 @@ const askedOf = (url: string): string =>
     Uint8Array.from(/data=0x([0-9a-f]+)/.exec(url)?.[1]?.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)),
   );
 
-// What an open proposal's page states (F4308, Alexis: the ring shows what the chain gives): its yes and its no in its one Stats block,
+// What an open proposal's page states (the ring shows what the chain gives): its yes and its no in its one Stats block,
 // and that it is open for votes; never a threshold, which no recorded page states.
 describe("an open proposal's yes and no, from its page", () => {
   it("reads gnoland-1's open #14: open, its yes and its no", () => {
@@ -270,7 +270,7 @@ describe("readProposals", () => {
   });
 });
 
-// What proposalOf's tests held for a title and a state, now of a home page's entries.
+// A title and a state, read from a home page's entries.
 describe("a home page's titles and states are text and bounded", () => {
   const entry = (title: string, state = "ACTIVE") =>
     `### [Prop #7 - ${title}](/r/gov/dao:7)\nStatus: ${state}\n\n---\n`;

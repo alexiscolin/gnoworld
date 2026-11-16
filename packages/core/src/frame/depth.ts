@@ -1,4 +1,4 @@
-// A postcard read in depth (part 7p; Alexis, 2026-11-03, "pas 2 planètes de la même taille au même niveau, c'est pas naturel"): its plane
+// A postcard read in depth (no two planets of one size at one level, which is not natural): its plane
 // turned about the eye's line, as open as it was, till no two neighbours stand at one height, and each world drawn at a share of its size,
 // the nearer the larger, 1.5 times the next farther or more through its turn, none under a body's least size. Its data stays its own.
 import type { Orbiter, StarSystem } from "../cosmos/system.ts";

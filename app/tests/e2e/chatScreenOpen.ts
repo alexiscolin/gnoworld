@@ -1,4 +1,4 @@
-// What the chat-screen journeys share (5q): #games opened as an account or a guest, its two lines scripted and, when asked, a
+// What the chat-screen journeys share: #games opened as an account or a guest, its two lines scripted and, when asked, a
 // pin the server holds.
 import { lines } from "./chat.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";

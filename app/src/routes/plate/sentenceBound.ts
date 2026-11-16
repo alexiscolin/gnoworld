@@ -3,7 +3,7 @@ import type { Realm } from "../../features/realms/useRealm.ts";
 import type { PlateModel } from "./model.ts";
 import { sentenceOf } from "./sentence.ts";
 
-// How long the plate waits for the realm's sentence before it comes without it (D13971: a move may last a little longer to land whole).
+// How long the plate waits for the realm's sentence before it comes without it; a move may last a little longer to land whole.
 const SENTENCE_MS = 1200;
 /** Whether the plate has waited long enough for its sentence. */
 export function useSentenceBound(): boolean {

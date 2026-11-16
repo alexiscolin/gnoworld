@@ -1,4 +1,4 @@
-// The engine's frame (D401): each frame the rig moves the camera, the page's hold and the level follow it, the stage's planets, names,
+// The engine's frame: each frame the rig moves the camera, the page's hold and the level follow it, the stage's planets, names,
 // orbits, lights and effects follow the camera, and the frame is drawn, blurred while fast, when it would differ from the last (redraw.ts).
 // When the loop runs, sleeps and wakes is loop.ts's.
 import type { Space } from "./scene.ts";
@@ -34,7 +34,7 @@ export function draw(space: Space, signal: AbortSignal): void {
       paint(space, delta);
       touchOf(space);
       space.stage.frame.uThrough.value = space.stage.effects.through ? 1 : 0;
-      // Something that moves by itself is drawn each frame (at 15 fps, loop.ts), though nothing crossed half a pixel (D13013).
+      // Something that moves by itself is drawn each frame (at 15 fps, loop.ts), though nothing crossed half a pixel.
       space.keep.redraw.live = livelyOf(space, state);
       state.need = space.keep.redraw.check(momentOf(space, state));
       if (state.need !== "none") present(space);

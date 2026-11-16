@@ -45,7 +45,7 @@ async function arrive(
 }
 
 test.describe("a newcomer", () => {
-  // F4518: where no cosmos stands, no "Start here" either: the filled call and the way to the chat stay.
+  // Where no cosmos stands, no "Start here" either: the filled call and the way to the chat stay.
   test("keeps the video's pair on a computer whose scene does not run", async ({ page }) => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/" });

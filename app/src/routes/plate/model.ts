@@ -1,6 +1,6 @@
-// The plate's one model (slice 13, D566, D567): what every kind of place gives the blocks, in the blocks' order. An adapter per kind (a realm,
+// The plate's one model: what every kind of place gives the blocks, in the blocks' order. An adapter per kind (a realm,
 // the Earth, a hub world) fills it from its own sources; a block with no data is left out of it, never invented, and the blocks draw only
-// what the model holds. A satellite plugs in later with an adapter of its own, no new block.
+// what the model holds.
 import type { ReactNode } from "react";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import type { FromExplorerProps } from "../../features/realms/FromExplorer.tsx";
@@ -45,7 +45,7 @@ export interface PlateModel {
     /** Jarvis's two-sentence line from the code stands in the sentence's place once made; the sentence is the fallback. */
     explain?: Explained | undefined;
     status?: { label: string; tone: "mine" | "warm" | "neutral" } | undefined;
-    /** The rank's words, and what it ranks among (the pill's hint, the proposal's title). */
+    /** The rank's words, and what it ranks among (the pill's hint). */
     rank?: { label: string; among: string } | undefined;
   };
   actions: ActionsProps;

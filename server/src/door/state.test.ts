@@ -4,7 +4,7 @@ import { makeApp } from "../app.ts";
 import { DOOR } from "../testing/door.ts";
 import { stateRoutes } from "./state.ts";
 
-// 10u-a: GET /api/jarvis/state, whether Jarvis is on, from the door's switch alone: no session, no model, no jarvis called.
+// GET /api/jarvis/state, whether Jarvis is on, from the door's switch alone: no session, no model, no jarvis called.
 const setup = (on: boolean) => {
   const lines: string[] = [];
   const app = makeApp(

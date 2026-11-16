@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { migrations } from "../migrations.ts";
 import { namespaceFinder } from "./namespaceOf.ts";
 
-// Part 4's red pass, H2: the namespace a room is judged by comes from the server's own tables (realm_rooms.path, a hub's first realm), on a
+// The namespace a room is judged by comes from the server's own tables (realm_rooms.path, a hub's first realm), on a
 // real database; a room's name, whatever it looks like, grants nothing.
 const opened: DatabaseSync[] = [];
 afterEach(() => {

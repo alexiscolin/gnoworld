@@ -1,4 +1,4 @@
-// The saved messages' list (slice 4's 4d; ADR-0002's "Saved messages: Device"), a dialog over the page: each saved line
+// The saved messages' list (ADR-0002's "Saved messages: Device"), a dialog over the page: each saved line
 // with its author, its room and its words, a way back to the room and a way to remove it, and a word that they are
 // kept on this device alone. What was saved is anyone's words: drawn as text, never as markup.
 import { Button, Cluster, Dialog, IconButton, Stack } from "@gnoworld/ui";

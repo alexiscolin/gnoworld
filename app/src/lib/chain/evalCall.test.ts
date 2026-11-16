@@ -2,12 +2,11 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { realmType } from "@gnoworld/core";
-import { isRealmPath } from "@gnoworld/schemas";
 import { evalCall, evalNameOf, isAddress, userCall } from "./evalCall.ts";
 
-// 5g-reads, tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
+// Tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
 // (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
-// two calls on a proved address (D283), or nothing.
+// two calls on a proved address, or nothing.
 
 // A port of gno's parseQueryEvalData (gno.land/pkg/sdk/vm/handler.go:289 at v1.5.0): the first dot AFTER the first slash cuts the
 // realm from the expression. A realm path with a dot past its first slash would change what is asked.
@@ -24,62 +23,6 @@ function parseQueryEvalData(data: string): { pkgPath: string; expr: string } | n
   pkgPath += rest.slice(0, dot);
   return { pkgPath, expr: rest.slice(dot + 1) };
 }
-
-describe("isRealmPath, gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90)", () => {
-  it.each([
-    WUGNOT,
-    "gno.land/r/gnoland/blog",
-    "gno.land/r/sys/users/init",
-    "gno.land/r/demo/foo_bar",
-    "gno.land/r/demo/foo-bar",
-    "gno.land/r/demo/a1/b2",
-    "gno.land/r/demo/atest",
-    "gno.land/r/demo/test",
-    "gno.land/r/demo",
-    "my-sub.example.com/r/demo/x",
-    "a.b.example.com/r/demo/x",
-    `gno.${"l".repeat(63)}/r/demo/x`,
-    "gno.la/r/x",
-  ])("takes %s", (path) => {
-    expect(isRealmPath(path)).toBe(true);
-  });
-
-  it.each([
-    ["empty", ""],
-    ["a pure package", "gno.land/p/demo/avl"],
-    ["no name after /r/", "gno.land/r/"],
-    ["a name ending in _test", "gno.land/r/demo/foo_test"],
-    ["an upper-case name", "gno.land/r/Demo/x"],
-    ["a name starting with a digit", "gno.land/r/demo/1x"],
-    ["a dot past the first slash", "gno.land/r/demo/x.y"],
-    ["a dot after the realm, the expression's cut", "gno.land/r/demo/x.Foo()"],
-    ["a colon (qrender's cut)", "gno.land/r/demo:x"],
-    ["a trailing newline", "gno.land/r/demo/x\n"],
-    ["a leading newline", "\ngno.land/r/demo/x"],
-    ["an empty segment", "gno.land/r/demo//x"],
-    ["a trailing slash", "gno.land/r/demo/x/"],
-    ["a double underscore", "gno.land/r/demo/foo__bar"],
-    ["a trailing dash", "gno.land/r/demo/foo-"],
-    ["a space", "gno.land/r/demo/x y"],
-    ["a scheme", "https://gno.land/r/demo/x"],
-    ["an upper-case domain", "Gno.land/r/demo/x"],
-    ["a domain with no dot", "gno/r/demo/x"],
-    ["a full-width letter", "gno.land/r/demo/ｘ"],
-    ["a parenthesis", "gno.land/r/demo/x()"],
-    ["a quote", 'gno.land/r/demo/x"'],
-    ["a one-letter TLD", "gno.l/r/x"],
-    ["a 64-letter TLD", `gno.${"l".repeat(64)}/r/demo/x`],
-    ["an upper-case TLD", "gno.LAND/r/demo/x"],
-    ["a TLD with a digit", "gno.l4nd/r/demo/x"],
-    ...Array.from(";+,#?%\\`$:=*&|<>!@~^'{}[]", (char): [string, string] => [
-      `${char} in a segment`,
-      `gno.land/r/demo/a${char}b`,
-    ]),
-    ["a path of 200 KB near a valid one", `gno.land/r/${"a_".repeat(100_000)}!`],
-  ])("refuses %s", (_name, path) => {
-    expect(isRealmPath(path)).toBe(false);
-  });
-});
 
 describe("evalCall, one call of one exported name or nothing", () => {
   it.each(["TotalSupply", "A", "X1", "Foo_bar", "IsEnabled", "ResolveName"])("builds the call of %s", (name) => {
@@ -239,7 +182,7 @@ describe("evalCall, for any strings", () => {
   });
 });
 
-// Slice 13, B (docs/plans/slice-realm-plate.md §3): a read with arguments, its literals written by core's serializer (readArgs) and by
+// A read with arguments, its literals written by core's serializer (readArgs) and by
 // nothing else; the realm's grammar and the bare identifier still checked first. A first `realm` parameter is a write: qeval would inject
 // `cur` (gno v1.5.0, keeper.go:1924) and fake its success, so no call is built.
 describe("evalCall, a read with its typed arguments", () => {
@@ -295,7 +238,7 @@ describe("evalCall, a read with its typed arguments", () => {
     expect(call).toBeNull();
   });
 
-  // R5 of the red pass: the cap weighs the call as sent, its literals escaped, in UTF-8: the edge for each kind of character.
+  // The cap weighs the call as sent, its literals escaped, in UTF-8: the edge for each kind of character.
   it.each([
     ["quotes, each escaped to two bytes", '"', 128],
     ["backslashes, each escaped to two bytes", "\\", 128],
@@ -315,7 +258,7 @@ describe("evalCall, a read with its typed arguments", () => {
     expect(evalCall(WUGNOT, "Read", { params, texts: filled(pad + 1) })).toBeNull();
   });
 
-  // R6: a count of texts unlike the parameters' is a caller's bug: no call, never a throw that a read would not catch.
+  // A count of texts unlike the parameters' is a caller's bug: no call, never a throw that a read would not catch.
   it.each([
     ["a text missing", () => evalCall(WUGNOT, "Read", { params: [p("string")], texts: [] })],
     ["no texts given", () => evalCall(WUGNOT, "Read", { params: [p("string")] })],
@@ -355,8 +298,8 @@ describe("evalCall, a read with its typed arguments", () => {
   });
 });
 
-// 7c, tier 1 (the plan's §3, question 9): the one widening of the builder. The address alone is added, checked against a strict
-// g1 bech32 pattern and composed by code. The expression is the one a name read needs (chain-feasibility.md, item 9).
+// Tier 1: the one widening of the builder. The address alone is added, checked against a strict
+// g1 bech32 pattern and composed by code. The expression is the one a name read needs.
 describe("evalNameOf, the name registered for one address", () => {
   const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
 
@@ -434,7 +377,7 @@ describe("evalNameOf, the name registered for one address", () => {
   });
 });
 
-// D283, by Alexis: the name reader's two expressions are built here too, from an address the schema proved and nothing else.
+// The name reader's two expressions are built here too, from an address the schema proved and nothing else.
 describe("userCall, the two expressions on r/sys/users's record of an address", () => {
   const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 

@@ -25,7 +25,7 @@ export function CreditsDialog({ open, onClose }: { open: boolean; onClose: () =>
             </Stack>
           </li>
         ))}
-        {/* The home's prices: CoinGecko's free API asks to be credited (its documentation, read 2026-11-07). */}
+        {/* The home's prices: CoinGecko's free API asks to be credited. */}
         <li>
           <Stack space="3xs">
             <p>The prices of the home</p>

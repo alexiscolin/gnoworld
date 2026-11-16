@@ -1,4 +1,4 @@
-// Where the page's plate stands on the screen (D490), for the lights that must keep off its words: the plate's own uniforms, shared with the
+// Where the page's plate stands on the screen, for the lights that must keep off its words: the plate's own uniforms, shared with the
 // glare past a planet's limb and with the moons, which fade out toward the plate's text instead of washing or covering it.
 import { Vector4, type IUniform } from "three";
 

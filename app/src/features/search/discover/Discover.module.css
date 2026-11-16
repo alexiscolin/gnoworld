@@ -1,4 +1,4 @@
-/* Discover (D373): the shelves, the cards, a realm's detail; on a phone, the cards alone, the detail over them. */
+/* Discover: the shelves, the cards, a realm's detail; on a phone, the cards alone, the detail over them. */
 @layer components {
   .discover {
     /* raw: the shelves' column, narrower than the detail's */
@@ -31,7 +31,7 @@
   .group {
     /* layout: the items as wide as the column, a hair apart so a lit pill never touches the next item */
     display: grid;
-    /* layout: a hair apart so a lit pill stands clear of the next (Alexis, 2026-11-08: "trop collé"); the rows are a list row's high */
+    /* layout: a hair apart so a lit pill stands clear of the next; the rows are a list row's high */
     gap: var(--space-3xs);
   }
 
@@ -152,7 +152,7 @@
   .content {
     min-inline-size: 0;
     min-block-size: 0;
-    /* layout: a step off the shelves' line, its end on the sheet's own inset, as the field (Alexis, 2026-11-08) */
+    /* layout: a step off the shelves' line, its end on the sheet's own inset, as the field */
     padding-inline: var(--space-s) 0;
     overflow: auto;
   }
@@ -203,7 +203,7 @@
     grid-auto-columns: minmax(var(--column-s), 240px);
     /* layout: the palette's own arrangement */
     gap: var(--space-s);
-    /* Room inside the clip for a card's focus ring and edge, never cut (Alexis, 2026-11-08: "coupé en hauteur"). */
+    /* Room inside the clip for a card's focus ring and edge, never cut. */
     padding: calc(var(--focus-width) + var(--focus-offset));
     overflow: auto hidden;
     /* A row cut by the column's edge fades out there, so the cut reads as more to scroll, and each card stops at the row's start. */

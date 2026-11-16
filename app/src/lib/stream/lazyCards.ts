@@ -1,4 +1,4 @@
-// The cards' feed loaded on its first event (link-previews L4), as the chain's is (lazyChain.ts): a page whose stream never tells a card never
+// The cards' feed loaded on its first event, as the chain's is (lazyChain.ts): a page whose stream never tells a card never
 // loads the feed's chunk, which keeps the cards' schemas out of the first screen. Events wait for the chunk in their order.
 export type CardsIn = (data: unknown) => void;
 

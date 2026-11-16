@@ -7,7 +7,7 @@ import { makeKit, type MakeKit } from "./accountKit.ts";
 import { chatLink } from "./link.ts";
 
 // The link's account half (what it sends, the reading places, the notices) is asked for as an account connects, so a
-// visitor's page never loads it (ADR-0001 §12; docs/decisions.md, 2026-10-28).
+// visitor's page never loads it (ADR-0001 §12).
 const ALICE = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const T0 = "2026-10-25T10:00:00.000Z";
 const line = (text: string): IrcMessage => {

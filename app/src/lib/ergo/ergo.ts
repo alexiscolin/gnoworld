@@ -1,9 +1,9 @@
-// The browser's connection to Ergo (slice 4's 4a): one WebSocket, one IRC line a message, a login by SASL
+// The browser's connection to Ergo: one WebSocket, one IRC line a message, a login by SASL
 // with a ticket asked for each connection (server/src/login/ticket.ts), the nick the address; the handshake's
 // steps are handshake.ts's. Once connected, each line goes through core/irc and reaches onLine. A drop, a
 // refusal or a stall waits a full-jitter share of a cap doubling from a second to a minute, starting over only
-// after a minute connected (as the bot's link: F495), then reconnects with a fresh ticket; a session the
-// server no longer knows stops it.
+// after a minute connected (as the bot's link), then reconnects with a fresh ticket; a session the
+// server does not know stops it.
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { advance, CAPS, GUEST_TRIES, guestNick, oneLine, REFUSALS, type Step } from "./handshake.ts";
 import type { Result } from "../api/login.ts";

@@ -1,4 +1,4 @@
-// A part whose content changes with the place, the rail's worlds or the hero's system (D428): what it shows fades out where it stands,
+// A part whose content changes with the place, the rail's worlds or the hero's system: what it shows fades out where it stands,
 // then the new content fades in, never swapped at once; a change of the same content under the same key shows as it comes.
 import { useEffect, useState, type RefObject } from "react";
 import { swapIn } from "./features/universe/rise.ts";

@@ -1,4 +1,4 @@
-// Which realms tie to which world, from the data's own hubs, and which indexer addresses are read (slice 9g).
+// Which realms tie to which world, from the data's own hubs, and which indexer addresses are read.
 import type { Hubs } from "@gnoworld/schemas";
 import type { Watched } from "./message.ts";
 

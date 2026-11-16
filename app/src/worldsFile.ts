@@ -1,4 +1,4 @@
-// The worlds' file as space and its rail read it (7n2), and as every view that needs all the worlds does (the passport's constellations, the
+// The worlds' file as space and its rail read it, and as every view that needs all the worlds does (the passport's constellations, the
 // search palette, a plate's connected worlds and realm card): one query, one request for the page's life, read again only after five minutes
 // (the file is a job's, written now and then, and the browser's own cache holds it too). What it brings is counted as space draws it, and that
 // count stands over the one the home read. The reader and its schema come in a chunk of their own: a plate's first screen holds neither.

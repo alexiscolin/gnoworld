@@ -1,4 +1,4 @@
-// The release of a command-line key (D13940, M2): a key linked by phishing has no session to unlink with, so it signs a code, offline,
+// The release of a command-line key: a key linked by phishing has no session to unlink with, so it signs a code, offline,
 // and the server drops its row. The code is stateless: 6 bytes of expiry and 10 of an HMAC (a key derived from the server's secret for
 // this use alone) over the key, the host and the expiry. Asking writes nothing, so no flood can evict a code; a verified release is
 // spent in a row of its own, kept until the code would have expired. The answers never tell whether the key was linked.

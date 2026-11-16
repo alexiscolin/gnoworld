@@ -1,4 +1,4 @@
-// The first signals (slice 9h, D210 to D219): the first logged-in account to open a world, and the first line of a world
+// The first signals: the first logged-in account to open a world, and the first line of a world
 // that passed moderation, each recorded once a world by a unique key in SQLite. The store is the truth: the routes and the
 // stream only tell it. An account is an address and nothing else; a guest's nick or any other text is never recorded.
 import type { DatabaseSync } from "node:sqlite";
@@ -42,15 +42,15 @@ export function makeSignals(db: DatabaseSync, { now }: { now: () => number }): S
   const insert = db.prepare("INSERT OR IGNORE INTO first_signals (world, kind, account, at) VALUES (?, ?, ?, ?)");
   const read = db.prepare("SELECT kind, account, at FROM first_signals WHERE world = ?");
   // The unique key decides, not this process: a second writer's insert changes no row.
-  const record =
+  const claimFirst =
     (kind: Signal["kind"]) =>
     (world: string, account: string): boolean =>
       ChartRequest.safeParse({ world }).success &&
       Address.safeParse(account).success &&
       insert.run(world, kind, account, now()).changes === 1;
   return {
-    chart: record("chart"),
-    words: record("words"),
+    chart: claimFirst("chart"),
+    words: claimFirst("words"),
     firsts: (world) => {
       const firsts: WorldFirsts = { world, charted: null, words: null };
       for (const row of read.all(world)) {
@@ -78,7 +78,7 @@ export const firstSignals = (signals: Signals, worlds: Iterable<string>): Signal
 interface FirstWordsOptions {
   signals: Signals;
   publish: (signal: Signal) => void;
-  // Whether a room's lines may be a world's first words: open to everyone and listed (D214).
+  // Whether a room's lines may be a world's first words: open to everyone and listed.
   isPublic: (room: string) => boolean;
 }
 

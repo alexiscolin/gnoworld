@@ -13,7 +13,7 @@ const focused = (page: Page) =>
     return now?.getAttribute("aria-label") ?? now?.textContent.trim() ?? "";
   });
 
-// Where a box is once its enter has played: a dialog, a popover and a tooltip grow and settle (D13969), and a box read mid-way
+// Where a box is once its enter has played: a dialog, a popover and a tooltip grow and settle, and a box read mid-way
 // is a fraction of a pixel off.
 const box = async (locator: Locator) => {
   await settle(locator.page());
@@ -64,7 +64,7 @@ const under = (trigger: Locator, panel: Locator) =>
 
 test.describe("Dialog", () => {
   // The browser closes a dialog itself on a second Esc with nothing between (the close watcher's
-  // rule): one its page keeps shows again, modal, the focus in it (F330).
+  // rule): one its page keeps shows again, modal, the focus in it.
   test("stays open and modal after two Esc when its page keeps it", async ({ page }) => {
     await open(page, "flash--over-a-dialog");
     await page.keyboard.press("Escape");
@@ -101,7 +101,7 @@ test.describe("Dialog", () => {
     await expect(page.getByText("Closed 1", { exact: true })).toBeVisible();
   });
 
-  // 4c's UX review (U6): at a phone's width the title wraps its own words; Close stays at its row's end.
+  // At a phone's width the title wraps its own words; Close stays at its row's end.
   test("keeps Close on its title's row at 320 px, a long title wrapping beside it", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     for (const id of ["dialog--standard", "dialog--wide"]) {
@@ -118,7 +118,7 @@ test.describe("Dialog", () => {
     }
   });
 
-  // 9k (F5868): with Close hidden the name dialog's other way out, and Esc, still give the focus back.
+  // With Close hidden the name dialog's other way out, and Esc, still give the focus back.
   test("with Close hidden, Esc closes it and the focus goes back to the opener", async ({ page }) => {
     await open(page, "dialog--from-a-button-without-close");
     const opener = page.getByRole("button", { name: "Open the passport" });
@@ -165,7 +165,7 @@ test.describe("Dialog", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  // A modal dialog's page is inert, and still too (F373): under the wheel, over the scrim or the dialog,
+  // A modal dialog's page is inert, and still too: under the wheel, over the scrim or the dialog,
   // and under the keys; it scrolls again once the dialog closes. The scroll is read two frames on, and
   // the first wheel, with no dialog, shows those frames are enough to see one.
   test("keeps a long page behind it still under the wheel and the keys, and lets it scroll once closed", async ({
@@ -499,7 +499,7 @@ test("a skeleton shows only after 300 ms, and breathes then, but stays still und
   }
 });
 
-// The shorter last line belongs to a paragraph of lines, not to a lone line after a heading (F375).
+// The shorter last line belongs to a paragraph of lines, not to a lone line after a heading.
 test("a lone line skeleton after a heading keeps its whole width; a paragraph's last line is shorter", async ({
   page,
 }) => {
@@ -569,7 +569,7 @@ test("a chart's bars hold 3:1 against the page, the current one unlike the past,
   for (const bar of [past, now]) expect(contrast(rgb(bar), rgb(ground))).toBeGreaterThanOrEqual(3);
 });
 
-// F304 in a real browser: the words over a bar stay inside the viewport, the pointer and the arrows change them, and the focusable
+// In a real browser: the words over a bar stay inside the viewport, the pointer and the arrows change them, and the focusable
 // group is read by axe (the stories' axe sweep walks the same story).
 test.describe("a chart's tooltip", () => {
   const words = (page: Page) =>
@@ -616,7 +616,7 @@ test.describe("a planet's thumb", () => {
       await open(page, "planetthumb--magnified");
       const thumb = page.locator("[data-magnify]");
       const resting = (await box(thumb)).width;
-      // The dock's list writes --_mag on the planet under the pointer (71b0e235); the thumb has no hover scale of its own.
+      // The dock's list writes --_mag on the planet under the pointer; the thumb has no hover scale of its own.
       await thumb.evaluate((t) => {
         t.style.setProperty("--_mag", "1.55");
       });
@@ -639,7 +639,7 @@ test.describe("a planet's thumb", () => {
 });
 
 // A flash raised from a modal dialog shows above its scrim, at the top centre, as bright as without a
-// dialog (F331). Outside the dialog, it stays inert until the dialog closes: the platform's rule.
+// dialog. Outside the dialog, it stays inert until the dialog closes: the platform's rule.
 test("a flash raised from a dialog shows above its scrim, at the top centre", async ({ page }) => {
   const pill = pillOf(page);
   await open(page, "flash--timed");
@@ -654,7 +654,7 @@ test("a flash raised from a dialog shows above its scrim, at the top centre", as
 });
 
 // A manual popover, as its page holds it: an auto one closes on any click outside while the page
-// still thinks it shown (F346).
+// still thinks it shown.
 test("a flash stays shown when the page is clicked outside it", async ({ page }) => {
   await open(page, "flash--with-action");
   await page.mouse.click(5, 300);
@@ -663,8 +663,8 @@ test("a flash stays shown when the page is clicked outside it", async ({ page })
 });
 
 // While a flash that stays shows, scroll padding keeps each link the keyboard reaches clear of it; with
-// none, nothing is padded (F355, WCAG 2.4.11). A link at the page's very top cannot scroll down: it stays
-// under the pill, the backlog's "Where the update notice sits".
+// none, nothing is padded (WCAG 2.4.11). A link at the page's very top cannot scroll down: it stays
+// under the pill, which is accepted.
 test("a link reached by the keyboard is never under a flash that stays, and is not held off the top without one", async ({
   page,
 }) => {
@@ -707,7 +707,7 @@ test("a link reached by the keyboard is never under a flash that stays, and is n
 });
 
 // A flash shown before a modal dialog opens waits under its scrim, out of reach, and is there again as
-// it was when the dialog closes: the top layer stacks by opening order (F354, DESIGN-SYSTEM.md, Layers).
+// it was when the dialog closes: the top layer stacks by opening order (DESIGN-SYSTEM.md, Layers).
 test("a flash shown before a modal dialog waits under its scrim, and shows again when it closes", async ({ page }) => {
   await open(page, "flash--with-action");
   const pill = await box(pillOf(page));
@@ -739,7 +739,7 @@ test.describe("an avatar", () => {
     expect(Object.fromEntries(sides)).toEqual({ s: [20, 20], m: [24, 24], l: [48, 48] });
   });
 
-  // Decision 3 (docs/decisions.md): the assistant's orb is violet, the machine's colour; never mint.
+  // The assistant's orb is violet, the machine's colour; never mint.
   test("draws the assistant's orb in violet, never in mint", async ({ page }) => {
     await open(page, "avatar--kinds");
     const colours = await page.locator("[data-orb]").evaluate((orb) => {
@@ -763,8 +763,8 @@ test.describe("an avatar", () => {
     expect(drawn).toEqual({ stars: ["rgb(244, 246, 250)"], line: ["rgb(244, 246, 250)", "none"] });
   });
 
-  // A face is a picture: forced colours leave it as drawn, night and colours, as they leave a photo
-  // (F319). A bot's mark is the code icon, which takes the system's colours as every icon does.
+  // A face is a picture: forced colours leave it as drawn, night and colours, as they leave a photo.
+  // A bot's mark is the code icon, which takes the system's colours as every icon does.
   test("keeps its face, night and colours, under forced colours", async ({ page }) => {
     await open(page, "avatar--kinds");
     const faces = await page.locator("[data-kind='person'] svg, [data-kind='assistant'] svg").all();
@@ -812,7 +812,7 @@ test.describe("an avatar", () => {
     }
   });
 
-  // slice-2.md §5: each face as drawn at 20 px, blurred to 4 x 4 zones; two faces are alike when their
+  // Each face as drawn at 20 px, blurred to 4 x 4 zones; two faces are alike when their
   // zones differ by under 0.06 in OKLab on average. The browser converts the colours (relative colour).
   test("tells 200 addresses apart at 20 px: two faces alike in under 1% of pairs", async ({ page }) => {
     await open(page, "avatar--spread");

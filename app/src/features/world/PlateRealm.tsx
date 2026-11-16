@@ -1,6 +1,6 @@
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it. The chat's bar
-// takes a world's pinned actions (D271) from that module too (the chat reaches no realm code of its own); code that cannot be fetched
-// leaves its place alone (F1763). This file holds only the doors to that chunk.
+// takes a world's pinned actions from that module too (the chat reaches no realm code of its own); code that cannot be fetched
+// leaves its place alone. This file holds only the doors to that chunk.
 import { lazy, Suspense, type ComponentType } from "react";
 import { reportedOr } from "../../lib/reported.ts";
 import type { site } from "../../places.ts";

@@ -1,5 +1,5 @@
-// A world's rooms as the chat lists them: a search over its sections, and on the Earth (D394) for an account the button that makes one.
-// A guest searches, and sees no word about making one (Alexis, 2026-11-08).
+// A world's rooms as the chat lists them: a search over its sections, and on the Earth for an account the button that makes one.
+// A guest searches, and sees no word about making one.
 import type { RoomList } from "@gnoworld/schemas";
 import { Field, Stack } from "@gnoworld/ui";
 import { useState } from "react";
@@ -22,8 +22,8 @@ function matching(sections: RoomList["sections"], query: string): RoomList["sect
 
 export { RoomsNav } from "./RoomSections.tsx";
 
-// Every world's rooms under a search, as Slack's and Discord's (Alexis, 2026-11-08: "la barre de recherche doit être partout"); on the
-// Earth an account may also make one (D394).
+// Every world's rooms under a search, as Slack's and Discord's; on the
+// Earth an account may also make one.
 export function RoomsList(props: RoomSectionsProps) {
   const [query, setQuery] = useState("");
   const found = matching(props.sections, query);

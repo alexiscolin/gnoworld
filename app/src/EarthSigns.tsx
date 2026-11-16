@@ -1,6 +1,6 @@
 // The signs over the globe, as HTML anchored to the ground (ADR-0001 §7; frames 43 to 55, 85): who says what from where, each country's hour,
 // the far side's counts, the side rooms. Bubbles repeat the chat, so screen readers skip them; a pin is a link, and a room with no place stays in
-// the chat's list. On another world (`world`, D565) the bubbles alone stand, each on its speaker's own spot (spot.ts).
+// the chat's list. On another world (`world`) the bubbles alone stand, each on its speaker's own spot (spot.ts).
 import { countryName, centreOf, type Count, type Trend } from "@gnoworld/core/bubbles";
 import { Cluster, sightRef, Stack } from "@gnoworld/ui";
 import {
@@ -96,7 +96,7 @@ export function EarthSigns({ deps, open, inside }: { deps: SignsDeps; open: (hre
   const boxRef = useRef<HTMLDivElement>(null);
   const { ground, world } = deps;
   useEffect(() => signs.start(), [signs]);
-  // The bubbles' words come in a chunk of their own: asked as soon as the signs are up, so a bubble shows with its words, never without (D13014).
+  // The bubbles' words come in a chunk of their own: asked as soon as the signs are up, so a bubble shows with its words, never without.
   useEffect(() => {
     let wanted = true;
     // A load that fails is asked again by the bubble's own lazy; the effect's end only stops caring.

@@ -8,9 +8,10 @@ import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmFunctions } from "./RealmFunctions.tsx";
+import { pageFetch } from "../../lib/query/policy.ts";
 import { useFunctions } from "./useFunctions.ts";
 
-// 5i, tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
+// Tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
 // its result once through `vm/qeval`. Free: the label says so, the block height says when, and Adena is never asked.
 // The answers are chainFixture.ts's: EVALS recorded through gnomcp, FUNCTIONS written from wugnot's source (not recorded).
 const CHAIN = {
@@ -74,7 +75,7 @@ async function settle(box: HTMLElement, until: () => boolean = () => box.querySe
       await new Promise((resolve) => setTimeout(resolve, 5));
     });
   }
-  // Out of turns is a failure to say so, not a silent return that lets the next line fail for another reason (review of 5i, row 8).
+  // Out of turns is a failure to say so, not a silent return that lets the next line fail for another reason.
   if (!until()) throw new Error("settle: the page did not reach the state asked for");
 }
 async function panel(fetcher: ChainFetch, realm = WUGNOT, extra: { maxBytes?: number; chain?: typeof CHAIN } = {}) {
@@ -427,9 +428,9 @@ describe("a name from qfuncs", () => {
   });
 });
 
-// Slice 13, B (plan §3, eval floods; D13301): a card keeps one read in flight, starts one per 400 ms (later asks wait, the last kept), gives
+// Eval floods: a card keeps one read in flight, starts one per 400 ms (later asks wait, the last kept), gives
 // it 10 s and reads 64 KB of the answer. useFunctions is driven by a harness asking directly: the panel's busy button refuses a click while
-// a read is under way, which the plate's card (part C) may not.
+// a read is under way, which the plate's card may not.
 describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 KB", () => {
   const INT = [{ Name: ".res.0", Type: "int64", Value: "" }];
   const SEARCH = [
@@ -563,7 +564,7 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       ]);
     }));
 
-  // R1 of the review (F13318, S3 F13317): an earlier read that answers while a later one waits its turn is not the later one's answer.
+  // An earlier read that answers while a later one waits its turn is not the later one's answer.
   test("lets no answer of an earlier read stand for a later one asked while it waits", () =>
     faked(async () => {
       const fetcher = evalChain((url) => {
@@ -660,7 +661,7 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       expect(signalOf(fetcher, 0)?.aborted).toBe(true);
     }));
 
-  // The cap weighs the RPC's answer as sent (its JSON, the result in base64 inside), in bytes of UTF-8 (D13301).
+  // The cap weighs the RPC's answer as sent (its JSON, the result in base64 inside), in bytes of UTF-8.
   test.each([
     { name: "exactly 65,536 bytes of ASCII", bytes: 65_536, char: "e", state: "read" },
     { name: "65,537 bytes of ASCII", bytes: 65_537, char: "e", state: "failed" },
@@ -708,4 +709,142 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       await advance(1_000);
       expect(evalsOf(fetcher)).toHaveLength(1);
     }));
+});
+
+describe("the Try-it caller at the page's gate: 4 requests a host (F13326)", () => {
+  // The page asks with no fetch of its own (Plate gives RealmView no options): every request leaves through the global fetch, which
+  // holds the requests named `/hold-…` until `release` and answers the rest as the chain does.
+  test("a read and its height wait for a turn at the host, like every query's", async () => {
+    const answers = chain({
+      functions: [{ FuncName: "TotalSupply", Params: null, Results: [{ Name: ".res.0", Type: "int64", Value: "" }] }],
+    });
+    const held = new Map<string, () => void>();
+    const reached: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes("/hold-")) {
+          return new Promise<Response>((resolve) => {
+            held.set(url, () => {
+              resolve(new Response("{}"));
+            });
+          });
+        }
+        reached.push(url.includes("/status") ? "status" : queryOf(url));
+        return answers(url, init);
+      }),
+    );
+    function Page() {
+      const { results, read } = useFunctions(CHAIN.rpc, WUGNOT);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              read("TotalSupply");
+            }}
+          >
+            Ask
+          </button>
+          <output>{JSON.stringify(results)}</output>
+        </>
+      );
+    }
+    const turn = () =>
+      act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+    try {
+      queryClient.clear();
+      const box = mount(<Page />);
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs"]);
+      });
+      // The gate full: 4 of the host in flight, a fifth waiting, then the card's read, then a sixth that takes the turn its answer frees.
+      const asks = ["a", "b", "c", "d", "e"].map((id) => pageFetch(`${CHAIN.rpc}/hold-${id}`));
+      click(button(box, "Ask"));
+      await turn();
+      asks.push(pageFetch(`${CHAIN.rpc}/hold-f`));
+      await turn();
+      expect(reached).toEqual(["vm/qfuncs"]);
+      held.get(`${CHAIN.rpc}/hold-a`)?.();
+      await turn();
+      expect(reached).toEqual(["vm/qfuncs"]);
+      // The read gets its turn, and is answered; its height asks for the next, which the sixth holds.
+      held.get(`${CHAIN.rpc}/hold-b`)?.();
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs", "vm/qeval"]);
+      });
+      held.get(`${CHAIN.rpc}/hold-c`)?.();
+      await vi.waitFor(() => {
+        expect(reached).toEqual(["vm/qfuncs", "vm/qeval", "status"]);
+      });
+      expect(asks).toHaveLength(6);
+    } finally {
+      for (const release of held.values()) release();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("a height read still held ends with its card", async () => {
+    const answers = chain({
+      functions: [{ FuncName: "TotalSupply", Params: null, Results: [{ Name: ".res.0", Type: "int64", Value: "" }] }],
+    });
+    const statuses: (AbortSignal | null | undefined)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (!url.includes("/status")) return answers(url, init);
+        statuses.push(init?.signal);
+        return new Promise<Response>(() => undefined);
+      }),
+    );
+    function Page() {
+      const [here, setHere] = useState(true);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setHere(false);
+            }}
+          >
+            Leave
+          </button>
+          {here ? <Card /> : null}
+        </>
+      );
+    }
+    function Card() {
+      const { read } = useFunctions(CHAIN.rpc, WUGNOT);
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            read("TotalSupply");
+          }}
+        >
+          Ask
+        </button>
+      );
+    }
+    try {
+      queryClient.clear();
+      const box = mount(<Page />);
+      await vi.waitFor(() => {
+        expect(all(box, "button")).toHaveLength(2);
+      });
+      click(button(box, "Ask"));
+      await vi.waitFor(() => {
+        expect(statuses).toHaveLength(1);
+      });
+      expect(statuses[0]?.aborted).toBe(false);
+      click(button(box, "Leave"));
+      await vi.waitFor(() => {
+        expect(statuses[0]?.aborted).toBe(true);
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

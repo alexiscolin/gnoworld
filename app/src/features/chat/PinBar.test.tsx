@@ -8,7 +8,7 @@ import type { Done } from "./askPins.ts";
 import { PinBar, PinStack, type PinStackProps } from "./PinBar.tsx";
 import { standInPopovers } from "../../../tests/popover.ts";
 
-// The room's pins above its lines (slice 4's 4d; the prototype's #pinBar): one line, the newest pin with a count, which
+// The room's pins above its lines: one line, the newest pin with a count, which
 // opens into the stack; each pin's author, its words drawn from Markdown as a line's are (nothing from Ergo reaches
 // HTML), and for a reader who may pin, an Unpin of each. PinStack is the drawing; PinBar holds whether it is open.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -91,7 +91,7 @@ describe("the pin bar", () => {
 });
 
 // The bar as a reader uses it: shut at first, a click opens it and a second shuts it; an Unpin the server refused, or that
-// never got there, is said in a sentence, and one it took says nothing (G13).
+// never got there, is said in a sentence, and one it took says nothing.
 describe("the pin bar, used", () => {
   // Each test draws one bar in its own element, taken down after it.
   const host = document.createElement("div");

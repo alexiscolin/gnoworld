@@ -1,6 +1,6 @@
-// The store's rows (D373): each realm of the worlds' file with what Discover reads of it, built once per file, never per keystroke.
-// `firstHeight` and `rise` are what the server adds in phase 2 (the first block, the calls' rise); the file gives neither today, and every
-// rule that reads them is quiet till it does.
+// The store's rows: each realm of the worlds' file with what Discover reads of it, built once per file, never per keystroke.
+// `firstHeight` and `rise` (the first block, the calls' rise) come from the server; the file gives neither, and every rule that reads
+// them is quiet without them.
 import { BLOCK_MS } from "../planet/activity.ts";
 import { familyOf, nameOf } from "./families.ts";
 import { styleOf, type StyleId } from "./styles.ts";
@@ -13,7 +13,7 @@ export const WEEK_BLOCKS = 7 * DAY_BLOCKS;
 export interface StoreRealm {
   path: string;
   namespace: string;
-  /** The name its deployer registered. */
+  /** The name of its deployer. */
   author: string | null;
   functions: readonly string[];
   imports: readonly string[];
@@ -22,7 +22,7 @@ export interface StoreRealm {
   /** The block of its last call; null where the file did not read it. */
   lastHeight: number | null;
   firstHeight: number | null;
-  /** How much its calls rose, in percent; null until the server reads the history. */
+  /** How much its calls rose, in percent; null where the server has not read the history. */
   rise: number | null;
   world: string;
 }

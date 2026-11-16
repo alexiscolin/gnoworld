@@ -13,8 +13,7 @@ import { makeStream } from "../stream/stream.ts";
 import { makeCardFlow, type CardFlowOptions } from "./flow.ts";
 import { CARD_TABLES } from "./store.ts";
 
-// L3 (docs/plans/link-previews.md §3, §4's server rows, §7's L3 list; D13906, D13919): a line that passed moderation, its first https link
-// read by the link reader, the card checked by OpenAI in one call, told on the stream; what hides, expires and is removed.
+// A line that passed moderation, its first https link read by the link reader, the card checked by OpenAI in one call, told on the stream; what hides, expires and is removed.
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -997,7 +996,7 @@ describe("security: forged tags, few lines, races, a failing step", () => {
   });
 });
 
-// The surviving mutants of the day (slice 13): each test is named after the fault it guards.
+// Each test is named after the fault it guards.
 const pageOf = (db: DatabaseSync, key = KEY) =>
   db.prepare("SELECT state, title, picture FROM link_cards WHERE key = ?").get(key);
 

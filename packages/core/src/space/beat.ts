@@ -1,4 +1,4 @@
-// The sun's beat (ADR-0001 §7, "gno.land as the sun, pulsing on each block"; slice 7 answer 11): the great star swells once a block, at the
+// The sun's beat (ADR-0001 §7, "gno.land as the sun, pulsing on each block"): the great star swells once a block, at the
 // chain's pace from the time the worlds' file was written, and rests between. A sign of real data: a file with no time gives none, and so
 // does one read more than an hour from its writing, before or after, for the job writes it each half hour and the pace is then not known.
 // One read fresh beats as long as its page stays.

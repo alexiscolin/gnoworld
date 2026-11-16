@@ -1,5 +1,4 @@
-// The share sheet (ADR-0002 §1, Share: "the phone's share sheet, a copied link, a snapshot of the view with its caption"; no frame shows it,
-// so built from the design system and retouched in the ping-pong). The picture is the scene's canvas alone, asked as the sheet opens; with no
+// The share sheet (ADR-0002 §1, Share: "the phone's share sheet, a copied link, a snapshot of the view with its caption"). The picture is the scene's canvas alone, asked as the sheet opens; with no
 // scene on the page (a phone before View in space, the list) there is none. Its own root: the sheet needs neither the router nor the store.
 import { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "@gnoworld/core";
 import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";

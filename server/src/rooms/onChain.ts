@@ -1,4 +1,4 @@
-// Whether a realm path is on the chain (D413): one `vm/qpaths` read of the path as a prefix, limit 1, the exact path asked for
+// Whether a realm path is on the chain: one `vm/qpaths` read of the path as a prefix, limit 1, the exact path asked for
 // (a node sorts a prefix's own path first). A chain that does not answer is "down", never "no".
 import { pathsAsk } from "@gnoworld/chain/asks";
 import { RealmPath } from "@gnoworld/schemas/indexer";

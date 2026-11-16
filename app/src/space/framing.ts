@@ -1,6 +1,6 @@
-// The page's circle on space (D401): its planet slides to it with the move itself; the home's first screen frames the Earth close in it
-// (D459); and a framing that changes at rest (a window across the dock's width, the quality set low, the home left for its system's page)
-// flies the camera to it, telling the page nothing (D462). Seen from above, the framing is the Map's.
+// The page's circle on space: its planet slides to it with the move itself; the home's first screen frames the Earth close in it;
+// and a framing that changes at rest (a window across the dock's width, the quality set low, the home left for its system's page)
+// flies the camera to it, telling the page nothing. Seen from above, the framing is the Map's.
 import type { Space } from "./scene.ts";
 import { middleOf, shiftOf, type Circle } from "./goals.ts";
 import type { Planet, Universe, Vec } from "./layout.ts";
@@ -10,7 +10,7 @@ import { HOME_BOOST } from "./vista.ts";
 import type { Goal } from "./rig/rig.ts";
 import type { Frame } from "./stage.ts";
 
-/** Whether the home shows its first screen (D459): the Earth close, in the circle its page lays out, not its system. */
+/** Whether the home shows its first screen: the Earth close, in the circle its page lays out, not its system. */
 export const arrivalOf = ({ place, plan, circle }: Pick<Space, "place" | "plan" | "circle">): boolean =>
   place?.kind === "home" && !plan && circle?.close === true;
 
@@ -50,7 +50,7 @@ interface Uniforms<K extends keyof Frame> {
   readonly stage: { readonly frame: Pick<Frame, K> };
 }
 
-/** The page's planet alone once the page comes, and the home's Earth framed close (D481): the others shrink away, and come back as it
+/** The page's planet alone once the page comes, and the home's Earth framed close: the others shrink away, and come back as it
  * leaves; near the camera they would stand stretched at the frame's edge. One already alone stays so on the way to its own page (the
  * home's Earth to its page): the others came back for the flight, then went again. */
 export function aloneOf(space: At & Uniforms<"uSolo" | "uAlone">): Planet | undefined {
@@ -69,7 +69,7 @@ const SOLO_WHOLE = 0.01;
 export const nearAlone = ({ uSolo, uAlone }: { uSolo: { value: number }; uAlone: { value: number } }): number =>
   uSolo.value > SOLO_WHOLE ? uAlone.value : -1;
 
-// raw: on the home only the worlds this large on screen, in pixels, leave; the far ones stay as points behind the Earth, for depth (D499)
+// raw: on the home only the worlds this large on screen, in pixels, leave; the far ones stay as points behind the Earth, for depth
 const LEAVE_PX = 220;
 const SETTLED = 1e-3;
 
@@ -88,12 +88,12 @@ function soloOf(
 // raw: a flight shorter than this many radii of its planet is a hop (the home's Earth to its page)
 const HOP = 4;
 
-/** Whether a flight of the eye from `from` to `eye`, ending at `planet`, is long enough to end in the page's scan; none for a hop (D517). */
+/** Whether a flight of the eye from `from` to `eye`, ending at `planet`, is long enough to end in the page's scan; none for a hop. */
 export const scans = (planet: Planet, from: Vec, eye: Vec): boolean =>
   !(Math.hypot(eye.x - from.x, eye.y - from.y, eye.z - from.z) < planet.radius * HOP);
 
-/** The home's first screen in the frame's uniforms: which worlds leave (D499) and how much larger its featured worlds are drawn (D541):
- * grown in by the flight that lands there, whole once landed, so nothing grows at rest (D555); eased `share` of the way out as it is left. */
+/** The home's first screen in the frame's uniforms: which worlds leave and how much larger its featured worlds are drawn:
+ * grown in by the flight that lands there, whole once landed, so nothing grows at rest; eased `share` of the way out as it is left. */
 export function homeFrame(
   space: At & Pick<Space, "rig"> & Uniforms<"uSolo" | "uSoloPx" | "uSoloAll" | "uBoost">,
   alone: Planet | undefined,

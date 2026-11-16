@@ -1,4 +1,4 @@
-// The one way a page bounds what it remembers, its scene too: an insertion-ordered Set or Map walks its oldest first, so trimming from
+// The one way a page bounds what it holds, its scene too: an insertion-ordered Set or Map walks its oldest first, so trimming from
 // that end keeps the newest. A key set again keeps its place.
 
 interface Held<K> {

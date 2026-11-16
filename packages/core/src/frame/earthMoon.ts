@@ -1,4 +1,4 @@
-// The small Earth's Moon as the view at rest's judge reads it (7v's design review, F4471): on the ring the globe draws round the small Earth,
+// The small Earth's Moon as the view at rest's judge reads it: on the ring the globe draws round the small Earth,
 // in the camera's frame, for the small globe turns with the camera; where the Moon rests on it, frame 4's and the first screen's.
 import type { Look, Seen } from "./restLook.ts";
 

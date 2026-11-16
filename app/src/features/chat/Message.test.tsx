@@ -28,7 +28,7 @@ const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" dir="ltr" targe
 const MENTION = /^<span data-mention="(me)?" title="(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})">$/;
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// A checksum-valid address ground to shorten as BOB's: g1jg8m…vsqf5 (F812's verifier, seven seconds).
+// A checksum-valid address ground to shorten as BOB's: g1jg8m…vsqf5.
 const GROUND = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
 const opening = (markup: string) =>
   [...markup.matchAll(/<([a-z]+)[^>]*>/g)].map((found) => ({ tag: found[1] ?? "", whole: found[0] }));
@@ -38,7 +38,7 @@ describe("Message", () => {
     expect(html("a **b** *c* ~~d~~ `e`")).toBe("<span>a <strong>b</strong> <em>c</em> <s>d</s> <code>e</code></span>");
   });
 
-  // 8k: `++` draws <u>, a link inside it still the anchor it always is, and a page's underline nothing (it reads none).
+  // `++` draws <u>, a link inside it still the anchor it always is, and a page's underline nothing (it reads none).
   it("shows an underline as <u>, beside and around the other marks, a link and code inside it", () => {
     expect(html("a ++b++ c")).toBe("<span>a <u>b</u> c</span>");
     expect(html("**++b++** ++*i*++")).toBe("<span><strong><u>b</u></strong> <u><em>i</em></u></span>");
@@ -57,7 +57,7 @@ describe("Message", () => {
     );
   });
 
-  // 4c's UX review (U1): a line not the list's stop keeps its links out of the Tab order, in every block.
+  // A line not the list's stop keeps its links out of the Tab order, in every block.
   it("keeps every link out of the Tab order when asked, and in it otherwise", () => {
     const text = "[a](https://gno.land/a)\n\n> [b](https://gno.land/b)\n\n- [c](https://gno.land/c)";
     const out = renderToStaticMarkup(<Message text={text} tabbable={false} />);
@@ -87,7 +87,7 @@ describe("Message", () => {
     expect(html(`hi @${ALICE}`)).not.toContain('data-mention="me"');
   });
 
-  // F812: an address of the right checksum can be ground to shorten as another's does (seven seconds found GROUND,
+  // An address of the right checksum can be ground to shorten as another's does (seven seconds found GROUND,
   // drawn as BOB's), but holds no key, so never joins a room: the short form is the reader's and the members' alone.
   it("shows a mention shortened only for the reader and the room's members, anyone else's address whole (F812)", () => {
     const markup = renderToStaticMarkup(
@@ -135,7 +135,7 @@ describe("Message", () => {
     );
   });
 
-  // F812's review: a line may type an account's short form itself; it reads as the words they are.
+  // A line may type an account's short form itself; it reads as the words they are.
   it("draws a short form typed as text as text: no mark, no title", () => {
     expect(renderToStaticMarkup(<Message text="ask @g1jg8m…vsqf5" me={BOB} />)).toBe("<span>ask @g1jg8m…vsqf5</span>");
   });
@@ -159,7 +159,7 @@ describe("Message", () => {
     expect(renderToStaticMarkup(<Message text={text} me={BOB} />)).not.toContain('data-mention="me"');
   });
 
-  // A lookalike: an address of the right form whose checksum fails, written to shorten as BOB's does (F805).
+  // A lookalike: an address of the right form whose checksum fails, written to shorten as BOB's does.
   it("draws an address whose checksum fails whole, as text: no account's short form for it", () => {
     const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
     const markup = renderToStaticMarkup(<Message text={`ask @${lookalike} or @${BOB}`} me={BOB} />);

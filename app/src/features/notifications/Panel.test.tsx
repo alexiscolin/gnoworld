@@ -7,7 +7,7 @@ import { pageDevice } from "../../lib/keep/device.ts";
 import { isUnread } from "./feed.ts";
 import { Panel } from "./Panel.tsx";
 
-// The bell's panel (slice 8; frames 86, 87): the kinds with what is unread in each, the worlds to filter by, a followed world where people
+// The bell's panel (frames 86, 87): the kinds with what is unread in each, the worlds to filter by, a followed world where people
 // are, a line off the site opened only through the warning, Mark all read; Esc and a press outside close it.
 vi.mock("../../lib/api/presence.ts", () => ({
   pagePresenceApi: () => ({

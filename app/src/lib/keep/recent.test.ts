@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RECENT_KEPT, recentSearches } from "./recent.ts";
 
-// The chat's search words the device remembers (slice 13, C): the last few, newest first, on this device alone. What the device gives back
+// The chat's search words the device remembers: the last few, newest first, on this device alone. What the device gives back
 // is checked; a device that refuses keeps nothing and says so.
 function storage(refuses = false) {
   const kept = new Map<string, string>();

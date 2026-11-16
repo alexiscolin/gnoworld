@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Place } from "../../space/place.ts";
 import { useSpace, type WorldShown } from "./useSpace.ts";
 
-// A page's hold on space (D401): what it asks of the door to space (space.ts, the test's own here), and its first screen's end. The door's
+// A page's hold on space: what it asks of the door to space (space.ts, the test's own here), and its first screen's end. The door's
 // engine, its chunk and its failures are space.ts's.
 const door = vi.hoisted(() => ({
   show: vi.fn<(place: Place | undefined, to: (href: string) => void) => void>(),

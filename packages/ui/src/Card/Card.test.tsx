@@ -25,7 +25,7 @@ describe("Card", () => {
     expect(card.textContent).toBe("PollWhich realm next?LiveThree answersVote");
   });
 
-  // F5730: a card may set its title large, the light title-size of the frames; by default it is the body's.
+  // A card may set its title large, the light title-size of the frames; by default it is the body's.
   it("sets its title large when asked, and leaves it at the body's size otherwise", () => {
     render(
       <Card>
@@ -48,7 +48,7 @@ describe("Card", () => {
     return [card.dataset["tone"], card.dataset["edge"], card.dataset["density"]];
   }
 
-  // Under a page's h1, a card's title is an h2 (F305): its level is the page's to say, 3 unless asked.
+  // Under a page's h1, a card's title is an h2: its level is the page's to say, 3 unless asked.
   it.each([2, 3, 4] as const)("titles itself at the level it is given: %i", (level) => {
     render(
       <Card>

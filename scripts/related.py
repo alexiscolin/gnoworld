@@ -1,11 +1,10 @@
 """related.py: the unit tests a commit's change asks for, and the map that finds them (docs/HARNESS.md, "The related tests").
 
 Vitest's own `related` command follows the module graph: a test runs when it imports a changed file, through any chain of
-imports. What sits outside that graph, this script maps (Alexis, 2026-11-04: related tests at each commit, in every area, the
-whole suite at a part's end and at merges):
+imports. What sits outside that graph, this script maps:
 - server/src/main.test.ts runs the server as a child process, which loads core and the schemas outside Vitest's graph: any code
   of the server, core or the schemas adds it. The server loads core's whole index (193 of their 216 files), so a closure of its
-  imports would have spared 6 of slice 7's 226 commits that touch them.
+  imports would spare almost no commit.
 - a file read from disk: every code file under the sources is grepped for the places it names on disk (READ, a path written from the
   repository's root, a root folder's name alone);
   a change at or under a place adds its reader, a test, or a module whose importers Vitest then finds. A place that is a
@@ -28,7 +27,13 @@ import shlex
 import stat
 import sys
 
-SOURCES = re.compile(r"(?:app/src|app/tests|server/src|packages/[^/]+/src)/")
+SOURCES = re.compile(r"(?:app/src|app/tests|server/src|jarvis/src|link-reader/src|packages/[^/]+/src)/")
+# The two places under jarvis/src and link-reader/src that name a place the grep cannot follow, and read none of the repository's
+# files: a fake's own process folder, and a package's file in node_modules. Each is read as written, no other line of its file.
+EXEMPT = {
+    "jarvis/src/testing/fakeGnomcp.ts": "process.cwd()",
+    "link-reader/src/picture.ts": "import.meta.resolve(`${pkg}/package.json`)",
+}
 CODE = re.compile(r"\.(?:[cm]?[jt]s|[jt]sx)$")
 TEST = re.compile(r"\.test\.tsx?$")
 SERVER = ("server/src/", "packages/core/src/", "packages/schemas/src/")
@@ -39,7 +44,7 @@ READ = re.compile(r"""new URL\(\s*(?:"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`|([\w.$]+)
 GLOB = re.compile(r"""import\.meta\.glob\b(?:<[^>()]*>)?\(\s*(\[[^\]]*\]|"[^"\n]*"|'[^'\n]*')""")
 QUOTED = re.compile(r"""["'`]([^"'`\n]*)["'`]""")
 QUERY = re.compile(r"""\b(?:from|import)\s*\(?\s*["']([^"'?\n]+)\?(?:raw|url|inline|worker|sharedworker)\b""")
-# A project's setup files run before each of its tests, which import none of them: a change of one asks for every test (F4828).
+# A project's setup files run before each of its tests, which import none of them: a change of one asks for every test.
 SETUP = re.compile(r"""\b(?:setupFiles|globalSetup)\s*:\s*(\[[^\]]*\]|"[^"\n]*"|'[^'\n]*')""")
 # Every way to name a place on disk relative to a file or to the process: each must sit in a READ or a GLOB.
 ANCHOR = re.compile(
@@ -55,7 +60,7 @@ def tops():
 def sources():
     """(path, plain) for every code file under the sources, from the disk (a commit's staged copy has no repository to ask);
     plain is false for a link or a special file, and for a linked folder, which the walk does not follow."""
-    for top in ("app", "server", "packages"):
+    for top in ("app", "server", "jarvis", "link-reader", "packages"):
         for folder, dirs, files in os.walk(top):
             dirs[:] = sorted(d for d in dirs if d != "node_modules")
             for name in dirs + sorted(files):
@@ -132,6 +137,8 @@ def scan(top_folders):
                 reads.append((file, *got, False))
         for m in bare.finditer(text):
             reads.append((file, m.group(1), False, False))
+        if file in EXEMPT:
+            spans.extend((m.start(), m.end()) for m in re.finditer(re.escape(EXEMPT[file]), text))
         for m in ANCHOR.finditer(text):
             if not any(a <= m.start() < b for a, b in spans):
                 line = text.count("\n", 0, m.start()) + 1
@@ -184,7 +191,7 @@ def main():
             continue
         if path in setups:
             out.update(p for p, plain in sources() if TEST.search(p))
-        out.add(path)  # Vitest follows its importers, a JSON or a stylesheet of app/data or app/lab too (F4810)
+        out.add(path)  # Vitest follows its importers, a JSON or a stylesheet of app/data or app/lab too
         if path.startswith(SERVER) and CODE.search(path) and not TEST.search(path):
             out.add(MAIN)
         out.update(read[0] for read in reads if covers(read, path, top_folders))

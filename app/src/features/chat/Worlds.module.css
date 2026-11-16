@@ -1,7 +1,7 @@
 /* The column of worlds: planets one under another at the video's 44 px, no text, a ring around the one in view (frame 80). */
 @layer components {
   .list {
-    /* the fill-column utility lays it: the planets from the top, the credits at the column's foot (Alexis, 2026-11-07) */
+    /* the fill-column utility lays it: the planets from the top, the credits at the column's foot */
     box-sizing: border-box;
     /* raw: the first planet stands 23 px under the region's top in the frame (76 - 53), 24 here */
     padding-block: var(--space-m) var(--space-s);
@@ -110,7 +110,7 @@
     padding-block: var(--space-2xs);
     text-align: center;
     color: var(--color-text-muted);
-    /* a foot note in the narrow column (Alexis, 2026-11-08: "en plus petit") */
+    /* a foot note in the narrow column */
     font-size: var(--text-3xs);
   }
 

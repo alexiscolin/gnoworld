@@ -1,4 +1,4 @@
-// Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from 7b4's recipe, real maps lending
+// Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from its recipe, real maps lending
 // their fine contrast only, lit with the Earth's own light. Comments live here, out of the strings that ship (the scene's budget).
 import { CONTINENTS_SEA } from "@gnoworld/core";
 import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
@@ -59,7 +59,7 @@ void main() {
   float t;
   vec3 swirled = at;
   if (banded > 0.5) {
-    // Jets (D485): each band slides one way, the next the other. ponytail: they shear without end, past an hour into finer streaks.
+    // Jets: each band slides one way, the next the other. ponytail: they shear without end, past an hour into finer streaks.
     float jet = cloudTime * 0.004 * shape.drift * sin(at.y * max(shape.bands, 2.0) * 1.5708);
     vec3 flowing = vec3(at.x * cos(jet) - at.z * sin(jet), at.y, at.x * sin(jet) + at.z * cos(jet));
     swirled = shape.storms > 0.0 ? stormed(flowing) : flowing;

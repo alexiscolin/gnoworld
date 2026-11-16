@@ -1,5 +1,5 @@
 // What the chat's start builds from its settings, apart: the unknown channels it alerts on, whom a room is listed to, and the
-// verdicts' route (slice 3's plan, 3l, 3m, 4g).
+// verdicts' route.
 import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import type { Rooms } from "./rooms/create.ts";
@@ -27,7 +27,7 @@ export function seedRooms(db: DatabaseSync, settings: Settings, now: number): vo
   ensureNamed(db, typedRooms(settings.worlds), now);
 }
 
-// A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
+// A channel in Ergo the server did not make: with operator-only-creation, an operator made it.
 const unknownChannels =
   (db: DatabaseSync, log: Log) =>
   (names: readonly string[]): void => {
@@ -41,7 +41,7 @@ export const listedTo =
   (room: string, who: string | undefined, archived: boolean = keeper.archived(room)): boolean =>
     archived ? staffOf(settings, room, who) : listed(settings, room, who);
 
-// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
+// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads.
 export function verdictsFor(
   db: DatabaseSync,
   settings: Settings,
@@ -116,7 +116,7 @@ export function linkFor({
   });
 }
 
-/** What an owner's hide and mute do (D13936): the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
+/** What an owner's hide and mute do: the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
 export const ownerActs = (
   db: DatabaseSync,
   { send, link }: { send: (command: Command, params: readonly string[]) => boolean; link: () => Link | undefined },

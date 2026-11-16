@@ -1,4 +1,4 @@
-// The shaders' spaces stripped at build (Alexis, 2026-11-03): a GLSL compiler skips the spaces round its operators and the indentation, and a
+// The shaders' spaces stripped at build: a GLSL compiler skips the spaces round its operators and the indentation, and a
 // built chunk ships them, three's shader library most (about 550 B of the scene's gzip). Each built chunk is parsed; a string or template
 // that reads as GLSL loses them, every token kept in order and every preprocessor line whole; nothing else of the chunk changes.
 
@@ -48,7 +48,7 @@ const edgeOf = (space: string) => (space === "" ? "" : space.includes("\n") ? "\
 
 /** `glsl` with the spaces a compiler skips gone: comments, indentation, empty lines and the spaces round operators; a line the preprocessor
  * reads kept whole on its own line. Its edges are kept as they were, a line break as one and spaces as one space: code joins a string to
- * what stands beside it, a value set in or another string (three's `'#define ' + name`; 7v's security review, F4450). */
+ * what stands beside it, a value set in or another string (three's `'#define ' + name`). */
 export function stripGlsl(glsl: string): string {
   // Whichever comment starts first: `// x /* y` is a line's comment, and the next line is code.
   const uncommented = glsl.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (comment) => (comment.startsWith("//") ? "" : " "));
@@ -84,7 +84,7 @@ const CONTINUED = /\\\r?\n/;
 const opensComment = (part: string) => /\/[/*]/.test(part.replace(/\/\/[^\n]*\n|\/\*[\s\S]*?\*\//g, ""));
 
 // Whether `node` is a string or a template that reads as GLSL. One left whole: a string with a line continuation; a template that holds an
-// escape (its lines are not all its text's) or runs a comment into a value set in (7v's review).
+// escape (its lines are not all its text's) or runs a comment into a value set in.
 function readsAsShader(node: Node): boolean {
   if (node.type === "Literal")
     return typeof node["value"] === "string" && isShader(node["value"]) && !CONTINUED.test(node["value"]);

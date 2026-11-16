@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the agent's helper for every project and every Claude profile on this Mac (gnoworld's D13159, D13160), each file
+# Installs the agent's helper for every project and every Claude profile on this Mac, each file
 # from GitHub at one reviewed, pushed commit (never from this machine's .git, which sessions can write): agent-pr, its guard
 # hook, its skill, its state folder and allow list, and in each profile's settings the denies, the exclusion and the hook.
 # Then it asks for the agent account's token, which nothing shows. Run it in your own Terminal, never from Claude Code:
@@ -129,7 +129,7 @@ for p in everyone:
         rules += [r for r in json.load(f).get("permissions", {}).get("deny", []) if isinstance(r, str)]
 for rule in rules:
     add(deny, rule)
-# The sandbox in every project (D13162): the token is out of reach only of a sandboxed session.
+# The sandbox in every project: the token is out of reach only of a sandboxed session.
 sandbox = s.setdefault("sandbox", {})
 sandbox["enabled"] = True
 sandbox["allowUnsandboxedCommands"] = False

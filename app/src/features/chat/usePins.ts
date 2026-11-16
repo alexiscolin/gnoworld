@@ -1,4 +1,4 @@
-// The shown room's pins, followed and asked for the reader (slice 4's 4d): the asker (askPins.ts) is made once the page
+// The shown room's pins, followed and asked for the reader: the asker (askPins.ts) is made once the page
 // runs, asks the server as the room is shown and each minute while the page shows, and is asked again as the tab
 // shows. A guest's pins are read too (the room's pins are public to whoever may read it).
 import { useEffect, useRef } from "react";

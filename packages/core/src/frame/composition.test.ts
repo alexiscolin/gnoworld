@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { composed, coveredShare, offLine, type Frame } from "./composition.ts";
 import type { Seen } from "./restLook.ts";
 
-// Spots placed by hand just inside and just outside each rule (7d6's review, F4251): the view's sets never come near its limits.
+// Spots placed by hand just inside and just outside each rule: the view's sets never come near its limits.
 const spot = (x: number, y: number, [radius, away] = [4, 40]): Seen => ({
   x,
   y,
@@ -32,7 +32,7 @@ describe("the densest group", () => {
     expect(composed([...four, spot(95, 55)], spot(190, 110), FLAT)).toBe(false);
   });
 
-  // Seen on 7d6's review: a box centred on each body misses a group at the corners of one box.
+  // A box centred on each body misses a group at the corners of one box.
   it("refuses five bodies in any such box, though no box centred on one of them holds all five", () => {
     const five = [spot(0, 0), spot(199, 0), spot(0, 119), spot(199, 119), spot(100, 0)];
     expect(composed(five, spot(100, 300), FLAT)).toBe(false);
@@ -110,7 +110,7 @@ describe("no line, and depth with a close world", () => {
   });
 });
 
-// The chief, 2026-11-02: a line is not wrong in itself (Alexis's references put worlds on a slanted line that recedes, and that is depth); a
+// A line is not wrong in itself (a slanted line that recedes is depth); a
 // row of three or more is refused when it does not recede, its sizes falling less than twice from near to far. It is judged on what stands
 // on the screen: centres on it, and the glowing stars.
 describe("a row of bodies", () => {
@@ -143,7 +143,7 @@ describe("a row of bodies", () => {
   });
 });
 
-// The chief, 2026-11-03: what gives a planetarium away is a row at like gaps; a line at unequal gaps reads as depth. Three bodies, or
+// What gives a planetarium away is a row at like gaps; a line at unequal gaps reads as depth. Three bodies, or
 // three glowing stars, a tenth or less off a line, their two gaps alike within 15%, are refused among others off it; a mix is not judged.
 describe("a row at like gaps", () => {
   const SIZE = { width: 1728, height: 1080 };

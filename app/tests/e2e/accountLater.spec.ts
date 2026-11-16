@@ -5,7 +5,7 @@ import { logIn } from "./irc.ts";
 import { opened } from "./scripted.ts";
 
 // Code only an account uses (direct messages, notifications, what an account keeps) is not a visitor's first screen's
-// (ADR-0001 §12; docs/decisions.md, 2026-10-27's rule): a script holding one of these words is an account's.
+// (ADR-0001 §12): a script holding one of these words is an account's.
 const ACCOUNT_ONLY = [
   "Not encrypted: the server can read these.",
   "Direct message with",
@@ -18,7 +18,7 @@ const ACCOUNT_ONLY = [
   "@+typing=",
   "MARKREAD ",
   "+gnoworld/edit=",
-  // The country an account declares (7j): the tag it sends.
+  // The country an account declares: the tag it sends.
   "+gnoworld/country=",
 ];
 

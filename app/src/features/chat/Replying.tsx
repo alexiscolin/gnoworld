@@ -1,5 +1,5 @@
-// What a line answers (slice 4's 4d replies): its author and its words in one line, as the room reads them, cut between
-// graphemes, markup kept as text; or an earlier message, when the room no longer holds it.
+// What a line answers: its author and its words in one line, as the room reads them, cut between
+// graphemes, markup kept as text; or an earlier message, when the room does not hold it.
 import { excerpt, type Line } from "@gnoworld/core";
 import { shortened } from "./shortened.ts";
 import { Person } from "./Person.tsx";
@@ -35,12 +35,12 @@ export function Replying({ to, length, known }: { to: Answered | undefined; leng
   );
 }
 
-// The graphemes a reply quotes of the line it answers (docs/decisions.md, 2026-10-26).
+// The graphemes a reply quotes of the line it answers.
 const QUOTED = 70;
 
 // Above a reply, the line it answers, or an earlier message when the room holds it no more; nothing above another line.
 // `known` is the addresses in the words shortened, space-separated: a string React compares by value, so a quote keeps
-// its cut while the room's lines and members change around it (F1220).
+// its cut while the room's lines and members change around it.
 export function Quote({ line, answers, known }: { line: Line; answers: Line | undefined; known: string }) {
   if (line.reply === undefined) return null;
   const shortenable = new Set(known.split(" "));

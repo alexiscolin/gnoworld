@@ -1,4 +1,4 @@
-// The real server behind the journeys' /api (slice 4's 4a) and the real Ergo behind their /ws (4b), as nginx puts
+// The real server behind the journeys' /api and the real Ergo behind their /ws, as nginx puts
 // them behind the demo's: each started on free ports with a database or a folder of its own, the server linked
 // to Ergo as the stack links it, and each request or upgrade relayed with the visitor's address (X-Real-IP for the
 // server, which it believes from this host alone; X-Forwarded-For for Ergo, which does from localhost). Each
@@ -20,7 +20,7 @@ import { wallet } from "../../../server/src/testing/signer.ts";
 const ENTRY = fileURLToPath(new URL("../../../server/src/main.ts", import.meta.url));
 const AUTH_PORT = fileURLToPath(new URL("authPort.mjs", import.meta.url));
 const ROLES = fileURLToPath(new URL("../../../server/roles.json", import.meta.url));
-// The journeys' rooms (4b), added to the shipped roles file's Bubble: a section, Talk, of #games then the main
+// The journeys' rooms, added to the shipped roles file's Bubble: a section, Talk, of #games then the main
 // room, and #news outside it; so the first room listed is not the main one.
 const BUBBLE = {
   rooms: [
@@ -30,7 +30,7 @@ const BUBBLE = {
   sections: [{ name: "Talk", rooms: ["#bubble/games", "#bubble"] }],
 };
 
-// The shipped roles file, with the journeys' rooms and Bubble's moderators (test wallets moderator0 to moderator8, 4d's pins) for the
+// The shipped roles file, with the journeys' rooms and Bubble's moderators (test wallets moderator0 to moderator8, for the pins) for the
 // journeys alone; written where the server reads it; its worlds. The workshop takes the shipped file, its team the addresses `team`
 // names (WORKSHOP_TEAM), none by default.
 function writeRoles(path, journeys, team = []) {
@@ -74,11 +74,11 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
     jobs === undefined,
     jobs === undefined ? [] : teamOf(process.env.WORKSHOP_TEAM),
   );
-  // The workshop keeps its chat from one run to the next, as the playground does (Alexis, 2026-11-08: "le chat est vide?"): the
+  // The workshop's chat lasts from one run to the next, as the playground's does: the
   // server's database and Ergo's folder (its rooms, accounts and history) live in the workshop's data folder; the journeys' stay temporary.
-  const kept = jobs === undefined ? undefined : join(jobs.dir, "backend");
-  if (kept !== undefined) mkdirSync(join(kept, "ergo"), { recursive: true });
-  const ergoDir = kept === undefined ? {} : { dir: join(kept, "ergo") };
+  const dataDir = jobs === undefined ? undefined : join(jobs.dir, "backend");
+  if (dataDir !== undefined) mkdirSync(join(dataDir, "ergo"), { recursive: true });
+  const ergoDir = dataDir === undefined ? {} : { dir: join(dataDir, "ergo") };
   const ergo = await startErgo({
     origins,
     operPassword,
@@ -99,7 +99,7 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
   const child = spawn(process.execPath, ["--disallow-code-generation-from-strings", "--import", AUTH_PORT, ENTRY], {
     env: {
       PATH: process.env.PATH ?? "",
-      DATABASE: join(kept ?? dir, "server.db"),
+      DATABASE: join(dataDir ?? dir, "server.db"),
       LOG_PEPPER_FILE: join(dir, "pepper"),
       PORT: String(apiPort),
       ORIGINS: origins.join(","),
@@ -109,7 +109,7 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
       ERGO_PORT: String(ergo.port),
       ERGO_OPER_PASSWORD_FILE: join(dir, "oper"),
       ROLES_FILE: join(dir, "roles.json"),
-      // D218: only GovDAO can be first charted, which arrival.spec.ts owns: the worlds the other journeys open, Bubble and
+      // Only GovDAO can be first charted, which arrival.spec.ts owns: the worlds the other journeys open, Bubble and
       // Earth, are never charted, so their plates and pictures stay as they were and no journey earns a banner by its order.
       ...(jobs === undefined ? { FIRST_TO_CHART_WORLDS: "govdao" } : {}),
       // The workshop's jobs (config.ts): they read the default universe's chain and write these files, which its dev server serves.
@@ -125,7 +125,7 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
       ...(standin === undefined
         ? {}
         : { JARVIS: "on", JARVIS_URL: standin.url, JARVIS_DOOR_KEY_FILE: join(dir, "jarvis-key") }),
-      // A guest speaks only with moderation (D430, closed without it): the workshop alone may be given the key's file, by its absolute path (D564).
+      // A guest speaks only with moderation (closed without it): the workshop alone may be given the key's file, by its absolute path.
       ...(jobs !== undefined && process.env.WORKSHOP_OPENAI_KEY_FILE
         ? { OPENAI_API_KEY_FILE: process.env.WORKSHOP_OPENAI_KEY_FILE }
         : {}),

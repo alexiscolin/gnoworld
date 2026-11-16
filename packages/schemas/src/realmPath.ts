@@ -1,4 +1,4 @@
-// A realm's path, a chain's id, a world's id and a chain's count (7c), which the worlds' file, the ticker's trends and every request
+// A realm's path, a chain's id, a world's id and a chain's count, which the worlds' file, the ticker's trends and every request
 // that names a realm or a chain check: one grammar each, so no schema takes a realm or a chain another refuses on its way to a signature.
 import { WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";

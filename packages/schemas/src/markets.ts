@@ -1,4 +1,4 @@
-// The file the server's prices timer writes and the home page reads (ADR-0002 §6, "Prices"; slice 5 part 2, 5l):
+// The file the server's prices timer writes and the home page reads (ADR-0002 §6, "Prices"):
 // where the prices come from, when they were read, and the tokens that have a price, in the video's order.
 import { z } from "./zod.ts";
 
@@ -19,7 +19,7 @@ export type MarketToken = z.infer<typeof MarketToken>;
 
 /** The default universe's latest block as its RPC gave it (the server reads it with the prices): its height (1 to a trillion, a whole number), its own time, the host it was read from and, when two reads gave it, the average seconds between blocks. */
 export const MarketBlock = z.strictObject({
-  // Not z.int(): its class would sit in the store's chunk, which the first screen loads (F2976; indexer.ts).
+  // Not z.int(): its class would sit in the store's chunk, which the first screen loads (indexer.ts).
   height: z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(1e12)),
   // At most 40 characters: RFC 3339 allows any run of fractional digits, and 20 KB of them would put the file past the browser's 16 KB.
   time: z.iso.datetime({ offset: true }).check(z.maxLength(40)),

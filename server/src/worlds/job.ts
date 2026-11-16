@@ -1,6 +1,6 @@
-// The worlds job (slice 7, 7c; plan §3 "The server's new reads"): every half hour it reads a universe's realm list, groups the realms into
+// The worlds job: every half hour it reads a universe's realm list, groups the realms into
 // worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions, imports), the chain
-// for each deployer's name and its indexer for every call (7k3), and writes worlds.json and its count (7n2) beside and renamed over. One
+// for each deployer's name and its indexer for every call, and writes worlds.json and its count beside and renamed over. One
 // call at a time, each started a pause after the last, every answer capped and parsed. A fault of the list keeps the last files; a silent
 // indexer leaves a world at rest (its last counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind.
 import { worldsDrawn } from "@gnoworld/core";
@@ -34,7 +34,7 @@ export interface RunOptions {
   /** The transactions a page of the indexer's read asks, history.ts's unless a test says less. */
   historyPage?: number;
   isStopped?: () => boolean;
-  /** Each realm's rollup (13a): its state's database and the folder of its files; none without it. */
+  /** Each realm's rollup: its state's database and the folder of its files; none without it. */
   rollup?: { db: DatabaseSync; dir: string };
   /** The token store the server's route reads too, so a reset of a pass clears the route's answers; none: each pass makes its own. */
   tokens?: TokenStore;

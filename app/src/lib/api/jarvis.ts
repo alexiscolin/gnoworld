@@ -9,7 +9,7 @@ import { jsonCall, type Fetcher, type Result } from "./http.ts";
 export const KeptAnswer = z.strictObject({ answer: JarvisAnswer, asker: z.string() });
 export type KeptAnswer = z.infer<typeof KeptAnswer>;
 
-/** The most code points a person's own question holds (D13986); the server's cap is higher and its own. */
+/** The most code points a person's own question holds; the server's cap is higher and its own. */
 export const QUESTION_CHARS = 500;
 // The door waits for jarvis up to ASK_WAIT_S.door and keeps the call whatever the page does: the page waits 10 s longer, so a slow answer is not lost.
 const ASK_MS = ASK_WAIT_S.page * 1000;

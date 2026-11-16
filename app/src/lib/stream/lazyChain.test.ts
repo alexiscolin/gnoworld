@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChainFeed } from "./chainFeed.ts";
 import { lazyChain } from "./lazyChain.ts";
 
-// Slice 9g: the feed's chunk is asked for on the first event, once, and what came meanwhile is given to it in order.
+// The feed's chunk is asked for on the first event, once, and what came meanwhile is given to it in order.
 function setup() {
   const told: string[] = [];
   const stop = vi.fn();

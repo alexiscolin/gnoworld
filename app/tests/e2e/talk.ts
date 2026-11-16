@@ -1,4 +1,4 @@
-// What 4d's journeys share: #games' history, a TAGMSG and a tagged line as Ergo replays or relays them, a line's bar,
+// What the chat journeys share: #games' history, a TAGMSG and a tagged line as Ergo replays or relays them, a line's bar,
 // the composer's field, and the test's account on a scripted Ergo that echoes it.
 import { lines, word } from "./chat.ts";
 import type { Locator } from "@playwright/test";
@@ -33,7 +33,7 @@ export const barOf = (page: Page, at: number) =>
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 
 /** The test's account on a scripted Ergo that echoes what the page says, its script made with the account's address,
- * the room showing `shown` lines; what the page says in a room, as it sends it, its typing (4f) left out. */
+ * the room showing `shown` lines; what the page says in a room, as it sends it, its typing left out. */
 export async function asAccount(page: Page, script: (address: string) => Scripted = () => ({}), shown = 2) {
   const address = await logIn(page, word("talk"));
   const sent: string[] = [];

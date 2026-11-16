@@ -1,7 +1,7 @@
-// The chat's link to Ergo (slice 4's merge 4b): one connection for the page, as the session says (a guest
+// The chat's link to Ergo: one connection for the page, as the session says (a guest
 // when nobody is logged in, the account when one is), in the rooms the world page follows, 100 at most
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
-// Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
+// Ergo paces a client to 2 lines a second; Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
 import { BatchReader, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";

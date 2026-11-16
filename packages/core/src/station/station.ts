@@ -1,4 +1,4 @@
-// A station from its seed (part 7x; Alexis, 2026-11-04, "Avant la démo"): a project's name joins a spine, wheels, arms, wings of cells,
+// A station from its seed: a project's name joins a spine, wheels, arms, wings of cells,
 // dishes and lights, and past a size an artificial world's great wheel or shell, each count, length and turn from its own draws, so no two
 // names build alike and none is picked from a set of models. Its size, 0 a small satellite to 1 an artificial world, comes from the caller:
 // a sign, read from the team's file, never from the name. Its parts stand within a reach of 1.
@@ -10,8 +10,7 @@ import { greatWheelOf, shellOf } from "./great.ts";
 import { at, reachOf, scaled, type Part } from "./parts.ts";
 import { sidesOf, spineOf, type Spine } from "./spine.ts";
 
-/** The one switch for the stations round the Earth (Alexis, 2026-11-08: "enlève les mcp, adena, gnosh etc. : plus aucun satellite et station pour
- * le moment"). Off: the scene draws none, the hubs of kind "station" are not offered as places, and a direct URL still opens their page. */
+/** The one switch for the stations round the Earth. Off: the scene draws none, the hubs of kind "station" are not offered as places, and a direct URL still opens their page. */
 export const STATIONS_SHOWN = false as boolean;
 
 export interface Station {

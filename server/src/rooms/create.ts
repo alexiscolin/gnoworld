@@ -1,7 +1,7 @@
-// A world's further rooms (slice 3's plan, 3l; decisions 147, 162): made by its moderators as
+// A world's further rooms: made by its moderators as
 // #<world>/<name>, recorded, joined by the bot and open to accounts (+M); archived, never destroyed:
 // read-only (+m) and unlisted (+s), its name and its place in the world's cap kept. The reconciler
-// (reconcile.ts, 3m) puts the modes back from what Ergo says, so a room Ergo lost comes back as it was.
+// (reconcile.ts) puts the modes back from what Ergo says, so a room Ergo lost comes back as it was.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Command } from "../irc/lines.ts";
@@ -11,7 +11,7 @@ export const ROOM_STATE = `
 ALTER TABLE rooms ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
 `;
 
-// The rooms made for realms (D390), told from a moderator's: they have a cap of their own and take nothing of a world's.
+// The rooms made for realms, told from a moderator's: they have a cap of their own and take nothing of a world's.
 export const REALM_TABLES = `
 CREATE TABLE realm_rooms (name TEXT PRIMARY KEY) STRICT;
 `;
@@ -22,7 +22,7 @@ export const REALM_PATH = `
 ALTER TABLE realm_rooms ADD COLUMN path TEXT;
 `;
 
-// The Earth's public rooms (D394): any signed-in account makes one, so each records its maker, who moderates it, and when.
+// The Earth's public rooms: any signed-in account makes one, so each records its maker, who moderates it, and when.
 export const EARTH_TABLES = `
 CREATE TABLE earth_rooms (name TEXT PRIMARY KEY, maker TEXT NOT NULL, created_at INTEGER NOT NULL) STRICT;
 CREATE INDEX earth_rooms_by_maker ON earth_rooms (maker, created_at);
@@ -55,7 +55,7 @@ export interface Rooms {
   isRealm: (room: string) => boolean;
   /** What `earth` would answer, with no work done: "ok", or the refusal. */
   mayEarth: (maker: string, name: string) => "ok" | "exists" | "full" | "too_long" | "day";
-  /** A public room of the Earth (D394), made by any account: its own cap and its maker's 3 a day, none of a world's 20. */
+  /** A public room of the Earth, made by any account: its own cap and its maker's 3 a day, none of a world's 20. */
   earth: (maker: string, name: string) => { made: string } | "exists" | "full" | "too_long" | "day";
   /** The account that made a public room of the Earth, who moderates it; none for any other room. */
   maker: (room: string) => string | undefined;

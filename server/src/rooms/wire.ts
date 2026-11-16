@@ -1,4 +1,4 @@
-// The rooms' part of the chat (slice 3's plan, 3l, 3m): the roles file's typed rooms, the reconciler that
+// The rooms' part of the chat: the roles file's typed rooms, the reconciler that
 // keeps each room as its type says, and the rooms' keeper as the routes use it.
 import type { DatabaseSync } from "node:sqlite";
 import type { Mutes } from "../moderation/mute.ts";
@@ -8,11 +8,11 @@ import { makeReconciler, type Reconciler } from "./reconcile.ts";
 import { listRooms, mainRoom, worldOf } from "./rooms.ts";
 import { desired, type Typed, type World } from "./types.ts";
 
-// The roles file's typed rooms, each with its world (3m).
+// The roles file's typed rooms, each with its world.
 export const typedRooms = (worlds: ReadonlyMap<string, World>) =>
   [...worlds].flatMap(([world, { rooms }]) => [...(rooms?.keys() ?? [])].map((name) => ({ name, world })));
 
-// Each room kept as its type says (3m), from what Ergo says it is: an archived room read-only and unlisted.
+// Each room kept as its type says, from what Ergo says it is: an archived room read-only and unlisted.
 export function reconcilerFor(
   db: DatabaseSync,
   roles: Typed,
@@ -29,8 +29,8 @@ export function reconcilerFor(
   });
 }
 
-// The rooms as the routes make and archive them (3l): a room made gets the live mutes; a room archived is
-// put as its type says at once, its voices taken, not at the next minute's pass (F580).
+// The rooms as the routes make and archive them: a room made gets the live mutes; a room archived is
+// put as its type says at once, its voices taken, not at the next minute's pass.
 export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; reconciler: Reconciler }): Rooms {
   return {
     ...keeper,
@@ -57,7 +57,7 @@ export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; re
   };
 }
 
-/** The Earth's public rooms nobody writes in are archived once an hour and at start (D394). The archive is a decision on the lines the
+/** The Earth's public rooms nobody writes in are archived once an hour and at start. The archive is a decision on the lines the
  * verdicts hold, which the reconciler does not read: it only puts Ergo as the database says, at once for each room swept (keeping's archive). */
 export function sweeping(
   db: DatabaseSync,

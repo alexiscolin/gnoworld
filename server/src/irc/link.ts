@@ -1,4 +1,4 @@
-// The server's IRC link (slice 3's plan, 3h, 3j, 3k, 3m): one TCP connection to Ergo's internal listener,
+// The server's IRC link: one TCP connection to Ergo's internal listener,
 // as its operator, in every room. It reads the rooms' messages, never a direct one, and sends only the
 // commands lines.ts lists, each through formatLine. It comes back after a close, and after three
 // unanswered pings, then asks each room's history from the time of the last line checked there, a page at
@@ -21,10 +21,10 @@ export interface Link {
   send: (command: Command, params: readonly string[]) => boolean;
   // A room's flags, invite list and people, once it is in its rooms; undefined otherwise or past stateMs.
   state: (room: string) => Promise<RoomState | undefined>;
-  // One line of a room by its id, as Ergo holds it now (4d, pins): "gone" when Ergo holds none, "unanswered" when it
+  // One line of a room by its id, as Ergo holds it (for the pins): "gone" when Ergo holds none, "unanswered" when it
   // could not be asked or did not answer in time.
   line: (room: string, msgid: string) => Promise<Fetched>;
-  // A guest's line said by the bot as anon/<name> (RELAYMSG, D430): whether Ergo took it.
+  // A guest's line said by the bot as anon/<name> (RELAYMSG): whether Ergo took it.
   relay: (room: string, nick: string, text: string) => Promise<Relayed>;
   // The relays waiting for Ergo's word now.
   relaying: () => number;
@@ -75,7 +75,7 @@ function splitter(s: Socket, read: (s: Socket, message: IrcMessage) => void, log
 
 // The capabilities it asks, its nick and its user, the lines a connection opens with. multi-prefix: NAMES gives each person every power;
 // sasl: the bot logs in as its account; message-redaction: Ergo tells each REDACT, the bot's own too (irc/handlers.go:3010), for the pins;
-// draft/multiline: a message of several lines comes whole (several.ts); labeled-response: Ergo's answer to a relay carries its label (D430).
+// draft/multiline: a message of several lines comes whole (several.ts); labeled-response: Ergo's answer to a relay carries its label.
 function greet(s: Socket): void {
   const caps =
     "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline labeled-response";

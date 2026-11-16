@@ -1,4 +1,4 @@
-// The server's own JSON reads (lib/api) as queries (slice 13): their `Result` is a value, so a failed one throws `Unread` for the query to keep its last
+// The server's own JSON reads (lib/api) as queries: their `Result` is a value, so a failed one throws `Unread` for the query to keep its last
 // good data and cache no failure; a network drop or a 5xx may be asked again (client.ts's rule), a refusal or a malformed answer never. Their
 // calls hold a time limit and the schema already (lib/api/http.ts), so no second one is added here.
 import { isCancelled, isUnread, Unread } from "./client.ts";

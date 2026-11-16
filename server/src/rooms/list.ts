@@ -1,8 +1,8 @@
-// GET /api/rooms?world=<slug> (slice 4's plan, 4b; decisions of 2026-10-25): a world's rooms a reader may
+// GET /api/rooms?world=<slug> a world's rooms a reader may
 // see, in the sections its moderators set in the roles file, a section named null holding the others. A
 // room is listed to whom `visible` lets see it, by the login's session, as the activity route lists it:
 // the answer to a session is private, and a section with no room to show is left out, its name with it. Each room carries
-// the people here now and its lines of the last 24 hours when there are any (D394); on the Earth the rooms anyone made
+// the people here now and its lines of the last 24 hours when there are any; on the Earth the rooms anyone made
 // follow the moderators' own, by people here, then lines, then the newest.
 import type { DatabaseSync } from "node:sqlite";
 import { RoomList, type ApiError } from "@gnoworld/schemas";
@@ -132,7 +132,7 @@ export function listRoutes({
     if (!parsed.success) return c.json({ error: "refused" } satisfies ApiError, 400);
     const world = parsed.data;
     const who = session(getCookie(c, "__Host-session"));
-    // The answer depends on the session: a shared cache keeps each cookie's apart (F585).
+    // The answer depends on the session: a shared cache keeps each cookie's apart.
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
     c.header("vary", "cookie");
     const kept = who === undefined ? guests.get(world) : undefined;

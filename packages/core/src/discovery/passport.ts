@@ -1,6 +1,6 @@
-// The passport (slice 8; ADR-0002 §1, Passport): a stamp per world visited, on the device, keyed "universe:world"; progress per
+// The passport (ADR-0002 §1, Passport): a stamp per world visited, on the device, keyed "universe:world"; progress per
 // constellation, a world counted once in the one it belongs to, and the header's counter out of the worlds the reader's own view lists
-// (ADR-0002 §3, Alexis's answer 1 to slice 8's plan).
+// (ADR-0002 §3).
 
 /** The device's key of world `world` of `universe`. */
 export const stampKey = (universe: string, world: string): string => `${universe}:${world}`;

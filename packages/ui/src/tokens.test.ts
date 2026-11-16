@@ -56,7 +56,7 @@ describe("parseTokens", () => {
   });
 
   // The plate's and the composer's own layout variables, and the animation's per-element ones, are set in :root as defaults for a stylesheet's
-  // `var()` (slice 13): not design tokens, so no group draws them; a new name in none still fails here, until it is a token with its group or is named here.
+  // `var()`: not design tokens, so no group draws them; a new name in none still fails here, until it is a token with its group or is named here.
   const LAYOUT_VARIABLES = [
     "--chart-h",
     "--chart-h-l",
@@ -160,7 +160,7 @@ describe("the tokens", () => {
   });
 
   it("make every colour role of primitives only, never of a raw value", () => {
-    // A link takes the colour of the text round it (`--color-link`, 977255f1): no colour of its own, so none to be raw.
+    // A link takes the colour of the text round it (`--color-link`): no colour of its own, so none to be raw.
     for (const token of tokens().filter((t) => t.name.startsWith("--color-") && t.value !== "currentcolor")) {
       expect(token.value).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|oklab)a?\(/i);
       // A role may be a wash of another role (the pill glass is the surface's): that one is of primitives in its turn.
@@ -247,14 +247,14 @@ describe("the tokens", () => {
     expect(value(name)).toBe(px);
   });
 
-  // F5967 (answer 9k-3): the video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.
+  // The video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.
   it("set the medium control to 44 px on every pointer, a coarse one setting none of its own", () => {
     const coarse = /@media \(pointer: coarse\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(value("--control-m")).toBe("44px");
     expect(parseTokens(`:root {${coarse}}`).map(({ name }) => name)).not.toContain("--control-m");
   });
 
-  // D363: every other duration is multiplied by --motion-scale, 0 here.
+  // Every other duration is multiplied by --motion-scale, 0 here.
   it("still the fast and the base motion under reduced motion, and the scale of every other, and keep the wait", () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(parseTokens(`:root {${reduced}}`).map(({ name, value: v }) => [name, v])).toEqual([
@@ -276,7 +276,7 @@ describe("the writing direction", () => {
   });
 });
 
-// The UX review (U5, U11): what is new has a token of its own, coral as the prototype set it, not the danger token; its
+// What is new has a token of its own, coral as the prototype set it, not the danger token; its
 // rule holds WCAG 1.4.11's 3:1 against the page, being the one mark of the line's start.
 describe("the New mark's colours", () => {
   it("names coral for what is new, and its rule above 3:1 on the page", () => {
@@ -285,21 +285,21 @@ describe("the New mark's colours", () => {
   });
 });
 
-// F5954 (frames 10 and 110): the sentence under a title is 13 px with a reading leading, which --font-ui (leading 1, weight 500) is not.
+// Frames 10 and 110: the sentence under a title is 13 px with a reading leading, which --font-ui (leading 1, weight 500) is not.
 describe("the reading font", () => {
   it("is Geist 400 at 13 px with a leading of 1.5, in a token of its own", () => {
     expect(value("--font-reading")).toBe("400 0.8125rem/1.5 var(--family-sans)");
   });
 });
 
-// F5969 (answer 9k-3): frame 10's dialog title has capitals 19 px tall (rows 390 to 408), where Geist 300 at 28 px draws 20.
+// Frame 10's dialog title has capitals 19 px tall (rows 390 to 408), where Geist 300 at 28 px draws 20.
 describe("the panel and dialog title", () => {
   it("is Geist 300 at 26 px", () => {
     expect(value("--font-title-m")).toBe("300 1.625rem/1 var(--family-sans)");
   });
 });
 
-// F5980 (answer 9k-3): frame 10's placeholder is dimmer than the field's prefix (luma 128 against 174); a placeholder is
+// Frame 10's placeholder is dimmer than the field's prefix (luma 128 against 174); a placeholder is
 // text, so it keeps WCAG AA's 4.5:1 on the field's fill wherever a field sits: the dialog's night, the page's space, and a
 // card's fill under the field's own (the call card), which the frame's 4.44:1 grey would not.
 describe("the placeholder's grey", () => {
@@ -316,7 +316,7 @@ describe("the placeholder's grey", () => {
   });
 });
 
-// docs/DESIGN-SYSTEM.md, "Type" (Alexis, 2026-10-31): the instrument figures, the board "Instrument" of the counter-proposal: Geist
+// docs/DESIGN-SYSTEM.md, "Type": the instrument figures, the board "Instrument" of the counter-proposal: Geist
 // Mono 500, 44 px (the video's figure on a plate); the Stat takes it (worldPage.spec.ts reads what it draws).
 describe("the instrument figure", () => {
   it("is Geist Mono 500 at 44 px, in a token of its own", () => {

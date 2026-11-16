@@ -23,7 +23,7 @@ export type AppState = LoginSlice &
   DeviceSlice &
   SignalsSlice &
   ChainSlice & {
-    /** The page's Adena, set by a call card's first gesture so the login follows its account (F5651). Absent until then. */
+    /** The page's Adena, set by a call card's first gesture so the login follows its account. Absent until then. */
     wallet?: unknown;
   };
 // The calls' slice (lib/calls.ts) is added when a realm view draws its first card, so it is not in this type: features/calls/slice.ts
@@ -52,7 +52,7 @@ export const createAppStore = () => {
   }));
   // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines or pins,
   // whether or not the chat is open to begin the new one (the link then reads its account's device). The first session,
-  // from none, has none to leave. This is the one place that ends a session's state (F2091).
+  // from none, has none to leave. This is the one place that ends a session's state.
   store.subscribe((state, before) => {
     if (!sessionChanged(state, before)) return;
     state.chatActions.follow([]);

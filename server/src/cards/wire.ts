@@ -1,5 +1,5 @@
-// The link cards as the server wires them (slice 13, L3): the flow the chat makes behind its one breaker, the lines it hears after the search index
-// has, and what main hands the retention before the chat exists.
+// The link cards as the server wires them: the flow the chat makes behind its one breaker, the lines
+// it hears after the search index has, and what main hands the retention before the chat exists.
 import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import type { Config } from "../config.ts";

@@ -1,13 +1,13 @@
 // The air: light scattered along each ray through a shell, not a painted rim, so a world lit from behind wears a thin ring of light and a
 // sunset along its terminator. Eight steps a pixel, in the world's own radii, over the whole disc: the shell's front covers it, so a close world pays for all of it.
 // A glowing world's air takes light from its own glow (`selfLight`, its level): its edge in its air's cream all round, as frame 4's Music.
-// Framed close on a page (`close`, D458), its lit limb is pushed into a bright crescent toward the sun.
+// Framed close on a page (`close`), its lit limb is pushed into a bright crescent toward the sun.
 import { FARAWAY } from "./chunks.ts";
 import { PLATE_CLEAR } from "./plateMask.ts";
 
-/** The light scattered past the limb of a world framed close (D463): a quad turned to the eye in the plane of the planet's middle; its air's
+/** The light scattered past the limb of a world framed close: a quad turned to the eye in the plane of the planet's middle; its air's
  * colour past the limb, thick on the lit side and gone round the night, and where the sun stands at the limb a warm glare that washes over
- * it with a lens's level streak (D482), the stronger the more the sun stands behind the planet; none over the plate's words (D490). */
+ * it with a lens's level streak, the stronger the more the sun stands behind the planet; none over the plate's words. */
 export const GLOW_VERTEX = /* glsl */ `
 uniform vec3 sun;
 varying vec2 vAt;

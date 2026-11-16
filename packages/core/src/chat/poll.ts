@@ -1,4 +1,4 @@
-// A poll in a room (slice 8's 8d; the video's frames 68 to 76): a line of text any IRC client reads, a question after the
+// A poll in a room: a line of text any IRC client reads, a question after the
 // chart mark and one answer a line after its keycap, whose votes are the line's reactions with those keycaps (+draft/react,
 // which Ergo relays, stores and replays: deploy/ergo/ircd.yaml.tmpl's tagmsg-storage). One vote an account: its newest
 // keycap still on. Nothing new on the wire, so no server keeps a count: each page counts what its room's window holds.

@@ -1,4 +1,4 @@
-// Speed, as the demo shows it (D401): a radial blur towards where the camera goes, only while the stage seems to move fast (at rest no
+// Speed: a radial blur towards where the camera goes, only while the stage seems to move fast (at rest no
 // extra pass is drawn), and dust that streams past the eye in a flight, wrapped round it on the GPU so the CPU writes nothing a frame.
 import {
   BufferGeometry,
@@ -23,8 +23,8 @@ import type { Rig } from "./rig.ts";
 import { BLUR_FRAGMENT, BLUR_VERTEX, DUST_FRAGMENT, DUST_VERTEX } from "./speedShaders.ts";
 import { ADDITIVE } from "../additive.ts";
 
-// The blur's strength by the stage's speed (its moves over its distance, a second): none under 0.8, all from 3.2; at most half (the
-// demo's 0.5), reaching 14 % of the way to the centre at its strongest.
+// The blur's strength by the stage's speed (its moves over its distance, a second): none under 0.8, all from 3.2; at most half,
+// reaching 14 % of the way to the centre at its strongest.
 const BLUR_FROM = 0.8;
 const BLUR_FULL = 3.2;
 const BLUR_MOST = 0.5;

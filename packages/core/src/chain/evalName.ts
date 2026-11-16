@@ -1,4 +1,4 @@
-// Tier 1 (docs/REVIEW.md). The one widening of the `vm/qeval` builder (slice 7, 7c): the name registered for an address. It lives
+// Tier 1 (docs/REVIEW.md). The one widening of the `vm/qeval` builder: the name registered for an address. It lives
 // here so the app and the server build it from one function; app/src/lib/chain/evalCall.ts re-exports it beside its own builder.
 
 /** bech32's alphabet, lower case: no b, i, o or 1. */

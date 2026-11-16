@@ -1,6 +1,6 @@
-// GET /api/verdicts?room=<room>&ids=<msgid,...> (slice 4's 4g; docs/decisions.md, 2026-10-26): the latest verdict of
+// GET /api/verdicts?room=<room>&ids=<msgid,...>: the latest verdict of
 // each line asked, for the lines a page shows older than the stream's replay. Answered for a room the reader may
-// read alone, as the stream and GET /api/rooms are (3m); a visitor's requests limited, refused ones counted.
+// read alone, as the stream and GET /api/rooms are; a visitor's requests limited, refused ones counted.
 import type { DatabaseSync } from "node:sqlite";
 import { type ApiError, LineVerdicts, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";

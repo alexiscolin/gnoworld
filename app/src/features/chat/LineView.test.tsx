@@ -6,8 +6,8 @@ import { setJarvisSaidDrawing } from "../../jarvisHere.ts";
 import { all, faceOf, follows, mount, one } from "../../../tests/mount.tsx";
 import { LineView, type LineViewProps } from "./LineView.tsx";
 
-// 5q: a message as the video shows it (frame 23.58.01): the person's nebula, the name,
-// the time at the right edge, the text below. "Translated" waits for slice 10.
+// A message as the video shows it (frame 23.58.01): the person's nebula, the name,
+// the time at the right edge, the text below.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const bare = {
@@ -146,7 +146,7 @@ describe("a line's marks in the new head", () => {
   });
 });
 
-// 7j: the country a line declares, between the face and the name as the video's frames 40 and 60 draw it; a reader and a screen reader get
+// The country a line declares, between the face and the name as the video's frames 40 and 60 draw it; a reader and a screen reader get
 // its name. What the table of countries does not hold is no country, here as on the Earth.
 describe("a line's country", () => {
   const mark = (row: Element) => row.querySelector("[data-line-country]");

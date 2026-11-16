@@ -6,7 +6,7 @@ const RETRY_MS = 15_000;
 
 /** A timer's waits, pass after pass, told each pass's fault (none when it went well): after one that `soon` names (by default a call that
  * reached nothing), RETRY_MS doubled for each such pass in a row, never past `everyMs`; after any other, `everyMs`. So a way out that never
- * comes is asked ever less often, and a host that answers badly no sooner than the plan says (F4872). */
+ * comes is asked ever less often, and a host that answers badly no sooner than the plan says. */
 export function waits(
   everyMs: number,
   soon: (kind: Kind) => boolean = reachedNothing,

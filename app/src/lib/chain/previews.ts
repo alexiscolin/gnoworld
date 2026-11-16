@@ -1,4 +1,4 @@
-// The preview captures' file (8f): the site's own, the server's job writes it from a chain, so its answer passes a size cap and the schema
+// The preview captures' file: the site's own, the server's job writes it from a chain, so its answer passes a size cap and the schema
 // before anything reads it. A read that fails is no capture, never a throw: no capture, no preview.
 import { Previews, PREVIEWS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readSiteFile, type SiteFileRead } from "@gnoworld/chain/transport";

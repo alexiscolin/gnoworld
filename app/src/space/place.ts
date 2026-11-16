@@ -1,4 +1,4 @@
-// Where space is asked to be (D401): the home's system, the universe, a namespace's system, or a world's planet.
+// Where space is asked to be: the home's system, the universe, a namespace's system, or a world's planet.
 import type { Planet, System, Universe } from "./layout.ts";
 
 export type Place =

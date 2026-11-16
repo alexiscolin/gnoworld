@@ -228,7 +228,7 @@ describe("the chat's link: who connects", () => {
     expect(t.links).toHaveLength(1);
   });
 
-  // 4b's pre-merge, the security-reviewer: a member's rooms must not follow it into a guest's connection.
+  // A member's rooms must not follow it into a guest's connection.
   it("starts a new session with no room: the last one's rooms neither joined nor kept", () => {
     const t = setup();
     t.link.follow(["#bubble", "#bubble/members"]);
@@ -241,7 +241,7 @@ describe("the chat's link: who connects", () => {
     expect(t.connected().sent).toEqual([]);
   });
 
-  // 4e's late test audit (T1): an account's conversations must not follow it into the next session's page.
+  // An account's conversations must not follow it into the next session's page.
   it.each([
     [
       "nobody logged in",
@@ -265,7 +265,7 @@ describe("the chat's link: who connects", () => {
     expect(t.store.getState().dms).toEqual({});
   });
 
-  // 4e's complexity review: the account's device, handed to the store at its start; a refused line's draft goes back to it.
+  // The account's device, handed to the store at its start; a refused line's draft goes back to it.
   it("hands the store the device of each account's session, and none of a guest's", () => {
     const asked: string[] = [];
     const drafts: [string, string][] = [];
@@ -374,7 +374,7 @@ describe("the chat's link: the rooms it joins", () => {
     expect(Object.keys(t.chat().rooms)).toEqual(rooms.slice(0, 100));
   });
 
-  // Found by 4b's pre-merge: ?room= may name any room listed, the 101st too, which nothing joined.
+  // ?room= may name any room listed, the 101st too, which nothing joined.
   it("joins the room shown though it is listed past the hundredth, leaving the hundredth, and asks its history", () => {
     const rooms = Array.from({ length: 120 }, (_, n) => `#bubble/r${String(n).padStart(3, "0")}`);
     const t = guestIn(rooms);
@@ -433,7 +433,7 @@ describe("the chat's link: the rooms it joins", () => {
 });
 
 // The history of the room in view alone: Ergo paces a client to 2 lines a second past a burst of 5
-// (deploy/ergo/ircd.yaml.tmpl), so a page per room joined would keep the one in view waiting (plan §4).
+// (deploy/ergo/ircd.yaml.tmpl), so a page per room joined would keep the one in view waiting.
 describe("the chat's link: the history of the room in view", () => {
   const history = (fake: Fake) => fake.sent.filter((line) => line.startsWith("CHATHISTORY "));
 
@@ -475,7 +475,7 @@ describe("the chat's link: the history of the room in view", () => {
     expect(t.fake.sent).toEqual([]);
   });
 
-  // F768: with Ergo's multiclient, a second tab of an account already in a room gets no echo of its own JOIN
+  // With Ergo's multiclient, a second tab of an account already in a room gets no echo of its own JOIN
   // (Ergo's channel.go answers nothing); Ergo told it of the room before, at its welcome or when the first joined.
   it("asks a room's history though its own JOIN brings no echo, Ergo having said before that I am in it", () => {
     const t = guestIn([]);
@@ -757,7 +757,7 @@ describe("the chat's link: what it says", () => {
     ]);
   });
 
-  // F2092 (AP3): the server hides the 21st message and the 101st line of an account's minute, a strike each; the link
+  // The server hides the 21st message and the 101st line of an account's minute, a strike each; the link
   // refuses them before sending, and says why through `slow`.
   describe("at the server's pace", () => {
     afterEach(() => {
@@ -817,7 +817,7 @@ describe("the chat's link: what it says", () => {
     },
   );
 
-  // 4c's message menu (docs/decisions.md, 2026-10-26): Delete on one's own line, Ergo's REDACT (draft/message-
+  // Delete on one's own line, Ergo's REDACT (draft/message-
   // redaction, allow-individual-delete), which Ergo refuses for another's line.
   const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
 
@@ -845,7 +845,7 @@ describe("the chat's link: what it says", () => {
     expect(redacted(g.fake.sent)).toEqual([]);
   });
 
-  // The red pass (M9): what holds say holds redact.
+  // What holds say holds redact.
   it("deletes nothing in a room Ergo kicked it from", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`:op!u@h KICK #bubble/games ${ADDRESS} :bye`);
@@ -866,7 +866,7 @@ describe("the chat's link: what it says", () => {
     expect(redacted(again.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
   });
 
-  // The green pass (G13): the rule's bound itself, 64 characters, goes out.
+  // The rule's bound itself, 64 characters, goes out.
   it("deletes by a msgid of 64 characters, the rule's longest", () => {
     const t = memberIn(["#bubble/games"]);
     const id = "a".repeat(64);
@@ -874,7 +874,7 @@ describe("the chat's link: what it says", () => {
     expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${id}`]);
   });
 
-  // The red pass (M10): a msgid comes from a line's tags; one that is no single word never reaches the wire.
+  // A msgid comes from a line's tags; one that is no single word never reaches the wire.
   it.each([
     ["nothing", ""],
     ["a space", "a b"],
@@ -884,7 +884,7 @@ describe("the chat's link: what it says", () => {
     ["a NUL", "a\u0000b"],
     ["a comma", "a,b"],
     ["a leading colon", ":a"],
-    // The green pass (G2): what a command splits on, leading too, and one character past 64.
+    // What a command splits on, leading too, and one character past 64.
     ["a leading space", " a"],
     ["a leading comma", ",a"],
     ["a tab", "a\tb"],
@@ -894,7 +894,7 @@ describe("the chat's link: what it says", () => {
     ["a leading NUL", "\u0000a"],
     ["65 characters", "a".repeat(65)],
     ["600 characters", "a".repeat(600)],
-    // The green pass (G13): one past the rule's bound.
+    // One past the rule's bound.
     ["65 characters", "a".repeat(65)],
   ])("sends no REDACT for a msgid holding %s", (_, id) => {
     const t = memberIn(["#bubble/games"]);
@@ -939,7 +939,7 @@ describe("the chat's link: what it says", () => {
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
-  // The security review (4f's S1): Ergo's PART of the account, another session leaving the room (channel.go:1078-1082,
+  // Ergo's PART of the account, another session leaving the room (channel.go:1078-1082,
   // v2.19.1), takes every session out of it, as a KICK does; a PART of the past or of another is no such thing.
   it("says nothing, tells no typing and marks nothing in a room another session of the account left", () => {
     const t = memberIn(["#bubble/games", "#bubble"]);
@@ -990,7 +990,7 @@ describe("the chat's link: what it says", () => {
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
   });
 
-  // draft/multiline (docs/decisions.md row 255): a draft of several lines goes as one batch, its lines PRIVMSGs of
+  // draft/multiline: a draft of several lines goes as one batch, its lines PRIVMSGs of
   // it (Ergo's batchHandlerMultiline and absorbBatchedMessage, irc/handlers.go, v2.19.1); Ergo echoes it, and every
   // reader with the capability hears it, as a batch whose opening line carries its id, time and account.
   const batches = (sent: readonly string[]) => sent.filter((line) => /^(@batch=\S+ )?(BATCH|PRIVMSG) /.test(line));
@@ -1085,7 +1085,7 @@ describe("the chat's link: what it says", () => {
     expect(t.room("#bubble/games")?.lines.map((line) => line.text)).toEqual(["before", "> quoted\nanswer"]);
   });
 
-  // The red pass's R7, R8, R15 and the fallback (docs/decisions.md, 2026-10-26): what a message of several lines
+  // What a message of several lines
   // sends, to whom, and with an Ergo that never granted draft/multiline.
   it("names each batch with a reference Ergo accepts: letters, digits and hyphens, 32 at most", () => {
     const t = memberIn(["#bubble/games"]);
@@ -1191,7 +1191,7 @@ describe("the chat's link: what it says", () => {
     expect(t.room("#bubble/games")?.lines.map((line) => line.text)).toEqual(["between"]);
   });
 
-  // 4f: who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
+  // Who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
   describe("typing", () => {
     const tagged = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
     afterEach(() => {
@@ -1234,7 +1234,7 @@ describe("the chat's link: what it says", () => {
       ]);
     });
 
-    // The code review (CR5), in place of the red pass's R23 (the throttle reset on a done): a field cleared and written
+    // A field cleared and written
     // again within the 3 s keeps the typing shown, its readers' 6 s running, and tells nothing more; clearing it and
     // writing again over and over sends one TAGMSG each 3 s, never two a cycle.
     it("keeps the typing shown with nothing more told when a field cleared is written again within the 3 s", () => {
@@ -1276,7 +1276,7 @@ describe("the chat's link: what it says", () => {
       ]);
     });
 
-    // StrykerJS's survivors on the pace: a timer for a done waiting its turn, none left once a line or a drop ends it.
+    // A timer for a done waiting its turn, none left once a line or a drop ends it.
     it("holds one timer for a done waiting its turn, and none once a line ends the typing or the link drops", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn(["#bubble/games"]);
@@ -1309,7 +1309,7 @@ describe("the chat's link: what it says", () => {
       expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
     });
 
-    // The red pass (R10): nothing counted as sent while the link is away; the first word after the JOIN goes.
+    // Nothing counted as sent while the link is away; the first word after the JOIN goes.
     it("tells no typing while away, and tells it at once once back in the room", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn(["#bubble/games"]);
@@ -1334,9 +1334,9 @@ describe("the chat's link: what it says", () => {
     });
   });
 
-  // 4f: the reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
+  // The reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
   describe("the reading place", () => {
-    // The places set: a MARKREAD with its time, not the ask of Ergo's (CR7).
+    // The places set: a MARKREAD with its time, not the ask of Ergo's.
     const marked = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
     const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
     // A line of the room in the store, said at T(minute), its msgid m<minute>.
@@ -1378,7 +1378,7 @@ describe("the chat's link: what it says", () => {
       expect(marked(guest.fake.sent)).toEqual([]);
     });
 
-    // The red pass (R4): the room in view alone, and one Ergo said I am in; never another room's newest.
+    // The room in view alone, and one Ergo said I am in; never another room's newest.
     it("marks no room read but the one in view, and none Ergo has not said I am in, nor after my PART or KICK", () => {
       const t = memberIn(["#bubble/games", "#bubble", "#bubble/news"]);
       heard(t.fake, "#bubble/games", 0);
@@ -1396,7 +1396,7 @@ describe("the chat's link: what it says", () => {
       expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
     });
 
-    // The red pass (R5): a time Ergo would keep for good is a held line's own, never a word the caller makes.
+    // A time Ergo would keep for good is a held line's own, never a word the caller makes.
     it.each([
       ["a line the room does not hold", "nope"],
       ["a time in place of a msgid", T(1)],
@@ -1410,7 +1410,7 @@ describe("the chat's link: what it says", () => {
       expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
     });
 
-    // The red pass (R10): a place asked while away, or sent and never answered, goes once the room is joined again.
+    // A place asked while away, or sent and never answered, goes once the room is joined again.
     it("marks the room read once back in it, what was asked while away", () => {
       const t = memberIn(["#bubble/games"]);
       heard(t.fake, "#bubble/games", 1);
@@ -1446,7 +1446,7 @@ describe("the chat's link: what it says", () => {
       expect(marked(again.sent.slice(before))).toEqual([]);
     });
 
-    // The code review (CR7): Ergo's place lost to a race (its JOIN and MARKREAD played as a second tab attached, before
+    // Ergo's place lost to a race (its JOIN and MARKREAD played as a second tab attached, before
     // the page followed the room) is asked of Ergo as the history is: an account's, the store holding none.
     it("asks Ergo the room's place as its history is asked, an account's, when the store holds none", () => {
       const asks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+$/.test(line));
@@ -1465,7 +1465,7 @@ describe("the chat's link: what it says", () => {
       expect(asks(guest.fake.sent)).toEqual([]);
     });
 
-    // The red pass (R20): an account's places are its own; another session starts with none.
+    // An account's places are its own; another session starts with none.
     it("forgets an account's places when another session starts", () => {
       const t = memberIn(["#bubble/games"]);
       t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
@@ -1478,7 +1478,7 @@ describe("the chat's link: what it says", () => {
       expect(t.room("#bubble/games")?.read).toBeUndefined();
     });
 
-    // The code review (CR2) and /simplify (E1): each MARKREAD spends Ergo's fakelag once its budget of 16 is gone, so a
+    // Each MARKREAD spends Ergo's fakelag once its budget of 16 is gone, so a
     // busy room read at its end must not queue the account's own lines behind them.
     describe("paced", () => {
       afterEach(() => {
@@ -1523,7 +1523,7 @@ describe("the chat's link: what it says", () => {
         expect(marked(t.fake.sent)).toHaveLength(3);
       });
 
-      // StrykerJS's survivors on the pace: a timer a room while its place waits, none left once sent, flushed or dropped.
+      // A timer a room while its place waits, none left once sent, flushed or dropped.
       it("holds one timer a room while its place waits, and none once it is sent, flushed or the link drops", () => {
         const t = reading();
         const base = vi.getTimerCount();
@@ -1574,7 +1574,7 @@ describe("the chat's link: what it says", () => {
     });
   });
 
-  // The green pass (G5-G7): the edges of what the page tells Ergo as it types and reads.
+  // The edges of what the page tells Ergo as it types and reads.
   describe("the typing and the reading place, at their edges", () => {
     const ROOM = "#bubble/games";
     const TT = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -1616,7 +1616,7 @@ describe("the chat's link: what it says", () => {
   });
 });
 
-// 4e: direct messages, an account's alone; Ergo refuses a guest's to any account, which its default-user-modes set +R
+// Direct messages, an account's alone; Ergo refuses a guest's to any account, which its default-user-modes set +R
 // (deploy/ergo/ircd.yaml.tmpl).
 describe("the chat's link: direct messages", () => {
   const account = () => {
@@ -1632,7 +1632,7 @@ describe("the chat's link: direct messages", () => {
   const labelOf = (sent: readonly string[], at: number) =>
     sent.filter((line) => unlabelled(line).startsWith(`PRIVMSG ${OTHER}`))[at]?.match(/^@label=(\S+) /)?.[1];
 
-  // 4e's late test audit (T2): no test said the link hands Ergo's lines to the direct messages' store.
+  // The link hands Ergo's lines to the direct messages' store.
   it("hands Ergo's lines to the direct messages' store: an account's to me kept, a room's line not", () => {
     const t = account();
     t.fake.line(`@msgid=r;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG #bubble :to the room`);
@@ -1641,7 +1641,7 @@ describe("the chat's link: direct messages", () => {
     expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["to you"]);
   });
 
-  // 4e's UX review (U1): Ergo answers 401 to a line for an account not connected (irc/handlers.go:2533, v2.19.1),
+  // Ergo answers 401 to a line for an account not connected (irc/handlers.go:2533, v2.19.1),
   // and its echo to one it delivered; the page emptied the box all the same, the line lost.
   // Ergo's answers carry the label of the line they answer (irc/responsebuffer.go:264-281, v2.19.1), when it had one.
   const refusal = (partner: string, label?: string) =>
@@ -1701,9 +1701,9 @@ describe("the chat's link: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "three" } });
   });
 
-  // /code-review (CR1): Ergo answers a labeled line by its label, one line or a labeled-response batch
-  // (irc/commands.go:41, responsebuffer.go:264-281, v2.19.1); the outbox matched answers by order, so a line
-  // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
+  // Ergo answers a labeled line by its label, one line or a labeled-response batch
+  // (irc/commands.go:41, responsebuffer.go:264-281, v2.19.1); matching answers by order would leave a line
+  // refused otherwise (a 417, a 477) waiting, and a later 401 would put back its draft, not the 401's line's.
   it("sends each direct message with a label of its own", () => {
     const t = account();
     t.link.sayTo(OTHER, { composed: composed(OTHER, "one"), draft: "one" });
@@ -1726,7 +1726,7 @@ describe("the chat's link: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
   });
 
-  // /code-review on 4d's DM bar (CR2): a refused correction or reply came back as a plain draft, its tags lost.
+  // A refused correction or reply comes back with its tags, never as a plain draft.
   it("hands the tags of a refused correction or reply back with its draft, where the draft is back", () => {
     const t = withDrafts();
     t.link.sayTo(OTHER, { composed: composed(OTHER, "fixed"), draft: "fixed" }, { edit: "m1" });
@@ -1761,7 +1761,7 @@ describe("the chat's link: direct messages", () => {
     expect(t.kept.get(OTHER)).toBe(`line ${String(WAITING)}`);
   });
 
-  // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
+  // A standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
   it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
     const t = withDrafts();
     t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
@@ -1819,7 +1819,7 @@ describe("the chat's link: direct messages", () => {
     expect([...t.kept.keys()]).toEqual([]);
   });
 
-  // StrykerJS on 4e: what answers a line waiting on Ergo, and what does not.
+  // What answers a line waiting on Ergo, and what does not.
   const to = (id: string, text: string) =>
     `@msgid=${id};time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :${text}`;
   it.each([
@@ -1899,7 +1899,7 @@ describe("the chat's link: direct messages", () => {
   );
 });
 
-// 4d: a reaction is a TAGMSG naming the line it answers (+draft/react to add, +draft/unreact to take back, Ergo storing
+// A reaction is a TAGMSG naming the line it answers (+draft/react to add, +draft/unreact to take back, Ergo storing
 // both), labelled so Ergo's answer to it is known (labeled-response). What holds say and redact holds it: an account's,
 // in a room Ergo says it is in; one emoji of RGI's set, a msgid a tag may carry.
 describe("the chat's link: reactions", () => {
@@ -1913,7 +1913,7 @@ describe("the chat's link: reactions", () => {
     fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
     return { ...t, fake };
   };
-  // The tagged lines sent, each label as a star: what a label says is the link's own (F1170).
+  // The tagged lines sent, each label as a star: what a label says is the link's own.
   const tagged = (sent: readonly string[]) =>
     sent.filter((line) => line.startsWith("@")).map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
 
@@ -1982,7 +1982,7 @@ describe("the chat's link: reactions", () => {
   });
 });
 
-// R10: Ergo refuses a reaction in a room the account may not speak in (+m, a mute), answering its label with a 404; the
+// Ergo refuses a reaction in a room the account may not speak in (+m, a mute), answering its label with a 404; the
 // page shows no reaction Ergo did not echo, and says it could not react.
 describe("the chat's link: a reaction Ergo refused", () => {
   const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
@@ -1995,7 +1995,7 @@ describe("the chat's link: a reaction Ergo refused", () => {
     fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
     return { ...t, fake };
   };
-  // The label of the last reaction sent, which Ergo answers by (the link's own word, F1170).
+  // The label of the last reaction sent, which Ergo answers by (the link's own word).
   const labelOf = (sent: readonly string[]) =>
     /^@label=([^;]+);/u.exec(sent.filter((line) => line.startsWith("@")).at(-1) ?? "")?.[1] ?? "";
   const refusal = (label: string) => `@label=${label} :ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`;
@@ -2026,9 +2026,9 @@ describe("the chat's link: a reaction Ergo refused", () => {
   });
 });
 
-// R1: Ergo counts a stored reaction as a history item, so a page of 200 may hold few lines or none; while a full page
+// Ergo counts a stored reaction as a history item, so a page of 200 may hold few lines or none; while a full page
 // leaves the room's window short of lines, the link asks for the items before its oldest, three times at most a room and
-// a connection (docs/decisions.md, 2026-10-26).
+// a connection.
 describe("the chat's link: the history read past reactions", () => {
   const ROOM = "#bubble/games";
   const T = (n: number) => new Date(Date.parse(T0) + n * 1000).toISOString();
@@ -2073,7 +2073,7 @@ describe("the chat's link: the history read past reactions", () => {
     expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
   });
 
-  // The code review (CR1): JOIN and QUIT events fill pages too; the link reads on while Ergo's ring holds pages.
+  // JOIN and QUIT events fill pages too; the link reads on while Ergo's ring holds pages.
   it("asks from each full page's oldest while Ergo's ring of the room holds pages, ten more at most, then stops", () => {
     const t = asked();
     const pages = Array.from({ length: 12 }, (_, n) => 12_000 - n * 1000);
@@ -2103,7 +2103,7 @@ describe("the chat's link: the history read past reactions", () => {
     expect(before(t.fake.sent)).toEqual([]);
   });
 
-  // The green pass (G2): the oldest item's msgid as its tag carries it, what a command splits on leading too.
+  // The oldest item's msgid as its tag carries it, what a command splits on leading too.
   it.each([
     ["a leading space", String.raw`\sa`],
     ["a leading comma", ",a"],
@@ -2127,7 +2127,7 @@ describe("the chat's link: the history read past reactions", () => {
     ]);
   });
 
-  // The green pass (G11): a page of nothing asks nothing, and throws nothing.
+  // A page of nothing asks nothing, and throws nothing.
   it("asks nothing for an empty page, and throws nothing", () => {
     const t = asked();
     expect(() => {
@@ -2149,7 +2149,7 @@ describe("the chat's link: the history read past reactions", () => {
   });
 });
 
-// 4d: a reply is a PRIVMSG tagged +reply with the msgid it answers (ratified in 2026: docs/plans/chat-features.md, M2),
+// A reply is a PRIVMSG tagged +reply with the msgid it answers,
 // the draft composed as the composer composes it; a msgid a tag cannot carry sends nothing, the draft included.
 describe("the chat's link: replies", () => {
   const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
@@ -2202,7 +2202,7 @@ describe("the chat's link: replies", () => {
     ["a backslash", "a\\b"],
     ["nothing", ""],
     ["65 characters", "a".repeat(65)],
-    // The green pass (G2): what a tag escapes, leading too.
+    // What a tag escapes, leading too.
     ["a leading semicolon", ";a"],
     ["a leading backslash", "\\a"],
     ["a leading space", " a"],
@@ -2239,7 +2239,7 @@ describe("the chat's link: replies", () => {
   });
 });
 
-// 4f-n (docs/decisions.md, 2026-10-26): what the link makes a notice of, from Ergo's lines (the kinds themselves are
+// What the link makes a notice of, from Ergo's lines (the kinds themselves are
 // core/chat/notice.test.ts's).
 describe("the chat's link: notices", () => {
   const GAMES = "#bubble/games";
@@ -2373,7 +2373,7 @@ describe("the chat's link: notices", () => {
       expect(kinds(t)).toEqual([["h3", "mention", GAMES]]);
     });
 
-    // F1534: each notice of a page set the store on its own, a notification for each of up to 200 lines.
+    // A page's notices go to the store in one change, not a notification for each of up to 200 lines.
     it("hands the notices of a page to the store in one change", () => {
       const t = member();
       t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
@@ -2436,7 +2436,7 @@ describe("the chat's link: notices", () => {
   });
 });
 
-// 4f-n, the red pass's cases (docs/review/findings.md, R2 to R16): what must not leak between sessions, outlive a room, or
+// What must not leak between sessions, outlive a room, or
 // slip through the history page's own path; a direct message's privacy and reading; replies and edits.
 describe("the chat's link: notices, the edges", () => {
   const GAMES = "#bubble/games";
@@ -2490,7 +2490,7 @@ describe("the chat's link: notices, the edges", () => {
       expect(t.store.getState().noticeModes).toEqual({ [NEWS]: "none" });
     });
 
-    // G1 (F1500): the account held no mode, so the guard in `begin` that skips a reset for an empty session saw its notices.
+    // The account held no mode, so the guard in `begin` that skips a reset for an empty session saw its notices.
     it("forgets an account's notices and marks at sign-out though it held no mode, for the next account of the device", () => {
       const t = member(() => ({ ...drafts(), notices: { modes: () => ({}), setModes: () => true } }));
       say(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
@@ -2507,7 +2507,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // G2 (F1501): the connection of a guest has a nick, so `me` is defined; only the account check keeps it out.
+  // The connection of a guest has a nick, so `me` is defined; only the account check keeps it out.
   describe("a guest", () => {
     it("makes no notice of a live mention of the whole room, in a room where it counts", () => {
       const t = guestIn([NEWS]);
@@ -2519,7 +2519,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // G3 (F1502): lines that are no text line, or come for a room not followed, pass the notices by.
+  // Lines that are no text line, or come for a room not followed, pass the notices by.
   describe("a line of Ergo's that is no notice's", () => {
     const tag = `@batch=h1;msgid=t1;time=${T(4)};account=${OTHER};+draft/react=:+1:;+draft/reply=m0`;
     it("lets a reaction in a history page pass, and the mention after it still counts", () => {
@@ -2563,7 +2563,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // F1693 (the simplify survivor): a live line of a room Ergo says the account joined (from another session, say) that
+  // A live line of a room Ergo says the account joined (from another session, say) that
   // the page does not follow.
   describe("a room joined that the page does not follow", () => {
     it("makes no notice of its live lines", () => {
@@ -2576,7 +2576,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // F1672 (S3): a page asked before a KICK and written after it made notices for a room the account is out of.
+  // A page asked before a KICK and written after it made notices for a room the account is out of.
   describe("a history page that comes after the account is taken out of its room", () => {
     it("makes no notice of its lines", () => {
       const t = member();
@@ -2589,7 +2589,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // StrykerJS (F1681): the ids a REDACT took away are kept to a bound, the newest 100, so the memory of a long session
+  // The ids a REDACT took away are kept to a bound, the newest 100, so the memory of a long session
   // does not grow.
   describe("the lines REDACT took away", () => {
     it("are remembered up to the newest 100, a page refusing those and no older one", () => {
@@ -2604,7 +2604,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // F1673 (CR1): the page came before Ergo's MARKREAD reply, so it made no notice and none came for them afterwards.
+  // The page came before Ergo's MARKREAD reply, so it made no notice and none came for them afterwards.
   describe("a history page that comes before the reading place", () => {
     it("makes the notices of the lines past the place once it is known, and of no line before it", () => {
       const t = member();
@@ -2626,7 +2626,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // F1676 (CR4): Clear marked the page only, so a reload or another device brought the cleared mentions back.
+  // Clear must mark Ergo too, not the page only: else a reload or another device brings the cleared mentions back.
   describe("a room marked read from outside it", () => {
     it("tells Ergo the place for a room followed, though it is not in view, and for no conversation", () => {
       const t = member();
@@ -2645,7 +2645,7 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
-  // F1681 (CR9): a REDACT that came while a page was open left no trace, so the page's end made the notice again.
+  // A REDACT that comes while a page is open must leave a trace, else the page's end makes the notice again.
   describe("a history page open while a line of it is deleted", () => {
     it("makes no notice of that line, and one of its neighbour", () => {
       const t = member();
@@ -2755,7 +2755,7 @@ describe("the chat's link: notices, the edges", () => {
       t.fake.me = ADDRESS;
       t.fake.state("connected");
       t.fake.line(`:${ADDRESS}!u@h JOIN ${GAMES}`);
-      // Ergo's place is the older one, its throttled MARKREAD not yet echoed (F940), and the page repeats the line.
+      // Ergo's place is the older one, its throttled MARKREAD not yet echoed, and the page repeats the line.
       t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
       t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
       t.fake.line(`@batch=h1;msgid=m1;time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
@@ -2812,7 +2812,7 @@ describe("the chat's link: notices, the edges", () => {
 const unseen = (t: { store: ReturnType<typeof createAppStore> }) =>
   unseenNotices(t.store.getState()).map(({ id }) => id);
 const totalOf = (t: { store: ReturnType<typeof createAppStore> }) => totalUnseen(t.store.getState());
-// slice-4-room-edit (docs/decisions.md, 2026-10-28): a correction of a room's line is a PRIVMSG to the room tagged
+// A correction of a room's line is a PRIVMSG to the room tagged
 // +gnoworld/edit with the msgid of the line it corrects, a msgid a tag carries; the draft composed as any line is.
 describe("the chat's link: a room's edits", () => {
   const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
@@ -2853,7 +2853,7 @@ describe("the chat's link: a room's edits", () => {
     ["a leading semicolon", ";a"],
     ["a comma", "a,b"],
     ["a NUL", "a\u0000b"],
-    // R5 (redpass-red): what a tag may not carry, and what no line carries, each one a control or a break.
+    // What a tag may not carry, and what no line carries, each one a control or a break.
     ["a TAB", "a\tb"],
     ["a NEL", "a\u0085b"],
     ["a line separator", "a\u2028b"],
@@ -2904,14 +2904,14 @@ describe("the chat's link: a room's edits", () => {
   });
 
   // A correction is a line of its own, which a REDACT of the line it corrects does not take: a deleted line would stay,
-  // as its newest correction, for every reader (a direct message's delete sends one for each of mine, 4d-dm-bar).
+  // as its newest correction, for every reader (a direct message's delete sends one for each of mine).
   describe("a delete", () => {
     const at = "2026-10-25T10:00:00.000Z";
     const said = (id: string, tags: string, { text = "words", who = ADDRESS } = {}) =>
       `@msgid=${id};time=${at};account=${who}${tags === "" ? "" : `;${tags}`} :${who}!u@h PRIVMSG #bubble/games :${text}`;
     const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
 
-    // R1 (redpass-red): with the line's REDACT last, a refused one finds no correction of it to show the original behind.
+    // With the line's REDACT last, a refused one finds no correction of it to show the original behind.
     it("goes out for each correction of mine to a line and then the line, the line's last", () => {
       const t = memberIn(["#bubble/games"]);
       t.fake.line(said("m1", ""));
@@ -2943,7 +2943,7 @@ describe("the chat's link: a room's edits", () => {
       expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
     });
 
-    // R2 (redpass2-red): the ids the store keeps (stamp drops a comma or a space) that no command can name: a leading
+    // The ids the store keeps (stamp drops a comma or a space) that no command can name: a leading
     // colon, which IRC reads as the REDACT's trailing parameter, and 65 characters.
     it.each([
       ["a leading colon", ":e1"],
@@ -2956,7 +2956,7 @@ describe("the chat's link: a room's edits", () => {
       expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
     });
 
-    // R2 (redpass-red): a ceiling, written down. The page names the corrections it holds alone; one it never heard (made
+    // A ceiling, written down. The page names the corrections it holds alone; one it never heard (made
     // from another device while this page was away, then older than its history) is not deleted. The readers who hold
     // the line never see it (core's redactedLines), the others when they reload.
     it("names the corrections the page holds alone: one it does not hold is not deleted", () => {
@@ -2977,7 +2977,7 @@ describe("the chat's link: a room's edits", () => {
   });
 });
 
-// 4d-dm-bar: a direct message's lines get the message bar. Each act is a line to the partner's nick, labelled so Ergo's
+// A direct message's lines get the message bar. Each act is a line to the partner's nick, labelled so Ergo's
 // refusal (401, its partner not connected) is known; nothing here is a room's, which the link must be in to speak.
 describe("the chat's link: a direct message's bar", () => {
   const account = () => {
@@ -3045,7 +3045,7 @@ describe("the chat's link: a direct message's bar", () => {
     expect(t.fake.sent.filter((line) => line.includes("TAGMSG"))).toEqual([]);
   });
 
-  // CR2 of the room edit: the room's order (F1950), the line's REDACT last, so a refused one never leaves the words it was
+  // The room's order: the line's REDACT last, so a refused one never leaves the words it was
   // corrected from showing alone.
   it("deletes a line by a labelled REDACT to the partner, and each correction of mine to it before it", () => {
     const t = account();
@@ -3069,7 +3069,7 @@ describe("the chat's link: a direct message's bar", () => {
     expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} p1`]);
   });
 
-  // R2 (redpass2-red): the same for a msgid no command can name, a leading colon or 65 characters.
+  // The same for a msgid no command can name, a leading colon or 65 characters.
   it.each([
     ["a leading colon", ":e1"],
     ["65 characters", "e".repeat(65)],
@@ -3081,7 +3081,7 @@ describe("the chat's link: a direct message's bar", () => {
     expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} m1`]);
   });
 
-  // R4 (redpass-dmb): a partner's PRIVMSG tagged as a correction of my line is not mine, so my delete leaves it alone.
+  // A partner's PRIVMSG tagged as a correction of my line is not mine, so my delete leaves it alone.
   it("deletes my line alone when the partner's line is tagged as a correction of it", () => {
     const t = account();
     t.fake.line(mine("m1", "", "mine"));

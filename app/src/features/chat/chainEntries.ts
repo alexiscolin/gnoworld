@@ -1,4 +1,4 @@
-// The calls of the chain a room draws among its messages (slice 9g): which they are, and where each stands. Asked by the lines view,
+// The calls of the chain a room draws among its messages: which they are, and where each stands. Asked by the lines view,
 // which is a chunk of its own.
 import { use } from "react";
 import type { ChainHeard } from "../../store/chain.ts";

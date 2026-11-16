@@ -1,4 +1,4 @@
-// The direct messages a connection sent that Ergo has not answered yet (slice 4's 4e), each by the label it went with.
+// The direct messages a connection sent that Ergo has not answered yet, each by the label it went with.
 // Ergo answers a labeled line with that label (labeled-response, irc/commands.go:41, v2.19.1): its echo when it
 // delivered it, a numeric when it refused it (401 its partner not connected, irc/handlers.go:2533; 477; 417), or a
 // labeled-response batch of several lines (irc/responsebuffer.go:264-281). Another tab's line carries no label of ours.
@@ -9,7 +9,7 @@ import type { createAppStore } from "../../store/index.ts";
 /** The lines waiting at once: one more drops the oldest, whose answer then puts nothing back. */
 export const WAITING = 50;
 
-/** What a line that is no message was: a delete of the line, or a reaction (4d's DM bar). */
+/** What a line that is no message was: a delete of the line, or a reaction. */
 type Act = { deleted: string } | { reacted: true };
 
 interface Waiting {
@@ -22,7 +22,7 @@ interface Waiting {
 export interface Outbox {
   /** A line to `line.partner`, composed from `line.draft`, sent by `send` with the label it gives, the connection's own
    * count: whether it went, and then waits for Ergo's answer. An `act` (a delete, a reaction) has no draft to put back:
-   * its refusal is told as the act's. A reply's or a correction's `tags` come back with its refusal (CR2). */
+   * its refusal is told as the act's. A reply's or a correction's `tags` come back with its refusal. */
   send: (
     line: { partner: string; draft: string; act?: Act; tags?: RefusedTags },
     send: (label: string) => boolean,

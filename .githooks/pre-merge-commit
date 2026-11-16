@@ -1,4 +1,4 @@
 #!/bin/sh
-# Git runs no pre-commit for a merge it concludes itself: pre-commit's checks, for every merge commit (D13173), so a merge brings no
-# secret, nor, from Claude Code's sandbox, a harness file (D241).
+# Git runs no pre-commit for a merge it concludes itself: pre-commit's checks, for every merge commit, so a merge brings no
+# secret, nor, from Claude Code's sandbox, a harness file.
 exec "$(dirname "$0")/pre-commit"

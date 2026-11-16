@@ -19,13 +19,13 @@ const DEGREE = Math.PI / 180;
 // A sign this close to the limb would slide off the edge: the cosine of the eye's angle over the ground.
 const CLEAR = 0.15;
 // A point is well seen when its ground faces the eye within about 56 degrees (the cosine), and stands this far, in pixels, from the plate's,
-// the header's, the dock's and the window's edges: Japan squeezed on the limb, at 75 degrees, was "seen" and not read (Alexis, 2026-11-11).
+// the header's, the dock's and the window's edges: Japan squeezed on the limb, at 75 degrees, counted as seen yet could not be read.
 const WELL = 0.55;
 const MARGIN = 60;
 // raw: a turn's speed is capped, in radians a second, for the spin and for the lean (spring.ts)
 const MOST_SPIN = 1.5;
 const MOST_TILT = 1;
-// The arrival has calmed this many seconds after its animation has ended: no aim, no ping before (D13001).
+// The arrival has calmed this many seconds after its animation has ended: no aim, no ping before.
 const CALM_S = 4;
 
 // The window's foot, as the page stands in a window; none where there is no window (the unit tests).
@@ -44,7 +44,7 @@ export class EarthGround {
   readonly #centre = new Vector3();
   readonly #on: Vec = { x: 0, y: 0, z: 0 };
   readonly #spin = new Spring();
-  /** The turn the reader's hand gave the planet (D13011), on top of its spin and lean; each world's kept as the lead is. */
+  /** The turn the reader's hand gave the planet, on top of its spin and lean; each world's kept as the lead is. */
   readonly grab = new Grab();
   readonly #grabbed = new Map<string, Quaternion>();
   readonly #lean = new Spring();
@@ -62,7 +62,7 @@ export class EarthGround {
   readonly #left = new Map<string, number>();
   readonly #axisOf: (id: string) => Axis;
   readonly #still: () => boolean;
-  // The planet's arrival's calm (D13001): no aim and no ping before it is over.
+  // The planet's arrival's calm: no aim and no ping before it is over.
   readonly #calm: Calm;
   #base = new Quaternion().setFromEuler(new Euler(EARTH.lean, 0, EARTH.tilt));
   #back = this.#base.clone().invert();
@@ -80,7 +80,7 @@ export class EarthGround {
     this.#calm = new Calm(calm, now);
   }
 
-  /** The ground turned past the Earth's own spin, in radians (D488): its shader, its signs and its facing all take it. */
+  /** The ground turned past the Earth's own spin, in radians: its shader, its signs and its facing all take it. */
   get lead(): number {
     return this.#spin.at;
   }
@@ -89,7 +89,7 @@ export class EarthGround {
     this.#spin.jump(angle);
   }
 
-  /** How far the planet leans toward the eye, in radians (D13916); and that lean as a turn of the world, for its group. */
+  /** How far the planet leans toward the eye, in radians; and that lean as a turn of the world, for its group. */
   get lean(): number {
     return this.#lean.at;
   }
@@ -191,7 +191,7 @@ export class EarthGround {
   }
 
   /** A page's planet that is not at rest on its page (a flight to it, from it, its arrival): its bubbles never turn it, and its lean eases
-   * back to rest by `step` seconds, so no flight leaves with a lean (D13916). */
+   * back to rest by `step` seconds, so no flight leaves with a lean. */
   rest(earth: Planet, step: number): void {
     this.#stand(earth);
     this.#calm.away();
@@ -199,13 +199,13 @@ export class EarthGround {
     this.#advance(step, false);
   }
 
-  // The newest bubble not well seen turns the planet, the short way, eased (Alexis, 2026-11-11), to where its country stands in the free area; with
+  // The newest bubble not well seen turns the planet, the short way, eased, to where its country stands in the free area; with
   // none the aim holds; with reduced motion at once.
   #turn(seen: Eye, seconds: number, step: number): void {
     const held = this.#newest;
     // An aim goes on, following the planet's own spin, until its country has been well seen; then it stays, whatever the spin does to the
-    // country after (D13946), and with no bubble left nothing eases back.
-    // No aim before the arrival has calmed, nor for a message said before it (D13001).
+    // country after, and with no bubble left nothing eases back.
+    // No aim before the arrival has calmed, nor for a message said before it.
     if (held !== undefined && this.#calm.over && !this.#calm.before(held.mark.sent)) {
       if (held.mark !== this.#aimed?.mark) this.#aimed = { mark: held.mark, spin: NaN, seen: false };
       // The hand turning the planet takes the aim over: the country it shows is the reader's to choose.

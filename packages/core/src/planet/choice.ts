@@ -1,7 +1,6 @@
-// Which of the 24 a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class
+// Which of the 24 a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look, so the class
 // reads a second hash of it. The strange ones stay rare, about one world in ten. A nature leans a world without fixing it, and is never
-// shown: its rules read real realms right most of the time, not always (.claude/tmp/slice-7/reports/chain-feasibility.md and
-// slice-7b4-natures.md), so an error must cost nothing. Tier 1 (docs/REVIEW.md).
+// shown: its rules read real realms right most of the time, not always, so an error must cost nothing. Tier 1 (docs/REVIEW.md).
 import type { Anchor } from "./anchors.ts";
 import { sha256 } from "./sha256.ts";
 
@@ -42,8 +41,8 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["sub-Neptune", 14],
 ];
 // Each nature to anchors of its own: tokens to the giants, DAOs to temperate worlds and games to fire and the strange ones (ADR-0002 §3);
-// NFTs to the jewel-like ices and exchanges to the seas (Alexis, 2026-11-02). Names were measured and dropped: a rule read 3 of 7 unseen
-// registries (reports/slice-7b4-natures-2.md).
+// NFTs to the jewel-like ices and exchanges to the seas. Names were measured and dropped: a rule read 3 of 7 unseen
+// registries.
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
   nft: ["nitrogen ice", "grooved ice"],
   token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
@@ -81,7 +80,7 @@ export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor
   return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
 }
 
-/** The class of a world by its id: GovDAO is drawn by hand, sandy as Venus (Alexis, 2026-11-06, frames 4 and 16); every other world, Bubble
+/** The class of a world by its id: GovDAO is drawn by hand, sandy as Venus (frames 4 and 16); every other world, Bubble
  * included, reads its seed. */
 export function worldAnchor(id: string, seed: Uint8Array, nature: Nature | null = null): Anchor {
   if (id === "gov/dao") return "cloud deck";

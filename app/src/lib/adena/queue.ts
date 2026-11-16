@@ -1,5 +1,5 @@
 // Adena opens one popup at a time, and a new one closes the open one: its requests go one after another, in the
-// order asked. No timeout (D201): the popup waits for the person, and a "failed" given while a late signature
+// order asked. No timeout: the popup waits for the person, and a "failed" given while a late signature
 // still lands would be false; a reload frees the queue.
 let tail: Promise<unknown> = Promise.resolve();
 

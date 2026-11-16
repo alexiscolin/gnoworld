@@ -1,4 +1,4 @@
-// What every page sits in: the store, the page's links (F326), the header and the main column. Layout (root.tsx) wraps the
+// What every page sits in: the store, the page's links, the header and the main column. Layout (root.tsx) wraps the
 // document around it; apart, so a test can render it without the router's document components.
 import { Center } from "@gnoworld/ui";
 import { useEffect, type ReactNode } from "react";

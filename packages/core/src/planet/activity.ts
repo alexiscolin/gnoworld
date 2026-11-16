@@ -3,7 +3,7 @@
 // per call. Time and heights come in as parameters. Tier 1 (docs/REVIEW.md).
 import { presenceOf, share } from "./gauges.ts";
 
-/** A run's light lasts this many blocks after its last call: an hour of Onyx's 4 s blocks (gnomcp, 2026-11-02). */
+/** A run's light lasts this many blocks after its last call: an hour of Onyx's 4 s blocks (gnomcp). */
 export const RUN_BLOCKS = 900;
 /** One block of the chain, in milliseconds, to age a file the job has not written again. */
 export const BLOCK_MS = 4000;

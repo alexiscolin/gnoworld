@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Fetcher } from "./http.ts";
 import { marksSound, searchApi } from "./search.ts";
 
-// The browser's client of the chat's search (server/src/search/routes.ts, mounted at /api/search; slice 13, C), through the one JSON
+// The browser's client of the chat's search (server/src/search/routes.ts, mounted at /api/search), through the one JSON
 // call of lib/api/http.ts: its words checked before any is sent, its answer read through the schema and refused whole when a mark
 // lies outside the text it marks (a server answer is parsed, never trusted).
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";

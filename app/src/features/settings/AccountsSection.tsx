@@ -1,4 +1,4 @@
-// Settings, Accounts (owners' moderation, part 5; the approved proposal's "The screens"): the addresses of the identity of the account logged in,
+// Settings, Accounts: the addresses of the identity of the account logged in,
 // each with the way it was proven and the day it was linked, Unlink on each (its own asks first), and the button that opens the dialog. A person with no link
 // sees their own address and the button. The list is the person's alone: it is the server's answer for this session.
 import { shortAddress, type Address } from "@gnoworld/schemas";
@@ -93,7 +93,7 @@ function OwnerNote({ worlds }: { worlds: readonly string[] }) {
   );
 }
 
-// Link an account, and free a command-line key (which needs no account: D13940).
+// Link an account, and free a command-line key (which needs no account).
 function Buttons({ onLink }: { onLink: () => void }) {
   const [, open] = useDeviceView();
   return (

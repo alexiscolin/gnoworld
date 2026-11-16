@@ -8,8 +8,8 @@ import type { Roles } from "../roles/roles.ts";
 import { makeSignals, SIGNAL_TABLES } from "./signals.ts";
 import { signalRoutes } from "./routes.ts";
 
-// Slice 9h: POST /api/signals/chart (a logged-in account opens a world) (who is first is told on the stream alone).
-// Authorization is checked before any work; a guest never charts; an account has a rate (D211: 20 a hour, every
+// POST /api/signals/chart (a logged-in account opens a world) (who is first is told on the stream alone).
+// Authorization is checked before any work; a guest never charts; an account has a rate (20 a hour, every
 // call counted, a refused one included); the winner's signal is published once, never the answer's word alone.
 const T0 = Date.parse("2026-11-05T12:00:00.000Z");
 const HOUR = 60 * 60_000;
@@ -90,7 +90,7 @@ describe("charting a world", () => {
     expect(published).toEqual([{ kind: "chart", world: "govdao", account: ALICE, at: "2026-11-05T12:00:00.000Z" }]);
   });
 
-  // D218: FIRST_TO_CHART_WORLDS names the worlds that can be charted; any other listed world answers "not first" and records
+  // FIRST_TO_CHART_WORLDS names the worlds that can be charted; any other listed world answers "not first" and records
   // nothing, as quietly as a later account's call.
   it("charts only the worlds the setting names, and answers not first for another listed world, recording nothing", async () => {
     const { post, published, signals } = setup(new Set(["govdao"]));
@@ -162,7 +162,7 @@ describe("charting a world", () => {
     expect(signals.firsts("govdao").charted).toBeNull();
   });
 
-  // D211: every call of a logged-in account counts, whatever its answer; D216: the order is the origin, the session, the
+  // Every call of a logged-in account counts, whatever its answer; the order is the origin, the session, the
   // account's count, then the body and the world, so a refused world or a bad body is spent too and probes nothing for free.
   it("gives an account 20 calls an hour, refused ones counted too: the 21st is a 429 that charts nothing", async () => {
     const { post, signals, published } = setup();

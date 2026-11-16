@@ -1,4 +1,4 @@
-// What a line is to its reader (slice 4's 4f-n): a notice, which the page tells the account of and counts unseen, or
+// What a line is to its reader: a notice, which the page tells the account of and counts unseen, or
 // none. An account's alone, in a room it follows or in a direct message; never its own line, a NOTICE (a bot's or a
 // server's) or an edit, a line already counted when it came. One notice a line, in this order: a mention of the account,
 // a reply to one of its lines, a mention of the whole room where that counts.
@@ -22,7 +22,7 @@ export interface Notice {
   readonly by: string;
 }
 
-/** A line, with the msgid it answers or corrects when it does (4d). */
+/** A line, with the msgid it answers or corrects when it does. */
 export type NoticeLine = Line;
 
 /** What the reader is, and holds, in the room a line came to. */
@@ -32,7 +32,7 @@ export interface RoomAt {
   readonly mode: NoticeMode;
   /** The room's lines held, which a reply's target is looked for in. */
   readonly held: readonly NoticeLine[];
-  /** Whether a mention of the whole room counts here (decisions, 2026-10-27, N3). */
+  /** Whether a mention of the whole room counts here. */
   readonly groups: boolean;
 }
 

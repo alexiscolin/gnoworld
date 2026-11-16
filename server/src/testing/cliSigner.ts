@@ -1,4 +1,4 @@
-// A throwaway command-line key for the tests (owners' moderation, part 3): a secp256k1 key from @cosmjs/crypto's own
+// A throwaway command-line key for the tests (owners' moderation): a secp256k1 key from @cosmjs/crypto's own
 // random at each run, never a key in a file. It writes the file the tool leaves after signing, over the server's own
 // `signBytes`; the bytes themselves are pinned apart, by a golden test against Go's encoder and a real onyx-1 signature.
 import { Random, ripemd160, Secp256k1, sha256 } from "@cosmjs/crypto";

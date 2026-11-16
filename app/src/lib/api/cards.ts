@@ -1,4 +1,4 @@
-// The browser's client of the link cards (server/src/cards/routes.ts, mounted at /api/cards; link-previews L4), through the one JSON call of
+// The browser's client of the link cards (server/src/cards/routes.ts, mounted at /api/cards), through the one JSON call of
 // lib/api/http.ts. Every answer is read through its schema and must name what was asked; a card's picture is only ever the route of its own key.
 import { CardEvent, CardRemove, LineCards, LinkCard, RoomId, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";

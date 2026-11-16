@@ -2,24 +2,24 @@ import type { ChainRead } from "@gnoworld/chain/read";
 import { realmType } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
-import { recordedAdena, SIGNED_HASH } from "../../../tests/recordedAdena.ts";
+import { fakeAdena, SIGNED_HASH } from "../../../tests/fakeAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import { createAppStore } from "../../store/index.ts";
 import { callsIn, ensureCalls } from "../calls/slice.ts";
 import type { SignDeps } from "../calls/signCall.ts";
 import { REGISTER_ID, registerName, registrationOf } from "./registerName.ts";
 
-// 9f: Register of r/sys/namereg/v0 through 9d's card course (signCall) on the universe's chain only: the name is checked before
+// Register of r/sys/namereg/v0 through the call card's course (signCall) on the universe's chain only: the name is checked before
 // anything opens, the call's one argument is `nym-` and what was typed, and the person is registered only when the chain's
-// answer says so. Adena is the recording's stand-in (app/tests/recordedAdena.ts), the chain's tx read a fake.
+// answer says so. Adena is a stand-in (app/tests/fakeAdena.ts), the chain's tx read a fake.
 const ACCOUNT = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const MAINNET = { chainId: "gnoland-1", name: "gno.land", rpc: "https://rpc.gno.land:443" };
 const source = { url: ONYX.rpc, at: "2026-11-06T05:00:00.000Z" };
-const LANDED = { height: 55414, failed: false, data: "", log: "ok" };
+const LANDED = { height: 4242, failed: false, data: "", log: "ok" };
 const found = (value: typeof LANDED): ChainRead<typeof LANDED> => ({ ok: true, value, source });
 
-function setup(over: Partial<SignDeps> = {}, adena = recordedAdena({ account: ACCOUNT })) {
+function setup(over: Partial<SignDeps> = {}, adena = fakeAdena({ account: ACCOUNT })) {
   const store = ensureCalls(createAppStore());
   store.getState().loginActions.signedIn(ACCOUNT);
   const deps: SignDeps = {
@@ -80,7 +80,7 @@ describe("registerName", () => {
     expect(stateOf(store)).toMatchObject({ kind: "landing", hash: SIGNED_HASH });
     gate.resolve(found(LANDED));
     await running;
-    expect(stateOf(store)).toEqual({ kind: "done", hash: SIGNED_HASH, height: 55414, value: "" });
+    expect(stateOf(store)).toEqual({ kind: "done", hash: SIGNED_HASH, height: 4242, value: "" });
   });
 
   it("is failed, not registered, when the chain says the call failed (the collision's error is shown as the chain's log)", async () => {
@@ -91,7 +91,7 @@ describe("registerName", () => {
   });
 
   it("asks for the universe's chain only: a mainnet universe's request names gnoland-1, and Onyx's never reaches it", async () => {
-    const mainnet = setup({ universe: MAINNET }, recordedAdena({ account: ACCOUNT, chain: "gnoland-1" }));
+    const mainnet = setup({ universe: MAINNET }, fakeAdena({ account: ACCOUNT, chain: "gnoland-1" }));
     await registerName("alexis042", mainnet.deps);
     expect(callsIn(mainnet.store.getState())?.calls[REGISTER_ID]?.chainId).toBe("gnoland-1");
     const sent = mainnet.adena.asked.find((entry) => entry.call === "DoContract")?.arg as {
@@ -102,7 +102,7 @@ describe("registerName", () => {
   });
 
   it("signs nothing when Adena is on another chain than the universe's and will not move", async () => {
-    const adena = recordedAdena({ account: ACCOUNT, chain: "gnoland-1", stuck: true });
+    const adena = fakeAdena({ account: ACCOUNT, chain: "gnoland-1", stuck: true });
     const { store, deps, asked } = setup({}, adena);
     await registerName("alexis042", deps);
     expect(asked()).not.toContain("DoContract");
@@ -110,7 +110,7 @@ describe("registerName", () => {
   });
 
   it("offers no second Register after a maybe-sent with no hash: the card has no way back", async () => {
-    const adena = recordedAdena({
+    const adena = fakeAdena({
       account: ACCOUNT,
       doContract: () => Promise.resolve({ status: "failure", type: "TRANSACTION_FAILED", message: "", data: {} }),
     });
@@ -146,11 +146,11 @@ describe("registerName: a store that already holds a registration", () => {
   const failing = (type: string) => () => Promise.resolve({ status: "failure", type, message: "", data: {} });
 
   it("offers no second Register after a decline once signing was asked: it may have gone (9d-2)", async () => {
-    const adena = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
+    const adena = fakeAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
     const { store, deps } = setup({}, adena);
     expect(await registerName("alexis042", deps)).toEqual({ ok: true });
     expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "declined-maybe-sent" });
-    const second = recordedAdena({ account: ACCOUNT });
+    const second = fakeAdena({ account: ACCOUNT });
     const again = await registerName("alexis043", { ...deps, adena: second.adena });
     expect(again).toEqual({ ok: false, problem: expect.stringMatching(/may already have been sent/) as string });
     expect(signedBy(second)).toEqual([]);
@@ -158,10 +158,10 @@ describe("registerName: a store that already holds a registration", () => {
   });
 
   it("asks for the other universe's chain after a decline on this one, never a silent end on the first's card", async () => {
-    const adena = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
+    const adena = fakeAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
     const { store, deps } = setup({}, adena);
     await registerName("alexis042", deps);
-    const mainnet = recordedAdena({ account: ACCOUNT, chain: "gnoland-1" });
+    const mainnet = fakeAdena({ account: ACCOUNT, chain: "gnoland-1" });
     expect(await registerName("alexis042", { ...deps, adena: mainnet.adena, universe: MAINNET })).toEqual({ ok: true });
     expect(callsIn(store.getState())?.calls[REGISTER_ID]?.chainId).toBe("gnoland-1");
     expect(JSON.stringify(signedBy(mainnet))).toContain("gnoland-1");
@@ -229,7 +229,7 @@ describe("registerName: a store that already holds a registration", () => {
     expect(stateOf(store)).toMatchObject({ kind: "done" });
     const other = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
     store.getState().loginActions.signedIn(other);
-    const second = recordedAdena({ account: other });
+    const second = fakeAdena({ account: other });
     expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")?.state).toMatchObject({ kind: "done" });
     expect(registrationOf(store.getState(), other, "onyx-1")).toBeUndefined();
     expect(await registerName("bobname043", { ...deps, adena: second.adena })).toEqual({ ok: true });
@@ -241,7 +241,7 @@ describe("registerName: a store that already holds a registration", () => {
 describe("registerName: while Adena is asked, and whose card it is", () => {
   it("refuses a second Register while Adena still holds the signature, and asks it once", async () => {
     const gate = Promise.withResolvers<unknown>();
-    const adena = recordedAdena({ account: ACCOUNT, doContract: () => gate.promise });
+    const adena = fakeAdena({ account: ACCOUNT, doContract: () => gate.promise });
     const { store, deps } = setup({}, adena);
     const first = registerName("alexis042", deps);
     await vi.waitFor(() => {

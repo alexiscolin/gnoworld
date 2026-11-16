@@ -1,6 +1,6 @@
-// The messages of several lines Ergo relays to a reader with draft/multiline (slice 4): a batch whose opening line
+// The messages of several lines Ergo relays to a reader with draft/multiline: a batch whose opening line
 // holds the message's id, time and account, each part a PRIVMSG of it, held until its end and read as one message
-// (core's foldMultiline), so each line is checked. Fail closed (G1, G5): a batch it cannot hold whole and fold (a
+// (core's foldMultiline), so each line is checked. Fail closed: a batch it cannot hold whole and fold (a
 // part core refuses, more parts than Ergo's cap, a 17th open at once) is handed on as hidden by its opening line's id,
 // never folded in part, never left unjudged: Ergo relays and keeps it all the same (irc/client.go, v2.19.1).
 import { foldMultiline, MULTILINE, MULTILINE_LINES, OPEN_BATCHES, type Batch, type IrcMessage } from "@gnoworld/core";

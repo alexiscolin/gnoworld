@@ -1,4 +1,4 @@
-// gnoscope's client (ADR-0002 §5; D104, D105): a third party behind JARVIS_GNOSCOPE, off by default and then never
+// gnoscope's client (ADR-0002 §5): a third party behind JARVIS_GNOSCOPE, off by default and then never
 // asked. On, its tools are listed once at start over MCP's streamable HTTP, every page, and ours alone are taken, each
 // with our schema and words, when it lists every field of ours. Every request goes through net.ts's send (its time, no
 // redirect) and an answer past 1 MiB is cut off; a call is our read with the arguments our schema took, its result
@@ -20,7 +20,7 @@ interface Setup {
 
 interface Gnoscope {
   readonly definitions: readonly ReturnType<typeof gnoscopeTools>[number][];
-  // A read, ended by `signal` too, answering `timeout` then (F5290).
+  // A read, ended by `signal` too, answering `timeout` then.
   call(name: string, args: unknown, signal?: AbortSignal): Promise<Ran>;
   close(): Promise<void>;
 }
@@ -30,7 +30,7 @@ const MAX_BYTES = 1024 * 1024;
 class Unread extends Error {}
 
 // A fetch through net.ts, its body cut off once it passes 1 MiB, so a third party's answer holds no more. gnoscope
-// answers JSON (read live, 2026-11-04); an event stream is refused, as the client's reader of one ends no call (D108).
+// answers JSON (read live); an event stream is refused, as the client's reader of one ends no call.
 const cappedFetch = (timeoutMs: number) => async (url: string | URL, init?: RequestInit) => {
   const response = await send(String(url), init ?? {}, timeoutMs);
   if (response.headers.get("content-type")?.startsWith("text/event-stream") === true) {
@@ -61,7 +61,7 @@ const none = (): Gnoscope => ({
 export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
   if (!setup.on) return none();
   const ours = gnoscopeTools(setup.networks);
-  // Four pages of tools at most, each within its time; gnoscope listed seven on one page (2026-11-04).
+  // Four pages of tools at most, each within its time; gnoscope listed seven on one page.
   const client = new Client({ name: "jarvis", version: "1.0.0" }, { listMaxPages: 4 });
   const transport = new StreamableHTTPClientTransport(new URL(setup.url), {
     fetch: cappedFetch(setup.timeoutMs),
@@ -92,7 +92,7 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       if (closed) return { ok: false, reason: "down" };
       try {
-        // Our own definition, with no output schema: the client checks none of gnoscope's against a result (S1).
+        // Our own definition, with no output schema: the client checks none of gnoscope's against a result.
         const options = { timeout: setup.timeoutMs, toolDefinition: unchecked(name), ...(signal && { signal }) };
         return read(await client.callTool({ name, arguments: parsed.data }, options));
       } catch (error) {

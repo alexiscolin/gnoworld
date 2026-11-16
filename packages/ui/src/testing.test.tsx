@@ -66,14 +66,14 @@ describe("storiesOf", () => {
   });
 });
 
-// The threat model's two cases (slice 2's plan, §3): every staysText proof rests on them.
+// The threat model's two cases every staysText proof rests on them.
 describe("ABUSE", () => {
   it("holds markup that would run if parsed, and a name of 10,000 letters", () => {
     expect(ABUSE).toEqual(['<img src="x" onerror="alert(1)">', `nym-${"a".repeat(9_996)}`]);
   });
 });
 
-// A union's members each count (F333): one that takes className makes the whole union styled. The
+// A union's members each count: one that takes className makes the whole union styled. The
 // type check fails on these lines when Unstyled reads only the keys the members share.
 describe("Unstyled", () => {
   it("reads every member of a union", () => {

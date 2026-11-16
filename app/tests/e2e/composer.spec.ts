@@ -6,7 +6,7 @@ import { MEMBER, scriptedErgo } from "./scripted.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { axeOf } from "./axe.ts";
 
-// The composer (slice 4's 4c) on the real server and Ergo: an account writes in #games, its line shown once Ergo
+// The composer on the real server and Ergo: an account writes in #games, its line shown once Ergo
 // echoes it, its Markdown as marks; a guest is told to log in. Each test logs in a wallet of its own (?as=).
 
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
@@ -71,7 +71,7 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveText("");
   });
 
-  // F2092: the server hides the 21st message of a minute and strikes the account; the page holds it back and says why.
+  // The server hides the 21st message of a minute and strikes the account; the page holds it back and says why.
   test("holds the 21st message of a minute back, its draft kept, and says why", async ({ page }) => {
     await inGames(page);
     const text = word("fast");
@@ -136,7 +136,7 @@ test.describe("the composer", () => {
     await expect(field(page)).toBeFocused();
   });
 
-  // 8k (frame 73's U): the bar's underline goes to Ergo as `++word++`, comes back to the room and is drawn as <u>, its line
+  // Frame 73's U: the bar's underline goes to Ergo as `++word++`, comes back to the room and is drawn as <u>, its line
   // the muted grey a step under the words, apart from a link's, which is the words' own colour at the font's place.
   test("underlines a word with the bar's U, sent through Ergo and drawn apart from a link", async ({ page }) => {
     await inGames(page);
@@ -273,7 +273,7 @@ test.describe("the composer", () => {
     await expect(heading("#games")).toBeVisible();
   });
 
-  // 4d: drafts kept on the device (ADR-0002's "Saved messages and drafts: Device"; F787).
+  // Drafts held on the device (ADR-0002's "Saved messages and drafts: Device").
   test("keeps each room's draft on the device, typed, formatted or completed, through changes of room and a reload, until sent", async ({
     page,
   }) => {
@@ -305,7 +305,7 @@ test.describe("the composer", () => {
     await expect(bubbleField).toHaveText(`/me ${bubble}`);
     await page.keyboard.press("Alt+ArrowUp");
     // Ergo having said the account is here, as inGames waits: a line sent before it goes nowhere, which the page's
-    // few more requests (4d's pins) and a loaded machine made likely.
+    // few more requests (the pins) and a loaded machine made likely.
     await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
     await field(page).press("Enter");
     await expect(lineOf(page, games)).toHaveCount(1);
@@ -320,21 +320,21 @@ test.describe("the composer", () => {
   // A shared device: each account finds its own drafts, the next account none of them, a guest nothing.
   test("shows an account's drafts to it alone: not to the next account, nor to a guest", async ({ page }) => {
     const alice = word("alice");
-    const kept = [`gnoworld:draft:${await logIn(page, alice)}:#bubble/games`];
+    const ownDrafts = [`gnoworld:draft:${await logIn(page, alice)}:#bubble/games`];
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const draft = word("draft");
     await field(page).fill(draft);
     await logOut(page);
-    // A guest writes one plain line (D430), in a textarea: the account's field is gone, and its draft with it.
+    // A guest writes one plain line, in a textarea: the account's field is gone, and its draft with it.
     await expect(page.locator("textarea")).toHaveValue("");
     await expect(page.getByRole("textbox").and(page.locator("[contenteditable]"))).toHaveCount(0);
-    expect(await draftKeys(page)).toEqual(kept);
+    expect(await draftKeys(page)).toEqual(ownDrafts);
     await logIn(page, word("bob"));
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(field(page)).toHaveText("");
-    expect(await draftKeys(page)).toEqual(kept);
+    expect(await draftKeys(page)).toEqual(ownDrafts);
     await logOut(page);
     await logIn(page, alice);
     await page.goto("/w/bubble?room=games&chat=full");
@@ -355,7 +355,7 @@ test.describe("the composer", () => {
     await expect(send(page)).toBeDisabled();
     await field(page).press("Enter");
     await expect(lineOf(page, "a".repeat(420))).toHaveCount(0);
-    // Enter sent nothing and says nothing more: the reason stays the cap's, not a "Not sent" of the link's (G9).
+    // Enter sent nothing and says nothing more: the reason stays the cap's, not a "Not sent" of the link's.
     await expect(field(page)).toHaveAccessibleDescription("Too long by 1 byte.");
   });
 
@@ -369,7 +369,7 @@ test.describe("the composer", () => {
     expect(await page.evaluate(() => "__xss" in window)).toBe(false);
   });
 
-  // 4c's security review (F786): a right-to-left override before a bare link would draw its address backwards,
+  // A right-to-left override before a bare link would draw its address backwards,
   // evil.example's reading as another's; the link isolates itself, left to right.
   test("draws a link's address left to right, an override before it notwithstanding", async ({ page }) => {
     await inGames(page);

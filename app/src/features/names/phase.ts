@@ -17,7 +17,7 @@ export function phaseOf(card: Pick<CallCard, "state" | "texts"> | undefined): Ph
   const { state } = card;
   if (state.kind === "done") return { kind: "done", name: card.texts[0] ?? "", height: state.height };
   if (state.kind !== "failed") return { kind: "working", text: WORKING[state.kind] };
-  // A call that may have been sent has no way back to a second signature (9d-2); one the chain ran and refused changed nothing.
+  // A call that may have been sent has no way back to a second signature; one the chain ran and refused changed nothing.
   const again = state.reason === "chain" || retryable(state);
   return { kind: "failed", text: sayFailure(state), again };
 }

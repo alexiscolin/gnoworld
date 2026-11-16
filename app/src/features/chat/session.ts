@@ -1,4 +1,4 @@
-// What a new session of the chat's link starts the store's device-bound state with (slice 4's 4d, 4e): an account's own
+// What a new session of the chat's link starts the store's device-bound state with: an account's own
 // read from its device, none for a guest; the last session's was forgotten by the store itself (store/index.ts).
 import type { IrcMessage } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";

@@ -1,6 +1,7 @@
-// The link cards' settings (slice 13, L3; D13906): a kill switch, "1" to run, off by default, and the link reader's origin on the private network
-// (http, a name, a port, no path); a card's `sexual` score hides it from 0.3 on, stricter than a line, since OpenAI scores no "sexual/minors" on an
-// image (D13919). config.ts takes them in its schema and its result.
+// The link cards' settings: a kill switch, "1" to run, off by default, and the link reader's origin
+// on the private network (http, a name, a port, no path); a card's `sexual` score hides it from 0.3
+// on, stricter than a line, since OpenAI scores no "sexual/minors" on an image. config.ts takes
+// them in its schema and its result.
 import { z } from "zod";
 import type { Thresholds } from "../moderation/decide.ts";
 

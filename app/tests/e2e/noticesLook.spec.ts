@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, live, room, T } from "./scriptedRoom.ts";
 
-// How what an account has not seen looks (slice 4's 4f-n), on a computer's screen: the counts on the rooms' rows, the
+// How what an account has not seen looks, on a computer's screen: the counts on the rooms' rows, the
 // list, the composer's word on @room. A scripted Ergo, so the same each run; the header,
 // and who is here, which name the test wallet drawn at the server's start, are masked.
 test.describe("what an account has not seen, as it looks", () => {

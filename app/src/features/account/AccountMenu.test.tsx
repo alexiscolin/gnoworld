@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { mount } from "../../../tests/mount.tsx";
 import { Opened } from "./Opened.tsx";
 
-// 8p (frames 6 and 17): the header's right end is one pill; logged in, the account's face and its address open the menu, which now holds the
-// way out the login's own control held beside it.
+// Frames 6 and 17: the header's right end is one pill; logged in, the account's face and its address open the menu, which holds the
+// way out.
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const items = (box: HTMLElement) => [...box.querySelectorAll("[role='menuitem']")].map((item) => item.textContent);
 
@@ -55,7 +55,7 @@ describe("the account's menu", () => {
   });
 });
 
-// The header's account as the page mounts it (the red pass's high): the session read once, the way in, the pill, the way out through the
+// The header's account as the page mounts it (a case the red pass found): the session read once, the way in, the pill, the way out through the
 // menu, and a refused logout said where the page says why a login stopped.
 const api = vi.hoisted(() => ({
   me: vi.fn<() => Promise<unknown>>(),

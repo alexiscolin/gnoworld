@@ -1,12 +1,12 @@
-// The shown room's pins (slice 4's 4d): asked of the server as the room is shown, again a minute after each answer
-// while the page shows, and after the reader's own pin or unpin. Ergo tells nothing of pins (they are the server's,
-// docs/decisions.md, 2026-10-27), so another moderator's change reaches a reader within a minute or at the next look.
-// One request at a time; an answer given after the room or the reader changed, or after stopping, is dropped, since
+// The shown room's pins: asked of the server as the room is shown, again a minute after each answer
+// while the page shows, and after the reader's own pin or unpin. Ergo tells nothing of pins (they are the server's),
+// so another moderator's change reaches a reader within a minute or at the next look.
+// One request at a time; an answer given after the room or the reader changed, or after stopping, is dropped, because
 // the right to pin is the reader's own.
 import type { PinList } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 
-/** How long after an answer the room's pins are asked again: the decision's minute. */
+/** How long after an answer the room's pins are asked again: a minute. */
 export const PINS_EVERY_MS = 60_000;
 
 /** What the asker asks of, and tells. */

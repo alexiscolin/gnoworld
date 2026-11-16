@@ -4,8 +4,8 @@ import * as core from "../index.ts";
 import { textProblem } from "./args.ts";
 import { helpCall, MAX_HELP_ARGS, prefill } from "./help.ts";
 
-// Slice 13, B (plan §3, D13300): what follows `$help` in a realm's link, as gno.land/p/moul/txlink/v0 writes it (read on onyx-1,
-// 2026-11-10: `$help&func=` then Go's url.Values encoding, a send under `.send`), read into a call by name: a card shows it, never signs
+// What follows `$help` in a realm's link, as gno.land/p/moul/txlink/v0 writes it (read on onyx-1:
+// `$help&func=` then Go's url.Values encoding, a send under `.send`), read into a call by name: a card shows it, never signs
 // it alone, and no send amount ever comes from a link.
 
 const PROPERTY = { seed: 20261110, numRuns: 400 };

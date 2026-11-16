@@ -1,4 +1,4 @@
-// The signals' slice of the store (slice 9h): the stream's first signals, each world's first of each kind, in the order heard.
+// The signals' slice of the store: the stream's first signals, each world's first of each kind, in the order heard.
 // A banner shows one only to the account it names, and the plate names anyone's (features/world/Banners.tsx). Kept small: it
 // is on every world's first screen (budgets.spec.ts).
 import type { Signal } from "@gnoworld/schemas";

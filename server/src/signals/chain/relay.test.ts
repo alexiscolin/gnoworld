@@ -4,7 +4,7 @@ import { loadRealmCount } from "./count.ts";
 import { makeRelay } from "./relay.ts";
 import type { ChainRead } from "./message.ts";
 
-// Slice 9g: what the poll's reads become on the stream: coalesced to 4 a second a room, each event with its block
+// What the poll's reads become on the stream: coalesced to 4 a second a room, each event with its block
 // height; the Earth's count from block times only (a transaction carries none, so a deploy waits for its block).
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 // A flood is of many accounts: each has its own address.
@@ -88,7 +88,7 @@ describe("the relay", () => {
     ).toEqual([0, 1, 2, 3]);
   });
 
-  // F5792: the cap keeps the first four of a second, so one account at the head of each block must not fill a room alone.
+  // The cap keeps the first four of a second, so one account at the head of each block must not fill a room alone.
   it("shows one call of an account in a room's second: four of an attacker's, then a visitor's, are two lines", () => {
     const { relay, chain } = setup();
     const KAITO = Address.parse("g1cvr48r7l7lkmvp77cr6zg2zhu26jgfwr0y8pew");
@@ -143,7 +143,7 @@ describe("the relay", () => {
     expect(deployed).toHaveBeenCalledTimes(2);
   });
 
-  // F5781: the blocks' times the relay remembers for the deploys that come after are bounded too.
+  // The blocks' times the relay remembers for the deploys that come after are bounded too.
   it("remembers the times of the last 100 blocks only: a deploy of an older block waits, one of the oldest kept is counted", () => {
     const { relay, deployed } = setup();
     for (let height = 1; height <= 101; height += 1) relay(block(height));
@@ -162,7 +162,7 @@ describe("the relay", () => {
     expect(deployed).toHaveBeenCalledTimes(1);
   });
 
-  // Red pass: a bot deploying 100 realms a second is 4 events a second to every ticker, and every deploy is still counted.
+  // A bot deploying 100 realms a second is 4 events a second to every ticker, and every deploy is still counted.
   it("tells the ticker 4 deploys a second in a flood of 100, counts all 100 once their blocks come, and admits a new one the second after", () => {
     const { relay, chain, deployed, at } = setup();
     for (let n = 0; n < 100; n += 1) relay(events(deploy(n, `r${String(n)}`, actorN(n))));

@@ -1,4 +1,4 @@
-// core/cosmos (slice 7, 7c and 7d1; ADR-0002 §3 and §10; F3520): where each system sits. Systems take cells in rings by their rank in the
+// core/cosmos (ADR-0002 §3 and §10): where each system sits. Systems take cells in rings by their rank in the
 // set (`rings.ts`): the rank and the ray come from a hash of the id, so they mean nothing on chain. A curated ecosystem's namespaces take
 // consecutive ranks and near rays, one blob. Height comes from a smooth field of position, so no list of clusters. An arrival moves others
 // outward, a little, and what moved drifts there over a season. Only the sines differ between engines, in a last bit no cell depends on.
@@ -101,7 +101,7 @@ function placeOf(seed: number, { ring, cell }: Seat): SystemPlace {
   const unit = (): number => draws.unit();
   const away = TURN * unit();
   const reach = STRAY * Math.sqrt(unit());
-  // A ring's cells take turns above and below the field, so two neighbours on a ring never share a side (7d6, a disc in 3D).
+  // A ring's cells take turns above and below the field, so two neighbours on a ring never share a side (a disc in 3D).
   const side = (ring + cell) % 2 === 0 ? 1 : -1;
   const lift = side * DISC_HALF_THICKNESS * (LEAST_LIFT + (1 - LEAST_LIFT) * Math.abs(unit() * 2 - 1));
   const x = ring * PITCH * Math.cos(angle) + reach * Math.cos(away);

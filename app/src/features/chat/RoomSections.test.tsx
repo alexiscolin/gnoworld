@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 
-// What a visitor's rooms list is (slice 4's 4b): the sections and their rooms, each a link, with no count after it unless
+// What a visitor's rooms list is: the sections and their rooms, each a link, with no count after it unless
 // the page gives one; RoomsView.test.tsx holds an account's, which wraps the same list.
 const SECTIONS = [
   { name: "Talk", rooms: [{ room: "#bubble", type: "open" as const }] },

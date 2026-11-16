@@ -1,5 +1,4 @@
-// What the room's flash says of a line's copy and its delete (4c's message menu, docs/decisions.md 2026-10-26),
-// moved out of Lines.tsx to keep each file and function in the lint's sizes.
+// What the room's flash says of a line's copy and its delete.
 import type { Line } from "@gnoworld/core";
 import type { FlashMessage } from "@gnoworld/ui";
 import { useState } from "react";
@@ -46,7 +45,7 @@ interface RemovalProps {
   /** Hands the focus to a neighbour of the line `id`, which goes. */
   leave: (id: string) => void;
   setSaid: (said: FlashMessage | null) => void;
-  /** The reader, and the room the lines are of: the reader's own message that leaves them is a hide (F2093). */
+  /** The reader, and the room the lines are of: the reader's own message that leaves them is a hide. */
   me?: string | undefined;
   room?: string | undefined;
 }
@@ -69,7 +68,7 @@ function hidden(
   );
 }
 
-// Says one's own message was hidden, when it leaves the lines of the room in view without a delete of one's own (F2093).
+// Says one's own message was hidden, when it leaves the lines of the room in view without a delete of one's own.
 function useHidden(props: Pick<RemovalProps, "lines" | "room" | "me" | "setSaid"> & { deleting: string | undefined }) {
   const { lines, room, me, deleting, setSaid } = props;
   const [seen, setSeen] = useState({ room, lines });
@@ -82,7 +81,7 @@ function useHidden(props: Pick<RemovalProps, "lines" | "room" | "me" | "setSaid"
 /** The id of a delete gone out and not answered yet, and the delete itself, which says whether it went out. */
 export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room }: RemovalProps) {
   // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
-  // its refusal ends it too (U4). ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
+  // its refusal ends it too. ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
   // milliseconds a REDACT waits for its echo.
   const [deleting, setDeleting] = useState<string>();
   useHidden({ lines, room, me, deleting, setSaid });
@@ -90,11 +89,11 @@ export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid
     setDeleting(undefined);
     if (refused !== deleting) setSaid({ title: "Message deleted." });
   } else if (deleting !== undefined && !connected) {
-    // A link that dropped forgot the act waiting for its answer: no refusal will end it (CR1).
+    // A link that dropped forgot the act waiting for its answer: no refusal will end it.
     setDeleting(undefined);
   }
-  // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept
-  // (/code-review, U8): the chat out of reach, to try again once back, or a msgid no command carries.
+  // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept:
+  // the chat out of reach, to try again once back, or a msgid no command carries.
   const remove = (id: string): boolean => {
     const went = onDelete(id);
     if (went) {

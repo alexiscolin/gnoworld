@@ -1,4 +1,4 @@
-// The market card's two reads as queries (D13973): the prices (/markets.json) and the day's history, each one request shared by every card
+// The market card's two reads as queries: the prices (/markets.json) and the day's history, each one request shared by every card
 // and kept fresh by the client's own rules, a failure never kept for the page's life.
 import { MARKETS_HISTORY_MAX_BYTES, MarketsHistory } from "@gnoworld/schemas/indexer";
 import { queryOptions } from "@tanstack/react-query";

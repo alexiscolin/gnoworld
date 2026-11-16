@@ -5,7 +5,7 @@ import { mountInStore } from "../../../tests/inStore.tsx";
 import { motionOf } from "../../space/motion.ts";
 import { useSettingsApplied } from "./applied.ts";
 
-// Each setting takes effect with no reload (slice 8, row 8): the page marks it on the root as it changes, where the stylesheets read the
+// Each setting takes effect with no reload the page marks it on the root as it changes, where the stylesheets read the
 // motion, space the quality and the motion (space/frame.ts, space/motion.ts), and its foot the 3D on a phone (SpaceFoot.tsx).
 const root = () => document.documentElement.dataset;
 const flushed = () =>

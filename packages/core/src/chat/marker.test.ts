@@ -64,7 +64,7 @@ describe("readAfter: the room's reading place, from Ergo's MARKREAD", () => {
     ["a MARKREAD with no time", read(":ergo.test MARKREAD #bubble")],
     ["a line that is not a MARKREAD", read(`:${ALICE}!u@h PRIVMSG #bubble timestamp=${T(2)}`)],
     ["a server's line that is not a MARKREAD", read(`:ergo.test NOTICE #bubble timestamp=${T(2)}`)],
-    // The red pass (R18): Ergo's own word alone, never a replay nor a person's.
+    // Ergo's own word alone, never a replay nor a person's.
     ["a MARKREAD in a batch", read(`@batch=h1 :ergo.test MARKREAD #bubble timestamp=${T(2)}`)],
     ["a MARKREAD from a person", read(`:mallory!u@h MARKREAD #bubble timestamp=${T(2)}`)],
   ])("keeps the place held on %s", (_, message) => {
@@ -75,7 +75,7 @@ describe("readAfter: the room's reading place, from Ergo's MARKREAD", () => {
     expect(after(undefined, marked("#Bubble", `timestamp=${T(1)}`))).toBe(T(1));
   });
 
-  // The red pass (R13): a place set far ahead by another client of the account, which Ergo would keep as its highest
+  // A place set far ahead by another client of the account, which Ergo would keep as its highest
   // for good, would hide every later line's mark; it is read as no place, 5 minutes of clock skew allowed.
   test("reads a place more than 5 minutes past the page's clock as none, and one within them", () => {
     const ahead = new Date(NOW + PLACE_AHEAD_MS + 1).toISOString();
@@ -108,7 +108,7 @@ describe("firstUnread: the first line past the reading place", () => {
     expect(firstUnread([line("a", T(0)), line("b", T(1), { account: ME })], T(0), ME)).toBeUndefined();
   });
 
-  // The red pass (R21): a line's author is its account tag alone (RoomView.tsx's rule), never its nick.
+  // A line's author is its account tag alone (RoomView.tsx's rule), never its nick.
   test("knows the reader's own line by its account tag alone, never by its nick", () => {
     expect(firstUnread([line("a", T(0)), line("b", T(1), { from: ME })], T(0), ME)).toBe("b");
     expect(
@@ -121,7 +121,7 @@ describe("firstUnread: the first line past the reading place", () => {
   });
 });
 
-// The red pass (R1, R1b): the New mark is decided once the room holds lines and its place is known, then kept while
+// The New mark is decided once the room holds lines and its place is known, then kept while
 // the room is open: the page's own MARKREAD, Ergo's answer to it and another session's later place move the store's
 // place, never the mark; a line that comes live in a room read to its end is no news.
 describe("newMarkAfter: the line marked New while a room is open", () => {
@@ -161,7 +161,7 @@ describe("concerns: the room of a MARKREAD", () => {
   });
 });
 
-// Mark unread (slice 4's 4d, ADR-0002: "Mark unread: 0, on the device"): Ergo's MARKREAD only moves forward
+// Mark unread (ADR-0002: "Mark unread: 0, on the device"): Ergo's MARKREAD only moves forward
 // (irc/getters.go:552, v2.19.1), so the device keeps a place of its own and the New mark is decided from the
 // earlier of the two.
 const item = (id: string, time: string, account = ALICE): Line => ({
@@ -269,7 +269,7 @@ describe("newMarkAfter: a line marked unread", () => {
     expect(first?.id).toBe("c");
   });
 
-  // The page waits for the history page before it decides (4f's G1), by which time Ergo's MARKREAD has answered: an
+  // The page waits for the history page before it decides, by which time Ergo's MARKREAD has answered: an
   // unknown place is Ergo knowing none (a room never read), and the device's alone decides.
   test("decides from the device's place alone where Ergo knows none", () => {
     expect(newMarkAfter(undefined, { lines: ITEMS, read: undefined, unread: placeBefore(T(2)) }, ME)?.id).toBe("c");
@@ -291,7 +291,7 @@ describe("newMarkAfter: a line marked unread", () => {
   });
 
   // The reader reaching the end clears the device's place; the divider they just read through stays until the room
-  // closes, as Ergo's own does (docs/decisions.md, 2026-10-27).
+  // closes, as Ergo's own does.
   test("keeps the mark when the device's place is cleared", () => {
     const marked = newMarkAfter(opened, { lines: ITEMS, read: T(3), unread: placeBefore(T(1)) }, ME);
     expect(newMarkAfter(marked, { lines: ITEMS, read: T(3), unread: undefined }, ME)).toBe(marked);

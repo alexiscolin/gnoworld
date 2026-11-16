@@ -1,6 +1,5 @@
-// The place's own buttons in the chat's header (Alexis, 2026-11-07: "Who's here et Events devraient être des boutons à côté, ça ne fait
-// rien dans le chat"): search in the chat, who is here, the place's events and a video call, the last two greyed until they come (D13995).
-// The header is one line (Alexis, 2026-11-12): where its width does not hold them all, the last ones leave into a "More" menu, the
+// The place's own buttons in the chat's header: search in the chat, who is here, the place's events and a video call, the last two greyed until they come.
+// The header is one line: where its width does not hold them all, the last ones leave into a "More" menu, the
 // video call and the events first, then the people, then the search (`LEAVING`); the expand button never leaves (ChatHeader.tsx).
 import { ComingSoon, IconButton, Menu, type IconName } from "@gnoworld/ui";
 import { createContext, use } from "react";

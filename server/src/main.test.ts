@@ -46,7 +46,7 @@ const folder = (prefix: string): string => {
   return dir;
 };
 
-// The key the door proves itself to jarvis with, in a file of its own (10u-g2).
+// The key the door proves itself to jarvis with, in a file of its own.
 const DOOR_KEY = `door-key-${"d".repeat(40)}`;
 const doorKeyFile = (): string => {
   const path = join(folder("gnoworld-door-"), "door-key");
@@ -98,7 +98,7 @@ const exited = (server: Server): Promise<number | null> =>
   );
 
 // A wait with a bound: past it, the test fails saying what it waited for, whether the server still runs, what it printed and
-// what Ergo heard (F13188: on GitHub's coverage run one wait hung two minutes and said nothing).
+// what Ergo heard (a hung wait that said nothing cost two minutes on GitHub's coverage run).
 const bounded = async <T>(
   what: string,
   wait: Promise<T>,
@@ -332,7 +332,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await listening(server);
     const peer = await ergo.peer(0);
     await welcome(peer, { echo: false });
-    // Every world of the roles file the server ships, the stations round the Earth among them (8l), by name.
+    // Every world of the roles file the server ships, the stations round the Earth among them, by name.
     const rooms = shippedWorlds().map((world) => `#${world}`);
     expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual([`JOIN ${rooms.join(",")}`]);
     const left = once(peer.socket, "close");
@@ -341,8 +341,8 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await left;
   });
 
-  // Two minutes: under the coverage's instrumentation on GitHub's four cores it ran past one, twice (gate run 43599405799),
-  // then past two (F13188); each wait now has its own bound, their sum under the test's, so a hang names itself.
+  // Two minutes: under the coverage's instrumentation on GitHub's four cores a run goes past one;
+  // each wait has its own bound, their sum under the test's, so a hang names itself.
   it(
     "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
     { timeout: 120_000 },
@@ -367,7 +367,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
         peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
         peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
       }
-      // The mute's own line: the room's flags go out first, with the JOINs (3m).
+      // The mute's own line: the room's flags go out first, with the JOINs.
       const muted = await bounded("the mute's SAMODE", peer.next(/^SAMODE #bubble [+-]b /), {
         server,
         peer,
@@ -649,14 +649,14 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(roomy.out.stdout).not.toContain("ergo_volume");
   });
 
-  // The prices timer (5l) against a proxy that records what the server asks it to tunnel to, as the egress proxy would
+  // The prices timer against a proxy that records what the server asks it to tunnel to, as the egress proxy would
   // see it: the server reaches out only through HTTPS_PROXY (NODE_USE_ENV_PROXY), as in the stack.
   const tunnels = async (silent = false): Promise<{ proxy: string; seen: string[]; close: () => void }> => {
     const seen: string[] = [];
     const proxy = createHttpServer();
     proxy.on("connect", (request, socket) => {
       seen.push(request.url ?? "");
-      // A silent proxy never answers the CONNECT: the read stays open (F2758).
+      // A silent proxy never answers the CONNECT: the read stays open.
       if (!silent) socket.end("HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\n\r\n");
     });
     await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
@@ -694,7 +694,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  // The home's block height (2026-10-31): the timer also tunnels to the default universe's RPC, named by UNIVERSES_FILE, and to
+  // The home's block height: the timer also tunnels to the default universe's RPC, named by UNIVERSES_FILE, and to
   // no other universe's.
   it("reads the default universe's RPC beside CoinGecko when UNIVERSES_FILE names the data, and no other universe's", async () => {
     const way = await tunnels();
@@ -733,7 +733,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  // The worlds job (7c) tunnels to the default universe's RPC alone: the other universe's is not on the way out.
+  // The worlds job tunnels to the default universe's RPC alone: the other universe's is not on the way out.
   it("starts the worlds job when WORLDS_FILE and UNIVERSES_FILE are set: it asks the default universe's RPC, and stops on SIGTERM", async () => {
     const way = await tunnels();
     try {
@@ -778,7 +778,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  // The preview job (8f) reads the default universe's hubs' pages through its RPC alone, and only with the check that reads each capture.
+  // The preview job reads the default universe's hubs' pages through its RPC alone, and only with the check that reads each capture.
   it("starts the preview job with PREVIEWS_FILE, UNIVERSES_FILE and OpenAI's key: it asks the default universe's RPC alone, and stops on SIGTERM", async () => {
     const way = await tunnels();
     try {
@@ -934,7 +934,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     return { universes, hubs };
   };
 
-  // Slice 9g: the chain's rooms. The data's two files start one poll of each universe's indexer, which the egress way
+  // The chain's rooms. The data's two files start one poll of each universe's indexer, which the egress way
   // sees as a tunnel; SIGTERM stops it with the rest.
   it("follows each universe's indexer when UNIVERSES_FILE and HUBS_FILE name the data, and stops on SIGTERM", async () => {
     const way = await tunnels();
@@ -1009,7 +1009,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     ]);
   });
 
-  // 4d: the pins' table is among its migrations and its routes are mounted, with no Ergo set to read a line from.
+  // The pins' table is among its migrations and its routes are mounted, with no Ergo set to read a line from.
   it("serves a room's pins to a guest, none yet, saying it may not pin, and refuses a room that is no room's (4d)", async () => {
     const port = await listening(start(settings()));
     const ask = (query: string) => fetch(`http://127.0.0.1:${String(port)}/api/pins${query}`);
@@ -1191,7 +1191,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await read(leads)).toEqual([200, { ...settled, quota: 30 }]);
     const large = await post("/api/admin/jarvis/change", { nonce: "a".repeat(20_000) }, leads);
     expect(large.status).toBe(413);
-    // The console's session lasts an hour (ADR-0002 §6; Alexis, 10g-7), its cookie too.
+    // The console's session lasts an hour (ADR-0002 §6), its cookie too.
     const login = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
     const signed = { nonce: login.nonce, address: lead.address, proof: lead.sign("onyx-1", login.text) };
     expect((await post("/api/login/verify", signed)).headers.get("set-cookie")).toContain("Max-Age=3600;");
@@ -1261,7 +1261,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     };
     expect(await ask({})).toEqual([200, { status: "off" }]);
     expect(await ask({ JARVIS: "yes" })).toEqual([200, { status: "off" }]);
-    // The allowlist skips the first-ask check, so the question reaches jarvis, which is not there (D13985).
+    // The allowlist skips the first-ask check, so the question reaches jarvis, which is not there.
     expect(await ask({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
   });
 

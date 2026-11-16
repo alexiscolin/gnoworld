@@ -1,4 +1,4 @@
-// What a guest may say (plan 3.2, D430): stricter than an account, checked by the server before anything is relayed.
+// What a guest may say: stricter than an account, checked by the server before anything is relayed.
 // A link is what the chat makes clickable, the account rules' own detector (https:// and www.); "discord.gg/x" is text.
 import type { Rules } from "../roles/roles.ts";
 import { ruleVerdict } from "../moderation/rules.ts";

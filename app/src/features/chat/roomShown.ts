@@ -1,4 +1,4 @@
-// A room in view on a world's page (slice 4's 4b): the conversation's shape, one RoomView and one Writer whatever it is,
+// A room in view on a world's page: the conversation's shape, one RoomView and one Writer whatever it is,
 // and what a room is told. Apart from shown.tsx, whose direct messages an account alone has.
 import type { Composed } from "@gnoworld/core";
 import type { ReactNode } from "react";
@@ -9,7 +9,7 @@ import type { RoomViewProps } from "./RoomView.tsx";
 import type { WriterProps } from "./Writer.tsx";
 
 // The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key, one a
-// conversation, keeps each one's drawing, its scroll and whether its reader is at the end, apart (CR10).
+// conversation, keeps each one's drawing, its scroll and whether its reader is at the end, apart.
 export interface Shown {
   kind: "room" | "dm";
   key: string;

@@ -1,4 +1,4 @@
-// The URL rule, again: the reader trusts nothing the server says (docs/plans/link-previews.md §4). A page or a picture is read only at
+// The URL rule, again: the reader trusts nothing the server says. A page or a picture is read only at
 // an https address on port 443 (or none), with no userinfo, a public name (no IP literal, no local name) and at most 2,048 characters.
 // A name that resolves to a private address is the DNS check's and the way out's (fetch.ts), never this rule's.
 import { isPublicOrigin } from "@gnoworld/core";

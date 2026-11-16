@@ -3,7 +3,7 @@ import { textHash } from "../space/cell.ts";
 import { daysBetween, utcDay } from "./day.ts";
 import { expeditionOf, reach, reachedOn, streakAfter, streakOn } from "./expedition.ts";
 
-// The daily expedition (slice 8, row 8: "the same for everyone on a given day"; "streaks count UTC days"): three stops, a pure function of
+// The daily expedition (the same for everyone on a given day; streaks count UTC days): three stops, a pure function of
 // the UTC day and the curated pool, the live stop first; what a device reached that day; the streak, one step a UTC day.
 const pool = Array.from({ length: 12 }, (_, i) => ({ id: `stop-${String(i)}` }));
 const ids = (stops: readonly { id: string }[]) => stops.map(({ id }) => id);

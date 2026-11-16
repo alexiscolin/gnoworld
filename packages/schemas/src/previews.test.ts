@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAPTURE_MAX_BYTES, Previews, PREVIEWS_MAX, PREVIEWS_MAX_BYTES } from "./previews.ts";
 
-// The file the server's preview job writes and every client reads (8f, slice 7's 7l): each captured page by its realm's path, the time it
+// The file the server's preview job writes and every client reads: each captured page by its realm's path, the time it
 // was captured and its first part as the chain rendered it. All of it came from a chain, so every text is capped and every path is a realm's.
 const capture = (over: Record<string, unknown> = {}) => ({
   path: "gno.land/r/gov/dao",
@@ -70,7 +70,7 @@ describe("Previews, the captures' file", () => {
     expect(parses(file({ previews: [b, a] }))).toBe(false);
   });
 
-  // The job writes its paths in JavaScript's own order of code units, the one sort() gives: `-` before `/` before `_` (R4).
+  // The job writes its paths in JavaScript's own order of code units, the one sort() gives: `-` before `/` before `_`.
   it("takes sibling paths with -, / and _ in the one order sort() gives, and no other", () => {
     const siblings = ["gno.land/r/a-b", "gno.land/r/a/b", "gno.land/r/a_b"];
     expect(siblings.toSorted()).toEqual(siblings);

@@ -99,14 +99,14 @@ describe("an ecosystem's page", () => {
 });
 
 describe("the Earth of a universe that holds worlds", () => {
-  // 8g (frames 37 to 42): the Earth's plate is its general chat's; the List keeps every world and ecosystem.
+  // The Earth's plate is its general chat's; the List keeps every world and ecosystem.
   test("lists neither its worlds nor its ecosystems", async () => {
     const html = await page("earth", "/net/gnoland/earth");
     expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
     expect(html).not.toMatch(/<a [^>]*href="\/e\/tokens"/);
   });
 
-  // The crumb is gone with the plate (the header's views lead up: D344, D428); the plate's kicker says it is the home's general chat.
+  // The header's views lead up, so the plate has no crumb; its kicker says it is the home's general chat.
   test("says in its plate's kicker that it is the home, the general chat, and draws no crumb to the universe", async () => {
     const html = await page("earth", "/net/gnoland/earth");
     expect(html).toMatch(/<p class="label[^"]*">(?:<span[^>]*><\/span>)?Home · the general chat<\/p>/);
@@ -131,12 +131,12 @@ describe("the Earth of a universe that holds worlds", () => {
 describe("a universe's index", () => {
   test("is the cosmos of the universe at /net/<id>/: its name, its worlds, a way to its Earth", async () => {
     const html = await page("home", "/net/gnoland/");
-    // F3267: the hero's kicker names the universe, and the heading is its line, what the page holds.
+    // The hero's kicker names the universe, and the heading is its line, what the page holds.
     expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land<\/p>/);
     expect(headingOf(html)).toBe("1 world in gno.land");
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
     expect(html).toContain("Other");
-    // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
+    // The way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Go explore/);
     // Onyx's world is not listed here; the ticker's placeholder news names it, and is the site's, not a universe's.
     expect(html).not.toContain("/w/bubble");
@@ -147,7 +147,7 @@ describe("a universe's index", () => {
     for (const path of ["/", "/net/onyx/"]) {
       const html = await page("home", path);
       expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land · live now<\/p>/);
-      // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+      // The default universe's count is the cosmos's, which the browser reads from the worlds' file: none in the build, which keeps
       // the line's figure's room for it.
       expect(headingOf(html), path).toBe("Worlds in Onyx");
     }

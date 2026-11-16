@@ -1,4 +1,4 @@
-// GET /api/search (slice 13, B2; D13917, D13924): what a reader asks and what the server answers. The query's words are
+// GET /api/search: what a reader asks and what the server answers. The query's words are
 // measured after NFKC, the form the index matches; the server never sends HTML, a hit's `marks` are offsets (UTF-16 units)
 // into its `text`, which the page draws as text.
 import { Address } from "./address.ts";

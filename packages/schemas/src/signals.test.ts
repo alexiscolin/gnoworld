@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 
-// Slice 9h (D210 to D219): the server's first signals, each read through its schema on both sides. The account is an
+// The server's first signals, each read through its schema on both sides. The account is an
 // address and nothing else, so no name, hostile or not, ever travels as a signal's text.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const AT = "2026-11-05T12:00:00.000Z";

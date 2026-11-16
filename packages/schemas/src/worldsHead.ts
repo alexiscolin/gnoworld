@@ -1,4 +1,4 @@
-// What the worlds' file shares with its count (7n2): the caps of a file, the universe's slug and the time of the read. Apart from worlds.ts,
+// What the worlds' file shares with its count: the caps of a file, the universe's slug and the time of the read. Apart from worlds.ts,
 // so a page that reads only the count takes none of the file's schema: a bundler puts a module whole in one chunk.
 import { z } from "./zod.ts";
 
@@ -13,7 +13,7 @@ export const Moment = z.iso.datetime({ offset: true }).check(z.maxLength(40));
 /** The most bytes of the worlds' count: its head and a number, under 300; a client refuses more. */
 export const WORLDS_COUNT_MAX_BYTES = 1024;
 
-/** worlds-count.json (7n2), written with worlds.json in the same pass: its head and the worlds the cosmos draws from it with the Earth (core's
+/** worlds-count.json, written with worlds.json in the same pass: its head and the worlds the cosmos draws from it with the Earth (core's
  * `worldsDrawn`), so the home's hero reads a few bytes for its number and a phone nothing of the cosmos before View in space. */
 export const WorldsCount = z.strictObject({
   version: z.literal(1),

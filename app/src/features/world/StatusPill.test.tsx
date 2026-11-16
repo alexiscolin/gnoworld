@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ringOf } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
 
-// Slice 5k (ADR-0002 §4, "Status ring"; frames 22 and 27, the pill "Proposal 15 · YES 33% of 66.66%"): the data the orbit will draw
-// (slice 7) and the pill that carries the numbers, so the state never rests on the ring alone. The ring shows only what a realm
+// The status ring (ADR-0002 §4; frames 22 and 27, the pill "Proposal 15 · YES 33% of 66.66%"): the data the orbit draws
+// and the pill that carries the numbers, so the state never rests on the ring alone. The ring shows only what a realm
 // reports: no tally, no ring (gnoworld invents no timer). The proposals here are invented for the tests (nothing recorded).
 let host: HTMLElement | undefined;
 afterEach(() => {

@@ -107,7 +107,7 @@ function Shell({ title, kicker, name, open, onClose, other, account }: ShellProp
             {account ? <CopyAddress address={name} /> : null}
           </Cluster>
         </Cluster>
-        {/* Kept from the first opening on: dropped at the close, the window shrank to its head while it faded out. */}
+        {/* Kept from the first opening on: dropped at the close, the window would shrink to its head while it fades out. */}
         {account ? <PersonBody address={name} /> : null}
       </Stack>
     </Dialog>

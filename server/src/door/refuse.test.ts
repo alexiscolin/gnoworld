@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { refusedWithoutModel } from "./refuse.ts";
 
-// D13985 point 3: the asks refused without a model. The list is bypassable by design; the day's caps catch the rest.
+// The asks refused without a model. The list is bypassable by design; the day's caps catch the rest.
 const HOSTS = ["gno.land", "gnoworld.test"];
 const refused = (question: string) => refusedWithoutModel(question, HOSTS);
 

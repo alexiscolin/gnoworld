@@ -1,7 +1,7 @@
-// How busy each room is (slice 3's plan, 3h): messages a minute over the last five minutes, counted in
-// memory, which calls no service (ADR-0002, the heat). An account counts 10 times a minute at most, so a
-// spammer fakes no storm; the rooms and accounts it holds are capped. A guest's relayed line (D430) is counted apart: the plate
-// shows it (D374), the history never does (D353).
+// How busy each room is: messages a minute over the last five minutes, counted in memory, which
+// calls no service. An account counts 10 times a minute at most, so a spammer fakes no storm; the
+// rooms and accounts it holds are capped. A guest's relayed line is counted apart: the plate shows
+// it, the history never does.
 import { limiter } from "../limit.ts";
 
 export interface Activity {

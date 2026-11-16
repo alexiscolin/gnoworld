@@ -139,7 +139,7 @@ describe("the verdicts' retention by days and by cap (3n)", () => {
   });
 
   it("never removes a verdict still pending its check, past its days or the oldest past the cap (F598)", () => {
-    // The cap counts every row, the pending ones too (4 checks at a time, 3i), and removes settled ones.
+    // The cap counts every row, the pending ones too (4 checks at a time), and removes settled ones.
     const { db, retention, verdicts } = setup({ maxVerdicts: 4 });
     const pending = db.prepare(
       "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, '#bubble', 'h', 'pending', ?)",

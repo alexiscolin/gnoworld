@@ -1,4 +1,4 @@
-// The guest chat as the chat starts it (D430): the routes, with the bot's relay, the rooms' rules and the activity they feed.
+// The guest chat as the chat starts it: the routes, with the bot's relay, the rooms' rules and the activity they feed.
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import type { Activity } from "../activity/activity.ts";

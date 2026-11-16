@@ -1,4 +1,4 @@
-// The chain's side of the stream (slice 9g): a call is told to the readers of any room of its world, a deploy (which names no world) to
+// The chain's side of the stream: a call is told to the readers of any room of its world, a deploy (which names no world) to
 // the Earth's, in the verdicts' sequence of ids and live only, the indexer giving them again; the Earth's last count of each universe
 // is kept for a reader who comes after.
 import type { ChainEvent, RealmsDeployed } from "@gnoworld/schemas";

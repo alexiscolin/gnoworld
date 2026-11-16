@@ -1,4 +1,4 @@
-// The page's feed of the chain (slice 9g), a chunk of its own that a page loads when the stream first tells the chain (the first screen holds none of it): each
+// The page's feed of the chain, a chunk of its own that a page loads when the stream first tells the chain (the first screen holds none of it): each
 // event through its schema, a frame that fails dropped and said once, then into the store in batches. The server tells at most 4 events
 // a second a room, so a window of 100 ms joins a burst into one update of the store, one render, however many frames came.
 import { ChainEvent } from "@gnoworld/schemas/chainEvents";
@@ -9,7 +9,7 @@ export const BATCH_MS = 100;
 const HELD = 1000;
 
 /** What the feed gives the store: a batch of events. */
-export interface ChainActions {
+interface ChainActions {
   heard: (events: readonly ChainEvent[]) => void;
 }
 

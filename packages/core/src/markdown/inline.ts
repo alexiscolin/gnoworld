@@ -1,5 +1,5 @@
-// A line's marks (slice 4's 4c), read left to right once: escapes, code, bare https addresses, links
-// `[label](https://…)`, mentions `@g1…` (4d), and runs of one, two or three `*` or `_`, or two `~` or `+` (8k's
+// A line's marks, read left to right once: escapes, code, bare https addresses, links
+// `[label](https://…)`, mentions `@g1…`, and runs of one, two or three `*` or `_`, or two `~` or `+` (the
 // underline, the chat's alone), at word bounds.
 // A mark or label open is a frame on a stack, holding what it would wrap; one never closed gives its run back as
 // text. Marks and labels nest 8 deep at most, past which a mark is text: a hostile line costs no deeper stack and

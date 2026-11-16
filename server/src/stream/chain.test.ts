@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { makeStream, type Stream } from "./stream.ts";
 
-// Slice 9g: the chain's events reach a page on the server's existing stream, as their own events `chain` and `realms`, to the
+// The chain's events reach a page on the server's existing stream, as their own events `chain` and `realms`, to the
 // readers who follow the room and may read it, live only (the indexer gives them again; nothing is stored here) but for the
 // Earth's last count, which a page that opens later still needs.
 
-// worldOf, counted: an event must not split a client's rooms again (F5774).
+// worldOf, counted: an event must not split a client's rooms again.
 const worlds = vi.hoisted(() => ({ asked: 0 }));
 vi.mock("../rooms/rooms.ts", async (original) => {
   const rooms = await original<typeof import("../rooms/rooms.ts")>();
@@ -176,7 +176,7 @@ describe("the stream's realms event", () => {
     await late.cancel();
   });
 
-  // F5781: a reader that comes back with its newest id is replayed the counts after it, not the ones it has.
+  // A reader that comes back with its newest id is replayed the counts after it, not the ones it has.
   it("replays to a returning reader only the counts newer than its Last-Event-ID", async () => {
     const { stream, open } = setup();
     stream.realms(COUNT);

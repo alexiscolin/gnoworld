@@ -1,4 +1,4 @@
-// A line's head (slice 4's 4b, moved out of LineView.tsx): the face, the name, the marks and the time.
+// A line's head: the face, the name, the marks and the time.
 import type { Line, ShownLine } from "@gnoworld/core";
 import type { MouseEvent } from "react";
 import { Avatar, Cluster, Icon } from "@gnoworld/ui";
@@ -36,13 +36,13 @@ function openCardFrom(event: MouseEvent<HTMLElement>): void {
   event.currentTarget.parentElement?.querySelector<HTMLButtonElement>("[data-author] > button")?.click();
 }
 
-// "Edited" in the head, before the time, when the author's later edit is what the line shows (4d, U5).
+// "Edited" in the head, before the time, when the author's later edit is what the line shows.
 function Edited({ edited }: { edited: boolean | undefined }) {
   return edited === true ? <span className={styles["mark"]}>Edited </span> : null;
 }
 
-// The line's marks in its head, before the time: where no sender's words stand (F808). Pinned and Saved are a word and an
-// icon (4d): one reads the room's pins, the other what this device kept.
+// The line's marks in its head, before the time: where no sender's words stand. Pinned and Saved are a word and an
+// icon: one reads the room's pins, the other what this device kept.
 function Marks({
   mentioned,
   notice,

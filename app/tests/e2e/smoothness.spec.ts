@@ -9,7 +9,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { analyse, continuity, odd } from "./smoothAnalysis.ts";
 import { record, stop, type Raw } from "./smoothness.ts";
 
-// Smoothness (2026-11-11): each flow of a reader's first minutes recorded frame by frame (smoothness.ts), the numbers kept in the file
+// Smoothness: each flow of a reader's first minutes recorded frame by frame (smoothness.ts), the numbers kept in the file
 // `SMOOTH_OUT` names (one JSON line a flow) for the comparison of two trees. It fails on a jump or a bounce of what moves; a stall or a long
 // frame is a number to compare, as the software GPU's absolute times are not a budget.
 declare const process: { env: Record<string, string | undefined> };
