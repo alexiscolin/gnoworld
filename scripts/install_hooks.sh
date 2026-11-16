@@ -35,6 +35,15 @@ git config pull.ff only
 	echo "install_hooks: git still takes its hooks from $(git rev-parse --git-path hooks), set in a config this cannot change; remove it there" >&2
 	exit 1
 }
+# This machine's twins of the committed rules (D13413): the main checkout is git's shared folder's, the worktrees' folder "<main>-wt"
+# beside it; machine_rules.py of the same commit adds them to every Claude profile's user settings, a copy of each file kept, nothing
+# removed. A commit without it writes none.
+if git cat-file -e "$ref:scripts/machine_rules.py" 2>/dev/null; then
+	main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)
+	profiles=
+	for p in "$HOME/.claude" "$HOME"/.claude-*; do [ -f "$p/settings.json" ] || [ -L "$p/settings.json" ] && profiles="$profiles $p"; done
+	[ -z "$profiles" ] || git show "$ref:scripts/machine_rules.py" | python3 -I - "$(git show "$ref:.claude/settings.json")" "$main" $profiles
+fi
 # land (D13211), the owner's one command for a pull request, and agent-pr's code it reuses, from the same commit, beside the GitHub
 # repository origin names, which it lands to; a commit without it installs none. agent-github's installer, of that commit too,
 # writes into land the python3, git, gh and gitleaks the owner's PATH finds, or refuses (D13412): the new land is made whole beside

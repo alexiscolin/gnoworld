@@ -59,7 +59,7 @@ SECTIONS = {
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
-    "scripts/install_hooks.sh": "installed,outside", "scripts/land.py": "land,installed", "scripts/agent_pr.py": "land", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
+    "scripts/install_hooks.sh": "installed,outside", "scripts/land.py": "land,installed", "scripts/machine_rules.py": "siblings,installed", "scripts/agent_pr.py": "land", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/related.py": "gate_lanes", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/failures.json": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
@@ -1063,7 +1063,6 @@ def mutants():
     # twins in the main checkout beside it.
     for name in ("check.sh", "check_docs.py", "ergo.sh", "hidden.py", "related.py", "speeds.py", "workshop.sb", "workshop.sh"):
         yield from each(".claude/settings.json", f'      "Edit(/scripts/{name})",\n', "", "hooks", f"settings keep scripts/{name}, which runs outside the sandbox, out of the file tools")
-        yield from each(".claude/settings.json", f'      "Edit(~/Server/gnoworld/scripts/{name})",\n', "", "hooks", f"settings keep the main checkout's scripts/{name} out of the file tools")
     # The hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
     # land (D13211, D13213): the owner's one command for a pull request, and its installation from main.
@@ -1136,56 +1135,66 @@ def mutants():
     for path in (".git/commondir", ".mcp.json"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of Claude's file tools (F150, F158)")
     yield from each(".claude/settings.json", '        ".git/commondir",\n', "", "hooks", "the sandbox keeps commands out of git's commondir (F150)")
-    yield from each(".claude/settings.json", '        ".mcp.json",\n', "", "hooks", "the sandbox keeps commands out of .mcp.json (F158)")
-    # No session writes another worktree's closed files; each twin's kind switched off (its path made another, so the file
-    # stays JSON: a line cut last in its list would leave a comma, and the run fail on that), narrowed to one
-    # tree or widened past the worktrees' folder.
-    new = "~/Server/gnoworld-wt"
-    for rule, why in (("Edit(~/Server/gnoworld/scripts/stop_gate.sh)", "the main checkout's Stop hook (F4890)"), ("Edit(~/Server/gnoworld/.git/config)", "the main checkout's git config (F4890)"),
-                      (f"Edit({new}/*/.claude/settings.json)", "a sibling's settings, which its session reloads (F4890)"),
-                      ("Read(~/Server/gnoworld/deploy/secrets/**)", "the main checkout's secrets (F4892)")):
-        yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {why} out of the file tools")
-    # The instructions every session reads: its own tree's, to commands and to the file tools, and those of the folders above.
+    yield from each(".claude/settings.json", '        ".git/commondir",\n        ".mcp.json"\n', '        ".git/commondir"\n', "hooks", "the sandbox keeps commands out of .mcp.json (F158)")
+    # No session writes another worktree's closed files (machine_rules.py's twins, D13413): each kind of twin dropped, narrowed to one
+    # tree or widened past the worktrees' folder; the instructions every session reads, its own tree's and the folders' above.
+    mr = "scripts/machine_rules.py"
+    for find, replace, why in (
+        ('deny = {f"{k}({rule(main)}{p})" for k, p in own} | ', "deny = ", "the main checkout's files, to worktree sessions (F4890, F4892)"),
+        (' | {f"Edit({rule(main)}/scripts/**)"}', "", "the main checkout's scripts whole, to worktree sessions (F5058)"),
+        ('deny |= {f"{k}({rule(new)}/*{p})" for k, p in twins} | ', "deny |= ", "a sibling's closed files, to the file tools (F4890, 7w3)"),
+        ('{f"{k}({rule(new)}/*{p})" for k, p in twins}', '{f"Edit({rule(new)}/**)"}', "no twin closing a sibling's open files (F4890)"),
+        ('f"Edit({rule(new)}/*/.git)", ', "", "a sibling's .git, to the file tools (F5095)"),
+        ('f"Edit({rule(new)}/.claude/**)"}', "}", "the worktrees' folder's .claude, which --add-dir loads, to the file tools (7w3, S2-2)"),
+        ('for f in (new, tmp, "/tmp" + tmp[len("/private/tmp"):])', 'for f in (new,)', "the temporary folder's instructions, to the file tools (7z, S4)"),
+        ('for f in (new, tmp, "/tmp" + tmp[len("/private/tmp"):])', 'for f in (new, tmp)', "the temporary folder's instructions by /tmp, to the file tools (7z, S4)"),
+        ('writes = {f"{tmp}/{n}" for n in INSTRUCTIONS} | ', "writes = ", "the temporary folder's instructions, to commands (7z, S4)"),
+        ('{f"{new}/{n}" for n in INSTRUCTIONS} | ', "", "the instructions above the next parts' trees, to the chief's commands (7w3)"),
+        ('{f"{new}/.claude", f"{new}/*/.git"}', '{f"{new}/*/.git"}', "the worktrees' folder's .claude, to the chief's commands (7w3, S2-2)"),
+        ('{f"{new}/.claude", f"{new}/*/.git"}', '{f"{new}/.claude"}', "a sibling's .git, to commands (F5095)"),
+        ('writes |= {f"{new}/*/{w}" for w in KEPT}', 'writes |= {f"{new}/slice-7/{w}" for w in KEPT}', "a twin of a tree of the next parts' folder made tomorrow (7w3)"),
+        ('writes |= {f"{new}/*/{w}" for w in KEPT}', 'writes |= {f"{os.path.dirname(new)}/**/{w}" for w in KEPT}', "no twin closing a throwaway tree outside the worktrees' folder (F4890)"),
+        ('".githooks/pre-commit",\n        ".githooks/pre-push"', '".githooks/pre-push"', "a sibling's pre-commit hook, to commands (7w3)"),
+        ('"scripts/guard.py", "scripts/install_hooks.sh"', '"scripts/install_hooks.sh"', "a sibling's guard, to commands (7w3)"),
+        ('"/scripts/workshop.sb", "/scripts/workshop.sh")', '"/scripts/workshop.sb", "/scripts/workshop.sh", "/scripts/guard.py")', "a sibling's guard, to the file tools (7w3)"),
+        ('"AGENTS.md", ".claude/AGENTS.md")', '"AGENTS.md")', "an AGENTS.md of .claude, read above a session's folder (7w3, F5323)"),
+        ('main, new, tmp = short(main), short(main + "-wt"), f"/private/tmp/claude-{uid}"', 'main, new, tmp = short(main), short(main + "-wt"), "/private/tmp/claude-501"', "the uid's own temporary folder (D13413)"),
+        ('rule = lambda p: p if p.startswith("~") else "/" + p', "rule = lambda p: p", "an absolute rule written // (the permissions page)"),
+        ("    if os.path.islink(path):\n", "    if False:\n", "a profile's settings that are a link left as they are"),
+        ("    except ValueError:\n        return", "    except OSError:\n        return", "a profile's settings that are no JSON left as they are"),
+        ('        shutil.copyfile(path, ', '        (lambda *a: None)(path, ', "a copy of a profile's settings kept before they change"),
+        ("for x in wanted[key] if x not in lst]", "for x in wanted[key]]", "a twin added once to a profile"),
+    ):
+        yield from each(mr, find, replace, "hooks", f"machine_rules.py writes {why}")
+    yield from each(ih, 'main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)', "main=$(git rev-parse --show-toplevel)", "hooks",
+                    "install_hooks roots this machine's twins at the main checkout, from a worktree too (D13413)")
+    yield from each(ih, '[ -z "$profiles" ] || git show "$ref:scripts/machine_rules.py"', ': || git show "$ref:scripts/machine_rules.py"', "hooks",
+                    "install_hooks writes no profile where none is (D13413)")
+    # The instructions every session reads: its own tree's, to commands and to the file tools, and those of the home and temporary folders.
     for path in ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of the file tools (7z, R4, S4)")
     for path in ("CLAUDE.local.md", ".claude/CLAUDE.md"):
         yield from each(".claude/settings.json", f'        "{path}",\n', "", "hooks", f"the sandbox keeps commands out of {path} (7z, S4)")
-    for entry, why in (("/private/tmp/claude-501/.claude/rules", "the temp folder's rules"),):
-        yield from each(".claude/settings.json", f'"{entry}"', f'"{entry}-off"', "hooks", f"the sandbox keeps commands out of the instructions of {why} (7z, S4)")
-    for rule, why in (("Edit(~/Server/CLAUDE.md)", "above the main checkout"), ("Edit(//tmp/CLAUDE.md)", "above every worktree, by /tmp"),
-                      ("Edit(~/.claude/rules/**)", "of the home folder")):
+    for rule, why in (("Edit(//tmp/CLAUDE.md)", "above every worktree, by /tmp"), ("Edit(~/.claude/rules/**)", "of the home folder")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep the instructions {why} out of the file tools (7z, S4)")
-    yield from each(".claude/settings.json", f'"{new}/*/package.json"', '"~/Server/**/package.json"', "hooks", "no twin closes a throwaway tree outside the worktrees' folder (F4890)")
-    yield from each(".claude/settings.json", f'"Edit({new}/*/.githooks/pre-commit)"', f'"Edit({new}/**)"', "hooks", "no twin closes a sibling's open files (F4890)")
-    # The file tools write the session's folders alone; the next parts' folder's twins and the instructions above them; the
-    # instructions below a tree's root, and StrykerJS's copies left out of what those close.
+    # The file tools write the session's folders alone; the instructions below a tree's root, and StrykerJS's copies left out of what
+    # those close.
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
-                    "settings keep the file tools in the session's folders (7w3)")
-    for entry, why in ((".githooks/pre-commit", "a pre-commit hook of the next parts' folder"), (".git", "a .git of the next parts' folder"), ("**/CLAUDE.local.md", "a nested CLAUDE.local.md there")):
-        yield from each(".claude/settings.json", f'"{new}/*/{entry}"', f'"{new}/*/{entry}-off"', "hooks", f"the sandbox keeps the chief's commands out of {why} (7w3)")
-    yield from each(".claude/settings.json", f'"{new}/CLAUDE.md"', f'"{new}/CLAUDE.md-off"', "hooks", "the sandbox keeps the chief's commands out of the instructions above the next parts' trees (7w3)")
-    for rule, why in ((f"Edit({new}/*/scripts/guard.py)", "a guard of the next parts' folder"), (f"Read({new}/*/deploy/secrets/**)", "a sibling's secrets there"),
-                      (f"Edit({new}/*/.git)", "a sibling's .git there"), (f"Edit({new}/.claude/rules/**)", "the rules above the next parts' trees")):
-        yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {why} out of the file tools (7w3)")
-    yield from each(".claude/settings.json", f'"{new}/*/scripts/guard.py"', f'"{new}/slice-7/scripts/guard.py"', "hooks", "a twin covers a tree of the next parts' folder made tomorrow (7w3)")
+                    "settings keep the file tools in the session's folders (7w3, D13414)")
     for entry in ("**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules", "**/.claude/skills"):
         yield from each(".claude/settings.json", f'        "{entry}",\n', "", "hooks", f"the sandbox keeps commands out of {entry}, below the root (7w3, S2-3)")
     for rule in ("Edit(/**/CLAUDE.md)", "Edit(/**/CLAUDE.local.md)", "Edit(/**/AGENTS.md)", "Edit(/**/.claude/rules/**)", "Edit(/**/.claude/skills/**)"):
         yield from each(".claude/settings.json", f'      "{rule}",\n', "", "hooks", f"settings keep {rule[5:-1]} out of the file tools (7w3, S2-3)")
     yield from each(".claude/settings.json", '"Edit(/**/AGENTS.md)"', '"Edit(/AGENTS.md)"', "hooks", "settings keep an AGENTS.md below the root out of the file tools, not the root's alone (7w3)")
-    yield from each(".claude/settings.json", f'"Edit({new}/*/**/CLAUDE.md)"', f'"Edit({new}/*/**/CLAUDE.md-off)"', "hooks", "settings keep a sibling's nested CLAUDE.md out of the file tools (7w3)")
     for name in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"):
         yield from each("stryker.config.json", f',\n    "{name}"', "", "hooks", f"StrykerJS copies no {name} the sandbox refuses it to write (7w3)")
     yield from each("stryker.config.json", '".claude",\n    "coverage"', '"coverage"', "hooks", "StrykerJS copies no .claude folder, whose rules and skills the sandbox closes at any depth (7w3)")
-    # No write root reaches the next parts' folder, and AGENTS.md is closed above the trees.
-    yield from each(".claude/settings.json", '        "~/go/pkg/mod"\n', '        "~/go/pkg/mod",\n        "~/Server"\n', "hooks", "no allowWrite gives every part's command the next parts' folder (7w3)")
-    yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true,\n', '"blockWritesOutsideWorkingDirectories": true,\n    "additionalDirectories": ["~/Server/gnoworld-wt/slice-8"],\n', "hooks",
+    # No write root reaches the next parts' folder or a folder above the main checkout (D13414): the home folder given to every command,
+    # a working directory added to every session.
+    yield from each(".claude/settings.json", '        "~/go/pkg/mod"\n', '        "~/go/pkg/mod",\n        "~"\n', "hooks", "no allowWrite gives every command the folders above the main checkout (7w3, D13414)")
+    yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true,\n', '"blockWritesOutsideWorkingDirectories": true,\n    "additionalDirectories": ["~/work/gnoworld-wt/slice-8"],\n', "hooks",
                     "no additionalDirectories gives every part a sibling of the next parts' folder (7w3)")
-    for entry in (f"{new}/AGENTS.md",):
-        yield from each(".claude/settings.json", f'"{entry}"', f'"{entry}-off"', "hooks", f"the sandbox keeps commands out of {entry}, read above the trees (7w3)")
-    yield from each(".claude/settings.json", f'"{new}/.claude"', f'"{new}/.claude-off"', "hooks", "the sandbox keeps the chief's commands out of the next parts' folder's .claude, which --add-dir loads (7w3, S2-2)")
-    for rule in ("Edit(~/Server/AGENTS.md)", f"Edit({new}/.claude/**)"):
-        yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {rule[5:-1]}, read above the trees, out of the file tools (7w3)")
+    yield from each(".claude/settings.json", '"allowUnsandboxedCommands": false', '"allowUnsandboxedCommands": true', "hooks", "no command leaves the sandbox to write above the main checkout (D13414)")
     # check_docs refuses an instruction file below the root at every commit, each part of its reading.
     cd = "scripts/check_docs.py"
     for find, replace, why in (('if ".claude" in parts[1:]:', "if False:", "a .claude below the root"), ('if ".claude" in parts[1:]:', 'if ".claude" in parts[2:]:', "a .claude one folder below the root"),
@@ -1349,12 +1358,8 @@ def mutants():
     yield from each(".claude/settings.json", '"Edit(/.claude/settings.json)"', '"Edit(/.claude/**)"', "hooks", "settings: no deny bans the gate's state")
     yield from each(".claude/settings.json", '"Bash(git push *)",\n', '"Bash(git push *)",\n      "Edit(/app/**)",\n', "hooks", "settings: no edit asks")
     yield from each(".claude/settings.json", '"repo": "gnoverse/gno-mcp"', '"repo": "nowhere/nothing"', "hooks", "settings: gnomcp's marketplace")
-    yield from each(".claude/settings.json", '        "~/Server/gnoworld-wt/*/.git",\n', "", "hooks", "settings: no command points a worktree's git at another config (F5095)")
     yield from each(".claude/settings.json", '"excludedCommands": ["sh scripts/worktree.sh *"]', '"excludedCommands": ["sh *"]', "hooks", "settings: worktree.sh alone leaves the sandbox (F5058)")
     yield from each(".claude/settings.json", '"Edit(/scripts/worktree.sh)"', '"Edit(/nothing)"', "hooks", "settings: an edit of worktree.sh, which leaves the sandbox, is refused (F5058)")
-    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld-wt/*/.git)"', '"Edit(/nothing)"', "hooks", "settings: no file tool points a worktree's git at another config (F5095)")
-    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld/.git/hooks/**)"', '"Edit(/nothing)"', "hooks", "settings: no file tool writes the main checkout's git hooks (F5095)")
-    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld/scripts/**)"', '"Edit(/nothing)"', "hooks", "settings: no file tool writes the main checkout's scripts (F5095)")
     for path in ("scripts/test_hooks.sh", ".githooks/pre-commit"):
         yield from each(path, "|| status=1; exit \"$status\"' EXIT", "exit \"$status\"' EXIT", "hooks", f"{path} keeps a failure through its EXIT trap")
     yield from each("scripts/repo_files.py", "    clear_dead()\n", "\n", "hooks", "a copy clears the ones dead runs left")
