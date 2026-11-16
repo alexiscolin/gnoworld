@@ -3,6 +3,7 @@ import { lazy } from "react";
 
 export { chatHeld, DockedChatHost, FullChatHost, PlaceChat } from "./fullHost.tsx";
 export { LOADING } from "./Loading.tsx";
+export { PlateFrame } from "./PlateFrame.tsx";
 export { roomsChanged } from "./roomsListed.ts";
 export {
   BOT,

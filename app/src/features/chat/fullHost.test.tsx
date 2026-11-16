@@ -10,7 +10,10 @@ vi.mock("./Chat.tsx", async () => {
   return { Chat: () => <p data-testid="chat">{usePlacePage()}</p> };
 });
 const asked = vi.hoisted(() => ({ full: false }));
-vi.mock("./full.ts", () => ({ asksFull: () => asked.full, useChatAlone: () => asked.full }));
+vi.mock("./full.ts", () => ({
+  asksFull: (params: URLSearchParams) => params.get("chat") === "full",
+  useChatAlone: () => asked.full,
+}));
 
 vi.mock("./phoneGo.ts", () => ({ usePhoneGo: () => false }));
 
@@ -112,6 +115,168 @@ describe("the page the route hands to the chat alone", () => {
   it("gives none when the route has no plate", () => {
     const root = drawn();
     expect(document.querySelector("[data-plate]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
+describe("the plate goes with its chat", () => {
+  afterEach(() => {
+    asked.full = false;
+    document.body.replaceChildren();
+  });
+
+  it("gives no new plate to the old chat while the next place's chat loads", () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    asked.full = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const show = (chat: ChatProps | undefined, plate: string) => {
+      act(() => {
+        root.render(
+          <>
+            <DockedChatHost />
+            <PlaceChat chat={chat} plate={<b>{plate}</b>} page={() => null} />
+          </>,
+        );
+      });
+    };
+    show(chatOf("a"), "plate of a");
+    expect(document.querySelector("[data-testid=chat]")?.textContent).toBe("plate of a");
+    show(undefined, "plate of b");
+    expect(document.querySelector("[data-testid=chat]")?.textContent).toBe("plate of a");
+    show(chatOf("b"), "plate of b");
+    expect(document.querySelector("[data-testid=chat]")?.textContent).toBe("plate of b");
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("gives a docked chat no plate from the full one before", () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const show = (full: boolean) => {
+      asked.full = full;
+      act(() => {
+        root.render(
+          <>
+            <DockedChatHost />
+            <PlaceChat chat={chatOf("a")} plate={<b>its plate</b>} page={(dock) => <section>{dock}</section>} />
+          </>,
+        );
+      });
+    };
+    show(true);
+    expect(document.querySelector("[data-testid=chat]")?.textContent).toBe("its plate");
+    show(false);
+    expect(document.querySelector("[data-testid=chat]")?.textContent).toBe("");
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
+describe("the chat alone while the place's chat cannot be drawn", () => {
+  afterEach(() => {
+    asked.full = false;
+    vi.unstubAllGlobals();
+    document.body.replaceChildren();
+  });
+
+  const show = (chat: ChatProps | undefined, failed?: ReactNode) => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+    asked.full = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const draw = (next: ChatProps | undefined, why?: ReactNode) => {
+      act(() => {
+        root.render(
+          <>
+            <DockedChatHost />
+            <PlaceChat chat={next} failed={why} page={() => null} />
+          </>,
+        );
+      });
+    };
+    draw(chat, failed);
+    return { draw, root };
+  };
+
+  it("draws the failure, with its retry, and lets the old chat go", () => {
+    const { draw, root } = show(chatOf("a"));
+    expect(document.querySelector("[data-testid=chat]")).not.toBeNull();
+    draw(undefined, <button type="button">Retry</button>);
+    expect(document.querySelector("[data-chat-failed] button")?.textContent).toBe("Retry");
+    expect(document.querySelector("[data-testid=chat]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("stands a skeleton where no chat is held yet, and none once one is", async () => {
+    // The page before let its chat go in a microtask.
+    await Promise.resolve();
+    const { draw, root } = show(undefined);
+    expect(document.querySelector("[data-chat-skeleton]")).not.toBeNull();
+    draw(chatOf("a"));
+    expect(document.querySelector("[data-chat-skeleton]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
+describe("the skeleton of a page opened full", () => {
+  afterEach(() => {
+    asked.full = false;
+    vi.unstubAllGlobals();
+    history.replaceState(null, "", "/");
+    document.body.replaceChildren();
+  });
+
+  it("reads the address when first drawn, after a phone's address was rewritten at load", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+    vi.resetModules();
+    const mod = await import("./fullHost.tsx");
+    // markFullEarly's replaceState, after the module's load.
+    history.replaceState(null, "", "/w/x?chat=full");
+    asked.full = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(<mod.FullChatHost />);
+    });
+    expect(document.querySelector("[data-chat-skeleton]")).not.toBeNull();
     act(() => {
       root.unmount();
     });

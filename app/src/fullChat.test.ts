@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { phoneGoes } from "./fullChat.ts";
+import { fullChatHref, phoneGoes } from "./fullChat.ts";
 
 const at = (path: string) => {
   const [rest = "", hash] = path.split("#", 2);
@@ -45,5 +45,14 @@ describe("where a phone goes from an address", () => {
     expect(go("/list")).toBeUndefined();
     expect(go("/nowhere")).toBeUndefined();
     expect(go("/worlds/x")).toBeUndefined();
+  });
+});
+
+describe("a link kept in the full chat", () => {
+  it("keeps everything after a second ? in the query", () => {
+    expect(fullChatHref("/w/x?a=1?b=2")).toBe("/w/x?a=1%3Fb%3D2&chat=full");
+    expect(fullChatHref("/w/x?a=1#top")).toBe("/w/x?a=1&chat=full#top");
+    expect(fullChatHref("/w/x#top")).toBe("/w/x?chat=full#top");
+    expect(fullChatHref("/universe?a=1")).toBe("/universe?a=1");
   });
 });

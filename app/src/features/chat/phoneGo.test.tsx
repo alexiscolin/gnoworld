@@ -1,19 +1,23 @@
 // @vitest-environment jsdom
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter, useLocation } from "react-router";
+import { BrowserRouter, MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { canGoBack, useChatBack, usePhoneGo } from "./phoneGo.ts";
 
 let root: Root | undefined;
 let host: HTMLElement;
-const held: { back?: () => void } = {};
+const held: { back?: () => void; go?: (to: string) => void } = {};
 
 function Probe() {
   const going = usePhoneGo();
   const back = useChatBack();
+  const navigate = useNavigate();
   useEffect(() => {
     held.back = back;
+    held.go = (to) => {
+      Promise.resolve(navigate(to)).catch(reportError);
+    };
   });
   const { pathname, search } = useLocation();
   return (
@@ -110,5 +114,29 @@ describe("the chat's back", () => {
       held.back?.();
     });
     expect(shown()).toBe("here /net/gnoland/");
+  });
+
+  it("reads the router's own index end to end: back from the second entry lands on the first", async () => {
+    phone(true);
+    history.replaceState(null, "", "/list");
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <BrowserRouter>
+          <Probe />
+        </BrowserRouter>,
+      );
+    });
+    act(() => {
+      held.go?.("/w/govdao?chat=full");
+    });
+    expect(shown()).toBe("here /w/govdao?chat=full");
+    act(() => {
+      held.back?.();
+    });
+    await vi.waitFor(() => {
+      expect(shown()).toBe("here /list");
+    });
+    history.replaceState(null, "", "/");
   });
 });

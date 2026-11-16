@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
-import { expect, test } from "vitest";
+import { afterEach, describe, expect, it, test, vi } from "vitest";
 import { Button } from "@gnoworld/ui";
 import { AppLinks, RouterLink } from "./routerLink.tsx";
 
@@ -43,4 +46,40 @@ test.each([
   );
   expect(html).toContain(`href="${href}"`);
   expect(html.includes('data-discover="true"')).toBe(routed);
+});
+
+const draw = (phone: boolean) => {
+  Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: phone && query === "(max-width: 899px)",
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  const host = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(host);
+  act(() => {
+    root.render(
+      <MemoryRouter>
+        <AppLinks>
+          <Button href="/w/bubble">Go</Button>
+          <Button href="/list">List</Button>
+        </AppLinks>
+      </MemoryRouter>,
+    );
+  });
+  return [...host.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+};
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.unstubAllGlobals();
+});
+
+describe("the shell's links on a phone", () => {
+  it("open a place in its full chat, from anywhere, and a page with no chat as itself", () => {
+    expect(draw(true)).toEqual(["/w/bubble?chat=full", "/list"]);
+  });
+  it("are untouched on a computer", () => {
+    expect(draw(false)).toEqual(["/w/bubble", "/list"]);
+  });
 });

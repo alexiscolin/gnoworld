@@ -61,7 +61,8 @@ function OverSpace({
   const phone = useMedia(PHONE_QUERY);
   return (
     <>
-      <SpaceLoader waiting={!drawn} ready={loadedShare(drawn, worlds)} />
+      {/* No space on a phone, so no loader for it (false while hydrating, as the server drew it: no #418). */}
+      {phone ? null : <SpaceLoader waiting={!drawn} ready={loadedShare(drawn, worlds)} />}
       {phone ? null : (
         <Suspense fallback={null}>
           <LazyRail places={{ earth: universe.earth.path, worlds: universe.worlds }} universe={universe.id} />

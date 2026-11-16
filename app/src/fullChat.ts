@@ -62,12 +62,16 @@ export function withoutFull(pathname: string, params: URLSearchParams): string {
 /** A link to a page, kept in the full chat when the page holds one (routerLink.tsx): what is in the full chat stays in it, and a page
  * with no chat opens as itself. A link in the page's own search ("?room=…") keeps it already (names.ts). */
 export function fullChatHref(href: string): string {
-  const [path = "", query = ""] = href.split("?", 2);
+  const hashAt = href.indexOf("#");
+  const hash = hashAt < 0 ? "" : href.slice(hashAt);
+  const rest = hashAt < 0 ? href : href.slice(0, hashAt);
+  const cut = rest.indexOf("?");
+  const path = cut < 0 ? rest : rest.slice(0, cut);
   if (!holdsChat(path)) return href;
-  const [search = "", hash] = query.split("#", 2);
+  const search = cut < 0 ? "" : rest.slice(cut + 1);
   const params = new URLSearchParams(search);
   params.set(FULL, "full");
-  return `${path}?${params.toString()}${hash === undefined ? "" : `#${hash}`}`;
+  return `${path}?${params.toString()}${hash}`;
 }
 
 const ECOSYSTEM_PAGE = /^(?:\/net\/[^/]+)?\/e\//;

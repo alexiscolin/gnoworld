@@ -1,13 +1,14 @@
 // A realm's page, built as a world's: the same frame (placeFrame.tsx) and the same chat, with the realm's own
 // planet, which the cosmos draws for the realm's world and the flight flew to. The plate holds the realm's crumbs, short name,
 // lede, actions, talk bar, figures, page, functions, around it and facts (routes/plate); the dock is the world's chat, given the realm's place.
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { isAddress, realmName, realmRoom, worldIdOf } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
 import { pageRoomsApi } from "../lib/api/rooms.ts";
 import { Kicker, Panel } from "@gnoworld/ui";
-import { ErrorView, useWhere } from "../features/errors/index.ts";
+import { ErrorView, errorKind, useWhere } from "../features/errors/index.ts";
+import { chunked } from "../features/chat/Failing.tsx";
 import { chatPlace, PlaceChat, roomIds, roomsChanged } from "../features/chat/index.ts";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { placeOf, site } from "../places.ts";
@@ -17,7 +18,10 @@ import type { RealmAt } from "../realmAt.ts";
 import { PlaceFrame } from "./placeFrame.tsx";
 
 // The plate's blocks come in a chunk once the first screen has drawn: the frame and the title.
-const RealmPlate = lazy(() => import("./plate/RealmPlate.tsx"));
+const RealmPlate = chunked(() => import("./plate/RealmPlate.tsx"), {
+  waiting: null,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" />,
+});
 
 // The realm's room, asked of the server once when the world's list lacks it. The server's bot opens a room made a moment
 // after it answers, so the list is asked again till it holds the room, then the page's lists are told (gnodice's "opens soon").
@@ -133,24 +137,30 @@ const noRing = () => undefined;
 export function RealmPage({ found, known }: { found: RealmAt; known: boolean }) {
   const { namespace, name, talk, room, chat, failed, retry } = useRealmChat(found, known);
   const at = useWhere();
+  // The route's, so the chat alone (a phone's) has them as the page does.
+  useEntered();
   return (
-    <PlaceChat
-      chat={chat}
-      // The same plate as the page's, for the phone's "Its page" sheet of the full chat (no ring there).
-      plate={<RealmPlate found={found} name={name} talk={talk} room={room} onRing={noRing} />}
-      page={(dock) => (
-        <RealmPlace
-          found={found}
-          namespace={namespace}
-          name={name}
-          talk={talk}
-          room={room}
-          chat={failed ? <ErrorView kind="unavailable" size="inline" where={at} onRetry={retry} /> : dock}
-          failed={failed}
-          known={known}
-        />
-      )}
-    />
+    <>
+      <PlaceChat
+        chat={chat}
+        // The same plate as the page's, for the phone's "Its page" sheet of the full chat (no ring there).
+        plate={<RealmPlate found={found} name={name} talk={talk} room={room} onRing={noRing} />}
+        failed={failed ? <ErrorView kind="unavailable" size="place" where={at} onRetry={retry} /> : undefined}
+        page={(dock) => (
+          <RealmPlace
+            found={found}
+            namespace={namespace}
+            name={name}
+            talk={talk}
+            room={room}
+            chat={failed ? <ErrorView kind="unavailable" size="inline" where={at} onRetry={retry} /> : dock}
+            failed={failed}
+            known={known}
+          />
+        )}
+      />
+      <WorldSigns world={worldIdOf(found.realm)} />
+    </>
   );
 }
 
@@ -176,33 +186,27 @@ function RealmPlace({
   failed: boolean;
   known: boolean;
 }) {
-  useEntered();
   // The open proposal's ring round the planet, when the realm takes votes (Voted, StatusRing.tsx).
   const [ring, setRing] = useState<Ring>();
   const chatDue = useSpace(known ? { world: worldIdOf(found.realm), name } : undefined);
   // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
   const loaded = useLoaded();
   return (
-    <>
-      <PlaceFrame
-        ring={ring}
-        label={name}
-        plate={
-          <>
-            <Kicker planet>
-              Realm · <OwnerLink realm={found.realm} namespace={namespace} />
-            </Kicker>
-            <Panel.Title id="realm-title">{name}</Panel.Title>
-            {/* The rest of the plate comes in a chunk once the first screen has drawn: its blocks are the realm's own reads. */}
-            <Suspense fallback={null}>
-              {loaded && <RealmPlate found={found} name={name} talk={talk} room={room} onRing={setRing} />}
-            </Suspense>
-          </>
-        }
-        chat={chat}
-        chatDue={chatDue || failed}
-      />
-      <WorldSigns world={worldIdOf(found.realm)} />
-    </>
+    <PlaceFrame
+      ring={ring}
+      label={name}
+      plate={
+        <>
+          <Kicker planet>
+            Realm · <OwnerLink realm={found.realm} namespace={namespace} />
+          </Kicker>
+          <Panel.Title id="realm-title">{name}</Panel.Title>
+          {/* The rest of the plate comes in a chunk once the first screen has drawn: its blocks are the realm's own reads. */}
+          {loaded && <RealmPlate found={found} name={name} talk={talk} room={room} onRing={setRing} />}
+        </>
+      }
+      chat={chat}
+      chatDue={chatDue || failed}
+    />
   );
 }
