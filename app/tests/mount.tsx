@@ -127,18 +127,17 @@ export function markup(element: ReactElement): HTMLElement {
   return host;
 }
 
-/** One tick at least, then until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 4 s: just under vitest's 5 s
+/** Until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 4 s: just under vitest's 5 s
  * test timeout (no `testTimeout` is set), so a wait that fails throws its own message before the test is cut, and never keeps polling
  * `act` into the next tests. */
 export async function settled(holds: () => boolean): Promise<void> {
   const end = Date.now() + 4_000;
-  // At least one tick, so a wait on `() => true` still lets a settled promise reach its `.then`.
-  do {
+  while (!holds()) {
     if (Date.now() > end) throw new Error("waited 4 s");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
-  } while (!holds());
+  }
 }
 
 /** jsdom has no top layer and no showModal: a modal it opens is open, closed by close() with its event. The focus, Esc and the scrim

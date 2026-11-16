@@ -73,8 +73,14 @@ const choose = async (name: string) => {
   act(() => {
     radio(name).click();
   });
-  await settled(() => true);
+  await tick();
 };
+
+// One real tick inside act, so a promise settled by the test reaches its `.then` before what follows is checked.
+const tick = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
 
 describe("the network control", () => {
   it.each([false, true])(
@@ -115,7 +121,7 @@ describe("the network control", () => {
     });
     await settled(() => at() === "/w/bubble");
     settle(found);
-    await settled(() => true);
+    await tick();
     expect(at()).toBe("/w/bubble");
     expect(document.querySelector("[aria-busy='true']")).toBeNull();
     expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
@@ -134,7 +140,7 @@ describe("the network control", () => {
     await choose("gno.land");
     expect(chain.readPage).toHaveBeenCalledTimes(2);
     pending[0]?.(found);
-    await settled(() => true);
+    await tick();
     expect(at()).toBe("/r/gov/dao");
     expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
     expect(trigger(box).getAttribute("aria-busy")).toBe("true");
