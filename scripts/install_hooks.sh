@@ -47,7 +47,8 @@ if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	share=$HOME/.local/share/land
 	mkdir -p "$HOME/.local/bin" "$share"
 	chmod 700 "$share"
-	new=$(mktemp -d "$share/new.XXXXXX")
+	new=$share/new # owner-only, as $share is: a temporary folder of $TMPDIR would leave the new land where a session writes
+	rm -rf "${new:?}" && mkdir -m 700 "$new"
 	git show "$ref:scripts/land.py" >"$new/land.py"
 	git show "$ref:scripts/agent_pr.py" >"$new/agent_pr.py"
 	if git cat-file -e "$ref:tools/agent-github/install.sh" && git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$new/land.py"; then
