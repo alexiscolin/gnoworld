@@ -8,7 +8,7 @@ import type { Said } from "../irc/link.ts";
 import type { Log } from "@gnoworld/service/log";
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
-import { guestSaid } from "../rooms/earth.ts";
+import { guestSaid, unsaid } from "../rooms/earth.ts";
 import { editsOwn, lineKnown } from "./edits.ts";
 import type { Answer, Category } from "./provider.ts";
 import { lineRate } from "./rate.ts";
@@ -94,6 +94,22 @@ export function checkAgain(db: DatabaseSync, msgid: string): void {
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE msgid = ?").run(msgid);
 }
 
+/** A line that passes (or waits unchecked) is a line of its room; a hidden one is none. Counted once, when first settled; a retry
+ * that hides it takes its count back, from the hour it was counted in (`countedAt` reads it before the retry moves the line). */
+function lineCounting(db: DatabaseSync) {
+  const countLine = guestSaid(db);
+  const uncountLine = unsaid(db);
+  const unchecked = db.prepare("SELECT at FROM verdicts WHERE msgid = ? AND action = 'unchecked'");
+  const CountedAt = z.object({ at: z.number() }).optional();
+  return {
+    countedAt: (msgid: string, fresh: boolean) => (fresh ? undefined : CountedAt.parse(unchecked.get(msgid))?.at),
+    recount: (action: Verdict["action"], { room, at }: { room: string; at: number }, counted: number | undefined) => {
+      if (action === "hide" && counted !== undefined) uncountLine(room, counted);
+      else if (action !== "hide" && counted === undefined) countLine(room, at);
+    },
+  };
+}
+
 /** "seen": the line has its verdict; "busy": another run is checking it now, and settles it. */
 export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen" | "busy"> {
   const { db, rulesOf, provider, thresholds, pepper, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
@@ -121,8 +137,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
   const known = lineKnown(db);
-  // A line that passes (or waits unchecked) is a line of its room; a hidden one is none. Counted once, when first claimed.
-  const countLine = guestSaid(db);
+  const { countedAt, recount } = lineCounting(db);
   // An edit's line: none, its author's, another's, or one it never checked.
   const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
     edits === undefined ? "none" : !known(edits) ? "unknown" : owns(edits, key) ? "own" : "other";
@@ -146,6 +161,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const at = lineTime(said, now);
     const hashed = accountKey(pepper, account);
     const fresh = sql.claim.run(msgid, room, hashed, at).changes > 0;
+    // A retry of a line first settled unchecked (counted then) that now settles hide takes its count back, from the hour it had.
+    const counted = countedAt(msgid, fresh);
     const claimed = fresh || sql.retry.run(at, msgid).changes > 0;
     if (!claimed) return sql.pending.get(msgid) === undefined ? "seen" : "busy";
     const settle = (verdict: Verdict, { why, answer }: { why?: string; answer?: Answer } = {}): Verdict => {
@@ -157,7 +174,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
         ...used.map((part) => (part === null ? null : JSON.stringify(part))),
         msgid,
       );
-      if (fresh && verdict.action !== "hide") countLine(room, at);
+      recount(verdict.action, { room, at }, counted);
       return verdict;
     };
     const rules = rulesOf(room);

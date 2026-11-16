@@ -34,6 +34,16 @@ export function guestSaid(db: DatabaseSync): (room: string, at: number) => void 
   };
 }
 
+/** Takes back one line counted in a room's hour (a line first counted unchecked, then hidden): never below zero, a row at zero gone. */
+export function unsaid(db: DatabaseSync): (room: string, at: number) => void {
+  const less = db.prepare("UPDATE room_said SET n = n - 1 WHERE room = ? AND hour = ? AND n > 0");
+  const gone = db.prepare("DELETE FROM room_said WHERE room = ? AND hour = ? AND n = 0");
+  return (room, at) => {
+    less.run(room, hourOf(at));
+    gone.run(room, hourOf(at));
+  };
+}
+
 /** A public room nobody writes in for this long is archived. */
 const IDLE_MS = 14 * 24 * 60 * 60_000;
 
