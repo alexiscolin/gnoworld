@@ -1,4 +1,4 @@
-import { MAPS, NEBULA_IMAGES } from "@gnoworld/core";
+import { MAPS } from "@gnoworld/core";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -115,10 +115,6 @@ describe("the textures' credits", () => {
     const webb = CREDITS.find((credit) => credit.author === "ESA/Webb");
     expect(webb?.line).toContain("NASA, ESA, CSA, and STScI");
     expect(webb?.source).toBe("https://esawebb.org/images/weic2205a/");
-  });
-
-  it("credits every image a nebula is cut from", () => {
-    for (const name of NEBULA_IMAGES) expect(CREDITS.flatMap((credit) => credit.files)).toContain(name);
   });
 });
 

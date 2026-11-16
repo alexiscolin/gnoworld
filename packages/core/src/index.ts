@@ -17,67 +17,13 @@ export {
   sameName,
   topicAfter,
 } from "./chat/room.ts";
-export {
-  BELT_INNER,
-  EARTH_PLACE,
-  EARTH_RADIUS,
-  GNO_LAND,
-  GRAIN,
-  ROCKS_FROM,
-  ROOM,
-  systemsOf,
-  worldSize,
-  type Orbiter,
-  type StarSystem,
-  type WorldHeld,
-} from "./cosmos/system.ts";
 export { worldsDrawn } from "./cosmos/count.ts";
+export { STATIONS_SHOWN } from "./station/station.ts";
 export { rollupName } from "./rollupName.ts";
-export type { Planned, Rock } from "./lod/drawn.ts";
-export {
-  BODY_PIXELS,
-  BOUNDS,
-  dotLight,
-  Drawn,
-  HAZE,
-  Ladder,
-  LANDMARKS,
-  MIDDLE,
-  onScreen,
-  screenRadius,
-  type LadderView,
-} from "./lod/ladder.ts";
 export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
-export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
 export { callersIn, chooseRail, RAIL, type RailAsk, type RailWorld } from "./lod/rail.ts";
 export { middleOf, riseFrom, riseOf, usualOf, type PresenceSlot } from "./lod/rising.ts";
-export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
-export {
-  CENTRE,
-  DISC_TILT,
-  focusDistance,
-  focusOf,
-  onPlane,
-  orbitPlace,
-  toMap,
-  toScene,
-  type InPlane,
-} from "./frame/disc.ts";
-export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
-export { DIVE, diveAt } from "./frame/dive.ts";
-export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export type { Finish, Part, PartKind } from "./station/parts.ts";
-export { stationOf, STATIONS_SHOWN, type Station } from "./station/station.ts";
-export { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf, type Scenery } from "./station/scenery.ts";
-export { onOrbit, stationsRound, type Placed as PlacedStation } from "./station/round.ts";
-export { planOf, plannedOf } from "./frame/plan.ts";
-export { LENT, type Lent } from "./frame/lent.ts";
-export { rocksAt } from "./frame/rocks.ts";
-export { haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
-export * from "./frame/flight.ts";
 export { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "./frame/zoomPath.ts";
-export { drawnOf, easedOf, type Postcard } from "./frame/postcard.ts";
-export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -95,16 +41,12 @@ export {
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseCounts } from "./planet/gauges.ts";
 export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
-export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
-export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
 export { realmRoom } from "./cosmos/realmRoom.ts";
 export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
-export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { isExportedName } from "./chain/exportedName.ts";
 export { realmRoute, worldRoute } from "./places/route.ts";
-export { GOLDEN } from "./space/golden.ts";
 export { NATURES } from "./planet/choice.ts";
 export { CONTINENTS_SEA, readsMinorMap } from "./planet/continents.ts";
 export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
@@ -180,8 +122,6 @@ export { cardOf, cardText, type CardLine } from "./chat/cardLine.ts";
 export { fold, mentionList, mentionsOf } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
 export { placeAt, placesOf, type Place, type PlaceKind, type PlaceSource } from "./places/places.ts";
-export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState } from "./frame/rate.ts";
-export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "./frame/snapshot.ts";

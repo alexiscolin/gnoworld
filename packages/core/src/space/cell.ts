@@ -14,14 +14,14 @@ const PRIME = 0x01000193;
 const WORD = 2 ** 32;
 
 /** Where a salt's hashes start. */
-export const salted = (salt: number): number => Math.imul(salt ^ 0x811c9dc5, PRIME);
+const salted = (salt: number): number => Math.imul(salt ^ 0x811c9dc5, PRIME);
 
 /** Mixes in an integer of any size, its low word and then its high one. */
-export const mix = (hash: number, value: number): number =>
+const mix = (hash: number, value: number): number =>
   Math.imul(Math.imul(hash ^ (value >>> 0), PRIME) ^ Math.floor(value / WORD), PRIME);
 
 /** Spreads a hash over all its bits, murmur3's way: 32 bits out, whole and unsigned. */
-export function settle(hash: number): number {
+function settle(hash: number): number {
   let mixed = hash ^ (hash >>> 15);
   mixed = Math.imul(mixed, 0x2c1b3c6d);
   mixed ^= mixed >>> 12;

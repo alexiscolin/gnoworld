@@ -1,5 +1,5 @@
-// One stream of draws from a seed, read in a fixed order, so the same seed always gives the same numbers: a station's, a world's regions',
-// the rocks' and the rounds' (a text is hashed whole; a number is already a state).
+// One stream of draws from a seed, read in a fixed order, so the same seed always gives the same numbers: a world's regions'
+// (a text is hashed whole; a number is already a state).
 import { nextState, textHash, unitOf } from "../space/cell.ts";
 
 export class Draws {
@@ -26,10 +26,5 @@ export class Draws {
 
   chance(share: number): boolean {
     return this.unit() < share;
-  }
-
-  /** One of `from`, all alike likely. */
-  one<T>(from: readonly [T, ...T[]]): T {
-    return from[this.count(0, from.length - 1)] ?? from[0];
   }
 }
