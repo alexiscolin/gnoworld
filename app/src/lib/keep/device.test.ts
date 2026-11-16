@@ -161,7 +161,7 @@ describe("a field read from the device", () => {
   });
 
   it("reads each setting apart: one unreadable takes its default, a newer page's is kept and written back", () => {
-    put("settings", { quality: "ultra", calm: true, phone3d: "yes", subtitles: "fr" });
+    put("settings", { quality: "ultra", calm: true, autoTranslate: "yes", subtitles: "fr" });
     const device = pageDevice();
     expect(device.read("settings")).toEqual({ ...DEFAULT_SETTINGS, calm: true });
     device.write("settings", { ...DEFAULT_SETTINGS, quality: "low", calm: true });
@@ -230,7 +230,7 @@ describe("a field read from the device", () => {
 
 describe("a field written to the device", () => {
   it("removes the key for its default", () => {
-    put("settings", { quality: "low", calm: false, phone3d: false });
+    put("settings", { quality: "low", calm: false });
     const device = pageDevice();
     device.read("settings");
     expect(device.write("settings", DEFAULT_SETTINGS)).toBe(true);

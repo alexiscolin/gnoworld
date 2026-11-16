@@ -13,7 +13,7 @@ import { levelsOf } from "./shellWays.tsx";
 
 // The header as the video's frames 1, 20 and 37 show it: the logo, the views, the network named, "Testnet" on a testnet, search;
 // the chat is a control, and the passport's counter is not one.
-const inShell = (Page: () => React.JSX.Element) => () => (
+const inShell = (Page: () => React.JSX.Element | null) => () => (
   <Shell>
     <Page />
   </Shell>
@@ -167,15 +167,13 @@ describe("the header", () => {
     expect(mainnet).not.toContain("Testnet");
   });
 
-  // The video's search is the last of the views' pill, after a divider.
-  test("keeps search inside the views' pill, after the levels and the chat, and the wide one in the account's row", async () => {
+  // A phone has no views' pill to hold it: the one search is the account's row's, beside the bell.
+  test("keeps search in the account's row alone, none in the views' pill", async () => {
     const html = await header("/earth");
     const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
     expect(pill.indexOf("Earth")).toBeGreaterThan(0);
-    expect(pill.indexOf(">Chat<")).toBeGreaterThan(pill.indexOf("Earth"));
-    expect(pill.match(/aria-label="Search"/g)).toHaveLength(1);
-    expect(pill.indexOf('aria-label="Search"')).toBeGreaterThan(pill.indexOf(">Chat<"));
-    expect(html.match(/aria-label="Search"/g)).toHaveLength(2);
+    expect(pill).not.toContain('aria-label="Search"');
+    expect(html.match(/aria-label="Search"/g)).toHaveLength(1);
   });
 
   // The chat full of the world in view, or of the Earth, is a control beside the World level, named for its world; no

@@ -1,11 +1,9 @@
 /* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
-   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, the logo
-   and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
-   room for. The one breakpoint of both is here. */
+   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, one row:
+   the logo, the network and the account, with no views (the full chat only). The one breakpoint of both is here. */
 @layer components {
   /* The views' bar's height, one source for the bars and the room the page leaves under them on a phone; the two are no parent and child. */
-  .bars,
-  .page {
+  .bars {
     --_bar: var(--size-bar);
   }
 
@@ -332,9 +330,6 @@
     }
   }
 
-  /* A phone's bar: the places' names alone and the ways' icons alone, their kinds and words for a screen reader. */
-  /* The search: beside the bell on a computer; in the views' pill on a phone, after a divider, a control's own size centred in the pill's
-     34 px, so the pill keeps its height. */
   .divider {
     /* layout: the line keeps its room when the levels give way */
     flex: none;
@@ -345,31 +340,6 @@
     /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-3xs);
     background: var(--color-line-strong);
-  }
-
-  .phoneSearch {
-    /* layout: the button is the pill's own item */
-    display: contents;
-
-    /* raw: the target is the control's 44 px; the veil (an inset shadow) stops at the transparent 5 px edge, so the look stays the pill's 34 px */
-    --round-h: var(--control-m);
-  }
-
-  .phoneSearch button {
-    /* raw: the 5 px edge the 44 px target keeps over the pill's 34 */
-    border-width: 5px;
-  }
-
-  @media (width >= 900px) {
-    .phoneSearch {
-      display: none;
-    }
-  }
-
-  @media (width < 900px) {
-    .wideSearch {
-      display: none;
-    }
   }
 
   /* Where the bar cannot hold every word beside the logo and the account (a phone's, and a computer's under 1340 px), each level is its mark and
@@ -403,7 +373,45 @@
     }
   }
 
+  /* A phone is the full chat only: no views, no ways, no bar; the header is one row of 44 px targets, the logo, the network, then the
+     search, the bell and the account. */
   @media (width < 900px) {
+    .bars {
+      display: none;
+    }
+
+    .header {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .logo {
+      /* layout: the link is a 44 px target round its mark */
+      align-items: center;
+      justify-content: center;
+      min-inline-size: var(--control-m);
+      min-block-size: var(--control-m);
+    }
+
+    .network {
+      /* layout: the network shares the logo's row, between it and the controls */
+      grid-column: 2;
+      grid-row: 1;
+      order: 0;
+      min-inline-size: 0;
+    }
+
+    .network button {
+      min-block-size: var(--control-m);
+    }
+
+    /* raw: under 360 px the row cannot hold the name, its Testnet chip and three controls: the network drops under the logo */
+    @media (width < 22.5rem) {
+      .network {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+    }
+
     .chevron {
       /* raw: a phone's levels a step closer, so the lean is less */
       --_lean: 6px;
@@ -443,11 +451,6 @@
   .view:not([aria-current="page"]):hover {
     background: var(--color-fill);
     color: var(--color-text);
-  }
-
-  /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
-  .page {
-    padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
   @media (width >= 900px) {
@@ -513,10 +516,6 @@
     .ways {
       /* layout: Space and Map keep their width: the levels give way before them */
       flex: none;
-    }
-
-    .page {
-      padding-block-end: 0;
     }
   }
 

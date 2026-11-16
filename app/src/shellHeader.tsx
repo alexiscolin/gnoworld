@@ -22,7 +22,7 @@ import styles from "./shellHeader.module.css";
 function Account({ universe }: { universe: UniverseView }) {
   return (
     <Cluster space="2xs">
-      <SearchButton className={styles["wideSearch"] ?? ""} emphasis="outline" />
+      <SearchButton className="" emphasis="outline" />
       <BellSlot />
       <AccountMenu
         universe={universe.id}
@@ -104,9 +104,6 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             </Fragment>
           ))}
           <ChatWay key={String(woken)} world={world} />
-          {/* A phone's search, in the pill as it was: the account's row has no room for it at 320 px. */}
-          <span className={`${styles["divider"] ?? ""} ${styles["phoneSearch"] ?? ""}`} aria-hidden="true" />
-          <SearchButton className={`round-controls ${styles["phoneSearch"] ?? ""}`} emphasis="plain" />
         </nav>
         {/* Drawn anew once the page wakes, as the levels are. */}
         <Ways key={String(woken)} world={current === "world"} />

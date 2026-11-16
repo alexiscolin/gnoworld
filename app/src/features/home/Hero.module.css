@@ -229,10 +229,15 @@
   }
 
   @media (width < 900px) {
-    /* Under the ways' pill, which a phone fixes at the top right just under its header (shellHeader.module.css). */
-    .hero {
-      /* layout: the hero starts under the pill fixed over the page's top */
-      margin-block-start: calc(var(--size-bar) + 2 * var(--space-2xs));
+    /* A phone draws no space: no "View in space" under the list, no views' pill over the hero, a tap target to each world. */
+    .worlds {
+      padding-block-end: var(--space-xl);
+    }
+
+    .worlds a {
+      display: flex;
+      align-items: center;
+      min-block-size: var(--control-m);
     }
 
     .actions {

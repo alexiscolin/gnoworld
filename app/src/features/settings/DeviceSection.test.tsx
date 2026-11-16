@@ -33,7 +33,7 @@ const held = (key: string): unknown => JSON.parse(localStorage.getItem(key) ?? "
 
 // Every other thing the device keeps, which no clear of the passport may touch.
 const OTHERS: Record<string, unknown> = {
-  "gnoworld:device:settings": { quality: "low", calm: true, phone3d: false },
+  "gnoworld:device:settings": { quality: "low", calm: true },
   "gnoworld:device:streak": { day: "2026-11-05", count: 2, best: 3 },
   "gnoworld:device:expedition": { day: "2026-11-05", reached: ["onyx:a"] },
   "gnoworld:device:quests": { named: ["read"] },

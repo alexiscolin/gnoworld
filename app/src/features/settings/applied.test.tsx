@@ -16,7 +16,7 @@ const flushed = () =>
 let system = false;
 beforeEach(() => {
   localStorage.clear();
-  for (const key of ["motion", "quality", "phone3d"]) Reflect.deleteProperty(root(), key);
+  for (const key of ["motion", "quality"]) Reflect.deleteProperty(root(), key);
   system = false;
   vi.stubGlobal(
     "matchMedia",
@@ -51,7 +51,6 @@ describe("the settings on the page's root", () => {
     await settingsPage();
     expect(root()["motion"]).toBeUndefined();
     expect(root()["quality"]).toBeUndefined();
-    expect(root()["phone3d"]).toBeUndefined();
   });
 
   it("mark each setting as it changes, and take it off again, with no reload", async () => {
@@ -62,21 +61,17 @@ describe("the settings on the page's root", () => {
     expect(root()["quality"]).toBe("low");
     set({ quality: "high" });
     expect(root()["quality"]).toBe("high");
-    set({ phone3d: true });
-    expect(root()["phone3d"]).toBe("on");
-    set({ calm: false, quality: "auto", phone3d: false });
+    set({ calm: false, quality: "auto" });
     expect(root()["motion"]).toBeUndefined();
     expect(root()["quality"]).toBeUndefined();
-    expect(root()["phone3d"]).toBeUndefined();
   });
 
   it("mark the settings the device kept at the page's start (a reload keeps them)", async () => {
-    localStorage.setItem("gnoworld:device:settings", JSON.stringify({ quality: "low", calm: true, phone3d: true }));
+    localStorage.setItem("gnoworld:device:settings", JSON.stringify({ quality: "low", calm: true }));
     await settingsPage();
     await flushed();
     expect(root()["motion"]).toBe("reduce");
     expect(root()["quality"]).toBe("low");
-    expect(root()["phone3d"]).toBe("on");
   });
 
   it("keep a change on the device, for the next page", async () => {
@@ -85,7 +80,6 @@ describe("the settings on the page's root", () => {
     expect(JSON.parse(localStorage.getItem("gnoworld:device:settings") ?? "{}")).toEqual({
       quality: "high",
       calm: false,
-      phone3d: false,
       language: "en",
       autoTranslate: true,
     });

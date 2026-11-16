@@ -1,8 +1,7 @@
 // What stands at the foot of a page that shows space: the planets' credits, and where the device waits to be asked (a phone, a reader who
-// saves data; ADR-0002 §8), "View in space", pressed by the settings' "Space in 3D on a phone" too; where space cannot run, why not.
+// saves data; ADR-0002 §8), "View in space"; where space cannot run, why not.
 import { Button } from "@gnoworld/ui";
-import { useEffect, useSyncExternalStore } from "react";
-import { useApp } from "../../storeContext.tsx";
+import { useSyncExternalStore } from "react";
 import { Credits } from "./Credits.tsx";
 import { offer, press } from "./space.ts";
 import styles from "./Universe.module.css";
@@ -13,10 +12,6 @@ const undecided = () => "undecided" as const;
 
 export function SpaceFoot() {
   const state = useSyncExternalStore(offer.heard.subscribe, stateOf, undecided);
-  const phone3d = useApp(({ device }) => device.settings.phone3d);
-  useEffect(() => {
-    if (phone3d && state === "ask") press();
-  }, [phone3d, state]);
   return (
     <>
       {state === "taken" ? <Credits /> : null}

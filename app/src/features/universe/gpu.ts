@@ -33,9 +33,8 @@ export function gpuCanDraw(): boolean {
   return !isWeakGpu(name);
 }
 
-// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone (unless its settings ask for
-// space there) or a reader who saves data on "View in space"; any other at once.
+// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU or a phone never (D13711); a reader who
+// saves data on "View in space"; any other at once.
 export function offerOf(): SceneOffer {
-  const phone = matchMedia(PHONE_QUERY).matches && document.documentElement.dataset["phone3d"] !== "on";
-  return sceneOffer({ weak: !gpuCanDraw(), phone, savesData: savesData() });
+  return sceneOffer({ weak: !gpuCanDraw(), phone: matchMedia(PHONE_QUERY).matches, savesData: savesData() });
 }

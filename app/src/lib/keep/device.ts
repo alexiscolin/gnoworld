@@ -32,8 +32,6 @@ const SETTINGS = {
   quality: Quality,
   /** Reduce animations even where the system does not ask it. */
   calm: z.boolean(),
-  /** The 3D on a phone, where the list is the default. */
-  phone3d: z.boolean(),
   /** The language the room's lines are translated into. */
   language: z.enum(JARVIS_LANGUAGES),
   /** Whether the lines on screen are translated as they come. */
