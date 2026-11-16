@@ -195,6 +195,7 @@
     translate: 0 1px;
     /* raw: the frames' 22 px box, held whatever the font's metrics make of two letters (a runner's mono was a pixel narrower) */
     inline-size: 22px;
+    text-align: center;
   }
 
   /* The face opens its author's card, as the name does. */
