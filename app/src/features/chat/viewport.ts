@@ -11,10 +11,11 @@ export function viewportVars({ height, offsetTop }: Pick<VisualViewport, "height
 /** Keeps `box`'s properties at the visual viewport's, now and at each resize or scroll, until `signal` aborts (then unset). */
 export function followViewport(
   box: HTMLElement,
-  viewport: Pick<VisualViewport, "height" | "offsetTop" | "addEventListener"> | null,
+  viewport: Pick<VisualViewport, "height" | "offsetTop" | "addEventListener"> | null | undefined,
   signal: AbortSignal,
 ) {
-  if (viewport === null) return;
+  // The DOM's types say null; jsdom and older browsers leave it undefined.
+  if (viewport === null || viewport === undefined) return;
   const set = () => {
     for (const [name, value] of Object.entries(viewportVars(viewport))) box.style.setProperty(name, value);
   };
