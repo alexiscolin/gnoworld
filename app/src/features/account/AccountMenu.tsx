@@ -22,15 +22,11 @@ const PickName = lazy(async () => ({ default: (await import("../names/index.ts")
 
 // The account's pill (frame 17): its face and its short address, on the menu's trigger before and after its code comes.
 function AccountPill({
-  face,
   address,
   universe,
   again,
   onPickable,
-  network,
 }: {
-  face: ReactNode;
-  network: ReactNode;
   address: string;
   universe: string;
   again: number;
@@ -38,11 +34,12 @@ function AccountPill({
 }) {
   return (
     <>
-      {face}
+      <Suspense fallback={null}>
+        <Face address={address} />
+      </Suspense>
       <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
         <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
       </Suspense>
-      {network}
     </>
   );
 }
@@ -101,7 +98,7 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
   );
 }
 
-/** The account's menu; `network`, the network's name its pill carries once logged in. */
+/** The account's menu; `network`, the network's name LoginControl draws beside the way in, or beside the pill once logged in. */
 export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
@@ -120,44 +117,40 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
   const ask = () => {
     setAsked(true);
   };
-  const face =
-    address === undefined ? null : (
-      <Suspense fallback={null}>
-        <Face address={address} />
-      </Suspense>
-    );
   const pill =
     address === undefined ? null : (
-      <AccountPill
-        face={face}
-        network={network}
-        address={address}
-        universe={universe}
-        again={again}
-        onPickable={setPickable}
-      />
+      <AccountPill address={address} universe={universe} again={again} onPickable={setPickable} />
     );
   // The trigger as the menu draws it, until the menu's code takes its place, open.
   const trigger = <Trigger pill={pill} onClick={ask} />;
+  const door = asked ? (
+    <Suspense fallback={trigger}>
+      <Opened
+        address={address}
+        lead={pill}
+        onLogOut={logOut}
+        {...(pickable
+          ? {
+              onPickName: () => {
+                setNaming(true);
+              },
+            }
+          : {})}
+      />
+    </Suspense>
+  ) : (
+    trigger
+  );
   return (
     <>
-      {asked ? (
-        <Suspense fallback={trigger}>
-          <Opened
-            address={address}
-            lead={pill}
-            onLogOut={logOut}
-            {...(pickable
-              ? {
-                  onPickName: () => {
-                    setNaming(true);
-                  },
-                }
-              : {})}
-          />
-        </Suspense>
+      {/* Logged in, the pill's box holds the account's button and, after it, the network's: siblings, never one in the other. */}
+      {address === undefined ? (
+        door
       ) : (
-        trigger
+        <span className="pill-group">
+          {door}
+          {network}
+        </span>
       )}
       {address === undefined || !naming ? null : (
         <Suspense fallback={null}>

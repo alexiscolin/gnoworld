@@ -64,7 +64,7 @@ export {
 export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
 export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
-export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
+export { HIDE_IDS, PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export {
   SEARCH_PAGE,
   SEARCH_Q_MAX,

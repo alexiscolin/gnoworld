@@ -19,7 +19,7 @@ test("a down or slow chain proves nothing: the page stays as it is", () => {
 
 test("a realm listed, read, or with no page exists", () => {
   expect(knownOf(true, undefined)).toBe("yes");
-  expect(knownOf(false, { state: "read" } as never)).toBe("yes");
+  expect(knownOf(false, { state: "read" })).toBe("yes");
   expect(knownOf(false, failed("no-page"))).toBe("yes");
 });
 

@@ -34,7 +34,7 @@ const (
 // another's state. It sets no caller: testing.SetRealm only holds in
 // the test function that calls it.
 func fresh() {
-	rentals, payers = avl.Tree{}, avl.Tree{}
+	rentals, payers, holds = avl.Tree{}, avl.Tree{}, avl.Tree{}
 	held, price, paused = 0, startPrice, false
 	owner, pending, operator = adm, "", mod
 	at(t0)
@@ -511,12 +511,108 @@ func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(alice))
 	Close(cross(cur), "mars") // its payer, before that end
 	uassert.Equal(t, 2*p0, held)
+	offer(chain.Coins{{"ugnot", p0}}) // the world stays empty after that close (D13507)
+	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
 
 	at(t0 + 3*oneDay) // venus's paid end: anyone may close it now
 	testing.SetRealm(testing.NewUserRealm(carol))
 	Close(cross(cur), "venus")
+	uassert.False(t, holds.Has("venus")) // its hold ended at that second: removed with the record
 	uassert.Equal(t, 0, held)
 	uassert.Equal(t, 0, rentals.Size())
+}
+
+// D13507, the first way round the hold: the payer closes its taken-down rental
+// before the end it was paid for (it may, for its deposit) and rents the world
+// again at once with the same text.
+func TestTakedownHoldSurvivesThePayersClose(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	at(t0 + 3*oneDay - 1)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	Close(cross(cur), "mars")
+	offer(chain.Coins{{"ugnot", p0}})
+	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
+
+	at(t0 + 3*oneDay) // the paid end: the world is free again
+	pay(p0)
+	Rent(cross(cur), "mars", "again", 1)
+	_, text, _, ok := Rental("mars")
+	uassert.True(t, ok)
+	uassert.Equal(t, "again", text)
+	uassert.False(t, holds.Has("mars")) // a passed hold goes when the world is rented again
+}
+
+// D13507, the second way round: renting another world closes the payer's
+// ended rentals, the taken-down one among them, and with it the hold.
+func TestTakedownHoldSurvivesThePayersNextRent(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	at(t0 + 3*oneDay - 1)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(p0)
+	Rent(cross(cur), "venus", "hello", 1) // closes mars's ended rental
+	uassert.False(t, rentals.Has("mars"))
+	offer(chain.Coins{{"ugnot", p0}})
+	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
+
+	at(t0 + 3*oneDay)
+	pay(p0)
+	Rent(cross(cur), "mars", "again", 1)
+	_, _, _, ok := Rental("mars")
+	uassert.True(t, ok)
+}
+
+// A world taken down, rented again once its hold passed, then taken down
+// again holds to its second paid end, never to the first hold's.
+func TestSecondTakedownHoldsToItsOwnEnd(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(p0)
+	Rent(cross(cur), "mars", "hello", 1)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	at(t0 + oneDay) // the first hold has passed
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "again", 3)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r2")
+	testing.SetRealm(testing.NewUserRealm(alice))
+	Close(cross(cur), "mars")
+	at(t0 + 4*oneDay - 1)
+	offer(chain.Coins{{"ugnot", p0}})
+	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
+
+	at(t0 + 4*oneDay)
+	pay(p0)
+	Rent(cross(cur), "mars", "third", 1)
+	_, text, _, ok := Rental("mars")
+	uassert.True(t, ok)
+	uassert.Equal(t, "third", text)
+}
+
+// A taken-down record closed after its paid end, not only at that second,
+// takes its passed hold with it.
+func TestCloseAfterTheHoldRemovesIt(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	at(t0 + 3*oneDay + 100)
+	testing.SetRealm(testing.NewUserRealm(carol))
+	Close(cross(cur), "mars")
+	uassert.False(t, holds.Has("mars"))
 }
 
 // The whole days not yet begun come back to the payer at once; the day

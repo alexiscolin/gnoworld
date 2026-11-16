@@ -125,6 +125,17 @@ describe("LoginView", () => {
     },
   );
 
+  // The network beside the login, never inside it (F13560); named on a touch screen too, whose way in is words (Trust).
+  it("draws the network beside the login button and after the phone's words, never in a button, and not before the session is known", () => {
+    const network = <button type="button">Onyx</button>;
+    const out = view({ network });
+    expect(out).not.toMatch(/<button[^>]*>(?:(?!<\/button>).)*<button/);
+    expect(out.match(/>Onyx<\/button>/g)).toHaveLength(2);
+    expect(out).toMatch(/use a computer; once logged in you can write from here\.<button[^>]*>Onyx<\/button><\/span>/);
+    expect(view({ network, session: { kind: "unknown" } })).not.toContain("Onyx");
+    expect(view({ network, session: { kind: "in", address: ADDRESS } })).not.toContain("Onyx");
+  });
+
   it("says why the last login stopped, in its status region", () => {
     const html = view({ problem: { reason: "address", problem: "checksum" } });
     expect(html).toMatch(/role="status"[^>]*>[^<]*Adena&#x27;s address does not match its checksum/);

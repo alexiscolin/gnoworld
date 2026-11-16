@@ -134,6 +134,6 @@ export function JarvisCard({ item, ctx }: { item: JarvisItem; ctx: JarvisCardCon
     );
   // The door's quota full (429) is the day's questions all asked: the share's line, not a failure to try again.
   const value = result.ok ? result.value : result.reason === "full" ? ({ status: "capped" } as const) : undefined;
-  if (value?.status === "answered") return <AnswerCard {...ctx} answer={value} />;
+  if (value?.status === "answered") return <AnswerCard {...ctx} id={item.id} answer={value} />;
   return <Said value={value} forms={ctx.forms} />;
 }

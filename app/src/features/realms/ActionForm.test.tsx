@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { MemoryRouter } from "react-router";
 import type { ChainFetch } from "@gnoworld/chain/read";
-import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { SignedIn } from "../../../tests/grabStore.tsx";
-import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
+import { all, button, click, drawer, mount, one } from "../../../tests/mount.tsx";
 import {
   after,
   calling,
@@ -17,6 +17,7 @@ import {
   SIBLING_CHAIN,
   typed,
 } from "../../../tests/callFixtures.ts";
+import { callsIn } from "../calls/index.ts";
 import { ActionForm } from "./ActionForm.tsx";
 import { InlineCard } from "./InlineCard.tsx";
 
@@ -57,6 +58,7 @@ async function draw(action: Action, more: { label?: string; read?: () => Promise
       <SignedIn />
       <div data-test="under">
         <ActionForm
+          cardId="t1"
           action={action}
           {...(label === undefined ? {} : { label })}
           {...(viewHref === undefined ? {} : { viewHref })}
@@ -65,7 +67,7 @@ async function draw(action: Action, more: { label?: string; read?: () => Promise
         />
       </div>
       <div data-test="sibling">
-        <ActionForm action={VOTE} chain={SIBLING_CHAIN} options={{ fetch: sibling }} />
+        <ActionForm cardId="t2" action={VOTE} chain={SIBLING_CHAIN} options={{ fetch: sibling }} />
       </div>
     </StoreProvider>,
   );
@@ -116,7 +118,12 @@ describe("a checked action as a Form block", () => {
       );
       const box = mount(
         <StoreProvider>
-          <ActionForm action={{ realm: DAO, function: "Vote", args: {} }} chain={CHAIN} options={{ fetch: under }} />
+          <ActionForm
+            cardId="t3"
+            action={{ realm: DAO, function: "Vote", args: {} }}
+            chain={CHAIN}
+            options={{ fetch: under }}
+          />
         </StoreProvider>,
       );
       click(await calling(box, "Call Vote"));
@@ -147,6 +154,7 @@ describe("a checked action as a Form block", () => {
     const again = mount(
       <StoreProvider>
         <ActionForm
+          cardId="t4"
           action={{ ...VOTE, args: { pid: "99", option: "NO" } }}
           chain={CHAIN}
           options={{ fetch: vi.fn<ChainFetch>(FUNCTIONS_ANSWER) }}
@@ -209,7 +217,7 @@ describe("a checked action as a Form block", () => {
       const under = vi.fn<ChainFetch>(FUNCTIONS_ANSWER);
       const box = mount(
         <StoreProvider>
-          <ActionForm action={{ ...VOTE, realm }} chain={CHAIN} options={{ fetch: under }} />
+          <ActionForm cardId="t5" action={{ ...VOTE, realm }} chain={CHAIN} options={{ fetch: under }} />
         </StoreProvider>,
       );
       await act(async () => {
@@ -242,6 +250,7 @@ describe("a checked action in the chat", () => {
     const box = mount(
       <StoreProvider>
         <ActionForm
+          cardId="t6"
           action={{ realm: DAO, function: "Grant", args: { a: "x" }, why: "Needs three." }}
           chain={CHAIN}
           options={{ fetch: wide }}
@@ -266,6 +275,7 @@ describe("a checked action in the chat", () => {
     const box = mount(
       <StoreProvider>
         <ActionForm
+          cardId="t7"
           action={{ realm: DAO, function: "Grant", args: {} }}
           chain={CHAIN}
           options={{ fetch: vi.fn<ChainFetch>(() => listing(WIDE)) }}
@@ -301,7 +311,7 @@ describe("a checked action, as parts", () => {
     const under = vi.fn<ChainFetch>(FUNCTIONS_ANSWER);
     const box = mount(
       <StoreProvider>
-        <ActionForm action={VOTE} chain={CHAIN} options={{ fetch: under }} />
+        <ActionForm cardId="t8" action={VOTE} chain={CHAIN} options={{ fetch: under }} />
       </StoreProvider>,
     );
     click(await calling(box, "Call MustVoteOnProposalSimple"));
@@ -315,10 +325,15 @@ describe("a checked action, as parts", () => {
     const box = mount(
       <StoreProvider>
         <div data-test="first">
-          <ActionForm action={VOTE} chain={CHAIN} options={{ fetch: read }} />
+          <ActionForm cardId="t9" action={VOTE} chain={CHAIN} options={{ fetch: read }} />
         </div>
         <div data-test="second">
-          <ActionForm action={{ ...VOTE, args: { pid: "99", option: "NO" } }} chain={CHAIN} options={{ fetch: read }} />
+          <ActionForm
+            cardId="t10"
+            action={{ ...VOTE, args: { pid: "99", option: "NO" } }}
+            chain={CHAIN}
+            options={{ fetch: read }}
+          />
         </div>
       </StoreProvider>,
     );
@@ -342,6 +357,7 @@ describe("a pinned action in the quick actions bar", () => {
           </div>
           <div data-test="bar">
             <ActionForm
+              cardId="t11"
               action={action}
               label="Vote"
               chain={CHAIN}
@@ -400,6 +416,7 @@ describe("a pinned action in the quick actions bar", () => {
     const sibling = mount(
       <StoreProvider>
         <ActionForm
+          cardId="t12"
           action={VOTE}
           chain={SIBLING_CHAIN}
           options={{ fetch: vi.fn<ChainFetch>(() => after(under, FUNCTIONS_ANSWER)) }}
@@ -408,5 +425,52 @@ describe("a pinned action in the quick actions bar", () => {
     );
     await calling(sibling, "Call MustVoteOnProposalSimple");
     expect(one(box, '[data-test="bar"]').childElementCount).toBe(0);
+  });
+});
+
+// The card is the one the caller names (`cardId`), not one made at each mount: a form that mounts again (the chat scrolls it
+// out and back, a page redraws) finds the card it opened, still waiting for its block, never a fresh preview to sign twice.
+describe("a checked action's card across a remount", () => {
+  const show = (shown: boolean, cardId: string) => (
+    <StoreProvider>
+      <Grab />
+      <SignedIn />
+      {shown ? (
+        <ActionForm
+          cardId={cardId}
+          action={VOTE}
+          chain={CHAIN}
+          options={{ fetch: vi.fn<ChainFetch>(FUNCTIONS_ANSWER) }}
+        />
+      ) : null}
+    </StoreProvider>
+  );
+  const waitingFor = (box: HTMLElement) => calling(box, "Call MustVoteOnProposalSimple");
+
+  it("finds its card, waiting for the block, when the form is unmounted and mounted again", async () => {
+    const draw = drawer();
+    draw(show(true, "vote-15"));
+    const host = document.body.lastElementChild as HTMLElement;
+    click(await waitingFor(host));
+    const [id] = Object.keys(callsIn(state())?.calls ?? {});
+    if (id === undefined) throw new Error("no card opened");
+    const { callsActions } = callsIn(state()) ?? { callsActions: undefined };
+    callsActions?.signing(id);
+    draw(show(false, "vote-15"));
+    draw(show(true, "vote-15"));
+    await waitingFor(host);
+    expect(all(host, "article")).toHaveLength(1);
+    expect(host.textContent).toContain("Waiting for your signature in Adena");
+  });
+
+  it("gives two actions of the same function drawn with two ids a card each", async () => {
+    const draw = drawer();
+    draw(show(true, "vote-15"));
+    const host = document.body.lastElementChild as HTMLElement;
+    click(await waitingFor(host));
+    draw(show(false, "vote-16"));
+    draw(show(true, "vote-16"));
+    await waitingFor(host);
+    expect(all(host, "article")).toHaveLength(0);
   });
 });

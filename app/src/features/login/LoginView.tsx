@@ -13,7 +13,7 @@ export interface LoginViewProps {
   step: Login["step"];
   problem: Login["problem"];
   onLogIn: () => void;
-  /** The network's name, after the button's words, and after the phone's. */
+  /** The network's name, after the button in its pill, and after the phone's words. */
   network?: ReactNode;
 }
 
@@ -31,17 +31,21 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
       {problem === undefined ? null : sayProblem(problem)}
     </p>
   );
+  // Logged in, the account's pill names the network (AccountMenu.tsx); before the session is known, the header's own row does.
   if (session.kind !== "out") return status;
   // Why the last login stopped is the button's own words, short; its status region says it whole to a screen reader alone.
   const stopped = step === "idle" && problem !== undefined;
   return (
     <Cluster>
       <span className={styles["computer"]}>
-        <Button busy={step !== "idle"} onClick={onLogIn} {...(stopped ? { description: sayProblem(problem) } : {})}>
-          {stopped ? <Icon name="alert" /> : null}
-          {wordsOf(step, stopped ? sayShort(problem) : undefined)}
+        <span className="pill-group">
+          <Button busy={step !== "idle"} onClick={onLogIn} {...(stopped ? { description: sayProblem(problem) } : {})}>
+            {stopped ? <Icon name="alert" /> : null}
+            {wordsOf(step, stopped ? sayShort(problem) : undefined)}
+          </Button>
+          {/* Beside the button, never in it: a control in a control would press the login with it. */}
           {network}
-        </Button>
+        </span>
       </span>
       <span className={styles["phone"]}>
         To log in, use a computer; once logged in you can write from here.

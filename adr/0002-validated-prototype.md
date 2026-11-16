@@ -495,8 +495,8 @@ between worlds. None may saturate the map:
   row 11).
 - **A call is a transaction the user signs in Adena.** It shows as an inline card in the
   room or on the plate, in four steps (ADR-0001 §7):
-  1. the preview: realm, function, arguments, network, fee. The network is the universe's
-     chain, and Adena must be on it;
+  1. the preview: realm, function, arguments, network, fee, the deposit's cap (D13625). The
+     network is the universe's chain, and Adena must be on it;
   2. "sign in Adena": the wallet opens;
   3. "landing in a block": Adena answers once the network accepts the transaction, so
      the card follows its hash until the block and its result;
@@ -526,14 +526,14 @@ since Adena's SDK is young (0.1.x) and its docs lag its code.
   hears them, so `lib/adena` registers once and passes account and network changes to the
   store. A change of account or network ends the old account's session.
 - **One request at a time.** A new popup closes the open one, so requests queue.
-- **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld",
-  the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
+- **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld", a line asking
+  to sign only if the browser's address bar shows the site's address (D13600), the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
   most). The server checks it with `verifyArbitrarySignature`, always passing the signer,
   the chain id (`gnoland-1`, `onyx-1`) and the exact text, since with nothing to check it
   says yes. The server then checks the nonce (unused, unexpired) and the domain itself.
   Session and multisig accounts cannot sign in.
-- **A login lasts 30 days on a device,** renewed on use and revocable in the settings and
-  by moderators. Ergo checks a token the server issued, so a reconnect needs no new
+- **A login lasts 30 days on a device,** renewed on use and revocable in the settings (Settings, Accounts: "Log out my other
+  sessions", D13601) and by moderators. Ergo checks a token the server issued, so a reconnect needs no new
   signature and no chain read (§7).
 - **Before "sign in Adena",** the network is read again and compared with the universe's
   chain. Adena is asked to switch, or to add a community chain and then switch; it never
@@ -541,6 +541,9 @@ since Adena's SDK is young (0.1.x) and its docs lag its code.
 - **The fee is an estimate.** Adena simulates again and sets the gas and fee itself
   (gas used × 1.1 by default), so the preview labels its fee an estimate. gno charges the
   whole fee, not the gas used.
+- **The storage deposit is capped.** Every call is signed with `max_deposit` of 5 GNOT
+  (an empty cap falls back to the chain's 100 GNOT default), and the card shows it as a
+  DEPOSIT line beside the fee (D13625).
 - **Every failure is a state with its next step,** from Adena's error codes: connect (1000),
   finish the open request (1001), unlock (2000), the wrong account (3001), set up Adena
   (3002), refused (4000), failed, with its log (4001), Adena too old or the account type

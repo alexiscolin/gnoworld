@@ -75,11 +75,30 @@ describe("CallCard, the preview", () => {
 
   it("names the realm, the function, the arguments, the network and the fee before Adena opens", () => {
     const text = said(view());
-    for (const label of ["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE"]) expect(text).toContain(label);
+    for (const label of ["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE", "DEPOSIT"]) expect(text).toContain(label);
     expect(text).toContain(REALM);
     expect(text).toContain("Onyx");
     expect(text).toContain("onyx-1");
   });
+
+  it("shows the storage deposit cap beside the fee, without promising a refund (C11, D13625)", () => {
+    const text = said(view());
+    expect(text).toContain("DEPOSIT");
+    expect(text).toContain("up to 5 GNOT");
+    expect(text).toMatch(/held while the data stays on chain/);
+    expect(text).not.toMatch(/refund/i);
+  });
+
+  it("shows the deposit line whatever the fee line says", () => {
+    expect(said(view({ fee: "Set by Adena when you sign" }))).toContain("up to 5 GNOT");
+  });
+
+  it.each([{ kind: "signing" }, { kind: "failed", reason: "failed" }] as const)(
+    "keeps the deposit line once the card is %o",
+    (state) => {
+      expect(said(withState(state))).toContain("up to 5 GNOT");
+    },
+  );
 
   it("labels the fee an estimate", () => {
     expect(said(view())).toMatch(/estimate/i);
@@ -423,8 +442,15 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
   // Vitest reads the card's stylesheet as empty: the rules are the Mac Studio's pictures, the tests read the parts that wear them.
   it("lines the block up as one column: a definition list, each label before its value (F5732)", () => {
     const block = all(view(), "dl")[0] ?? document.body;
-    expect(all(block, "dt").map((dt) => dt.textContent)).toEqual(["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE"]);
-    expect(all(block, "dd")).toHaveLength(5);
+    expect(all(block, "dt").map((dt) => dt.textContent)).toEqual([
+      "REALM",
+      "FUNCTION",
+      "ARGUMENTS",
+      "NETWORK",
+      "FEE",
+      "DEPOSIT",
+    ]);
+    expect(all(block, "dd")).toHaveLength(6);
     expect(block.className).toContain("block");
   });
 

@@ -23,6 +23,7 @@ export function useUnread(on: boolean, api: UnreadApi = PAGE): Unread["worlds"] 
     if (!active) return;
     let live = true;
     const ask = (): void => {
+      if (document.hidden) return;
       counts().then(
         (got) => {
           if (live && got.ok) setWorlds(got.value.worlds);

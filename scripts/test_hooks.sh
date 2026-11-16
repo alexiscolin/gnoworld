@@ -4067,9 +4067,9 @@ sh_ 'echo x >|/tmp/f && git status' 0
 # A recursive delete takes no path from a variable that may be empty (a folder emptied by a find -delete
 # whose variable was unset): ${name:?} stops the shell first. BSD's and GNU's options before find's paths, a
 # wrapper, or a :? in a comment or another command change nothing.
-for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}/x" -delete' 'find "$dir" -exec rm -f {} +' \
+for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}" -delete' 'find "$dir" -exec rm -f {} +' \
 	'rm -r "$dir"' 'rm -fr $dir/*' 'rm -R -- "$1"' 'rm --recursive "$(git rev-parse --show-toplevel)/x"' \
-	'find "${dir:-.}" -delete' "sh -c 'rm -r \"\$d\"'" 'rm -r $(pwd)/x' 'cd x && /usr/bin/find "$TMPDIR/x" -delete' \
+	'find "${dir:-.}" -delete' "sh -c 'rm -r \"\$d\"'" 'rm -r $(pwd)/x' 'cd x && /usr/bin/find "$TMPDIR/$x" -delete' \
 	'find -x "$d" -delete' 'find -E "$d" -delete' 'find -d "$d" -delete' 'find -s "$d" -delete' 'find -Ex "$d" -delete' \
 	'find -f "$d" -delete' 'find -D tree "$d" -delete' 'find -O3 "$d" -delete' 'find -- "$d" -delete' \
 	'rm -rf `pwd`/x' 'find "$d" -execdir rm -rf {} \;' 'find "$d" -ok rm {} \;' 'find "$d" -exec /bin/rm {} +' \
@@ -4699,6 +4699,139 @@ sh scripts/worktree.sh u v w; true"; do
 	at_ "$root" "$cmd" 2
 done
 sh_ "sh scripts/worktree.sh x y z" 2
+# Narrowed refusals (the owner's review of 2026-11-16: about 200 of 288 refusals were false). Each narrowing passes what it
+# misread, and keeps its planted bypass refused.
+# A `$(...)` is read as the shell reads it: a quote inside it is a quote (`print(next(...))` in a python string is no glob
+# qualifier, `$(date)` in single quotes is text); a line a quote or a heredoc's body holds from an earlier line is read both ways,
+# as an apostrophe there is no quote. `$((...))` is arithmetic, unless what closes it is not `))`.
+for cmd in 'jid=$(python3 -I -c '"'"'import json; print(next(j["id"] for j in json.load(open("x"))["jobs"]))'"'"')' \
+	'printf '"'"'%s\n'"'"' '"'"'t0=$(date +%s)'"'"' > f.sh' \
+	'printf '"'"'%s\n'"'"' '"'"'t0=$(date +%s)'"'"' '"'"'echo "$(( $(date +%s) - t0 )) s"'"'"' > f.sh' \
+	'a=$(python3 -I -c '"'"'print(max(1, 2))'"'"')
+b=$(python3 -I -c '"'"'print(min(1, 2))'"'"')' \
+	'echo "$(( $(date +%s) - t0 )) s"' 'n=$((n + 1))' 'echo $((a * (b + 1))) $(( n ))'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'echo $(echo '"'"'x'"'"' $(gnokey list))' 'echo $(( $(gnokey list) + 1 ))' 'echo $(($(gnokey list)))' 'echo $(( `gnokey list` + 1 ))' \
+	'echo $((echo a); (gnokey list))' 'echo $((echo a)|(gnokey list))' 'echo $((gnokey list) )' 'echo "$(( 1 + $(rm -r "$d") ))"' \
+	'echo $( (gnokey list))' 'x=$(echo '"'"'a'"'"'; ls *(e:id:))' \
+	"sh <<EOF
+echo it's \$(ls *(e:id:)) isn't
+EOF" "cat <<EOF | sh
+echo it's \$(ls *(e:id:)) isn't
+EOF" '# "
+echo "a
+echo it'"'"'s $(ls *(e:id:)) isn'"'"'t"' '# "
+case x in x) echo "a
+echo it'"'"'s $(ls *(e:id:)) isn'"'"'t" ;; esac' 'echo $((echo a);$x)' 'rm -rf build/"$x".o'; do
+	sh_ "$cmd" 2
+done
+# rtk proxy runs the program after it: read as that program, a shell or worktree.sh among them, and git as git is.
+for cmd in 'rtk proxy git log -n 3' 'rtk proxy git diff > /tmp/x.patch' 'rtk proxy git diff "$ref"' 'rtk proxy sh -n scripts/check.sh'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rtk proxy git commit --no-verify -m x' 'rtk proxy git commit -nm x' 'rtk proxy sh scripts/worktree.sh a b' \
+	'rtk proxy bash < /tmp/f.sh' 'rtk proxy rm -rf "$x"' 'rtk proxy sh -c "gnokey list"'; do
+	sh_ "$cmd" 2
+done
+# Reading core.hooksPath (or include.path) is no override: git config with a read flag and nothing that writes, grep and rg. Setting it,
+# by -c, a config command, a GIT_CONFIG variable or an include, stays refused, and so does a read hiding one in the same command.
+for cmd in 'git config --get core.hooksPath' 'git config --get-all core.hooksPath' 'git config --get-regexp hooksPath' \
+	'git -C . config --local --get core.hooksPath' 'git config --show-origin --get core.hooksPath' '/usr/bin/git config --get include.path' \
+	'rtk proxy git config --get core.hooksPath' 'grep -n hooksPath scripts/guard.py' 'rg hooksPath' 'grep -rn core.hooksPath docs && git status'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'git config core.hooksPath x' 'git config --add core.hooksPath x' 'git config --get --add core.hooksPath x' \
+	'git config --get core.hooksPath --file x' 'git config --get core.hooksPath --add x' 'rtk proxy git config core.hooksPath x' 'rg --pre git hooksPath .' \
+	'git config --replace-all --get core.hooksPath x' 'git config --unset core.hooksPath' \
+	'git -c core.hooksPath=x config --get y' 'git -c core.hooksPath=x commit -m x' 'git --config-env=core.hooksPath=X config --get y' \
+	'GIT_CONFIG_COUNT=1 git config --get core.hooksPath' 'GIT_CONFIG_COUNT=1 grep hooksPath x' 'time git config --get core.hooksPath' \
+	'echo core.hooksPath' 'git config --get core.hooksPath; git config core.hooksPath x' 'git commit -m x -c include.path=y' \
+	'grep x -f core.hooksPath; git -c core.hooksPath=y commit -m x' 'git config --get x $(git config core.hooksPath y)'; do
+	sh_ "$cmd" 2
+done
+# A recursive delete is refused when what remains of its path, each expansion removed, is empty, relative, or the project's, the
+# home's or the temp root's own folder or one above them, or ends in a folder's whole contents (an expansion or a glob as its
+# last name): the variable may be empty. A name's start or end beside one, a folder of its own, passes. A substitution or a list
+# is no variable: refused wherever it stands.
+for cmd in 'rm -rf /private/tmp/claude-501/ht/x' 'rm -rf "$TMPDIR/foo"' 'rm -rf /private/tmp/claude-501/b-"$n"' 'rm -rf "$x"/private/tmp/claude-501/ht/y' \
+	'rm -rf "$TMPDIR/ht-$n"' 'rm -rf /tmp/"${d:-x}"/y' 'rm -rf /tmp/x-$((n + 1))' 'find "$TMPDIR/x" -delete' 'rm -r /tmp/"$d"/a/b' \
+	'find /tmp/"$out"/obj -name x -delete' 'rm -rf "$x"'"$root"'/dist'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rm -rf "$x"' 'rm -rf "$HOME/$x"' 'rm -rf /private/tmp/$x' 'rm -rf /tmp/"$x"' 'rm -rf "$x"/' 'rm -rf ./"$x"' 'rm -rf "$TMPDIR/$x"' \
+	'rm -rf /private/tmp/claude-501/ht/"$x"' 'rm -rf "$d"/*' 'rm -rf "$d/"*' 'rm -rf "$d"/.*' 'rm -rf "$TMPDIR/foo/$x/.."' 'rm -rf build/"$x"' \
+	'rm -rf ~/$x' 'rm -rf ~/"$x"' 'rm -rf '"$(dirname "$HOME")"'/$x' 'rm -rf /$x' 'rm -rf $x$y' 'rm -rf "$(pwd)/x"' 'rm -rf "$@"' 'rm -rf "$d"/"$@"' \
+	'rm -rf "${a[@]}/x"' 'rm -rf "$TMPDIR/`pwd`"' 'rm -rf "${d:-.}"' 'rm -rf "$dir"/.' 'rm -rf "$ROOT"/..' 'rm -rf "${TMPDIR:?}/$x"' \
+	'find "$x" -delete' 'find "$HOME/$x" -delete' 'find "$TMPDIR/$x" -exec rm -r {} +' 'find "$(pwd)/x" -delete' \
+	'rm -rf '"$root"'"$x"' 'rm -rf '"$(dirname "$root")"'"$x"' 'rm -rf '"$HOME"'"$x"' 'rm -rf '"$(dirname "$HOME")"'"$x"' 'rm -rf /tmp"$x"' \
+	'rm -rf /private/tmp"$x"' 'rm -rf "${d"/x' 'rm -rf /tmp/x/"${d"y' 'rm -rf "/tmp/x-$((pwd) )"' 'rm -rf "/tmp/x-$(( $(pwd) ))"' 'rm -rf "'"$root"'/$x"' 'rm -rf '"$root"'/"$x"' 'rm -rf '"$(dirname "$root")"'/"$x"' \
+	'rm -rf "'"$(dirname "$(dirname "$root")")"'/$x"'; do
+	sh_ "$cmd" 2
+done
+# The temp root is TMPDIR when it is set: a path an empty variable leaves at it is refused, and the same path is no root otherwise.
+tmp_() { # $1: TMPDIR, $2: a shell command, $3: the exit code expected
+	code=0
+	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$2" | TMPDIR="$1" python3 -I "$gd" >/dev/null 2>&1 || code=$?
+	[ "$code" = "$3" ] || fail "guard gave $code, not $3, for TMPDIR=$1: $2"
+}
+tmp_ /nonexistent-guard-tmp/x 'rm -rf /nonexistent-guard-tmp/x"$y"' 2
+tmp_ /nonexistent-guard-tmp/y 'rm -rf /nonexistent-guard-tmp/x"$y"' 0
+tmp_ /nonexistent-guard-tmp/x 'rm -rf "$x"/nonexistent-guard-tmp/x/y' 0
+tmp_ /nonexistent-guard-tmp/z 'rm -rf "$x"/nonexistent-guard-tmp/x/y' 2
+# sh -n only parses: a syntax check of files runs nothing, so it passes, worktree.sh among them, after `--` whatever the file's
+# name, else when each name is plain words. Any other option beside -n (-nc, -xn, -n -c, -n -s, +n, a redirection) is no pure check.
+for cmd in 'sh -n -- "$f"' 'sh -n scripts/x.sh' 'sh -n scripts/worktree.sh' 'bash -n -- "$f" scripts/y.sh' 'sh -n scripts/check.sh scripts/worktree.sh'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'sh -n "$f"' 'sh -n scripts/*.sh' 'sh -n -x scripts/worktree.sh' 'sh -nx scripts/worktree.sh' 'sh -xn scripts/worktree.sh' \
+	'sh -nc scripts/worktree.sh' 'sh -n -c scripts/worktree.sh' 'sh -n -s scripts/worktree.sh' 'sh -n +n scripts/worktree.sh' \
+	'sh -n -- scripts/worktree.sh < /dev/null' 'sh +n -n scripts/worktree.sh' 'sh scripts/worktree.sh' 'sh -n -c "sh scripts/worktree.sh x y z"' \
+	'sh -n -c "git commit --no-verify -m x"' 'sh -n < /tmp/f.sh' 'echo x | sh -n' 'git status --get core.hooksPath' 'sh -n scripts/x.sh && sh scripts/worktree.sh x y z' 'cd docs && sh -n scripts/worktree.sh; sh scripts/worktree.sh x'; do
+	sh_ "$cmd" 2
+done
+# Review fixes. A brace expansion, a `$name` followed by `[` or `:` (zsh's subscript and modifiers) and a `${...}` default holding a
+# `/`, `.`, `~` or `$` can each leave an empty member or a dropped part, so a delete naming one is refused; a path that starts
+# with an expansion is allowed only inside the project or a temp root (`$TMPDIR/x` is one); `$((` across a continued line is
+# no arithmetic; rtk proxy's own options are skipped, any other is refused; a read is no read with a redirection beside it.
+for cmd in 'rm -rf "$PWD"/{dist,"$sub"}' 'find "$PWD"/{dist,"$sub"} -delete' 'rm -rf ~/{a,$x}' 'rm -rf /private/tmp/claude-501/b2u/{dist,$x}' \
+	'rm -rf "/opt/data$x[2,1]"' 'find "/private/tmp/x${u:-/..}" -delete' 'rm -rf /tmp/x/"${u:+/}"' 'rm -rf /tmp/x/"${u:=.}"' \
+	'rm -rf /tmp/x/"${u:-~}"' 'rm -rf /tmp/x/"${u:-$v}"' 'rm -rf /tmp/x/"$p":h' 'rm -rf /tmp/x/"${u:-a.b}"-y' 'rm -rf /tmp/x/{a..c}$n' \
+	'rm -rf "$DESTDIR"/usr/local' 'rm -rf "$x"/opt/homebrew' 'rm -rf "$x"/Volumes' 'rm -rf "${x:-/}"/usr' 'rm -r "$d"/a/b' \
+	'rm -rf "$d/build"' 'find "$out/obj" -name x -delete' 'rm -rf "${d:-x}/y"'; do
+	sh_ "$cmd" 2
+done
+sh_ 'echo $((bash < /tmp/f.sh)\
+)' 2
+sh_ 'echo $((eval "$x")\
+)' 2
+for cmd in 'rtk proxy -v git log -n 3' 'rtk proxy --skip-env git status' 'rtk proxy -- git status' 'rtk proxy -vv --ultra-compact git status'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rtk proxy -v bash < /tmp/f.sh' 'rtk proxy --verbose bash < /tmp/f.sh' 'rtk proxy -v eval "$x"' 'rtk proxy -v zsh -s < /tmp/f.sh' \
+	'echo x | rtk proxy -v sh' 'rtk proxy -vv sh scripts/worktree.sh a b' 'rtk -v proxy bash < /tmp/f.sh' 'rtk proxy -x git status' \
+	'rtk proxy -- bash < /tmp/f.sh' 'grep -h hooksPath /tmp/cfg >> .git/config' 'git config --get core.hooksPath >> .git/config' \
+	'rg hooksPath 2>/dev/null'; do
+	sh_ "$cmd" 2
+done
+# F9: `$'\''` is an ANSI-C quote whose escaped quote does not end it; reading it as plain quotes hid what follows from a reading
+# that blanks quotes, so a text with `$'` is read both ways. F10: a glob character in a delete's last name, or anywhere after a
+# leading expansion, can match whatever an empty variable leaves. F12: a comment ending in a backslash is no continued line.
+for cmd in "echo \"\$( git commit --no-verify -m x; echo \$'\\'' ) ' \"" "echo \"\$( rm -rf \"\$x\"; echo \$'\\'' ) ' \"" \
+	"echo \"\$( sh scripts/worktree.sh a b c; echo \$'\\'' ) ' \"" 'rm -rf "$x"/[!.]*' 'rm -rf "$x"/.[!.]*' 'rm -rf "$x"/[a-z]*' \
+	'rm -rf "$x"/[[:alpha:]]*' 'rm -rf "$x"/*-*' 'rm -rf /tmp/x/"$y"*' 'rm -rf "$x"/a*/b' 'rm -rf "$x"/private/tmp/claude-501/ht/a*/b' 'rm -rf /tmp/x/a"$y"?' 'echo hi #\
+git commit --no-verify -m x'; do
+	sh_ "$cmd" 2
+done
+# A comment that opens a later line ends in a backslash; a $( and its ( split by a continued line, read joined as arithmetic.
+sh_ 'echo x
+#\
+bash < /tmp/f.sh' 2
+sh_ 'echo $(\
+(bash < /tmp/f.sh)\
+)' 2
+sh_ 'echo a \
+b' 0
 # A subagent edits no harness file with Edit or Write: the sandbox stops a shell's writes, never the file tools', so a subagent refused in a shell could still rewrite
 # stryker.config.json with Edit. The harness is
 # .githooks/records.sh's list, in the tree the file sits in, however its path is written; the session itself, with no agent_id

@@ -7,7 +7,7 @@ import { Address, type Challenge, type Proof } from "@gnoworld/schemas";
 import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import { cliSafe } from "./cliProof.ts";
-import { verifyProof, verifies, type Expected, type Verify } from "./login.ts";
+import { verifyProof, verifies, type Expected, type Verify } from "./verify.ts";
 import { droppers, makeRelease, type Release } from "./release.ts";
 
 export const LINK_TABLES = `
@@ -78,7 +78,7 @@ function linkText(who: {
     others.length === 0
       ? "each of them moderates the rooms of every world the other owns"
       : "each of these accounts moderates the rooms of every world any of them owns";
-  return `Link ${subject} to ${by} on ${host}${joined}. From now on ${grant} on ${chain}. Nothing else is granted. Code ${nonce}`;
+  return `Link ${subject} to ${by} on ${host}${joined}. From now on ${grant} on ${chain}. Nothing else is granted. Sign only if your browser's address bar shows ${host}. Code ${nonce}`;
 }
 
 /** How long after its signature a session may link and unlink (10 minutes). */

@@ -8,7 +8,7 @@ import { Address, type Challenge } from "@gnoworld/schemas";
 import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import { cliSafe } from "./cliProof.ts";
-import { verifies, type Expected } from "./login.ts";
+import { verifies, type Expected } from "./verify.ts";
 
 export const RELEASE_SPENT = `
 CREATE TABLE release_spent (code TEXT PRIMARY KEY, expires_at INTEGER NOT NULL) STRICT;

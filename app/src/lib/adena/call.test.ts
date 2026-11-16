@@ -141,7 +141,7 @@ const params = (request: CallRequest, universe = ONYX) => [
         value: {
           caller: request.caller,
           send: "",
-          max_deposit: "",
+          max_deposit: "5000000ugnot",
           pkg_path: request.realm,
           func: request.func,
           args: request.args,
@@ -193,6 +193,28 @@ describe("callContract: the way through", () => {
     });
   });
 
+  it("caps the storage deposit at 5 GNOT in coins, never the chain's 100 GNOT fallback an empty cap gets (C11, D13625)", async () => {
+    const adena = new Fake();
+    await callContract(adena, REQUEST, ONYX);
+    const [{ messages }] = sent(adena)[0]?.args as [{ messages: { value: { max_deposit: string } }[] }];
+    expect(messages[0]?.value.max_deposit).toBe("5000000ugnot");
+  });
+
+  // CallRequest is a strict object: a field that could carry a cap is refused before Adena is asked.
+  it.each([
+    ["max_deposit", { max_deposit: "999000000ugnot" }],
+    ["maxDeposit", { maxDeposit: "999000000ugnot" }],
+    ["an empty max_deposit", { max_deposit: "" }],
+    ["send with a nested max_deposit", { send: "1000000ugnot", value: { max_deposit: "999000000ugnot" } }],
+  ])("no request field can set the cap: %s is refused, Adena is never asked to sign (C11)", async (_, extra) => {
+    const adena = new Fake();
+    expect(await callContract(adena, { ...REQUEST, ...extra }, ONYX)).toStrictEqual({
+      ok: false,
+      reason: "malformed",
+    });
+    expect(sent(adena)).toHaveLength(0);
+  });
+
   it("sends exactly the request, whatever it holds (property): one message, nothing the preview does not show", () => {
     const realms = ["gno.land/r/demo/counter", "gno.land/r/sys/namereg/v0", "gno.land/r/gnoland/home"];
     return fc.assert(
@@ -207,6 +229,9 @@ describe("callContract: the way through", () => {
           const adena = new Fake();
           await callContract(adena, request, ONYX);
           expect(sent(adena)[0]?.args).toEqual(params(request));
+          // Any realm, function and arguments: the one cap (C11).
+          const [{ messages }] = sent(adena)[0]?.args as [{ messages: { value: { max_deposit: string } }[] }];
+          expect(messages[0]?.value.max_deposit).toBe("5000000ugnot");
         },
       ),
     );

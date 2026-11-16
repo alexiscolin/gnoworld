@@ -230,7 +230,8 @@ describe("registerName: a store that already holds a registration", () => {
     const other = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
     store.getState().loginActions.signedIn(other);
     const second = fakeAdena({ account: other });
-    expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")?.state).toMatchObject({ kind: "done" });
+    // A change of account leaves no idle card of the last one's (features/calls/slice.ts), a done one included.
+    expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")).toBeUndefined();
     expect(registrationOf(store.getState(), other, "onyx-1")).toBeUndefined();
     expect(await registerName("bobname043", { ...deps, adena: second.adena })).toEqual({ ok: true });
     expect(registrationOf(store.getState(), other, "onyx-1")?.texts).toEqual(["nym-bobname043"]);
