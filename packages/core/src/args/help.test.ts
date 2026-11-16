@@ -1,6 +1,5 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import * as core from "../index.ts";
 import { textProblem } from "./args.ts";
 import { helpCall, MAX_HELP_ARGS, prefill } from "./help.ts";
 
@@ -149,12 +148,5 @@ describe("prefill: the text each field of a card opens with", () => {
 
   it("gives nothing of an object's own names to a field called so", () => {
     expect(prefill([{ name: "constructor" }, { name: "__proto__" }, { name: "toString" }], [])).toEqual(["", "", ""]);
-  });
-});
-
-describe("the index", () => {
-  it("exports helpCall and prefill for the app", () => {
-    expect(core.helpCall).toBe(helpCall);
-    expect(core.prefill).toBe(prefill);
   });
 });

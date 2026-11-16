@@ -58,6 +58,8 @@ export class Links {
   readonly #byPlanet = new Map<Planet, Link[]>();
   readonly #bySystem = new Map<System, Link[]>();
   readonly #at: Vec = { x: 0, y: 0, z: 0 };
+  // What the strip is told each frame, made once.
+  readonly #told = { seconds: 0, delta: 0, still: false, ratio: 1 };
   // The links drawn now, whose tone they were written with, and the lens they were lit for.
   #shown = NONE;
   #bright = false;
@@ -116,8 +118,14 @@ export class Links {
 
   /** A frame on: the links of `at` (a world's, or a system's own), none for none. A change of place fades what shows out first. */
   tick(at: Planet | System | undefined, { seconds, lens, renderer, options }: Tick, delta: number): void {
-    this.#hover(lens, { seconds, delta, still: options.still(), ratio: renderer.getPixelRatio() });
-    const [links, bright] = this.#of(at);
+    const told = this.#told;
+    told.seconds = seconds;
+    told.delta = delta;
+    told.still = options.still();
+    told.ratio = renderer.getPixelRatio();
+    this.#hover(lens, told);
+    const links = this.#linksOf(at);
+    const bright = at !== undefined && "system" in at;
     const same = links === this.#shown && bright === this.#bright;
     if (!same && this.gain.value < 1e-3) this.#set(links, bright, lens);
     const to = same && links !== NONE ? 1 : 0;
@@ -141,10 +149,10 @@ export class Links {
     this.strip.tick(pointed === undefined ? undefined : (this.#byPlanet.get(pointed) ?? NONE), frame);
   }
 
-  // The links to draw for `at`, and whether they are bright: a world's own, or a system's between its worlds.
-  #of(at: Planet | System | undefined): readonly [readonly Link[], boolean] {
-    if (at === undefined) return [NONE, false];
-    return "system" in at ? [this.#byPlanet.get(at) ?? NONE, true] : [this.#bySystem.get(at) ?? NONE, false];
+  // The links to draw for `at`: a world's own, or a system's between its worlds (bright, a world's own).
+  #linksOf(at: Planet | System | undefined): readonly Link[] {
+    if (at === undefined) return NONE;
+    return "system" in at ? (this.#byPlanet.get(at) ?? NONE) : (this.#bySystem.get(at) ?? NONE);
   }
 
   // Draws `links` from now on, each with its tone.
@@ -175,15 +183,20 @@ export class Links {
 
   // The links' ends where their planets stand now.
   #follow(seconds: number): void {
-    const [out, at] = [this.#position.array, this.#at];
+    const out = this.#position.array;
+    const at = this.#at;
     const count = Math.min(this.#shown.length, MOST);
     for (let link = 0; link < count; link += 1) {
       const each = this.#shown[link];
       if (each === undefined) continue;
       placeOf(each.from, seconds, at);
-      [out[link * 6], out[link * 6 + 1], out[link * 6 + 2]] = [at.x, at.y, at.z];
+      out[link * 6] = at.x;
+      out[link * 6 + 1] = at.y;
+      out[link * 6 + 2] = at.z;
       placeOf(each.to, seconds, at);
-      [out[link * 6 + 3], out[link * 6 + 4], out[link * 6 + 5]] = [at.x, at.y, at.z];
+      out[link * 6 + 3] = at.x;
+      out[link * 6 + 4] = at.y;
+      out[link * 6 + 5] = at.z;
     }
     this.#position.needsUpdate = true;
   }

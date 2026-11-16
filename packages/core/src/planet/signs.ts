@@ -14,9 +14,9 @@ export const LIGHT_KINDS = ["towns", "coasts", "cracks", "seams", "belts", "pool
 export type LightKind = (typeof LIGHT_KINDS)[number];
 
 export interface WorldState {
-  /** `nextVitality`'s share. */
+  /** A world's vitality, a share 0 to 1. */
   readonly vitality: number;
-  /** `presenceOf`'s share. */
+  /** The people present, a share 0 to 1. */
   readonly present: number;
   /** `isFresh`: a new family nobody has visited. */
   readonly fresh: boolean;

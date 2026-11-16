@@ -1,7 +1,8 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { eachStory } from "../testing.tsx";
-import { Icon, ICON_NAMES, type IconName } from "./Icon.tsx";
+import { Icon, type IconName } from "./Icon.tsx";
+import { ICON_NAMES } from "../Overview/iconNames.ts";
 import * as stories from "./Icon.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Icons": the one set, and the six that point along the text.

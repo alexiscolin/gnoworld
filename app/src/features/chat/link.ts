@@ -17,7 +17,6 @@ import { beginSession, heardBy } from "./session.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
-export { HISTORY_LINES } from "./history.ts";
 
 export type { ChatLink, LinkDeps };
 

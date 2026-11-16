@@ -25,8 +25,6 @@ export interface MapLoad {
   readonly signal?: AbortSignal;
 }
 
-const MIPMAPS = 4 / 3;
-
 /** Sets what a map needs before its first use: a colour map is decoded by the GPU, a data map stays linear, on one channel. */
 export function prepareMap(texture: Texture, kind: MapKind, anisotropy: number): Texture {
   texture.colorSpace = kind === "colour" ? SRGBColorSpace : NoColorSpace;
@@ -40,17 +38,6 @@ export function prepareMap(texture: Texture, kind: MapKind, anisotropy: number):
   texture.generateMipmaps = true;
   texture.needsUpdate = true;
   return texture;
-}
-
-/** What `textures` take on the GPU, each once: three has no counter of bytes. */
-export function mapBytes(textures: Iterable<Texture>): number {
-  let bytes = 0;
-  for (const texture of new Set(textures)) {
-    const image = texture.image as { width?: number; height?: number } | null;
-    const pixels = (image?.width ?? 0) * (image?.height ?? 0);
-    bytes += Math.round(pixels * (texture.format === RedFormat ? 1 : 4) * MIPMAPS);
-  }
-  return bytes;
 }
 
 /** How the browser decodes a map, in full or scaled at once, so a small device never holds the full size. */

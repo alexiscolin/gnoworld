@@ -45,5 +45,5 @@ The network checks need Docker: `sh deploy/test-links.sh`.
   ([docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)).
 - A fetch never skips the address checks.
 - The rules for this folder are in [.claude/rules/typescript.md](../.claude/rules/typescript.md).
-- The allowed hosts of its way out are in `deploy/egress/links-acl.yaml` and
-  `deploy/egress/reader-acl.yaml`.
+- Its way out is `deploy/egress/links-acl.yaml`: any public https host, no list, the private ranges refused
+  (`reader-acl.yaml` is Jarvis's reader's, not this one's).

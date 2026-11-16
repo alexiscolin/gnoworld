@@ -171,7 +171,7 @@ export class Stage {
   }
 
   /** Lights the planets and the suns of the worlds `only` names, the near ones drawn as themselves lit alone; none, all. */
-  light(universe: Universe, only: ReadonlySet<string> | undefined): void {
+  lightOnly(universe: Universe, only: ReadonlySet<string> | undefined): void {
     if (this.near !== undefined) this.near.only = only;
     const lit = (planet: { readonly id: string } | undefined) => only?.has(planet?.id ?? "") === true;
     this.planets?.light(only === undefined ? undefined : (index) => lit(universe.planets[index]));

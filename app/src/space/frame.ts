@@ -11,10 +11,11 @@ import { onResize } from "./onResize.ts";
 import { choose, livelyOf, momentOf, napOf, pace, resize, stateOf } from "./view.ts";
 
 /** Runs `space`'s loop till `signal` aborts; `space.keep.wake` wakes it where it sleeps. */
-export function draw(space: Space, signal: AbortSignal): void {
+export function runFrames(space: Space, signal: AbortSignal): void {
   const sharpen = sharpener(space, performance.now());
   const state = stateOf(space);
   let drawn = false;
+  const spent = { real: 0, slept: 0 };
   const beat: Beat = {
     gone: () => space.disposed,
     unseen: () => {
@@ -29,7 +30,9 @@ export function draw(space: Space, signal: AbortSignal): void {
     work: ({ now, delta, slept, real }) => {
       if (resize(space, state.sized, state.freed)) space.touch();
       state.sized = state.freed = false;
-      advance(space, delta, { real, slept });
+      spent.real = real;
+      spent.slept = slept;
+      advance(space, delta, spent);
       choose(space, state, now);
       paint(space, delta);
       touchOf(space);

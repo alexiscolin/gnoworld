@@ -69,12 +69,6 @@ export function shownLine(lines: readonly Line[], id: string): ShownLine | undef
   return edit === undefined ? line : { ...line, text: edit.text, kind: edit.kind, edited: true };
 }
 
-/** The room's lines as shown: see foldEdits. */
-export const shownLines = (lines: readonly Line[]): readonly ShownLine[] => foldEdits(lines).shown;
-
-/** The line each folded edit corrects, by the edit's own msgid: see foldEdits. */
-export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => foldEdits(lines).folded;
-
 // The lines without the corrections of the line `id` that these accounts wrote: its author's, and its REDACT's sender's.
 function withoutCorrections(lines: readonly Line[], id: string, owners: readonly string[]): readonly Line[] {
   const taken = ({ edits, account }: Line) =>

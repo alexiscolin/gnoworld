@@ -31,8 +31,8 @@ export function hoverOver(space: Space, planet: Planet | undefined): void {
   state.lit = lens === undefined || near === undefined ? near : new Set([...near].filter((id) => lens.has(id)));
   space.labels.lit = state.lit;
   if (universe === undefined) return;
-  if (state.lit !== undefined) stage.light(universe, state.lit);
-  else if (lens !== undefined) stage.light(universe, lens);
+  if (state.lit !== undefined) stage.lightOnly(universe, state.lit);
+  else if (lens !== undefined) stage.lightOnly(universe, lens);
   state.written ||= state.lit !== undefined;
 }
 
@@ -44,5 +44,5 @@ export function settleHover(space: Space): void {
   const { universe, stage, lens } = space;
   if (!state.written || state.lit !== undefined || lens !== undefined || stage.frame.uLens.value > 1e-3) return;
   state.written = false;
-  if (universe !== undefined) stage.light(universe, undefined);
+  if (universe !== undefined) stage.lightOnly(universe, undefined);
 }

@@ -1,6 +1,7 @@
 import { UNDATED_EVENT } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { isDated, isLive, type CalendarEvent } from "./agenda.ts";
+import { isDated } from "../../lib/coming.ts";
+import { isLive, type CalendarEvent } from "./agenda.ts";
 
 // An event's time: dated before the data's sentinel, live for an hour from its start.
 const HOUR = 3_600_000;

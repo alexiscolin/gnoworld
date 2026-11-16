@@ -1,7 +1,7 @@
 // An event's time: whether it is dated, and live, an hour from its start. Pure: the clock is given.
 import { isDated, LIVE_FOR_MS, startOf, type CalendarEvent } from "../../lib/coming.ts";
 
-export { isDated, type CalendarEvent } from "../../lib/coming.ts";
+export type { CalendarEvent } from "../../lib/coming.ts";
 
 /** Whether `event` is live at `now`: begun, and within its hour. */
 export const isLive = (event: CalendarEvent, now: number): boolean =>

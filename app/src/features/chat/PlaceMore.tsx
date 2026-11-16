@@ -2,6 +2,7 @@
 // draws none), and the place on gnoweb and the explorer.
 import type { Line } from "@gnoworld/core";
 import { Cluster, Icon } from "@gnoworld/ui";
+import { explorerLink } from "../../lib/chain/explorer.ts";
 import { NEW_TAB } from "../../lib/newTab.ts";
 import { countriesHere } from "./Country.tsx";
 import { Figure } from "./Figure.tsx";
@@ -12,14 +13,13 @@ export function CountriesFigure({ lines, members }: { lines: readonly Line[]; me
   return count === 0 ? null : <Figure value={count} caption={count === 1 ? "Country" : "Countries"} />;
 }
 
-// Where gno.land's explorer is: the prototype's own link (docs/prototype/source/app.js, linksFor).
-const EXPLORER = "https://gnoscan.io";
-
-/** The place's links out, each opening in a new tab: the place on gnoweb (its realm's page, else gnoweb itself) and the explorer; no docs link. */
-export function Links({ gnoweb }: { gnoweb: string | undefined }) {
+/** The place's links out, each opening in a new tab: the place on gnoweb (its realm's page, else gnoweb itself) and its chain's explorer,
+ * none for a chain the explorer does not list; no docs link. */
+export function Links({ gnoweb, chainId }: { gnoweb: string | undefined; chainId: string | undefined }) {
+  const explorer = chainId === undefined ? undefined : explorerLink(chainId);
   const links = [
     ...(gnoweb === undefined ? [] : [{ label: "View on gnoweb", href: gnoweb }]),
-    { label: "Explorer", href: EXPLORER },
+    ...(explorer === undefined ? [] : [{ label: "Explorer", href: explorer }]),
   ];
   return (
     <Cluster as="ul" space="xs">

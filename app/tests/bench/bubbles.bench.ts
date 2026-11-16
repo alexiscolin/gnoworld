@@ -3,7 +3,8 @@
 import { bench, describe } from "vitest";
 import rules from "../../data/bubbles.json" with { type: "json" };
 import { cutText } from "../../../packages/core/src/bubbles/cut.ts";
-import { pickBubbles, type BubbleMessage, type Viewer } from "../../../packages/core/src/bubbles/pickBubbles.ts";
+import { pickBubbles } from "../../../packages/core/src/bubbles/pickBubbles.ts";
+import type { BubbleMessage, Viewer } from "../../../packages/core/src/bubbles/types.ts";
 
 const NOW = Date.UTC(2026, 9, 31, 12, 0, 0);
 const CODES = "JP FR DE US BR IN CA AU IT ES MX KR NL SE NO FI DK PL PT IE CH AT BE GR TR AR CL CO PE NZ".split(" ");

@@ -5,7 +5,8 @@ import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
 import { isFarSide, type LatLon } from "./farSide.ts";
-import { pickBubbles, type Bubble, type BubbleMessage, type Viewer } from "./pickBubbles.ts";
+import { pickBubbles } from "./pickBubbles.ts";
+import type { Bubble, BubbleMessage, Viewer } from "./types.ts";
 import type { Rules } from "./rules.ts";
 
 // The rules of ADR-0001 §7, as one pure function. Every number is read from

@@ -9,7 +9,7 @@ import { mentions, mentionsRoom } from "../markdown/mentions.ts";
 import type { Line } from "./room.ts";
 
 /** What a line is to its reader: a mention of them, a mention of the whole room, a reply to them, a direct message. */
-export type NoticeKind = "mention" | "group" | "reply" | "dm";
+type NoticeKind = "mention" | "group" | "reply" | "dm";
 
 export interface Notice {
   /** The line's msgid. */

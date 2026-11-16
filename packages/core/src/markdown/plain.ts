@@ -6,7 +6,7 @@ import { markdown } from "./markdown.ts";
 import type { Block, Inline } from "./types.ts";
 
 /** The words of inline nodes, their marks gone: code and mentions as they read. */
-export const words = (nodes: readonly Inline[]): string =>
+const words = (nodes: readonly Inline[]): string =>
   nodes
     .map((node) => {
       if (node.type === "text" || node.type === "code") return node.text;

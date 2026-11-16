@@ -4,7 +4,7 @@ import { Challenge, Me, Ticket, type Address, type Proof } from "@gnoworld/schem
 import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Call, type Fetcher, type Result } from "./http.ts";
 
-export { TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
+export type { Fetcher, Result } from "./http.ts";
 
 export function loginApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);

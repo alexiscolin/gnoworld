@@ -37,19 +37,19 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "cellIn", "write", "light", "unit", "moodAt", "lattice", "field", "side", "ringAt", "tintOf", "densityAt", "driftAt", "turnAt", "wrapTo", "nearestCell", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep", "frameRate", "isDue", "carryOver", "frameWait", "judgeFrames"]
+FRAME_NAMES = ["tick", "pose", "glideAt", "wayAt", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "smoothstep"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
-    ("frame_arrow.ts", "export const wrapTo = (): number[] => {\n  return [1];\n};\n", FRAME),
-    ("frame_closure.ts", "export function driftAt(): () => number {\n  return () => 1;\n}\n", FRAME),
-    ("frame_arrow_closure.ts", "export const wrapTo = (): (() => number) => () => 1;\n", FRAME),
+    ("frame_arrow.ts", "export const unitOf = (): number[] => {\n  return [1];\n};\n", FRAME),
+    ("frame_closure.ts", "export function settle(): () => number {\n  return () => 1;\n}\n", FRAME),
+    ("frame_arrow_closure.ts", "export const unitOf = (): (() => number) => () => 1;\n", FRAME),
     ("frame_method.ts", "export class Torus {\n  follow(): number[] {\n    return [1];\n  }\n}\n", FRAME),
     ("frame_property.ts", "export const cells = {\n  follow(): number[] {\n    return [1];\n  },\n};\n", FRAME),
     # By whole names; an index walks an array, where for...of is refused; a test stays under the tests' list.
     ("frame_longer.ts", "export function drawing(): number[] {\n  return [1];\n}\n", None),
-    ("frame_index.ts", "export function moodAt(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
+    ("frame_index.ts", "export function cellHash(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
     ("frame_off.test.ts", 'import { expect, test } from "vitest";\n\ntest.skip("x", () => {\n  expect(1).toBe(1);\n});\n', "no-restricted-syntax: A test is never switched off"),
-    ("frame_plain.ts", "export function moodAt(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
+    ("frame_plain.ts", "export function cellHash(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
     ("frame_setup.ts", "export function newMood(): number[] {\n  return [0, 0];\n}\n", None),
     # The block replaces core's list: what that list holds still holds here.
     ("frame_module.ts", "export const SEEN = new Set<string>();\n", MODULE),
@@ -256,7 +256,7 @@ try:
         for folder in ("space", "frame"):
             lint_cases(FRAME_CORE, f"packages/core/src/{folder}/__probe__", f"core {folder}")
             shutil.rmtree(f"packages/core/src/{folder}/__probe__")
-        # Elsewhere in core a `field` or a `sample` is nobody's frame.
+        # Elsewhere in core a `field` or a `side` is nobody's frame.
         lint_cases([("frame_elsewhere.ts", "export function field(): number[] {\n  return [1];\n}\n", None)], HERE, "core elsewhere")
         shutil.rmtree(HERE)
 
@@ -531,7 +531,7 @@ try:
             ("lib/__probe__/lib_zustand.ts", uses(name="createStore", path="zustand/vanilla"), "no-restricted-imports"),
             ("lib/__probe__/lib_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
             ("lib/__probe__/lib_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), "import-x/no-restricted-paths"),
-            ("lib/__probe__/lib_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("lib/__probe__/lib_scene.ts", uses(name="globe", path="../../space/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("lib/__probe__/lib_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
             ("lib/__probe__/lib_ui_path.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
             # store holds the state: zustand's vanilla store, core, lib; never React (zustand's own hooks
@@ -544,7 +544,7 @@ try:
             ("store/__probe__/store_zustand_hook.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
             ("store/__probe__/store_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
             ("store/__probe__/store_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
-            ("store/__probe__/store_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("store/__probe__/store_scene.ts", uses(name="globe", path="../../space/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("store/__probe__/store_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
             ("store/__probe__/store_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
             ("routes/__probe__/route_clean.ts", "export const globe = 1;\n", None),
@@ -552,26 +552,41 @@ try:
             ("lib/__probe__/lib_react.test.ts", 'import { useState } from "react";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(useState).toBeDefined();\n});\n', None),
             ("store/__probe__/store_react.test.ts", 'import { useState } from "react";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(useState).toBeDefined();\n});\n', None),
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
-            ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
-            ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
+            ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../space/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("space/__probe__/globe.ts", "export const globe = 1;\n", None),
             # The scene: core, the store and three; never React, the design system, a feature or a route (docs/ARCHITECTURE.md).
-            ("scene/__probe__/scene_three.ts", uses(name="Color", path="three"), None),
-            ("scene/__probe__/scene_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
-            ("scene/__probe__/scene_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), None),
-            ("scene/__probe__/scene_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
-            ("scene/__probe__/scene_react_dom.ts", uses(name="flushSync", path="react-dom"), "no-restricted-imports"),
-            ("scene/__probe__/scene_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
-            ("scene/__probe__/scene_zustand_react.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
-            ("scene/__probe__/scene_zustand.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
-            ("scene/__probe__/scene_lib.ts", uses(name="savesData", path="../../lib/saveData.ts"), "import-x/no-restricted-paths"),
-            ("scene/__probe__/scene_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
-            ("scene/__probe__/scene_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
-            ("scene/__probe__/scene_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
-            ("scene/__probe__/scene_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
-            ("scene/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
-            ("scene/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
+            ("space/__probe__/scene_three.ts", uses(name="Color", path="three"), None),
+            ("space/__probe__/scene_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("space/__probe__/scene_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), None),
+            ("space/__probe__/scene_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
+            ("space/__probe__/scene_react_dom.ts", uses(name="flushSync", path="react-dom"), "no-restricted-imports"),
+            ("space/__probe__/scene_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
+            ("space/__probe__/scene_zustand_react.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
+            ("space/__probe__/scene_zustand.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
+            # lib's saveData alone: the scene reads the data saver; the rest of lib stays out of it.
+            ("space/__probe__/scene_lib.ts", uses(name="savesData", path="../../lib/saveData.ts"), None),
+            ("space/__probe__/scene_lib_other.ts", uses(name="NEW_TAB", path="../../lib/newTab.ts"), "import-x/no-restricted-paths"),
+            ("space/__probe__/scene_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("space/__probe__/scene_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
+            ("space/__probe__/scene_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
+            ("space/__probe__/scene_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "no-restricted-imports"),
+            # The design system's helpers that touch no React are the scene's one door to ui, by name or by path.
+            ("space/__probe__/scene_ui_helper.ts", uses(name="typedIn", path="@gnoworld/ui"), None),
+            ("space/__probe__/scene_ui_helper_path.ts", uses(name="iconNode", path="../../../../packages/ui/src/index.ts"), None),
+            ("space/__probe__/scene_ui_helper_escape.ts", uses(name="holdsEscape", path="@gnoworld/ui"), None),
+            # Nor at run time: an import() of React, the design system, zustand or lib is refused; the scene's own chunks load.
+            ("space/__probe__/scene_dynamic_react.ts", 'export async function load(): Promise<unknown> {\n  return import("react");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_ui.ts", 'export async function load(): Promise<unknown> {\n  return import("@gnoworld/ui");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_lib.ts", 'export async function load(): Promise<unknown> {\n  return import("../../lib/newTab.ts");\n}\n', "no-restricted-syntax: The scene loads"),
+            # A bare import of the design system loads it too, by its name or a path; and an import() by a path.
+            ("space/__probe__/scene_ui_bare.ts", 'import "@gnoworld/ui";\n\nexport const x = 1;\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_ui_bare_path.ts", 'import "../../../../packages/ui/src/index.ts";\n\nexport const x = 1;\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_ui_path.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../packages/ui/src/index.ts");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_own.ts", 'export async function load(): Promise<unknown> {\n  return import("./globe.ts");\n}\n', None),
+            ("space/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("space/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
             # What runs on a frame makes nothing: a method, a private one, a field's arrow; each way of making, each alone.
-            *[(f"scene/__probe__/frame_{name}.ts", onframe(body), FRAME) for name, body in (
+            *[(f"space/__probe__/frame_{name}.ts", onframe(body), FRAME) for name, body in (
                 ("new", "return new Date();"),
                 ("array", "return [list];"),
                 ("object", "return { list };"),
@@ -602,25 +617,25 @@ try:
                 ("for_of", "for (const each of list) this.seen = each;"),
                 ("destructured", "const [first] = list;\n    return first;"),
             )],
-            ("scene/__probe__/frame_rest.ts", "export class Loop {\n  draw(...list: number[]): number {\n    return list.length;\n  }\n}\n", FRAME),
-            ("scene/__probe__/frame_private.ts", "export class Loop {\n  #kept = 0;\n\n  #tick(): number[] {\n    this.#kept += 1;\n    return [this.#kept];\n  }\n\n  run(): number[] {\n    return this.#tick();\n  }\n}\n", FRAME),
-            ("scene/__probe__/frame_field.ts", "export class Loop {\n  readonly #draw = (): number[] => {\n    return [1];\n  };\n\n  run(): number[] {\n    return this.#draw();\n  }\n}\n", FRAME),
-            ("scene/__probe__/frame_field_closure.ts", "export class Loop {\n  readonly #draw = () => () => 1;\n\n  run(): () => number {\n    return this.#draw();\n  }\n}\n", FRAME),
-            ("scene/__probe__/frame_plain.ts", onframe("this.seen = list.length * 2;"), None),
-            ("scene/__probe__/frame_index.ts", onframe("for (let at = 0; at < list.length; at += 1) this.seen += list[at] ?? 0;"), None),
-            ("scene/__probe__/frame_longer.ts", "export class Loop {\n  drawing(): number[] {\n    return [1];\n  }\n}\n", None),
-            ("scene/__probe__/frame_setup.ts", "export class Loop {\n  readonly kept = [1];\n\n  build(): number[] {\n    return [...this.kept];\n  }\n}\n", None),
-            ("scene/__probe__/frame_tested.test.ts", 'import { expect, test } from "vitest";\n\nconst draw = () => [1];\n\ntest("x", () => {\n  expect(draw()).toEqual([1]);\n});\n', None),
+            ("space/__probe__/frame_rest.ts", "export class Loop {\n  draw(...list: number[]): number {\n    return list.length;\n  }\n}\n", FRAME),
+            ("space/__probe__/frame_private.ts", "export class Loop {\n  #kept = 0;\n\n  #tick(): number[] {\n    this.#kept += 1;\n    return [this.#kept];\n  }\n\n  run(): number[] {\n    return this.#tick();\n  }\n}\n", FRAME),
+            ("space/__probe__/frame_field.ts", "export class Loop {\n  readonly #draw = (): number[] => {\n    return [1];\n  };\n\n  run(): number[] {\n    return this.#draw();\n  }\n}\n", FRAME),
+            ("space/__probe__/frame_field_closure.ts", "export class Loop {\n  readonly #draw = () => () => 1;\n\n  run(): () => number {\n    return this.#draw();\n  }\n}\n", FRAME),
+            ("space/__probe__/frame_plain.ts", onframe("this.seen = list.length * 2;"), None),
+            ("space/__probe__/frame_index.ts", onframe("for (let at = 0; at < list.length; at += 1) this.seen += list[at] ?? 0;"), None),
+            ("space/__probe__/frame_longer.ts", "export class Loop {\n  drawing(): number[] {\n    return [1];\n  }\n}\n", None),
+            ("space/__probe__/frame_setup.ts", "export class Loop {\n  readonly kept = [1];\n\n  build(): number[] {\n    return [...this.kept];\n  }\n}\n", None),
+            ("space/__probe__/frame_tested.test.ts", 'import { expect, test } from "vitest";\n\nconst draw = () => [1];\n\ntest("x", () => {\n  expect(draw()).toEqual([1]);\n});\n', None),
             # A page's own `draw` is no frame of the scene.
             ("features/__probe__/frame_elsewhere.ts", onframe("this.seen = [list].length;"), None),
             # The block replaces the root's list: what that holds still holds in the scene.
-            ("scene/__probe__/scene_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
-            ("scene/__probe__/scene_class_at_end.ts", dict((n, c) for n, c, _ in LINT)["class_at_end.ts"], "no-restricted-syntax: A character class right before"),
-            *[(f"scene/__probe__/frame_is_{name}.ts", f"export class Part {{\n  {name}(): number[] {{\n    return [1];\n  }}\n}}\n", FRAME) for name in FRAME_NAMES],
+            ("space/__probe__/scene_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+            ("space/__probe__/scene_class_at_end.ts", dict((n, c) for n, c, _ in LINT)["class_at_end.ts"], "no-restricted-syntax: A character class right before"),
+            *[(f"space/__probe__/frame_is_{name}.ts", f"export class Part {{\n  {name}(): number[] {{\n    return [1];\n  }}\n}}\n", FRAME) for name in FRAME_NAMES],
         ]
         lint_cases(app, src, "app folders")
         os.remove(f"{src}/probe_root_fetch.ts")
-        for folder in ("sw", "features", "lib", "store", "routes", "scene"):
+        for folder in ("sw", "features", "lib", "store", "routes", "space"):
             shutil.rmtree(f"{src}/{folder}/__probe__")
             if not os.listdir(f"{src}/{folder}"):
                 os.rmdir(f"{src}/{folder}")

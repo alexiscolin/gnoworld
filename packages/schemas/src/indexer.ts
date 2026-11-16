@@ -49,7 +49,6 @@ export {
   ExportedName,
   ImportPath,
   RealmPath,
-  WORLD_NATURES,
   WorldId,
   Worlds,
   WORLDS_CAPS,
@@ -135,3 +134,6 @@ export {
   tokenIdOf,
   TransferAttrs,
 } from "./token.ts";
+
+/** @internal what the server's tests read; the product reads none of it. */
+export { WORLD_NATURES } from "./worlds.ts";

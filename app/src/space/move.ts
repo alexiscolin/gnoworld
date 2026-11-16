@@ -2,6 +2,7 @@
 // Split from the loop (frame.ts), which decides whether the frame is drawn.
 import { damp } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
+import type { Place } from "./place.ts";
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import { ORBIT_GAIN } from "./parts/marks.ts";
 import { frameOf } from "./parts/bones.ts";
@@ -27,6 +28,7 @@ const ORBITS_S = 0.3;
 const PLANET_AT: Vec = { x: 0, y: 0, z: 0 };
 const SCAN_FRAME = new Quaternion();
 // The level follows the zoom: out of a system past 11 of its reaches, the universe; the eye among a system's orbits, that system.
+const UNIVERSE: Place = { kind: "universe" };
 const LEAVE = 11;
 const ENTER = 1.2;
 // raw: how many orbits a system draws at their full strength
@@ -36,7 +38,7 @@ const CLEAR_ORBITS = 12;
 export function advance(
   space: Space,
   delta: number,
-  { real = delta, slept = 0 }: { real?: number; slept?: number } = {},
+  { real = delta, slept = 0 }: { real?: number; slept?: number },
 ): void {
   const { rig, stage } = space;
   const still = space.options.still();
@@ -116,7 +118,7 @@ function settle(space: Space): void {
   // address stood far from where it last was, which left it for the universe at once.
   const eye = eyeOf(space.rig.pose, space.rig.eye);
   if (system !== undefined && distance(eye, system.place) > system.reach * LEAVE) {
-    space.place = { kind: "universe" };
+    space.place = UNIVERSE;
     space.options.events.universe();
   } else if (place.kind === "universe") enter(space, universe.systems);
 }

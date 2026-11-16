@@ -5,10 +5,6 @@ import { CREDITS, type Credit } from "./credits.ts";
 const FILES: readonly (readonly string[])[] = [
   ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze", "clouds", "ring"],
   ["earth-day", "earth-night"],
-  ["carina"],
-  ["veil"],
-  ["cliffs"],
-  ["far-mars", "far-venus", "far-jupiter", "far-neptune", "saturn"],
   ["moon-height"],
   ["earth-height"],
 ];

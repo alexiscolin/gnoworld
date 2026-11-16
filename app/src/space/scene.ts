@@ -3,7 +3,7 @@
 // the flight nears and lands; a click or a wheel asks a place back, which the page's address then asks of it.
 import { PerspectiveCamera, Vector3, type WebGLRenderer } from "three";
 import { usesOf, type CosmosWorld } from "./cosmosWorld.ts";
-import { draw } from "./frame.ts";
+import { runFrames } from "./frame.ts";
 import { arrivalOf, firstArrival, holdCircle, scans, slideFor, waitedOn } from "./framing.ts";
 import { homeGoal, middleOf, planetGoal, screenOf, systemGoal, universeGoal, type Circle } from "./goals.ts";
 import { enterHit, wireHands } from "./hands.ts";
@@ -70,7 +70,7 @@ export class Space {
       },
     });
     wireHands(this, this.#leaving.signal);
-    draw(this, this.#leaving.signal);
+    runFrames(this, this.#leaving.signal);
   }
 
   /** The worlds' file: the universe is laid out anew, and what was asked comes. */
@@ -97,8 +97,8 @@ export class Space {
   light(only: ReadonlySet<string> | undefined): void {
     this.touch();
     this.lens = only;
-    this.labels.light(only);
-    if (this.universe !== undefined) this.stage.light(this.universe, only);
+    this.labels.lightOnly(only);
+    if (this.universe !== undefined) this.stage.lightOnly(this.universe, only);
   }
 
   /** Whether a page covers space: it draws nothing then, and its loop sleeps till this goes. */

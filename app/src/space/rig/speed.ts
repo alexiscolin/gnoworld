@@ -119,6 +119,10 @@ export class Speed {
     this.#map.value = null;
   }
 
+  #made(): WebGLRenderTarget {
+    return new WebGLRenderTarget(this.#size.x, this.#size.y, { type: HalfFloatType, samples: 4 });
+  }
+
   /** Whether the frame goes through the blur's pass, which grades it anew. */
   get through(): boolean {
     return this.#strength >= OFF;
@@ -132,10 +136,7 @@ export class Speed {
   ): boolean {
     if (this.#strength < OFF) return false;
     renderer.getDrawingBufferSize(this.#size);
-    const target = (this.#target ??= new WebGLRenderTarget(this.#size.x, this.#size.y, {
-      type: HalfFloatType,
-      samples: 4,
-    }));
+    const target = (this.#target ??= this.#made());
     this.#map.value = target.texture;
     if (target.width !== this.#size.x || target.height !== this.#size.y) target.setSize(this.#size.x, this.#size.y);
     this.#look.project(camera);

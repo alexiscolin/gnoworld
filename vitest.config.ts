@@ -21,13 +21,12 @@ const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.
 // (`vitest run --project display --project display_ui`) and at night (nightly.yml), not in the default `test` and `coverage` runs.
 const DISPLAY_UI = [
   "packages/ui/src/{Avatar,Breadcrumb,Button,Card,ChatLayout,Chip,EmptyState,Kicker,Logo,NavItem,Overview,Panel,PlanetThumb,Row,Skeleton,Sparkline,Stat,TokensPage,compositions,icons}/**/*.test.{ts,tsx}",
-  "packages/ui/src/tokens.test.ts",
 ];
 const DISPLAY = [
   "app/src/routes/*.test.tsx",
   "app/src/{shell,slots,root,routerLink}.test.tsx",
   "app/src/features/world/*.test.tsx",
-  "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomMenu,RoomSections,Saved,SavedView}.test.tsx",
+  "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomSections,Saved,SavedView}.test.tsx",
   "app/src/features/realms/{ReadSource,RealmCard}.test.tsx",
   "app/src/features/universe/Credits.test.tsx",
   "app/src/features/home/{GoExplore,LatestOnGnoland}.test.tsx",
@@ -188,7 +187,7 @@ export default defineConfig({
         functions: 85,
         branches: 85,
         statements: 85,
-        "packages/core/**": { lines: 99.9, functions: 100, branches: 92.3, statements: 99.7 },
+        "packages/core/**": { lines: 99.9, functions: 100, branches: 96, statements: 99.9 },
         "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,packages/core/src/args,app/src/sw,server/src/ergo}/**":
           { lines: 100, functions: 100, statements: 100, branches: 97.2 },
         "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,packages/schemas/src/realmPath.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}":

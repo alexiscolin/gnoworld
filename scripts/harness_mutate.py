@@ -295,9 +295,17 @@ def mutants():
     calls = re.search(r"callee\.property\.name=/\^\(([^)]+)\)\$/\]\)\"", read("lint/shared.config.ts")).group(1)
     for call in calls.split("|"):
         yield from each("lint/shared.config.ts", calls, "|".join(c for c in calls.split("|") if c != call), "probe", f"eslint refuses {call} on a frame")
-    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "...SWALLOWED, CLASS_AT_END]", "probe", "eslint's scene block holds a frame's rule")
-    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "CLASS_AT_END, ON_A_FRAME]", "probe", "eslint's scene block keeps the swallowed errors refused")
-    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "...SWALLOWED, ON_A_FRAME]", "probe", "eslint's scene block refuses a u class right before $")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME, SCENE_LOADS]", "...SWALLOWED, CLASS_AT_END, SCENE_LOADS]", "probe", "eslint's scene block holds a frame's rule")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME, SCENE_LOADS]", "CLASS_AT_END, ON_A_FRAME, SCENE_LOADS]", "probe", "eslint's scene block keeps the swallowed errors refused")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME, SCENE_LOADS]", "...SWALLOWED, ON_A_FRAME, SCENE_LOADS]", "probe", "eslint's scene block refuses a u class right before $")
+    # The scene's walls (docs/ARCHITECTURE.md): a bare or run-time import refused, lib's saveData alone, ui's three helpers alone.
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME, SCENE_LOADS]", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "probe", "eslint's scene block refuses a bare or run-time import of React, ui, zustand or lib")
+    yield from each("lint/app.config.ts", ":matches(ImportExpression, ImportDeclaration[specifiers.length=0])", "ImportExpression", "probe", "eslint refuses the scene a bare import of the design system")
+    yield from each("lint/app.config.ts", "(lib|packages\\\\/ui)", "lib", "probe", "eslint refuses the scene a run-time import of ui by a path")
+    yield from each("lint/app.config.ts", 'except: ["./saveData.ts"],', 'except: ["./saveData.ts", "./newTab.ts"],', "probe", "eslint refuses the scene the rest of lib")
+    yield from each("lint/app.config.ts", 'except: ["./saveData.ts"],', "", "probe", "eslint lets the scene read lib's saveData")
+    yield from each("lint/app.config.ts", "{ regex: UI, allowImportNames: SCENE_UI, message: SCENE },", "", "probe", "eslint refuses the scene ui's components by name or path")
+    yield from each("lint/app.config.ts", "allowImportNames: SCENE_UI, ", "", "probe", "eslint lets the scene take ui's three React-free helpers")
     yield from each("lint/core.config.ts", "[...PURE, ON_A_FRAME]", "[...PURE]", "probe", "eslint core's frame and space folders hold a frame's rule")
     yield from each("lint/core.config.ts", 'const PURE = ["error",', 'const PURE = ["off",', "probe", "eslint core's own list is on")
     yield from each("lint/core.config.ts", 'ignores: ["**/*.test.ts"],\n    rules: {\n      "no-restricted-syntax": [...PURE', 'rules: {\n      "no-restricted-syntax": [...PURE', "probe", "eslint a test in core's frame and space stays under the tests' list")
@@ -1913,7 +1921,7 @@ def design_mutants():
     yield from each("scripts/check_docs.py", "problems or decisions or orphans", "problems or orphans", "hooks", "check_docs fails on a decision written twice")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
-        ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
+        ('["app/src/space/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
         ('"packages/core/src/cosmos/", "packages/core/src/space/"]', '"packages/core/src/space/"]', "starts the design-reviewer for a change of the cosmos"),
         ("    ...(gate.files.some(space)\n", "    ...(false\n", "starts the design-reviewer for how space looks"),
         ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),

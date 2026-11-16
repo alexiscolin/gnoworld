@@ -122,9 +122,6 @@ export function placeCounts(state: State): ReadonlyMap<string, number> {
   return counts;
 }
 
-/** What a room or a conversation counts. */
-export const badgeOf = (state: State, where: string): number => placeCounts(state).get(where) ?? 0;
-
 /** What the page counts in all: every room followed and every conversation, each by its own count. */
 export const totalUnseen = (state: State): number => [...placeCounts(state).values()].reduce((sum, n) => sum + n, 0);
 

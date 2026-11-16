@@ -10,7 +10,6 @@ import {
   featuredPool,
   latch,
   lightOf,
-  normalise,
   quarterOf,
   rollOf,
   turnOf,
@@ -18,7 +17,7 @@ import {
   type Featured,
   type View,
 } from "./vista.ts";
-import type { Planet, Vec } from "./layout.ts";
+import { normalise, type Planet, type Vec } from "./layout.ts";
 
 // raw: seconds between two searches, the pause after the reader's hand, and the eased share's time constants (the view's, the pose's)
 const EVERY = 2;
@@ -141,10 +140,10 @@ class Follow {
   }
 }
 
-const follow = new Follow();
+const home = new Follow();
 
 /** One frame of the home's first screen's follow of its featured worlds: one first screen at a time. */
 export const followHome = (space: Space, delta: number): void => {
   shapeBoosts(space);
-  follow.update(space, delta);
+  home.update(space, delta);
 };

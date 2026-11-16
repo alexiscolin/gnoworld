@@ -7,7 +7,9 @@ import { wallet } from "../testing/signer.ts";
 import type { Send } from "@gnoworld/service/net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { asOf, makeMayModerate, mayWithin, type MayModerateOptions } from "./mayModerate.ts";
-import { makeOwners } from "./owners.ts";
+import { makeOwnerReaders, type OwnersOptions } from "./owners.ts";
+
+const makeOwners = (options: OwnersOptions) => makeOwnerReaders(options).act;
 import { isTeam, mayCreateRoom, spared, type Roles } from "./roles.ts";
 import { staffOf } from "../rooms/types.ts";
 

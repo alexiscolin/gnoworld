@@ -102,7 +102,7 @@ export class Round {
   readonly #at: Vec = { x: 0, y: 0, z: 0 };
   readonly #up = new Vector3();
   readonly #way = new Vector3();
-  readonly #side = new Vector3();
+  readonly #right = new Vector3();
 
   constructor() {
     this.lines.visible = false;
@@ -123,7 +123,7 @@ export class Round {
   // The plane the eye stands just over, leaning across the view.
   #face({ way, up }: Pose): void {
     const towards = this.#way.set(way.x, way.y, way.z);
-    const side = this.#side.set(up.x, up.y, up.z).cross(towards).normalize();
+    const side = this.#right.set(up.x, up.y, up.z).cross(towards).normalize();
     const lifted = this.#up.copy(towards).cross(side).multiplyScalar(Math.cos(ROUND.lean));
     lifted.addScaledVector(side, Math.sin(ROUND.lean)).multiplyScalar(Math.sqrt(1 - ROUND.over ** 2));
     this.lines.quaternion.setFromUnitVectors(Y, lifted.addScaledVector(towards, ROUND.over).normalize());
