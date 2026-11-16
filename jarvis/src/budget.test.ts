@@ -1,9 +1,11 @@
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import fc from "fast-check";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "@gnoworld/service/db";
 import { makeBudget, type Budget, type Kind } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
@@ -23,7 +25,6 @@ afterAll(() => {
 const opened: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of opened.splice(0)) if (db.isOpen) db.close();
-  vi.unstubAllEnvs();
 });
 
 const setup = (path = ":memory:", at = T0) => {
@@ -126,18 +127,34 @@ describe("the budget", () => {
     expect(budget.reserve("ask", CAP)).toMatchObject({ ok: true });
   });
 
+  // Each zone from its process's start: one set while a process runs is not honoured everywhere (F13239); its offset shows it took
+  // hold. Spent at 23:30 UTC on the 4th, the 5th in Kiritimati; the 4th at 00:00 UTC is the same day; 20:00 at UTC-5 on the 4th is
+  // 01:00 UTC on the 5th, a new day.
+  const IN_ZONE = `
+import { openDatabase } from "@gnoworld/service/db";
+import { makeBudget } from "./budget.ts";
+import { jarvisMigrations } from "./migrations.ts";
+const late = Date.parse("2026-11-05T01:30:00+02:00");
+const clock = { now: late };
+const budget = makeBudget(openDatabase(":memory:", jarvisMigrations), { caps: { ask: ${String(CAP)}, translate: ${String(TRANSLATE_CAP)} }, holdMs: ${String(HOLD)}, now: () => clock.now });
+const held = budget.reserve("ask", ${String(CAP)});
+if (held.ok) budget.settle(held.hold, ${String(CAP)});
+const local = [new Date(late).getDate(), new Date(late).getUTCDate(), new Date(late).getTimezoneOffset()];
+clock.now = Date.parse("2026-11-04T00:00:00.000Z");
+const spent = budget.state("ask").spent;
+clock.now = Date.parse("2026-11-04T20:00:00-05:00");
+console.log(JSON.stringify({ local, spent, next: budget.reserve("ask", 1).ok }));
+`;
   it.each(["Pacific/Kiritimati", "America/Adak"])("counts the day in UTC with the machine in %s", (zone) => {
-    vi.stubEnv("TZ", zone);
-    // 23:30 UTC on the 4th, written at UTC+2, is the 5th in Kiritimati (UTC+14): the zone took hold.
-    const late = Date.parse("2026-11-05T01:30:00+02:00");
-    if (zone === "Pacific/Kiritimati") expect([new Date(late).getDate(), new Date(late).getUTCDate()]).toEqual([5, 4]);
-    const { budget, clock } = setup(":memory:", late);
-    spend(budget, "ask", CAP);
-    clock.now = Date.parse("2026-11-04T00:00:00.000Z");
-    expect(budget.state("ask").spent).toBe(CAP);
-    // 20:00 at UTC-5 on the 4th is 01:00 UTC on the 5th: a new day.
-    clock.now = Date.parse("2026-11-04T20:00:00-05:00");
-    expect(budget.reserve("ask", 1)).toMatchObject({ ok: true });
+    const run = spawnSync(process.execPath, ["--input-type=module", "-e", IN_ZONE], {
+      cwd: fileURLToPath(new URL(".", import.meta.url)),
+      env: { ...process.env, TZ: zone },
+      encoding: "utf8",
+    });
+    expect(run.status, run.stderr).toBe(0);
+    const got: unknown = JSON.parse(run.stdout);
+    expect(got).toMatchObject({ local: zone === "Pacific/Kiritimati" ? [5, 4, -840] : [4, 4, 600] });
+    expect(got).toMatchObject({ spent: CAP, next: true });
   });
 
   it("settles a hold made before midnight into its own day", () => {

@@ -1,11 +1,11 @@
 # The gate on GitHub's machines. One job, `changes`, reads what
 # the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
-# at most but deploy/test.sh's; `gate-ok`, the one check main will require, reads every result with the base commit's
-# scripts/ci_gate_ok.py. It reads the repository, and after a failure gate-ok's last step reads the repository's Actions data
-# to write each failed job's end as an annotation with the base's scripts/ci_annotate.py (after the verdict, in a job
-# already failed, so it can never pass a run); it holds no secret, pins every action and download, and runs on a pull request
-# to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only token and no
-# secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
+# at most but deploy/test.sh's and risk's; `gate-ok`, the one check main will require, reads every result with the base commit's
+# scripts/ci_gate_ok.py. Each job's second step registers .github/failures.json, so the failure lines our tools print are that job's
+# annotations, read with no login (D13177); no job holds a token or a right of its own. It reads the repository, holds no secret, pins
+# every action and download, and runs on a pull request to main, a push to main or by hand, never on a fork's privileged events: a pull
+# request's run gets a read-only token and no secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section
+# ci, holds each promise.
 # A run judged against a base that has no ci_gate_ok.py fails gate-ok, by design; a run by
 # hand then judges against the base that has it.
 name: gate
@@ -50,6 +50,9 @@ jobs:
         with:
           fetch-depth: 0 # the base commit and its history are read
           persist-credentials: false
+      - &failures
+        name: Our tools' failure lines, as this job's annotations (read with no login, D13177)
+        run: echo "::add-matcher::.github/failures.json"
       - name: The base, then what the change calls for, by the base commit's own detector
         id: diff
         env:
@@ -87,6 +90,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - *failures
       - &node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -110,6 +114,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - *checkout-history
+      - *failures
       - *node
       - *pnpm
       - &gitleaks
@@ -155,6 +160,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - *checkout
+      - *failures
       - name: zizmor 1.32.0 (released 2026-11-02), installed by its wheel's hash alone
         run: |
           set -eu
@@ -190,6 +196,7 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - *checkout
+      - *failures
       - &go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -213,6 +220,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *node
       - *pnpm
       - &chromium
@@ -238,6 +246,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -265,6 +274,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -310,6 +320,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - &gno-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -342,6 +353,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -354,15 +366,18 @@ jobs:
           BASE: ${{ needs.changes.outputs.base }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/patch_coverage.py" "$BASE"
 
-  # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate); a cap
-  # reached fails the job. 120 minutes: a branch of many changed tier-1 lines runs past an hour on GitHub's four cores (D13206).
+  # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate), failing when
+  # more than the config's low share of mutants survive (F13184). Past stryker_lines.py's cap of lines, or with a config it cannot read,
+  # the job fails, saying why: split the pull request. Two workers in 30 minutes, each process with a 3 GB heap (F13243: four workers
+  # with 8 GB each lost the runner).
   risk:
     needs: [changes]
     if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -371,16 +386,17 @@ jobs:
       - name: The mutants of the changed lines
         env:
           BASE: ${{ needs.changes.outputs.base }}
+          NODE_OPTIONS: --max-old-space-size=3072 # the run and its two workers, on the runner's 16 GB
         run: |
           set -eu
           rc=0
-          python3 -I "$RUNNER_TEMP/base/scripts/stryker_lines.py" "$BASE" "$RUNNER_TEMP/stryker.json" || rc=$?
+          python3 -I "$RUNNER_TEMP/base/scripts/stryker_lines.py" "$BASE" "$RUNNER_TEMP/stryker.json" 2>"$RUNNER_TEMP/stryker_lines.err" || rc=$?
           case $rc in
-          0) config="$RUNNER_TEMP/stryker.json" ;;
+          0) ;;
           3) echo "no tier-1 line StrykerJS mutates changed since $BASE"; exit 0 ;;
-          *) echo "stryker_lines.py failed: StrykerJS mutates the whole of tier 1"; config=stryker.config.json ;;
+          *) echo "::error title=risk::stryker_lines.py ended with $rc, so no mutant is judged: $(tr '\r\n' '  ' <"$RUNNER_TEMP/stryker_lines.err" | sed 's/%/%25/g')"; exit 1 ;;
           esac
-          pnpm exec stryker run "$config" --concurrency "$(nproc)" --incrementalFile "$RUNNER_TEMP/stryker-incremental.json"
+          pnpm exec stryker run "$RUNNER_TEMP/stryker.json" --concurrency 2 --incrementalFile "$RUNNER_TEMP/stryker-incremental.json"
 
   # The net never shrinks: check_regressions.py and check_migrations.py taken from the base, with every script they import.
   regressions:
@@ -389,6 +405,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -406,8 +423,9 @@ jobs:
           BASE: ${{ needs.changes.outputs.base }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/check_migrations.py" "$BASE"
 
-  # deploy/test.sh, the demo's proofs, when deploy/ changes: its own budget (18 to 30 minutes on the Mac), never counted in the 15.
-  # Two of its checks fail on GitHub's Linux runner: a deploy/ change waits for their fix or an admin.
+  # deploy/test.sh, the demo's proofs, when deploy/ or what the services' images build from changes (ci_changes.sh's deploy flag:
+  # server/, jarvis/, link-reader/, packages/service|chain|schemas/, app/data/, the root's package files; D13180, D13203): its own
+  # budget (18 to 30 minutes on the Mac), never counted in the 15.
   deploy-stack:
     needs: [changes]
     if: needs.changes.outputs.deploy == 'true'
@@ -415,6 +433,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - *checkout
+      - *failures
       - *node
       - *pnpm
       - name: The stack's static proofs, read as text (Vitest's job runs on a change of code alone, and these tests read deploy/)
@@ -434,6 +453,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -443,13 +463,14 @@ jobs:
       - *chromium
       - name: probe.py (it plants faults in the tree, so alone)
         run: python3 -I scripts/probe.py
-      - name: test_hooks.sh, sixteen sections at once on the four cores
+      - name: test_hooks.sh, four sections at once, one a core
         env:
-          HOOKS_JOBS: "16"
+          HOOKS_JOBS: "4"
         run: sh scripts/test_hooks.sh
 
   # The one check main requires. It reads every result with the base's ci_gate_ok.py: a failed or cancelled job fails it, and so
-  # does a skipped one the change called for; deploy/ and gno/ are read again from git, apart from `changes`.
+  # does a skipped one the change called for; deploy/ and gno/ are read again from git, apart from `changes`. A failed job's cause is in
+  # its own annotations: gate-ok can read no log while its run lasts.
   gate-ok:
     needs:
       - changes
@@ -469,9 +490,6 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
     steps:
       - *checkout-history
       - *base
@@ -480,17 +498,3 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py" "$EVENT"
-      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -eu
-          out="$RUNNER_TEMP/failed"
-          mkdir -p "$out"
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" >"$out/jobs.json"
-          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids "$out" >"$out/ids"
-          while read -r id; do
-            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" >"$out/$id.log" || rm -f "$out/$id.log"
-          done <"$out/ids"
-          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" "$out"

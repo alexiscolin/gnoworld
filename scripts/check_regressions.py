@@ -58,7 +58,9 @@ def floors(vitest_config, stryker_config):
         for key, value in re.findall(number, block):
             found[f"coverage {scope} {key}"] = float(value) if "." in value else int(value)
     if stryker_config:
-        found["mutation break"] = json.loads(stryker_config).get("thresholds", {}).get("break") or 0
+        # GitHub's risk job breaks at the config's break, or else at its low share (stryker_lines.py, D13402).
+        shares = json.loads(stryker_config).get("thresholds", {})
+        found["mutation break"] = shares.get("break") or shares.get("low") or 0
     return found
 
 
@@ -102,6 +104,10 @@ def settings(read):
     # change outside the packages list counts, as a fingerprint of the rest.
     rest = re.sub(r"^packages:\n(?:[ \t]*(?:-.*|#.*)?\n)*", "", read("pnpm-workspace.yaml") or "", flags=re.M)
     out["pnpm-workspace.yaml outside packages"] = hashlib.sha256(rest.encode()).hexdigest()[:12]
+    # GitHub's risk job runs the base's stryker_lines.py on the change's StrykerJS config, every key of which it keeps (D13402):
+    # a key gained, lost or changed (dryRunOnly, a timeout of 0, a plugin appended, mutate narrowed) is read in review.
+    stryker = json.loads(read("stryker.config.json") or "{}")
+    out["stryker.config.json"] = hashlib.sha256(json.dumps(stryker, sort_keys=True).encode()).hexdigest()[:12]
     return out
 
 
@@ -321,6 +327,8 @@ def self_test():
     assert lowered_floors(before, after, set()) == ["coverage packages/core/** branches 95 -> 90", "mutation break 80 -> 0"]
     assert lowered_floors(before, after, declared(log[:1], "Lowered-floor")) == lowered_floors(before, after, set()), "a sentence excused a floor"
     assert lowered_floors(before, after, {"mutation break", "coverage packages/core/** branches"}) == []
+    assert floors("", '{"thresholds": {"high": 95, "low": 85}}') == {"mutation break": 85}, "the low share risk breaks at is no floor"
+    assert lowered_floors(floors("", '{"thresholds": {"low": 85}}'), floors("", '{"thresholds": {"low": 0}}'), set()) == ["mutation break 85 -> 0"]
     # A key whose braces start on the next line, and a decimal floor: read whole, each under its own glob.
     wrapped = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 99.9, branches: 92.3 },\n  "{a,b}/**":\n    { lines: 100,\n      branches: 97.2 },\n}'
     seen = floors(wrapped, "")
@@ -379,6 +387,15 @@ def self_test():
         assert changed_settings(workspace(before), workspace(after + "pnpmfile: x.cjs\n"), set()) != [], listed
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
+    stryker = '{"mutate": ["{a,jarvis/src}/**/*.ts"], "mutator": {"excludedMutations": ["StringLiteral"]}, "testRunner": "vitest"}'
+    sk = lambda text: {k: v for k, v in settings({"stryker.config.json": text}.get).items() if k == "stryker.config.json"}
+    assert changed_settings(sk(stryker), sk(stryker.replace(", ", ",\n  ")), set()) == [], "risk's config only reformatted read as changed"
+    for loose in (stryker.replace(",jarvis/src", ""), stryker.replace('["StringLiteral"]', '["StringLiteral", "ConditionalExpression"]'),
+                  stryker.replace('"vitest"', '"command", "commandRunner": {"command": "true"}'), stryker[:-1] + ', "dryRunOnly": true}',
+                  stryker[:-1] + ', "timeoutMS": 0}', stryker[:-1] + ', "appendPlugins": ["./x.js"]}'):
+        changed = changed_settings(sk(stryker), sk(loose), set())
+        assert len(changed) == 1 and changed[0].startswith("stryker.config.json "), f"risk's config loosened unread: {loose}"
+        assert changed_settings(sk(stryker), sk(loose), {"setting stryker.config.json"}) == []
     plan = {"a.bench.ts": 'bench("a line [0.2 ms]", () => {});\nbench(\n  "a room [100 ms]",\n  () => {},\n);\n'}
     held = benches(plan)
     assert held == {"a line": 0.2, "a room": 100.0} and benches({"x.bench.ts": 'bench("no budget", f)'}) == {}

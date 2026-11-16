@@ -132,9 +132,9 @@ keep it so.
 GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` or what the services' images build from:
 `server/`, `jarvis/`, `link-reader/`, `packages/service|chain|schemas/`, `app/data/` and the root manifests (`package.json`,
 `pnpm-lock.yaml`, `pnpm-workspace.yaml`), not `packages/core/`, `packages/ui/` nor `app/src/` (D13180, D13203; `scripts/ci_changes.sh`). Run it by
-hand to debug. While F13163 keeps deploy-stack red on GitHub's Linux (two checks), a pull request that changes `deploy/` also gets this
-hand run and its `--mutants`, from the reviewed commit, and deploy-stack is read check by check: any red but F13163's two is a finding
-(D13191). App code alone needs neither: GitHub's journeys test it.
+hand to debug, and for `--mutants`, from the reviewed commit. F13163's fix ended D13191's hand run of every `deploy/` change (D13400):
+deploy-stack's red is a finding, its failed checks named on its last line and in the job's annotations. App code alone needs no
+deploy-stack: GitHub's journeys test it.
 
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.

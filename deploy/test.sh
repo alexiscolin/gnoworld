@@ -16,6 +16,7 @@ GOLANG=golang:1.26.2-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d27
 project=${TEST_PROJECT:-gnoworld-demo-test}
 os=$(uname -s)
 failed=0
+failed_checks= # their names, for the run's last line, which GitHub shows with no login
 
 missing() {
 	echo "test.sh: $1" >&2
@@ -84,6 +85,7 @@ pass() { printf 'ok    %s\n' "$1"; }
 fail() {
 	printf 'FAIL  %s\n' "$1"
 	failed=$((failed + 1))
+	failed_checks="${failed_checks:+$failed_checks; }${1%%: wanted \[*}"
 	# A mutant's run is told the check that must catch it (STOP_AT, see mutant() below) and ends at that check's failure, the other checks'
 	# failures shown before it: what comes after it, hours of the full stack, cannot change the verdict. A plain run has none, and goes through every check.
 	[ -z "${STOP_AT:-}" ] || case $1 in *"$STOP_AT"*) exit 1 ;; esac
@@ -1665,7 +1667,7 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 fi
 
 if [ "$failed" -gt 0 ]; then
-	echo "test.sh: $failed check(s) failed" >&2
+	echo "test.sh: $failed check(s) failed: $failed_checks" >&2
 	exit 1
 fi
 echo "test.sh: every check passed"
