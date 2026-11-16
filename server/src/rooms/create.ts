@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import type { Command } from "../irc/lines.ts";
-import { mainRoom, worldOf } from "./rooms.ts";
+import { earthWindowStart, mainRoom, worldOf } from "./rooms.ts";
 
 export const ROOM_STATE = `
 ALTER TABLE rooms ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
@@ -29,17 +29,15 @@ CREATE TABLE earth_rooms (name TEXT PRIMARY KEY, maker TEXT NOT NULL, created_at
 CREATE INDEX earth_rooms_by_maker ON earth_rooms (maker, created_at);
 `;
 
-// The window's count (EARTH_WINDOW_DAYS) and the rooms past it read a range of dates, not every row.
+// The window's count (earthWindowStart) and the rooms past it read a range of dates, not every row.
 export const EARTH_WINDOW_INDEX = `
 CREATE INDEX earth_rooms_by_date ON earth_rooms (created_at);
 `;
 
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
-/** The public rooms made in the last EARTH_WINDOW_DAYS, archived ones too: archiving frees no place, only time does (C12, D13675). */
+/** The public rooms made in the window (earthWindowStart), archived ones too: archiving frees no place, only time does (C12, D13675). */
 export const EARTH_ROWS_MAX = 5_000;
-/** The window the rows cap counts over: a month, the longest an archived room is worth holding a place for; older rows stay, uncounted. */
-export const EARTH_WINDOW_DAYS = 30;
 /** The public rooms an account makes in a day, archived ones counted. */
 export const EARTH_PER_DAY = 3;
 
@@ -144,7 +142,7 @@ export function makeRooms({
     if (room.length > CHANNEL_MAX) return "too_long";
     if (stateOf(room) !== undefined) return "exists";
     if (Count.parse(sql.today.get(maker, now() - DAY_MS)).n >= EARTH_PER_DAY) return "day";
-    const rows = Count.parse(sql.rows.get(now() - EARTH_WINDOW_DAYS * DAY_MS)).n;
+    const rows = Count.parse(sql.rows.get(earthWindowStart(now()))).n;
     return Count.parse(sql.live.get()).n >= earthMax || rows >= earthRowsMax ? "full" : "ok";
   };
   const mayRealm: Rooms["mayRealm"] = (room, reserve = 0) => {

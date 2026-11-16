@@ -150,6 +150,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const reconciler = reconcilerFor(db, settings, {
     seen: present?.seen,
     keeper,
+    now,
     send,
     state: (room) => link?.state(room) ?? Promise.resolve(undefined),
     log,
@@ -159,18 +160,9 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const stopSweeping = sweeping(db, rooms, { now, ms: options.sweepMs ?? 60 * 60_000, roles: settings });
   const kept = pinsFor(db, settings, { link: () => link, now, log });
   const onMessage = hearing({ kept, cards, recent, activity, present, visible, progress, queue, now });
-  const linked = {
-    db,
-    ergo: settings.ergo,
-    redactRetryMs: options.redactRetryMs,
-    progress,
-    queue,
-    reconciler,
-    mutes,
-    log,
-    onMessage,
-  };
-  const link = linkFor({ ...linked, cards, translations, kept: index.kept(kept), recent: index.recent });
+  const linked = { db, ergo: settings.ergo, redactRetryMs: options.redactRetryMs, now, progress, queue };
+  const heard = { reconciler, mutes, log, onMessage };
+  const link = linkFor({ ...linked, ...heard, cards, translations, kept: index.kept(kept), recent: index.recent });
   return {
     ...guestFor(db, settings, {
       ...options,

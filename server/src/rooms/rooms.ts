@@ -39,6 +39,22 @@ export function listRooms(db: DatabaseSync): Room[] {
   return Rooms.parse(db.prepare("SELECT name, world FROM rooms ORDER BY name").all());
 }
 
+/** The window the Earth's rows cap counts over: a month, the longest an archived room is worth holding a place and a channel for. */
+const EARTH_WINDOW_MS = 30 * 24 * 60 * 60_000;
+
+/** Where the window starts at `now`: a public room made after it counts (create.ts), one made at or before it is past. */
+export const earthWindowStart = (now: number): number => now - EARTH_WINDOW_MS;
+
+// An archived Earth room made at or before ? is past the window: its row and its name stay (D13675), its channel and its place in the lists do not.
+const NOT_PAST = "NOT (archived = 1 AND name IN (SELECT name FROM earth_rooms WHERE created_at <= ?))";
+
+/** The rooms the bot is in: every room but an archived Earth room made before the window, so what the link joins stays bounded. */
+export function joinedRooms(db: DatabaseSync, now: number): Room[] {
+  const Rooms = z.array(z.object({ name: z.string(), world: z.string() }));
+  const sql = `SELECT name, world FROM rooms WHERE ${NOT_PAST} ORDER BY name`;
+  return Rooms.parse(db.prepare(sql).all(earthWindowStart(now)));
+}
+
 export function worldRooms(db: DatabaseSync, world: string): string[] {
   const Names = z.array(z.object({ name: z.string() }));
   return Names.parse(db.prepare("SELECT name FROM rooms WHERE world = ? ORDER BY name").all(world)).map(

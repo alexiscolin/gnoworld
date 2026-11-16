@@ -5,7 +5,7 @@ import type { Mutes } from "../moderation/mute.ts";
 import type { Rooms } from "./create.ts";
 import { reservedOnEarth, sweepIdle } from "./earth.ts";
 import { makeReconciler, type Reconciler } from "./reconcile.ts";
-import { listRooms, mainRoom, worldOf } from "./rooms.ts";
+import { joinedRooms, mainRoom, worldOf } from "./rooms.ts";
 import { desired, type Typed, type World } from "./types.ts";
 
 // The roles file's typed rooms, each with its world.
@@ -16,11 +16,14 @@ export const typedRooms = (worlds: ReadonlyMap<string, World>) =>
 export function reconcilerFor(
   db: DatabaseSync,
   roles: Typed,
-  parts: Pick<Parameters<typeof makeReconciler>[0], "send" | "state" | "log" | "seen"> & { keeper: Rooms },
+  parts: Pick<Parameters<typeof makeReconciler>[0], "send" | "state" | "log" | "seen"> & {
+    keeper: Rooms;
+    now: () => number;
+  },
 ) {
-  const { keeper, send, state, log, seen } = parts;
+  const { keeper, send, state, log, seen, now } = parts;
   return makeReconciler({
-    rooms: () => listRooms(db).map(({ name }) => name),
+    rooms: () => joinedRooms(db, now()).map(({ name }) => name),
     desired: (room) => desired(roles, room, { archived: keeper.archived(room) }),
     state,
     send,

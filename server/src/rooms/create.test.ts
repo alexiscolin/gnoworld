@@ -16,7 +16,7 @@ import {
   REALM_TABLES,
   ROOM_STATE,
 } from "./create.ts";
-import { ensureRooms, listRooms, realmPaths, ROOM_TABLES } from "./rooms.ts";
+import { ensureRooms, joinedRooms, listRooms, realmPaths, ROOM_TABLES } from "./rooms.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const opened: DatabaseSync[] = [];
@@ -389,6 +389,37 @@ describe("a room anyone makes on the Earth", () => {
     const { db } = setup();
     const plan = db.prepare("EXPLAIN QUERY PLAN SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?").all(0);
     expect(JSON.stringify(plan)).toContain("earth_rooms_by_date");
+  });
+
+  // F13676 (Alexis: "Garde son nom, quitte canal et liste"): the rows past the window stay, the bot's channels and walks do not.
+  it("joins the live rooms and the window's archived ones, and leaves an archived room made before the window", () => {
+    const { rooms, clock, db } = setup();
+    for (const [maker, name] of [
+      [A, "old"],
+      [A, "kept"],
+      [B, "live"],
+    ] as const)
+      rooms.earth(maker, name);
+    rooms.archive("earth", "old");
+    clock.now += 31 * 24 * 60 * 60_000;
+    rooms.earth(B, "new");
+    rooms.archive("earth", "kept");
+    db.prepare("UPDATE earth_rooms SET created_at = ? WHERE name = '#earth/kept'").run(clock.now - 1000);
+    const joined = joinedRooms(db, clock.now).map(({ name }) => name);
+    expect(joined).toEqual(["#bubble", "#earth", "#earth/kept", "#earth/live", "#earth/new"]);
+    expect(listRooms(db).map(({ name }) => name)).toContain("#earth/old");
+    expect(rooms.earth(B, "old")).toBe("exists");
+    expect(rooms.maker("#earth/old")).toBe(A);
+  });
+
+  it("leaves an archived room at exactly the window's end (the count's `>`) and joins it one millisecond before", () => {
+    const { rooms, clock, db } = setup();
+    rooms.earth(A, "edge");
+    rooms.archive("earth", "edge");
+    const month = 30 * 24 * 60 * 60_000;
+    expect(joinedRooms(db, T0 + month - 1).map(({ name }) => name)).toContain("#earth/edge");
+    expect(joinedRooms(db, T0 + month).map(({ name }) => name)).not.toContain("#earth/edge");
+    expect(clock.now).toBe(T0);
   });
 
   it("keeps a room past the window as it was: its row, its name, its maker, archived, never destroyed", () => {

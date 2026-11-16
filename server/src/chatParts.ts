@@ -5,7 +5,7 @@ import type { Log } from "@gnoworld/service/log";
 import type { Rooms } from "./rooms/create.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Mutes } from "./moderation/mute.ts";
-import { ensureNamed, ensureRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, joinedRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
 import { listed, mayRead, staffOf } from "./rooms/types.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitorOf } from "./visitor.ts";
@@ -60,6 +60,7 @@ interface LinkParts {
   db: DatabaseSync;
   ergo: Config["ergo"];
   redactRetryMs: number | undefined;
+  now: () => number;
   progress: ReturnType<typeof makeProgress>;
   queue: { idle: () => Promise<void> };
   reconciler: ReturnType<typeof reconcilerFor>;
@@ -77,6 +78,7 @@ export function linkFor({
   db,
   ergo,
   redactRetryMs,
+  now,
   progress,
   queue,
   reconciler,
@@ -91,7 +93,7 @@ export function linkFor({
   if (ergo === undefined) return undefined;
   return ircLink({
     ...ergo,
-    rooms: () => listRooms(db).map(({ name }) => name),
+    rooms: () => joinedRooms(db, now()).map(({ name }) => name),
     lastChecked: progress.last,
     hold: progress.hold,
     drained: () => queue.idle(),
