@@ -110,7 +110,8 @@ export function matchLower(
 export const wordsOf = (t: string): string[] => t.split(WORD_START);
 
 /** How well `text` answers `query`, or none: its whole, its start, a word's start, a part, the letters in order, then a few letters off
- * (a missed, added, wrong or swapped one). The letters it matched are the hits. */
+ * (a missed, added, wrong or swapped one). The letters it matched are the hits.
+ * @internal */
 export function matchOf(text: string, query: string): { score: number; hits: number[] } | undefined {
   const t = text.toLowerCase();
   const q = query.toLowerCase();

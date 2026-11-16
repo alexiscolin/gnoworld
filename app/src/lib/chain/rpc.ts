@@ -84,12 +84,18 @@ export const toCallable = (read: ChainRead<Listing[]>): ChainRead<Callables> =>
       }
     : read;
 
-/** The exported functions of a realm, in the chain's order: readable when it takes nothing (a `cur` is a parameter) and gives something. */
+/**
+ * The exported functions of a realm, in the chain's order: readable when it takes nothing (a `cur` is a parameter) and gives something.
+ * @internal
+ */
 export async function readFunctions(rpc: string, realm: string, options?: ReadOptions): Promise<ChainRead<Readable>> {
   return toFunctions(await listExported(rpc, realm, options ?? {}));
 }
 
-/** The exported functions of a realm with their parameters, in the chain's order: what a call card is made from. */
+/**
+ * The exported functions of a realm with their parameters, in the chain's order: what a call card is made from.
+ * @internal
+ */
 export async function readCallable(rpc: string, realm: string, options?: ReadOptions): Promise<ChainRead<Callables>> {
   return toCallable(await listExported(rpc, realm, options ?? {}));
 }

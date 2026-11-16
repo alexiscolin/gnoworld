@@ -73,7 +73,10 @@ function bytesShape(type: string): Shape | undefined {
   return Number.isSafeInteger(length) ? { kind: "bytes", length } : undefined;
 }
 
-/** Whether a call carries a parameter of this `vm/qfuncs` type as text. */
+/**
+ * Whether a call carries a parameter of this `vm/qfuncs` type as text.
+ * @internal
+ */
 export function isCarried(type: string): boolean {
   return shapeOf(type) !== undefined;
 }
@@ -195,7 +198,10 @@ function resolveRead(params: Params): ReadResolved {
   return fields === undefined ? { ok: false, why: "gnoweb" } : { ok: true, fields };
 }
 
-/** The fields a read draws, every parameter a string, a bool or an integer; none for a write or another type. */
+/**
+ * The fields a read draws, every parameter a string, a bool or an integer; none for a write or another type.
+ * @internal
+ */
 export function readFields(params: Params): ReadFields {
   const done = resolveRead(params);
   return done.ok ? { ok: true, fields: done.fields.map(({ field }) => field) } : done;
