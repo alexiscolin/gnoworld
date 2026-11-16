@@ -1,4 +1,4 @@
-import { createContext, use, useId, type CSSProperties, type ReactNode } from "react";
+import { createContext, isValidElement, use, useId, type CSSProperties, type ReactNode } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Chip } from "../Chip/Chip.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
@@ -43,15 +43,17 @@ function looks({ tone = "neutral", dashed, compact, look, flush, fixed, open, ri
   };
 }
 
-/** A card: an article named by its header's title, with its body and actions. Layout only: what it
+/** A card: an article named by its header's title when it has one, with its body and actions. Layout only: what it
  * holds (a poll, a call, a seal) is an assembly in its feature. */
 export function Card({ children, ...own }: CardProps) {
   const titleId = useId();
   const { ref, state } = useRise(own.rises === true);
+  // Named by its header's title, when it has a header: one that keeps its own heading (CallRow's) points at no missing id.
+  const headed = [children].flat(2).some((child) => isValidElement(child) && child.type === Header);
   return (
     <article
       className={styles["card"]}
-      aria-labelledby={titleId}
+      aria-labelledby={headed ? titleId : undefined}
       {...looks(own)}
       data-state={state === undefined ? undefined : "in"}
       ref={ref}
