@@ -9,7 +9,7 @@ import { guard, refuserOf, type Refusals, type Guarded, sessionOf } from "../gua
 import { limiter } from "../limit.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { hiddenRoom, mayRead, searchable, type Typed } from "../rooms/types.ts";
-import { visitorOf } from "../visitor.ts";
+import { visitor48Of, visitorOf } from "../visitor.ts";
 import type { Search } from "./index.ts";
 import type { Found, Query } from "./query.ts";
 import { snippetOf } from "./snippet.ts";
@@ -17,6 +17,8 @@ import { snippetOf } from "./snippet.ts";
 /** Requests a minute: a visitor, and an account (its address is the key when the session is valid). */
 const SEARCH_PER_MINUTE = 20;
 const SEARCH_ACCOUNT_PER_MINUTE = 60;
+/** Requests a minute from one address block (a /48, one customer at most providers): four visitors', so a few accounts of one block cannot keep the whole's second full (C12). */
+const SEARCH_BLOCK_PER_MINUTE = 4 * SEARCH_PER_MINUTE;
 /** Searches a second across every visitor: the index is one synchronous connection, so per-visitor limits do not bound its load. */
 const SEARCH_PER_SECOND = 10;
 
@@ -94,6 +96,7 @@ export function searchRoutes({
 }: Options): Hono<Guarded> {
   const byVisitor = limiter({ max: SEARCH_PER_MINUTE, windowMs: 60_000, keys });
   const byAccount = limiter({ max: SEARCH_ACCOUNT_PER_MINUTE, windowMs: 60_000, keys });
+  const byBlock = limiter({ max: SEARCH_BLOCK_PER_MINUTE, windowMs: 60_000, keys });
   const together = limiter({ max: perSecond, windowMs: 1000, keys: 1 });
   const refuse = refuserOf(log, "search_refused", refusals);
   // The rooms the reader's search covers: the asked room alone, or the world's. `undefined`: the reader may not read the room.
@@ -136,7 +139,8 @@ export function searchRoutes({
     // Counted before anything is read: a refused request is load too.
     if (!(who === undefined ? byVisitor.take(visitorOf(c, proxy), now()) : byAccount.take(who, now())))
       return refuse(c, "limit");
-    // After the visitor's own: a request refused there spends nothing of the whole's.
+    // After the visitor's own and its block's: a request refused there spends nothing of the whole's.
+    if (!byBlock.take(visitor48Of(c, proxy), now())) return refuse(c, "limit");
     if (!together.take("all", now())) return refuse(c, "limit");
     const query = asked(c, who);
     if (typeof query === "string") return refuse(c, query);
