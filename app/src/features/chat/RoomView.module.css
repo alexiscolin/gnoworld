@@ -370,10 +370,9 @@
   }
 }
 
-/* A phone's finger: the author's name gains an invisible 44 px box growing upward only, since the line's first row under it holds links.
-   The box stays inside its own line: the head of a line that opens a group takes the room above it, which the step between lines gave
-   (the step moves into the head's padding), so the box never covers the line before it.
-   In the utilities layer, a selector above the generic bare-button box's, which is symmetric and would win from the components layer. */
+/* A phone's finger: the author's name gains an invisible 44 px box growing upward only (the line's first row holds links), into the
+   head's own padding, where the step between lines moved, so it covers no line before it. In the utilities layer, above the generic
+   bare-button box, which is symmetric and would win from the components layer. */
 @layer components {
   @media (width < 900px) {
     .lines > li:not([data-grouped], :first-child) {
