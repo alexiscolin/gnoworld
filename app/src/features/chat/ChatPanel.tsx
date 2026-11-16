@@ -82,10 +82,11 @@ function useLinkAt(
   useEffect(() => {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
   }, [linkRef, sections]);
-  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's.
+  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's. Said again as the rooms come:
+  // a session change makes the link forget the room in view, which the new list gives back (its history is asked on the new connection).
   useLayoutEffect(() => {
     linkRef.current?.show(current);
-  }, [linkRef, current]);
+  }, [linkRef, current, sections]);
 }
 
 export function ChatPanel({ world, place, room }: { world: string; place: ChatPlace; room?: string | undefined }) {
@@ -113,12 +114,14 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   const chat = useApp((app) => app.login.chat);
   const failed =
     loaded && sections === undefined ? (
-      <RoomsFailed
-        error={asked.error}
-        onRetry={() => {
-          setAttempt((n) => n + 1);
-        }}
-      />
+      <div data-chat-failed="">
+        <RoomsFailed
+          error={asked.error}
+          onRetry={() => {
+            setAttempt((n) => n + 1);
+          }}
+        />
+      </div>
     ) : undefined;
   const dismissed = (room: string) => {
     store.getState().chatActions.dismissed(room);
@@ -151,8 +154,6 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
     );
   }
   if (!loaded) return LOADING;
-  // A visitor has no direct message: the rooms that could not load are all the page says.
-  if (failed !== undefined) return <div data-chat-failed="">{failed}</div>;
   return (
     <GuestLoaded
       sections={sections ?? []}
@@ -164,6 +165,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
       link={linkRef}
       dismissed={dismissed}
       asksDm={params.get("dm") !== null}
+      failed={failed}
       place={shown.place}
     />
   );

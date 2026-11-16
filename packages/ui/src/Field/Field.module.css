@@ -56,8 +56,9 @@
     max-block-size: calc(10lh + var(--_frame));
   }
 
-  /* A box that grows on its own has no handle to drag. */
+  /* A fixed box has no handle to drag and keeps the height of its two rows: one plain line, as a guest's. */
   textarea.box[data-fixed] {
+    field-sizing: fixed;
     resize: none;
   }
 

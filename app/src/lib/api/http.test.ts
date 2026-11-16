@@ -98,3 +98,11 @@ describe("a call's time", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+// The server answers a made thing with 201 and its body (server/src/rooms/routes.ts): a success the client reads, never a refusal.
+describe("a call's success statuses", () => {
+  it("reads a 201 with its body as the answer", async () => {
+    const created: Fetcher = () => Promise.resolve(new Response(JSON.stringify({ n: 1 }), { status: 201 }));
+    expect(await jsonCall(created)({ path: "/api/x", body: {}, schema })).toEqual({ ok: true, value: { n: 1 } });
+  });
+});
