@@ -61,6 +61,11 @@
     inset-inline: var(--banner-start) var(--banner-end);
   }
 
+  /* The room a banner takes over a page's first lines, held while it shows, for a page that keeps none free otherwise (a phone's full chat). */
+  :root:has(.flash[data-banner]) {
+    --banner-held: var(--banner-room);
+  }
+
   /* While a flash shows, what the keyboard reaches scrolls clear of it (WCAG 2.4.11). */
   /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller. */
   :root:has(.flash:popover-open, .flash[data-banner]) {

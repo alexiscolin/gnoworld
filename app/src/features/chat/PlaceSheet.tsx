@@ -3,7 +3,7 @@
 // shows it in its own sheet in place of the info: the button here opens it, the page here is what it shows. The element is lazy: its chunk
 // is asked when the page is drawn, on the press.
 import { Button } from "@gnoworld/ui";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { ErrorView, errorKind } from "../errors/index.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { Failing } from "./Failing.tsx";
@@ -21,6 +21,17 @@ export function PageButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+// The section the address names (#page: the realm's page, where its proposals are), scrolled to once the plate is drawn: a sibling of the
+// plate in its Suspense mounts as the plate does. Only a section of the plate's own panel, never one of the chat behind the sheet.
+function ScrollToSection() {
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    const target = id === "" ? null : document.getElementById(id);
+    if (target?.closest("[data-look='plate']")) target.scrollIntoView({ block: "start" });
+  }, []);
+  return null;
+}
+
 /** The place's page, in the frame the page gives its plate. A plate that fails to load or to draw is said, never a blank; the route
  * makes its plate with `chunked` (Failing.tsx), which asks its chunk again, so this boundary holds a failure of the drawing alone. */
 export function PlacePage({ place }: { place: ChatPlace }) {
@@ -30,6 +41,7 @@ export function PlacePage({ place }: { place: ChatPlace }) {
       <Failing fallback={(error) => <ErrorView kind={errorKind(error)} size="inline" urgent />} renew={() => undefined}>
         <Suspense fallback={<p role="status">Loading the page…</p>}>
           <InPageSheet value>{plate}</InPageSheet>
+          <ScrollToSection />
         </Suspense>
       </Failing>
     </PlateFrame>

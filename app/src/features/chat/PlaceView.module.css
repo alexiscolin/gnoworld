@@ -49,6 +49,13 @@
     inset: 0;
   }
 
+  /* A phone: the fold's control is a finger's height, not its invisible box alone (over the Button's size rule: one more class). */
+  @media (width < 900px) {
+    .view .handle button {
+      --_h: var(--control-m);
+    }
+  }
+
   /* A phone on its side (the window's width and height, as PhoneHeader.module.css reads them): the planet is a band, so the info sheet's
      name and "Its page" stay in view; the planet is still drawn, the canvas filling the band. */
   @media (width < 900px) and (height < 500px) {

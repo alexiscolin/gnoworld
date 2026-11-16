@@ -171,11 +171,13 @@
     }
 
     /* The whole composer is budgeted inside the visual viewport (--chat-vh), so Send never leaves the screen: what is left of it after the
-       header, the dock's padding, the foot, the open format bar (two rows, worst case), the words' row when there are some and a few
+       header, the dock's padding and rule, the foot, the open format bar (two rows, worst case), the words' row when there are some and a few
        lines of the conversation is the field's cap. Where that is under the field's own minimum, the minimum wins. */
     .box {
       --_foot: calc(var(--control-m) + var(--space-3xs) + var(--space-2xs));
-      --_dock: calc(var(--space-s) + max(var(--space-s) + var(--space-3xs), env(safe-area-inset-bottom)));
+      --_dock: calc(
+        var(--space-s) + var(--line-width) + max(var(--space-s) + var(--space-3xs), env(safe-area-inset-bottom))
+      );
       /* raw: no format bar, no words */
       --_bar: 0px;
       /* raw: no words */
@@ -224,6 +226,13 @@
 
   /* A phone on its side: height is what is scarce, so the field starts at one line and the conversation gives way to the rest. */
   @media (width < 900px) and (height < 500px) {
+    /* The dock's top padding a step smaller (QuickActions.module.css does the same), which the budget above counts. */
+    .box {
+      --_dock: calc(
+        var(--space-2xs) + var(--line-width) + max(var(--space-s) + var(--space-3xs), env(safe-area-inset-bottom))
+      );
+    }
+
     .box [role="textbox"],
     .box [role="textbox"] + [aria-hidden="true"],
     .box .field textarea {

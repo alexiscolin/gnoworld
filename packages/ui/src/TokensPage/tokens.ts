@@ -34,6 +34,8 @@ export function groups() {
         "--chat-",
         "--flash-",
         "--banner-",
+        "--shell-",
+        "--hit-",
         "--dock-",
         "--page-",
         "--globe-",

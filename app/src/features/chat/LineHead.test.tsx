@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import type { ShownLine } from "@gnoworld/core";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,5 +72,20 @@ describe("a line's author name", () => {
     expect(document.activeElement).toBe(outside);
     outside.remove();
     expect(all(box, "[data-author] > button")).toHaveLength(1);
+  });
+});
+
+// A phone's name box grows upward only (under the name stands the line's first row). utilities.css gives every bare button a symmetric
+// 44 px box, and the layer order (components, then utilities) lets it beat any rule of the components layer whatever its specificity:
+// the author's box must sit in the utilities layer, on a selector one class and one attribute above the generic rule's (specificity 0,3,2 against 0,2,2).
+describe("the author's tap box on a phone", () => {
+  const sheet = readFileSync(`.${new URL("./RoomView.module.css", import.meta.url).pathname}`, "utf8");
+  const generic = ':is(.hit, button.bare):not([data-stretch], [data-emphasis="link"])::after';
+
+  it("outranks the generic bare-button box and grows upward only", () => {
+    const own =
+      /@layer utilities \{\s*@media \(width < 900px\) \{\s*\.author button\[type\]\[aria-haspopup\]::after \{([^}]*)\}/;
+    expect(own.exec(sheet)?.[1]).toMatch(/inset-block: calc\(1lh - var\(--control-m\)\) 0;/);
+    expect(readFileSync("packages/ui/src/utilities.css", "utf8")).toContain(generic);
   });
 });

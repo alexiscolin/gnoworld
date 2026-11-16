@@ -72,4 +72,11 @@
       padding-block-end: max(calc(var(--space-s) + var(--space-3xs)), env(safe-area-inset-bottom));
     }
   }
+
+  /* A phone on its side: height is what is scarce, so the dock's top padding is a step smaller (MessageBox.module.css budgets it). */
+  @media (width < 900px) and (height < 500px) {
+    .dock {
+      padding-block-start: var(--space-2xs);
+    }
+  }
 }

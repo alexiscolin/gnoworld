@@ -104,8 +104,7 @@
 
   /* A phone's full chat (under 900 px): from under the shell header to the visual viewport's foot, which viewport.ts keeps in --chat-vh (the dynamic viewport's where
      unset), so the on-screen keyboard never covers the composer; a header of 44 px rows (PhoneHeader.module.css, which also says where the
-     arrival's pill stands under it); and no room kept free over the lines for that pill, which floats over them instead of leaving an
-     empty band. */
+     arrival's pill stands under it); and the room for that pill kept free over the lines only while it shows, never an empty band. */
   @media (width < 900px) {
     .screen[data-full] {
       /* the layer starts under the shell header's row, which stays visible and pressable (shellHeader.module.css); past it, where the
@@ -126,7 +125,8 @@
     }
 
     .screen[data-full][data-compact] [data-region="conversation"] {
-      padding-block-start: 0;
+      /* the arrival's pill's room, only while it shows (ui's Flash sets --banner-held) */
+      padding-block-start: var(--banner-held);
     }
   }
 

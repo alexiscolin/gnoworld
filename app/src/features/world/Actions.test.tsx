@@ -99,9 +99,11 @@ describe("a world's actions, with proposals", () => {
     expect(first?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
-  // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts).
+  // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts), at its page section (#page), where the proposals are.
   it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", () => {
-    expect(draw(PROPOSALS, true).querySelector("a")?.getAttribute("href")).toBe(`${PROPOSALS}?sheet=page&chat=full`);
+    expect(draw(PROPOSALS, true).querySelector("a")?.getAttribute("href")).toBe(
+      `${PROPOSALS}?sheet=page&chat=full#page`,
+    );
     expect(draw(PROPOSALS).querySelector("a")?.getAttribute("href")).toBe(PROPOSALS);
   });
 

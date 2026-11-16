@@ -24,8 +24,10 @@ const toComposer = (event: MouseEvent) => {
 // `/<tab>/host` as another host).
 const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+$/.test(path);
 
-// In a phone's page sheet the proposals are the realm's page, which opens in its own sheet; elsewhere the realm's view.
-const proposalsHref = (path: string, sheet: boolean): string => (sheet ? fullChatHref(sheetHref(path, "page")) : path);
+// In a phone's page sheet the proposals are the realm's page, which opens in its own sheet at the plate's page section (#page, where the
+// realm's Render lists them); elsewhere the realm's view.
+const proposalsHref = (path: string, sheet: boolean): string =>
+  sheet ? `${fullChatHref(sheetHref(path, "page"))}#page` : path;
 
 export interface ActionsProps {
   /** The place, as a share names and links it. */

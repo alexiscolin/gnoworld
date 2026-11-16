@@ -224,6 +224,8 @@
     /* Whether the plate's own fill shows: a page that draws a globe beside it sets `hidden`, its canvas painting the fill. */
     --plate-fill: visible;
     --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
+    /* The banner's room, held only while a banner shows (Flash.module.css): for a page that keeps none free otherwise. */
+    --banner-held: 0px;
 
     --radius-s: 8px;
     --radius-item: 10px;

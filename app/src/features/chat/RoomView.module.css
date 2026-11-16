@@ -359,20 +359,14 @@
 }
 
 /* A phone's finger: an author's name, one line high, gains an invisible box to 44 px (WCAG 2.5.5 target size), its look unchanged. The box
-   grows upward only: under the name stands the message's first line, whose links a box over it would take. */
-@layer components {
+   grows upward only: under the name stands the message's first line, whose links a box over it would take. It sits in the utilities
+   layer, with a selector one class and one attribute above the generic bare-button box's (the name button has both attributes): that rule
+   (utilities.css) is symmetric and would win from the components layer whatever this one's specificity. */
+@layer utilities {
   @media (width < 900px) {
-    .author button {
-      position: relative;
-    }
-
-    .author button::after {
-      content: "";
-      position: absolute;
+    .author button[type][aria-haspopup]::after {
       /* the name's top edge up by what the line lacks of 44 px; none below */
       inset-block: calc(1lh - var(--control-m)) 0;
-      inset-inline-start: 0;
-      inline-size: 100%;
     }
   }
 }

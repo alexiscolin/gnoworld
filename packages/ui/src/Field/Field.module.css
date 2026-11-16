@@ -57,6 +57,11 @@
       /* raw: the same, for the list's filter */
       font-size: 1rem;
     }
+
+    /* The input in a frame is a finger's height itself, the frame's edges outside it (a bare box's are inside its 44 px). */
+    .frame .box {
+      min-block-size: var(--control-m);
+    }
   }
 
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls; a
