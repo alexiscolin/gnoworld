@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 // The page that showed space goes, and the moons' asking and looking go with it.
 const stopped = vi.hoisted(() => vi.fn());
 const flies = vi.hoisted(() => ({ on: false }));
-vi.mock("./moonRooms.ts", () => ({ feedMoons: () => undefined, stopMoons: stopped }));
+const fed = vi.hoisted(() => vi.fn());
+vi.mock("./moonRooms.ts", () => ({ feedMoons: fed, stopMoons: stopped }));
 vi.mock("../../space/scene.ts", () => ({
   Space: class {
     covered = false;
@@ -43,6 +44,38 @@ describe("release", () => {
     expect(stopped).not.toHaveBeenCalled();
     await Promise.resolve();
     expect(stopped).toHaveBeenCalledTimes(1);
+  });
+
+  // A page that asks for no space (an error, the full chat) covers it: nothing looks at the moons then, so their asking stops too.
+  it("stops the moons' feed when a page asks for no place, space being covered", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    const { offer, show } = await import("./space.ts");
+    offer.state = "taken";
+    show({ kind: "universe" }, () => undefined);
+    await new Promise((done) => setTimeout(done, 50));
+    stopped.mockClear();
+    show(undefined, () => undefined);
+    expect(stopped).toHaveBeenCalledTimes(1);
+  });
+
+  it("feeds the moons again when a page asks for a place after one that asked for none", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    const { offer, show } = await import("./space.ts");
+    offer.state = "taken";
+    show({ kind: "universe" }, () => undefined);
+    await new Promise((done) => setTimeout(done, 50));
+    show(undefined, () => undefined);
+    fed.mockClear();
+    show({ kind: "universe" }, () => undefined);
+    expect(fed).toHaveBeenCalledTimes(1);
   });
 
   // A page's planet box that mounts after the flight began (its route's chunk comes late) takes the flight's state: the page's parts wait out of
