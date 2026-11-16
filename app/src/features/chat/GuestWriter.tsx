@@ -1,6 +1,7 @@
 // A guest's composer: one plain line in the composer's box, Enter sending it as the account's does, said through the server, which judges it before the bot says it
 // as anon/<name>. The name is the visit's, asked as the reader first comes to the box; a refusal says why, in the field's own words.
 // Connect Adena stays beside it: an account keeps its name and does what a guest cannot.
+import { PHONE_QUERY } from "@gnoworld/core";
 import type { GuestCause } from "@gnoworld/schemas";
 import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useId, useRef, useState, type SubmitEvent } from "react";
@@ -9,6 +10,7 @@ import { askFor } from "../../pageAsks.ts";
 import { useComputerNeeded } from "./LogInToWrite.tsx";
 import { USE_A_COMPUTER } from "../login/index.ts";
 import { MessageBox } from "./MessageBox.tsx";
+import { useMedia } from "./useMedia.ts";
 import { roomLabel } from "./names.ts";
 import styles from "./LogInToWrite.module.css";
 
@@ -87,13 +89,15 @@ function GuestField(props: {
   onDraft: (draft: string) => void;
 }) {
   const { label, draft, problem, onDraft } = props;
+  // A phone's box has no line saying who speaks: its placeholder does.
+  const asGuest = useMedia(PHONE_QUERY);
   return (
     <Field
       kind="lines"
       resizable={false}
       hideLabel
       label={`Message ${label}`}
-      placeholder={`Message ${label}`}
+      placeholder={`Message ${label}${asGuest ? " as a guest" : ""}`}
       value={draft}
       invalid={problem !== undefined}
       describedBy={problem}

@@ -236,6 +236,40 @@
       max-block-size: min(calc(10lh + var(--space-s)), var(--_free));
       overflow: auto;
     }
+
+    /* A line to start: the field is a finger's height (the placeholder centred in it), and the box has its resting edge, one more line wide on each side. */
+    .box {
+      border: var(--line-width) solid var(--color-line-strong);
+    }
+
+    .box [role="textbox"],
+    .box [role="textbox"] + [aria-hidden="true"],
+    .box .field textarea {
+      min-block-size: var(--control-m);
+      padding-block: calc((var(--control-m) - 1lh) / 2);
+    }
+
+    /* At rest the box is one line: the field and Send side by side, the foot (the format control and the quick actions' /) shown once the
+       box has the focus, inside it, so the keyboard comes with the box whole above it. */
+    .box:not(:focus-within) [role="textbox"],
+    .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
+    .box:not(:focus-within) .field textarea {
+      /* layout: beside Send, not over its row */
+      grid-area: 2 / 1;
+    }
+
+    .box:not(:focus-within) .send {
+      /* layout: Send beside the field, level with it, its edge a step in */
+      grid-area: 2 / 2;
+      /* layout: level with the field's line */
+      align-self: center;
+      /* layout: a step in from the box's edge, none above or below */
+      margin: 0 var(--space-3xs) 0 0;
+    }
+
+    .box:not(:focus-within) .acts {
+      display: none;
+    }
   }
 
   /* A phone on its side: height is what is scarce, so the field starts at one line and the conversation gives way to the rest. */

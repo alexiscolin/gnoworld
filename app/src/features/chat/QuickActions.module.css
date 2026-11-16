@@ -83,6 +83,13 @@
     .dock {
       padding-block-end: max(calc(var(--space-s) + var(--space-3xs)), env(safe-area-inset-bottom));
     }
+
+    /* The composer's edge on the lines' own (the chat's inset), its words a step in. */
+    .dock {
+      /* raw: no bleed past the dock's inset */
+      --box-bleed: 0px;
+      --box-in: var(--space-s);
+    }
   }
 
   /* A phone on its side: height is what is scarce, so the dock's top padding is a step smaller (MessageBox.module.css budgets it). */

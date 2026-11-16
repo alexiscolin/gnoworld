@@ -79,4 +79,11 @@
   .title {
     font: var(--font-ui);
   }
+
+  /* A phone's flash is a box, not a pill: a title over a line wraps in two rows, which a pill's radius clips. */
+  @media (width < 900px) {
+    .flash {
+      border-radius: var(--radius-box);
+    }
+  }
 }

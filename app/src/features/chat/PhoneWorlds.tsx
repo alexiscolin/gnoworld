@@ -1,17 +1,18 @@
 // A phone's main navigation, at the bottom of its chat: the worlds in one row that scrolls sideways inside itself, each its planet with its
-// name under it; the world in view ringed and brought into view when the row is drawn. The row first holds the chat's own worlds (the hubs),
-// then, read after the first paint, the desktop rail's worlds in the rail's order (railFeed, RailOrder), the Earth and the world in view first,
-// and ends with "See all", which asks the search palette open on every place, as the rail's does.
+// name under it and its unseen lines at its corner; the world in view ringed and brought into view when the row is drawn. The row is the
+// desktop column's (the Earth, the worlds followed, then the chat's own, Worlds.tsx), then, read after the first paint, the desktop rail's
+// worlds the column lacks (railFeed, RailOrder), and ends with "All", which asks the search palette open on every place, as the rail's does.
 import { EARTH, hubWorldOf } from "@gnoworld/core";
-import { Button, Cluster } from "@gnoworld/ui";
+import { Icon } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import type { RailEntry } from "../../railWorlds.ts";
 import { RouterLink } from "../../routerLink.tsx";
 import { SEARCH } from "../../space/openEvent.ts";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
-import type { ChatWorld } from "./place.ts";
+import { UnreadPill } from "./UnreadPill.tsx";
 import styles from "./PhoneWorlds.module.css";
 import column from "./Worlds.module.css";
+import { inRailOrder, NONE, type WorldsProps } from "./Worlds.tsx";
 
 // The rail's feed and order, in chunks of their own: out of the component, where the React Compiler takes no import().
 const railModules = () => Promise.all([import("../../railFeed.ts"), import("../../railWorlds.ts")]);
@@ -20,39 +21,39 @@ interface Item {
   readonly id: string;
   readonly name: string;
   readonly href: string;
+  /** Its unseen lines: none for the world in view, whose own rooms carry theirs. */
+  readonly unseen: number;
   /** A seed is uncharted: its disc, no planet. */
   readonly seed?: true;
 }
 
-const hubItem = (world: ChatWorld): Item => ({ id: hubWorldOf(world), name: world.name, href: world.href });
-
 /** The id of the world in view: its hub's world, else the slug itself (a realm's world the chat lists not). */
-const hereOf = (worlds: readonly ChatWorld[], current: string): string => {
+const hereOf = (worlds: WorldsProps["worlds"], current: string): string => {
   const hub = worlds.find(({ slug }) => slug === current);
   return hub === undefined ? current : hubWorldOf(hub);
 };
 
-/** The row's worlds: the Earth, the world in view, then the rest in the order given, each once. `rail`, the desktop rail's worlds once
- * read, replaces the hubs but for the two firsts, whose names and links the chat knows. */
-export function rowOf(worlds: readonly ChatWorld[], current: string, rail: readonly RailEntry[] | undefined): Item[] {
-  const hubs = worlds.map(hubItem);
-  const rest: Item[] =
-    rail?.map(({ id, title, href, section }) => ({
-      id,
-      name: title,
-      href,
-      ...(section === "seed" ? { seed: true as const } : {}),
-    })) ?? hubs;
-  const first = new Map<string, Item>();
-  for (const id of [EARTH, hereOf(worlds, current)]) {
-    const item = hubs.find((hub) => hub.id === id) ?? rest.find((each) => each.id === id);
-    if (item !== undefined) first.set(id, item);
-  }
-  return [...first.values(), ...rest.filter(({ id }) => !first.has(id))];
+/** The row's worlds: the desktop column's, in its order (the Earth, the worlds followed, the rest), each with its unseen lines; then the
+ * rail's worlds, once read, that the column does not hold. Each once. */
+export function rowOf(
+  { worlds, current, followed = NONE, unread }: Pick<WorldsProps, "worlds" | "current" | "followed" | "unread">,
+  rail: readonly RailEntry[] | undefined,
+): Item[] {
+  const hubs: Item[] = inRailOrder(worlds, followed).map((world) => ({
+    id: hubWorldOf(world),
+    name: world.name,
+    href: world.href,
+    unseen: world.slug === current ? 0 : (unread?.[world.slug] ?? 0),
+  }));
+  const held = new Set(hubs.map(({ id }) => id));
+  const more: Item[] = (rail ?? []).flatMap(({ id, title, href, section }) =>
+    held.has(id) ? [] : [{ id, name: title, href, unseen: 0, ...(section === "seed" ? { seed: true as const } : {}) }],
+  );
+  return [...hubs, ...more];
 }
 
 /** The desktop rail's worlds, none till they are read: the code and the file come after the first paint, never with the chat. */
-function useRail(worlds: readonly ChatWorld[]): readonly RailEntry[] | undefined {
+function useRail(worlds: WorldsProps["worlds"]): readonly RailEntry[] | undefined {
   const [entries, setEntries] = useState<readonly RailEntry[]>();
   const [places] = useState(() => ({
     earth: worlds.find(({ slug }) => slug === EARTH)?.href ?? "/earth",
@@ -91,9 +92,10 @@ function useRail(worlds: readonly ChatWorld[]): readonly RailEntry[] | undefined
   return entries !== undefined && entries.length > 0 ? entries : undefined;
 }
 
-export function PhoneWorlds({ worlds, current }: { worlds: readonly ChatWorld[]; current: string }) {
+export function PhoneWorlds(props: WorldsProps) {
   const rowRef = useRef<HTMLElement>(null);
-  const items = rowOf(worlds, current, useRail(worlds));
+  const { worlds, current } = props;
+  const items = rowOf(props, useRail(worlds));
   const here = hereOf(worlds, current);
   useEffect(() => {
     // Sideways only: the page itself never moves. The row's own scroll-behavior (CSS) is auto under reduced motion.
@@ -101,37 +103,50 @@ export function PhoneWorlds({ worlds, current }: { worlds: readonly ChatWorld[];
   }, []);
   return (
     <nav ref={rowRef} aria-label="Worlds" className={styles["row"]}>
-      <Cluster as="ul" space="2xs" wrap="no" className={styles["list"]}>
+      <ul className={styles["list"]}>
         {items.map((item) => (
           <li key={item.id}>
             <RouterLink
               href={item.href}
+              aria-label={item.unseen > 0 ? `${item.name}, ${String(item.unseen)} unseen` : undefined}
               aria-current={item.id === here ? "page" : undefined}
-              className={`${column["world"] ?? ""} ${styles["link"] ?? ""}`}
+              className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
             >
-              <span className={column["planet"]}>
-                <WorldPlanet
-                  world={item.seed === true ? "" : item.id}
-                  fallback=""
-                  name={item.name}
-                  kind={item.seed === true ? "signal" : "world"}
-                  decorative
-                />
+              <span className={styles["disc"]}>
+                <span className={column["planet"]}>
+                  <WorldPlanet
+                    world={item.seed === true ? "" : item.id}
+                    fallback=""
+                    name={item.name}
+                    kind={item.seed === true ? "signal" : "world"}
+                    decorative
+                  />
+                </span>
+                <span aria-hidden="true">
+                  <UnreadPill count={item.unseen} />
+                </span>
               </span>
-              <span className={`${styles["name"] ?? ""} truncate`}>{item.name}</span>
+              <span className={`${styles["name"] ?? ""} label truncate`}>{item.name}</span>
             </RouterLink>
           </li>
         ))}
         <li>
-          <Button
+          <button
+            type="button"
+            className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
             onClick={() => {
               window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
             }}
           >
-            See all<span className="visually-hidden"> places</span>
-          </Button>
+            <span className={`${styles["disc"] ?? ""} ${styles["all"] ?? ""} grid-center`}>
+              <Icon name="orbits" size="l" />
+            </span>
+            <span className={`${styles["name"] ?? ""} label`}>
+              All<span className="visually-hidden"> places</span>
+            </span>
+          </button>
         </li>
-      </Cluster>
+      </ul>
     </nav>
   );
 }

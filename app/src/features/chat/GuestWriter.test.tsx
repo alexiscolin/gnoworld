@@ -70,6 +70,13 @@ describe("a guest's composer", () => {
       expect(view.textContent).toContain("To log in, use a computer");
     });
 
+    it("says in its placeholder that it speaks as a guest", () => {
+      phone();
+      const box = one(mount(<GuestWriter room="#games" />), "form textarea");
+      expect(box.getAttribute("placeholder")).toBe("Message #games as a guest");
+      expect(box.parentElement?.querySelector(`label[for="${box.id}"]`)?.textContent).toBe("Message #games");
+    });
+
     it("with Adena (a computer's narrow window), keeps Connect Adena", () => {
       phone();
       vi.stubGlobal("adena", { AddEstablish: () => undefined });

@@ -10,21 +10,48 @@
   }
 
   .list {
-    /* layout: the first and last world clear the screen's edge, and the ring has room above and below */
+    /* layout: one line of worlds a step apart; the first and last clear the screen's edge, and the ring has room above and below */
+    display: flex;
+    /* layout: a step between the worlds */
+    gap: var(--space-2xs);
+    /* layout: the list's own margin gone */
+    margin: 0;
     padding: var(--space-2xs) var(--space-s);
+    list-style: none;
     inline-size: max-content;
     min-inline-size: 100%;
   }
 
-  /* a target of 44 px at least on both sides, the name's width capped so a long one is cut */
+  /* A world's item is the rail's width (64 px), so the step is regular and the cut one says there is more; its name under the planet,
+     cut where it is long. A target of 44 px at least on both sides. */
   .link {
-    min-inline-size: var(--control-m);
-    max-inline-size: var(--space-2xl);
+    inline-size: var(--thumb-l);
+    min-block-size: var(--control-m);
+    padding-block: 0;
+    padding-inline: 0;
+    background: none;
     color: var(--color-text-muted);
-    font: var(--font-label);
+    cursor: pointer;
   }
 
   .link[aria-current="page"] {
+    color: var(--color-text);
+  }
+
+  /* The planet's box (the column's 44 px, Worlds.module.css), centred in the item; the pill stands at its corner. */
+  .disc {
+    position: relative;
+    /* layout: centred in the item by its text-align, the pill standing off its corner */
+    display: inline-block;
+    vertical-align: top;
+    inline-size: var(--control-m);
+    block-size: var(--control-m);
+    border-radius: var(--radius-pill);
+  }
+
+  /* "All": a circle in the strong line, holding its icon. */
+  .all {
+    border: var(--line-width) solid var(--color-line-strong);
     color: var(--color-text);
   }
 
