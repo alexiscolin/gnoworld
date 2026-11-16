@@ -47,7 +47,7 @@ export function Disclosure({
   const button = (
     <button
       type="button"
-      className={[styles["row"], lead === undefined ? "text-meta" : "icon-text-meta", "pointer"].join(" ")}
+      className={["lit", styles["row"], lead === undefined ? "text-meta" : "icon-text-meta", "pointer"].join(" ")}
       data-size={size}
       aria-expanded={open}
       aria-controls={bodyId}

@@ -97,7 +97,7 @@ export function NavItem({ children, current = false, lead, badge, meta, href, on
   // The whole pill is the link, its sides and its count too: ui's `covers`.
   return (
     <div
-      className={["column-item", styles["item"]].join(" ")}
+      className={["lit", "column-item", styles["item"]].join(" ")}
       data-nav-item=""
       data-current={current ? "" : undefined}
       data-unread={unseen(badge) ? "" : undefined}

@@ -32,7 +32,7 @@ export function Listbox({ label, id, options, active, onPick }: ListboxProps) {
           id={option.id}
           role="option"
           aria-selected={at === active}
-          className={styles["option"]}
+          className={["lit", styles["option"]].join(" ")}
           onMouseDown={(event) => {
             event.preventDefault();
             onPick(option.id);

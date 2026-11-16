@@ -190,7 +190,9 @@ export function Menu({
               type="button"
               role="menuitem"
               tabIndex={-1}
-              className={["tint", "full-start", styles["item"], "soon" in item ? soon["soon"] : undefined].join(" ")}
+              className={["lit", "tint", "full-start", styles["item"], "soon" in item ? soon["soon"] : undefined].join(
+                " ",
+              )}
               {...("soon" in item
                 ? { "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
                 : {

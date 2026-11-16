@@ -59,7 +59,7 @@ export function Shelves({ discovery }: { discovery: Discovery }) {
               tabIndex={shelf === id ? 0 : -1}
               data-shelf={id}
               data-style={STYLES.some((style) => style.id === id) ? id : undefined}
-              className={["column-item", styles["shelf"]].join(" ")}
+              className={["lit", "column-item", styles["shelf"]].join(" ")}
               onClick={() => {
                 show(id);
               }}

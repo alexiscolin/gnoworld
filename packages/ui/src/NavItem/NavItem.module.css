@@ -30,12 +30,10 @@
     color: inherit;
   }
 
-  .item:hover {
-    background: var(--color-fill);
-  }
-
   /* What is yet to come: no fill under it; ComingSoon greys it and refuses the pointer's promise of an act. */
   .item[data-soon] {
+    --lit-fill: transparent;
+
     background: none;
   }
 
@@ -44,6 +42,8 @@
   }
 
   .item[data-current] {
+    --lit-now: var(--color-primary);
+
     background: var(--color-primary);
     color: var(--color-ink);
   }

@@ -106,7 +106,7 @@ export function Row({
   const body = <Body led={led} current={current} href={href} external={external} onClick={onClick} />;
   return (
     <div
-      className={styles["row"]}
+      className={["lit", styles["row"]].join(" ")}
       data-look={look}
       aria-current={current && href === undefined && onClick === undefined ? "true" : undefined}
     >

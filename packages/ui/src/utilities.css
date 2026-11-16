@@ -127,6 +127,17 @@
     border-radius: var(--radius-item);
   }
 
+  /* The pointer's light on a row, and the row that is current or chosen: it fills as the resting fill's next step, or as --lit-fill says; the
+     one in view (aria-current, aria-selected, data-current), as --lit-now says, the stronger step, which wins under the pointer too.
+     A row that is greyed or drawn another way sets the two itself (a menu's strong hover, Discover's cream shelf). */
+  .lit:hover {
+    background: var(--lit-fill, var(--color-fill));
+  }
+
+  .lit:is([aria-current="true"], [aria-selected="true"], [data-current]) {
+    background: var(--lit-now, var(--color-fill-hover));
+  }
+
   /* The pointer's light on a box that has a fill at rest: the fill brightens, nothing moves (the Select, the chips, Discover's cards). */
   .fill-hover:hover {
     background: var(--color-fill-hover);
