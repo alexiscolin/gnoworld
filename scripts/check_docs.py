@@ -17,7 +17,7 @@ sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no _
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
 import speeds
 from hidden import hidden_in, hidden_in_data
-from repo_files import git, listed, listing
+from repo_files import git, listed, listing, report
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
@@ -211,22 +211,22 @@ for f in files:
         if not (root / p).exists():
             missing.append(f"{f.relative_to(root)}: {p}")
 if missing:
-    print("check_docs: these docs name files that do not exist:", *missing, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: these docs name files that do not exist:", missing)
 problems = ledger_problems(root)
 rules = lost_rules(root)
 if rules:
-    print("check_docs: a rule the review depends on is gone:", *rules, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: a rule the review depends on is gone:", rules)
 if problems:
-    print("check_docs: the findings ledger (docs/review/findings.md):", *problems, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: the findings ledger (docs/review/findings.md):", problems)
 # No instruction file below the root reaches a commit: every commit runs this, prose alone included.
 stray = stray_instructions(root)
 if stray:
-    print("check_docs: instructions every session reading their folder would follow, past the root's CLAUDE.md:", *stray, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: instructions every session reading their folder would follow, past the root's CLAUDE.md:", stray)
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
 tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$", p.name) and "src" in p.relative_to(root).parts]
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
-    print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: these tests sit beside no file of their name:", orphans)
 # The alerts the server logs are OPERATIONS.md's "Every alert", which ops matches, both ways: each
 # log("alert", { ..., error: "x" }), however laid out, a test's none. An "alert" written otherwise (a template, a
 # constant) or a name no literal cannot be read: it fails.
@@ -248,11 +248,11 @@ unnamed = [f"{a}: logged, not in the alerts list" for a in sorted(alerts - liste
 unnamed += [f"{a}: listed, never logged" for a in sorted(listed_alerts - alerts)]
 unnamed += [f"{f}: an alert whose name is no literal" for f in unread]
 if unnamed:
-    print("check_docs: the server's alerts and docs/OPERATIONS.md's list of them differ:", *unnamed, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: the server's alerts and docs/OPERATIONS.md's list of them differ:", unnamed)
 # A runbook says each known limit, its line wrapped anyhow; a folder with no runbook (a test's) has none to say.
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
-    print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", lost)
 # docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways: pre-commit runs this on every commit,
 # prose alone included, so a row the table gains or loses without the workflow stops at its own commit, which took a change of the
 # table for prose and ran no gate. The table is read as speeds.py reads it, one reader for both. The harness's
@@ -271,7 +271,7 @@ drift += [f"branch.js's TIER1 lacks {p}, tier 1 by the harness's own rule" for p
 drift += [f"branch.js's TIER1 holds {p}, which no tier-1 row of docs/REVIEW.md names in backticks" for p in sorted(tier1 - named) if named]
 drift += [f"docs/REVIEW.md names {p} as tier 1 in backticks, which branch.js's TIER1 lacks" for p in sorted(named - tier1) if tier1]
 if drift:
-    print("check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", *drift, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", drift)
 # The coverage globs held at 100% (vitest.config.ts) are docs/REVIEW.md's tier-1 TypeScript paths: each such path under app/,
 # server/ or packages/ is in one, and each glob matches a file, as istanbul gives a glob with no file no percentage and so no failure.
 held = []
@@ -283,12 +283,12 @@ ts = [p for p in sorted(named) if p.startswith(("app/", "server/", "packages/"))
 globs = [f"docs/REVIEW.md names {p} as tier 1, which no glob of vitest.config.ts held at 100% covers" for p in ts if not any(p == h or p.startswith(h + "/") or p == h + "/" for h in held)]
 globs += [f"vitest.config.ts holds {h} at 100%, which matches no file" for h in held if not (root / h).is_file() and not any((root / h).rglob("*.ts*"))]
 if globs:
-    print("check_docs: docs/REVIEW.md's tier-1 TypeScript paths and vitest.config.ts's 100% globs differ: change both in one commit:", *globs, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: docs/REVIEW.md's tier-1 TypeScript paths and vitest.config.ts's 100% globs differ: change both in one commit:", globs)
 hidden_chars = hidden(root)
 if hidden_chars:
-    print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
-          " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
-          " bytes, IMAGES):", *hidden_chars, sep="\n  ", file=sys.stderr)
+    report("check_docs", "check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
+           " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
+           " bytes, IMAGES):", hidden_chars)
 if hidden_chars or missing or problems or orphans or unnamed or lost or rules or drift or globs:
     sys.exit(1)
 if stray:

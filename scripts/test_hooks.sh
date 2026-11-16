@@ -7,6 +7,9 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 unset GIT_REFLOG_ACTION
 # records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not.
 unset GIT_NO_REPLACE_OBJECTS
+# GitHub sets it in every step: left set, each check_docs and check_regressions a case runs annotates as well (repo_files.report,
+# F13435), and the night's controls failed on it; the cases that want it set it themselves.
+unset GITHUB_ACTIONS
 # The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in a person's
 # shell.
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
@@ -1572,6 +1575,21 @@ good_rules "$d"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
+# On GitHub its refusal is one annotation holding the header and its lines, twenty at most and how many more, escaped as GitHub's
+# toolkit escapes a message (F13435: a problem matcher kept the header alone).
+i=0 && while [ $i -lt 25 ]; do i=$((i + 1)) && printf 'Run `scripts/gone%s%%.sh`.\n' "$i"; done >"$d/.claude/rules/x.md"
+out=$(GITHUB_ACTIONS=true python3 -I "$docs" "$d" 2>/dev/null) && fail "check_docs accepted docs naming 25 missing files"
+printf '%s\n' "$out" | grep -c '^::error title=check_docs::' | grep -qx 1 || fail "check_docs gave its refusal on GitHub as no single annotation: $out"
+python3 -I - "$out" <<'PY' || fail "check_docs's annotation is not its header, twenty lines and how many more, escaped: $out"
+import sys
+line = next(l for l in sys.argv[1].splitlines() if l.startswith("::error title=check_docs::"))
+lines = line.split("::", 2)[2].split("%0A")
+assert lines[0] == "check_docs: these docs name files that do not exist:", lines[0]
+assert len(lines) == 22 and lines[-1] == "  +5 more", lines[-3:]
+assert all(l.startswith("  .claude/rules/x.md: scripts/gone") and l.endswith("%25.sh") for l in lines[1:21]), lines[1:3]
+PY
+out=$(python3 -I "$docs" "$d" 2>/dev/null) || :
+[ -z "$out" ] || fail "check_docs annotated off GitHub: $out"
 rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
@@ -5485,6 +5503,17 @@ python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(in
 fi
 
 if part regressions; then
+# F13435: check_regressions's refusal on GitHub is one annotation of its header and problems, through repo_files.report.
+out=$(cd "$here" && GITHUB_ACTIONS=true python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("check_regressions", "check_regressions: the safety net shrank:", ["a test is gone: a > %s" % n for n in range(3)])' 2>/dev/null) || :
+[ "$out" = "::error title=check_regressions::check_regressions: the safety net shrank:%0A  a test is gone: a > 0%0A  a test is gone: a > 1%0A  a test is gone: a > 2" ] ||
+	fail "repo_files.report gave no single annotation of a refusal's lines: $out"
+grep -q 'report("check_regressions", "check_regressions: the safety net shrank' "$here/check_regressions.py" || fail "check_regressions does not report its problems through repo_files.report"
+err=$(cd "$here" && python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("t", "h:", ["a\r\n::error title=gate-ok::forged", " ::warning title=forged::ok"])' 2>&1 >/dev/null) || :
+[ "$err" = "h:
+  a\r\n::error title=gate-ok::forged
+  \\ ::warning title=forged::ok" ] || fail "repo_files.report let an item's newline, or its leading ::, start a command line: $err"
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
 # An exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` adds an ignore that
@@ -7718,9 +7747,9 @@ def annotated(lines):
                 out.append((m.get("severity", "error"), re.search(pats[0]["regexp"], lines[i]).group(pats[0]["message"])))
     return out
 FAILED = ["FAIL  the reader resolves a name of its own network (the control): wanted [some], got [0]", "test_hooks: stryker_lines.py did not say what it kept",
-          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer", "check_docs: these docs name files that do not exist:",
-          "check_regressions: the safety net shrank, and no commit says why:", "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
-          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit:",
+          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer",
+          "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
+          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit: scripts/a.sh, scripts/b.py",
           "\x1b[31mERROR: Coverage for lines (80%) does not meet global threshold (85%)\x1b[39m",
           "12:00:00 (4242) ERROR MutationTestReportHelper Final mutation score 70.00 under breaking threshold 85, setting exit code to 1 (failure)."]
 for line in FAILED:
@@ -8067,6 +8096,9 @@ grep -q "no commit 0000000000000000000000000000000000000000" "$c/err" || fail "c
 undeclared 'printf "y\n" >scripts/new.py'
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a harness file no commit declares (F089)"
 grep -qF "scripts/new.py" "$c/err" || fail "ci_changes.sh did not name the undeclared harness file: $(cat "$c/err")"
+# On its one line, the one GitHub's matcher keeps (F13435: PR #17's changes job lost the list printed under it).
+grep -qx "ci_changes.sh: harness files changed with no \`Harness-changed: <path> - why\` line in a commit: scripts/new.py" "$c/err" ||
+	fail "ci_changes.sh named the undeclared files elsewhere than on its refusal's line: $(cat "$c/err")"
 changes push "$base" "$c/base" && fail "ci_changes.sh passed on a push a harness file no commit declares (F089)"
 (cd "$c/repo" && git commit -q --allow-empty -m declare -m "Harness-changed: scripts/new.py")
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh took a declaration with no reason"

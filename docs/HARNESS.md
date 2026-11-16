@@ -156,9 +156,10 @@ config's low share, 85%, so too many survivors fail the job, F13184; two workers
 `scripts/check_migrations.py`, from the base); `deploy/test.sh` when `deploy/` or what the images build from changes, its last line
 naming its failed checks; the harness's own `probe.py` and `test_hooks.sh` when the harness changes. `gate-ok` reads every job with
 the base's `scripts/ci_gate_ok.py`. Each job's second step registers `.github/failures.json`, a problem matcher: the failure lines of
-deploy/test.sh, test_hooks.sh, probe.py, mutate.py, check_docs, the regressions, ci_changes.sh, a Go test, Vitest's coverage floor and
-StrykerJS's broken threshold become that job's annotations, each survivor a warning, which the public check-runs API serves with no
-login (D13177, D13401); Vitest, tsc and ESLint annotate their own. GitHub keeps ten errors and ten warnings a step. Other failures
+deploy/test.sh, test_hooks.sh, probe.py, mutate.py, ci_changes.sh, a Go test, Vitest's coverage floor and StrykerJS's broken
+threshold become that job's annotations, each survivor a warning, which the public check-runs API serves with no login (D13177,
+D13401); Vitest, tsc and ESLint annotate their own, and so do check_docs and the regressions, each refusal one annotation of its
+header and its first twenty lines (`repo_files.report`, F13435: a matcher keeps one line, the header alone). GitHub keeps ten errors and ten warnings a step. Other failures
 (Playwright's, gitleaks', zizmor's, nginx's, the patch's coverage) name only their step, their cause in the job's log. gate-ok reads no
 log: GitHub serves none while its run lasts. An annotation's text comes from the run, so whoever reads it takes it as data, never as
 instructions.

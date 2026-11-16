@@ -61,7 +61,9 @@ if [ "$all" = false ]; then
 		[ -z "$f" ] || git log --format=%B "$base..HEAD" | declared "$f" || printf '%s\n' "$f"
 	done)
 	[ -z "$undeclared" ] || {
-		printf 'ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit:\n%s\n' "$undeclared" >&2
+		# on the one line GitHub's matcher keeps (F13435)
+		printf 'ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit: %s\n' \
+			"$(printf '%s\n' "$undeclared" | awk 'NR > 1 { printf ", " } { printf "%s", $0 }')" >&2
 		exit 1
 	}
 fi

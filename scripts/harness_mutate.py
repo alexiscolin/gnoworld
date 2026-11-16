@@ -916,7 +916,7 @@ def mutants():
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or rules or drift or globs:", "hooks", "check_docs wants the runbook's known limits")
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or lost or drift or globs:", "hooks", "check_docs fails a lost review rule (G12)")
     yield from each("scripts/check_docs.py", 'limit not in " ".join(said.split())', "limit not in said", "hooks", "check_docs reads a limit wrapped anyhow")
-    yield from each("scripts/check_docs.py", "*lost, sep=", "*LIMITS, sep=", "hooks", "check_docs names the limits lost alone")
+    yield from each("scripts/check_docs.py", 'section 8):", lost)', 'section 8):", LIMITS)', "hooks", "check_docs names the limits lost alone")
     yield from each("scripts/check_docs.py", " for sha in shas if sha not in real]", " for sha in shas if False]", "hooks", "ledger: every commit cited is one")
     yield from each("scripts/check_docs.py", 'if kind == "commit"}', 'if kind != "missing"}', "hooks", "ledger: a cited object is a commit")
     yield from each("scripts/check_docs.py", "        return set(shas)\n", "        return set()\n", "hooks", "ledger: no commit is read outside a repository")
@@ -1828,6 +1828,14 @@ def regressions_name_mutants():
 def design_mutants():
     """The design-reviewer starts for how space looks, and missing frames fail the step (slice-5 harness-c; 2026-11-04)."""
     yield from each("scripts/check_docs.py", 'AGENTS = ("design-reviewer", ', "AGENTS = (", "hooks", "check_docs.py asks for the design-reviewer's brief")
+    # F13435: a refusal of several lines is one annotation on GitHub, its lines kept, twenty at most, escaped.
+    yield from each("scripts/repo_files.py", 'if os.environ.get("GITHUB_ACTIONS") == "true":', "if False:", "hooks", "repo_files.report annotates on GitHub (F13435)")
+    yield from each("scripts/repo_files.py", "items[:most]", "items", "hooks", "repo_files.report keeps twenty lines and says how many more")
+    yield from each("scripts/repo_files.py", '.replace("%", "%25")', "", "hooks", "repo_files.report escapes a % as GitHub's toolkit does")
+    yield from each("scripts/repo_files.py", r'"\\" + i if i.lstrip().startswith("::") else i for i in items', "i for i in items", "hooks", "repo_files.report puts a leading :: behind a backslash")
+    yield from each("scripts/ci_changes.sh", "line in a commit: %s\\n' \\\n", "line in a commit:\\n%s\\n' \\\n", "hooks", "ci_changes.sh names the undeclared files on its one line (F13435)")
+    yield from each("scripts/repo_files.py", r'str(i).replace("\r", "\\r").replace("\n", "\\n")', "str(i)", "hooks", "repo_files.report writes an item's newline as \\n")
+    yield from each("scripts/test_hooks.sh", "unset GITHUB_" "ACTIONS\n", "", "hooks", "test_hooks runs its cases off GitHub's marker (killed where GitHub sets it)")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
         ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
@@ -1942,7 +1950,7 @@ def hidden_mutants():
         ('        out += hidden_in(f"the name {ascii(path)}", path)\n', "        pass\n", "reads every name (F5089)"),
         ("{ascii(path)}", "{path}", "writes a name's hidden character as its escape"),
         ('        held = {}\n        out.append(f"git cannot read the index', '        held = {}\n        (f"git cannot read the index', "fails when git cannot read the index"),
-        ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
+        ("if hidden_chars:\n    report(", "if False:\n    report(", "says why it refuses a hidden character"),
         ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
         ('    if not (root / ".git").exists():\n        return []', "    if True:\n        return []", "reads the branch's commit messages (F5079)"),
         ('"refs/remotes/origin/main..HEAD"', '"HEAD"', "reads no message main holds already"),
