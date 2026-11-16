@@ -65,6 +65,8 @@
   .soon {
     /* layout: the chip at the row's end, after the words */
     margin-inline-start: auto;
+    /* layout: a gap off the words, kept where the row is as wide as its words */
+    padding-inline-start: var(--space-s);
   }
 
   .separator {

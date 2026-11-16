@@ -13,7 +13,7 @@ export interface LoginViewProps {
   step: Login["step"];
   problem: Login["problem"];
   onLogIn: () => void;
-  /** The network's name, beside the button and the phone's words. */
+  /** The network's name, after the button in its pill. */
   network?: ReactNode;
 }
 
@@ -31,11 +31,11 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
       {problem === undefined ? null : sayProblem(problem)}
     </p>
   );
-  // Beside the account's pill, never in its button: pressing the network must not open the account's menu.
+  // The account's pill holds the network itself (AccountMenu.tsx); before the session is known, it stands alone.
   if (session.kind !== "out")
     return (
       <>
-        {network}
+        {session.kind === "in" ? null : network}
         {status}
       </>
     );
@@ -44,14 +44,16 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
   return (
     <Cluster>
       <span className={styles["computer"]}>
-        <Button busy={step !== "idle"} onClick={onLogIn} {...(stopped ? { description: sayProblem(problem) } : {})}>
-          {stopped ? <Icon name="alert" /> : null}
-          {wordsOf(step, stopped ? sayShort(problem) : undefined)}
-        </Button>
+        <span className="pill-group">
+          <Button busy={step !== "idle"} onClick={onLogIn} {...(stopped ? { description: sayProblem(problem) } : {})}>
+            {stopped ? <Icon name="alert" /> : null}
+            {wordsOf(step, stopped ? sayShort(problem) : undefined)}
+          </Button>
+          {/* Beside the button, never in it: a control in a control would press the login with it. */}
+          {network}
+        </span>
       </span>
       <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
-      {/* Beside the button, never in it: a control in a control would press the login with it. */}
-      {network}
       {status}
     </Cluster>
   );
