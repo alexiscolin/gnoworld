@@ -318,7 +318,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no git pointed at folders of the command's own (`GIT_DIR`, `GIT_COMMON_DIR`,
   `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
-  run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
+  run, or none), no recursive delete of a path whose variable may be empty, when what remains of the path with each expansion
+  removed is empty, relative, the project's, the home's or a temp root's folder or one above, or a folder's whole contents (`${name:?}`
+  stops the shell first; `rm -rf "$TMPDIR/x"` passes, `rm -rf "$x"` and `"$d"/*` do not; a substitution or a list is no variable), no
   `gnokey` by its name, no raw call to a chain node (curl or wget, a scheme or none, an interpreter's words, a web
   fetch; the sandbox's network list does not hold in every session), and no `worktree.sh` run but alone as `sh scripts/worktree.sh` and plain
   words, from the project's root: elsewhere those words would run a script the session can write,
@@ -331,7 +333,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   a function's body and a command whose quotes hold a newline, takes a quoted mark for a word, and reads
   past git's global options that take their argument apart; it refuses a shell or `source` reading a pipe,
   a file, a here-string or a process (`=(…)` and stdin by any path included; a heredoc's lines are read), and a
-  zsh glob qualifier after any word. What it cannot read it refuses:
+  zsh glob qualifier after any word. What runs nothing passes: a read of `core.hooksPath` (`git config --get`, grep, rg), `sh -n` of
+  files, `$((...))`, a quote inside `$(...)` (a line a quote or a heredoc holds from an earlier line is read both ways); `rtk proxy` is
+  read as the program after it. What it cannot read it refuses:
   - a program a substitution's output names, a variable alone, a glob or a brace naming one (`/usr/bin/gi?`,
     `""{zsh,-s}`), find's `-exec {}`; a program a variable names is otherwise read as git, rm and curl;
   - in git: a list's words (`"$@"`), a subcommand, a `-c` value or a config key from an expansion, an expansion
