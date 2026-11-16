@@ -72,8 +72,9 @@ describe("sceneOffer", () => {
     expect(sceneOffer({ weak: false, phone: false, savesData: false })).toBe("auto");
   });
 
-  it("waits to be asked on a phone", () => {
-    expect(sceneOffer({ weak: false, phone: true, savesData: false })).toBe("ask");
+  it("offers nothing on a phone, the full chat alone there until the phone's 3D pass (D13711)", () => {
+    expect(sceneOffer({ weak: false, phone: true, savesData: false })).toBe("none");
+    expect(sceneOffer({ weak: false, phone: true, savesData: true })).toBe("none");
   });
 
   it("waits to be asked under the data saver, on a computer too", () => {
