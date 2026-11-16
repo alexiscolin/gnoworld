@@ -61,7 +61,7 @@
 
   .box [role="textbox"],
   .box [role="textbox"] + [aria-hidden="true"],
-  .box textarea {
+  .box .field textarea {
     /* layout: across the box, on the second row, two lines high until it grows */
     grid-area: 2 / 1 / auto / -1;
     min-block-size: calc(2lh + var(--space-s));

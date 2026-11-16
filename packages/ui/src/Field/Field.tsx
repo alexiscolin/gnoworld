@@ -16,11 +16,13 @@ export interface FieldProps {
   enterAddsLine?: boolean | undefined;
   help?: string;
   error?: string;
+  /** The box is marked invalid with no message of the field's own: the page says why elsewhere (a refused line's alert), `describedBy` linking it. */
+  invalid?: boolean | undefined;
   /** What the empty box says it is for, muted in the box: the chat's "Message #general". */
   placeholder?: string | undefined;
   /** Words inside the box before its value, not editable and read with the field: "nym-" before a name. */
   prefix?: string;
-  /** A box of lines has a handle to drag its height by, unless it grows on its own, as a chat's does to ten lines. */
+  /** A box of lines grows with its draft, as a chat's does to ten lines; false fixes it at its two rows, with no handle. */
   resizable?: boolean | undefined;
   /** The label is for assistive technology alone: the box says what it is for itself (a placeholder). */
   hideLabel?: boolean | undefined;
@@ -177,6 +179,7 @@ export function Field({
   enterAddsLine,
   placeholder,
   combobox,
+  invalid,
 }: FieldProps) {
   const id = useId();
   const described = describing(id, { prefix, help, error, describedBy });
@@ -185,7 +188,7 @@ export function Field({
       kind={kind}
       id={id}
       value={value}
-      invalid={error !== undefined}
+      invalid={error !== undefined || invalid === true}
       described={described || undefined}
       enterAddsLine={enterAddsLine}
       placeholder={placeholder}

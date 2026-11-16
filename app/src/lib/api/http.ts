@@ -53,7 +53,7 @@ async function answerOf<T>(response: Response, { schema }: Call<T>): Promise<Res
   const got = await read(response);
   if (got === "network") return { ok: false, reason: "network" };
   const value = got.text === "" ? undefined : jsonOf(got.text);
-  if (response.status !== 200 && response.status !== 204)
+  if (response.status !== 200 && response.status !== 201 && response.status !== 204)
     return { ok: false, reason: refusal(response.status, value), body: value };
   const parsed = schema.safeParse(value);
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, reason: "malformed" };

@@ -129,3 +129,18 @@ describe("a world's rooms, from the server", () => {
     });
   });
 });
+
+// POST /api/rooms and /api/rooms/realm answer a made room with 201 and { room } (server/src/rooms/routes.ts).
+describe("a room made, from the server's 201", () => {
+  const made = { room: "#earth/dev" };
+
+  it("reads a made room as success", async () => {
+    const { api, sent } = server(json(201, made));
+    expect(await api.make("dev")).toEqual({ ok: true, value: made });
+    expect(sent[0]?.init.body).toBe(JSON.stringify({ world: "earth", name: "dev" }));
+  });
+
+  it("reads a realm's room, made, as success", async () => {
+    expect(await server(json(201, made)).api.realm("gno.land/r/demo/x")).toEqual({ ok: true, value: made });
+  });
+});
