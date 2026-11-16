@@ -13,7 +13,7 @@ export interface LoginViewProps {
   step: Login["step"];
   problem: Login["problem"];
   onLogIn: () => void;
-  /** The network's name, after the button in its pill. */
+  /** The network's name, after the button in its pill, and after the phone's words. */
   network?: ReactNode;
 }
 
@@ -31,14 +31,8 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
       {problem === undefined ? null : sayProblem(problem)}
     </p>
   );
-  // The account's pill holds the network itself (AccountMenu.tsx); before the session is known, it stands alone.
-  if (session.kind !== "out")
-    return (
-      <>
-        {session.kind === "in" ? null : network}
-        {status}
-      </>
-    );
+  // Logged in, the account's pill names the network (AccountMenu.tsx); before the session is known, the header's own row does.
+  if (session.kind !== "out") return status;
   // Why the last login stopped is the button's own words, short; its status region says it whole to a screen reader alone.
   const stopped = step === "idle" && problem !== undefined;
   return (
@@ -53,7 +47,10 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
           {network}
         </span>
       </span>
-      <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
+      <span className={styles["phone"]}>
+        To log in, use a computer; once logged in you can write from here.
+        {network}
+      </span>
       {status}
     </Cluster>
   );
