@@ -155,8 +155,8 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 60664, // 60,408 B measured, 256 B ahead
-  HubPlate: 56992, // 56,736 B measured, 256 B ahead
+  EarthPlate: 61022, // 60,766 B measured with the call card's deposit line (D13626), 256 B ahead
+  HubPlate: 57374, // 57,118 B measured with the call card's deposit line (D13626), 256 B ahead
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
