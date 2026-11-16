@@ -10,7 +10,6 @@
     "@gnoworld/schemas": "workspace:*",
     "@gnoworld/service": "workspace:*",
     "@hono/node-server": "2.1.6",
-    "@hono/zod-validator": "0.9.1",
     "hono": "4.13.16",
     "zod": "4.6.7"
   },

@@ -174,7 +174,7 @@ const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
 // space looks (the scene, the planets, the cosmos) brings the design-reviewer apart.
 const screen = (file) => file.startsWith("app/src/") || file.startsWith("packages/ui/src/");
 const space = (file) =>
-  ["app/src/scene/", "packages/core/src/planet/", "packages/core/src/cosmos/", "packages/core/src/space/"].some((p) =>
+  ["app/src/space/", "packages/core/src/planet/", "packages/core/src/cosmos/", "packages/core/src/space/"].some((p) =>
     file.startsWith(p),
   );
 // A writer that committed on another branch than its own counts as no report, and the loop

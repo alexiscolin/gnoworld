@@ -3,13 +3,13 @@
 // the trigonometry. Tier 1 (docs/REVIEW.md). The path comes in as bytes: core has no TextEncoder.
 import { REALM_PREFIX } from "../chain/realm.ts";
 import { ANCHORS, MAPS, type Anchor, type AnchorRow, type MapName, type Ramp, type Rgb } from "./anchors.ts";
-import { anchorOf, natureOf, worldAnchor, type Nature, type RealmFunctions } from "./choice.ts";
+import { natureOf, worldAnchor, type Nature } from "./choice.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { between, seedShare } from "./shares.ts";
 import { asciiBytes } from "../text/bytes.ts";
 
-export { anchorOf, ANCHORS, asciiBytes, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
+export { ANCHORS, asciiBytes, MAPS, natureOf, type Anchor, type MapName, type Nature };
 
 /** Above this the warp smears a map's real detail. */
 export const MAX_WARP_FREQUENCY = 2.4;

@@ -84,16 +84,6 @@ export const toCallable = (read: ChainRead<Listing[]>): ChainRead<Callables> =>
       }
     : read;
 
-/** The exported functions of a realm, in the chain's order: readable when it takes nothing (a `cur` is a parameter) and gives something. */
-export async function readFunctions(rpc: string, realm: string, options?: ReadOptions): Promise<ChainRead<Readable>> {
-  return toFunctions(await listExported(rpc, realm, options ?? {}));
-}
-
-/** The exported functions of a realm with their parameters, in the chain's order: what a call card is made from. */
-export async function readCallable(rpc: string, realm: string, options?: ReadOptions): Promise<ChainRead<Callables>> {
-  return toCallable(await listExported(rpc, realm, options ?? {}));
-}
-
 /** A realm's exported functions as a query: the one read the function lists and the call forms of a view share, kept and asked ahead
  * (warm.ts). A list that did not come whole is no answer: it throws, with the failed read for the view to say. */
 export const realmFunctions = (rpc: string, realm: string, options?: ReadOptions) =>

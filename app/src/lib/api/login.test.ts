@@ -1,6 +1,7 @@
 import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loginApi, pageLoginApi, TIMEOUT_MS, type Fetcher } from "./login.ts";
+import { TIMEOUT_MS } from "./http.ts";
+import { loginApi, pageLoginApi, type Fetcher } from "./login.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";

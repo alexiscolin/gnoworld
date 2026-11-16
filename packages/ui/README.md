@@ -4,7 +4,7 @@ The design system: tokens, base styles, components and layout compositions, with
 
 ## What is in it
 
-- `src/tokens.css`, `src/tokens.ts`: the design tokens (colours, sizes and so on), with tests that check them.
+- `src/tokens.css`, `src/TokensPage/tokens.ts`: the design tokens (colours, sizes and so on), with tests that check them.
 - `src/reset.css`, `src/base.css`, `src/layers.css`, `src/utilities.css`, `src/styles.css`: the base styles and cascade layers. The package exports `./styles.css` and `./layers.css`.
 - `src/<Component>/`: one folder per component (`Button/`, `Dialog/`, `Tabs/`, `Planet/` and so on), each with its CSS module, stories and tests.
 - `src/compositions/`: layout building blocks (`Center`, `Cluster`, `Grid`, `Sidebar`).

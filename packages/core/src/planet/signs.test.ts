@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { anchorOf, ANCHORS, asciiBytes, planetSeed, type Anchor } from "./look.ts";
+import { anchorOf } from "./choice.ts";
+import { ANCHORS, asciiBytes, planetSeed, type Anchor } from "./look.ts";
 import { sha256 } from "./sha256.ts";
 import {
   daysSince,

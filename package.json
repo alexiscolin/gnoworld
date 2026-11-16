@@ -17,7 +17,7 @@
     "test": "vitest run --project node --project ui --project compiled",
     "coverage": "vitest run --coverage --project node --project ui --project slow",
     "mutate": "stryker run",
-    "unused": "knip --no-progress",
+    "unused": "knip --no-progress && knip --no-progress --production -c knip.production.json",
     "copies": "jscpd .",
     "comments": "node scripts/check_comments.mjs",
     "mutate:all": "stryker run stryker.all.config.json"

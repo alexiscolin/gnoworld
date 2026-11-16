@@ -3,12 +3,12 @@
 import { cellHash, nextState, textHash, unitOf } from "../space/cell.ts";
 
 /** gno.land's star, at the centre: a slug holds no dot, so no namespace is it. */
-export const GNO_LAND = "gno.land";
+const GNO_LAND = "gno.land";
 const GREAT_WARMTH = 0.45;
 const SALT = 2;
 
 /** A namespace's star's draws, one a step. */
-export function starDraws(id: string): (step: number) => number {
+function starDraws(id: string): (step: number) => number {
   const seed = textHash(`star ${id}`);
   return (step) => unitOf(nextState(cellHash(SALT, { x: seed, y: step, z: 0 })));
 }

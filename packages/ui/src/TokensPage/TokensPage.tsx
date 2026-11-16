@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { Grid, Stack } from "../compositions/index.ts";
-import { groups, tokens } from "../tokens.ts";
+import { groups, tokens } from "./tokens.ts";
 import { Region } from "../Overview/Region.tsx";
 import styles from "./TokensPage.module.css";
 

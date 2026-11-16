@@ -1,7 +1,7 @@
 // Discover's first page, Today: a few rows of realms, each a rule over the shelves, and the three next stops of a realm.
 import type { Store, StoreRow } from "./rows.ts";
 import type { StyleId } from "./styles.ts";
-import { shelfRows, sortRows, type Ground, type ShelfId, type SortId, type View } from "./shelves.ts";
+import { shelfRows, sortRows, type ShelfId, type SortId, type View } from "./shelves.ts";
 
 export interface TodayRow {
   id: string;
@@ -85,10 +85,4 @@ export function nextStops(store: Store, of: StoreRow): Stop[] {
     "callers",
   ).slice(0, 3 - mine.length);
   return [...alike.map((row): Stop => ({ row, why: "style" })), ...mine.map((row): Stop => ({ row, why: "author" }))];
-}
-
-/** One realm that was called and not visited, chosen by `at`, a number from 0 up to 1 (the page rolls it); none where there is none. */
-export function surprise(rows: readonly StoreRow[], ground: Ground, at: number): StoreRow | undefined {
-  const pool = rows.filter((row) => row.calls > 0 && !ground.visited(row));
-  return pool[Math.floor(at * pool.length)];
 }

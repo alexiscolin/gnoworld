@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, one } from "../../../tests/mount.tsx";
-import { keepCountry, keptCountry } from "../../lib/country.ts";
+import { keepCountry, shownCountry } from "../../lib/country.ts";
 import { CountryChoice } from "./CountryChoice.tsx";
 
 // An account's lines show its time zone's country by default, the one it picks instead, or none once it hides
@@ -40,7 +40,7 @@ describe("the choice of a country", () => {
     const box = mount(<CountryChoice account={ME} />);
     expect(list(box).value).toBe("JP");
     expect(says(box)).toContain("set from your time zone");
-    expect(keptCountry(ME)).toBeUndefined();
+    expect(shownCountry(ME, [])).toBeUndefined();
     expect(localStorage.length).toBe(0);
   });
 
@@ -87,7 +87,7 @@ describe("the choice of a country", () => {
   it("keeps a country taken from the list, and says what it means", () => {
     const box = mount(<CountryChoice account={ME} />);
     pick(box, "FR");
-    expect(keptCountry(ME)).toBe("FR");
+    expect(shownCountry(ME, [])).toBe("FR");
     expect(list(box).value).toBe("FR");
     expect(says(box)).toContain("public rooms");
   });
@@ -96,7 +96,7 @@ describe("the choice of a country", () => {
     keepCountry(ME, "FR");
     const box = mount(<CountryChoice account={ME} />);
     pick(box, "");
-    expect(keptCountry(ME)).toBeUndefined();
+    expect(shownCountry(ME, [])).toBeUndefined();
     expect(says(box)).toBe(NONE);
     expect(list(box).value).toBe("");
     expect(Object.values(localStorage)).toEqual(['"hidden"']);
@@ -149,7 +149,7 @@ describe("the choice of a country", () => {
     refusal.mockRestore();
     pick(box, "JP");
     expect(box.textContent).not.toContain("Not kept on this device");
-    expect(keptCountry(ME)).toBe("JP");
+    expect(shownCountry(ME, [])).toBe("JP");
   });
 
   it("names its list for a screen reader", () => {

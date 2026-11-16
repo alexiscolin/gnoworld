@@ -2,10 +2,9 @@ import { Address } from "@gnoworld/schemas";
 import type { IrcMessage } from "@gnoworld/core";
 import { describe, expect, it, vi } from "vitest";
 import type { Result } from "../api/login.ts";
+import { BASIC_CAPS, CAPS } from "./handshake.ts";
 import {
   BACKOFF,
-  BASIC_CAPS,
-  CAPS,
   connectErgo,
   drawGuestNick,
   HANDSHAKE_MS,

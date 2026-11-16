@@ -1,4 +1,3 @@
-import { LABEL_MS } from "../features/universe/arrivalBase.ts";
 import { motionOf } from "./motion.ts";
 
 // The names' pool: a name keeps its slot while it is chosen, and a slot is taken for another name only once the old one has faded out, so a
@@ -14,6 +13,8 @@ export interface Slot<Item, Button> {
 // raw: how long a name stays after it fell out of the choice (a world at a threshold's edge does not blink), and the fade's length, which
 // is labels.module.css's --motion-label.
 const HOLD_MS = 250;
+/** A label's fade, ms: tokens.css's --motion-label (features/universe/arrivalBase.test.ts holds the two together). */
+export const LABEL_MS = 400;
 const FADE_MS = LABEL_MS;
 
 /** The lens said the names anew: the old ones fade out where they stand, and no new choice takes them back. */

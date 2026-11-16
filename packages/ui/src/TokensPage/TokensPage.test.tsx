@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { eachStory } from "../testing.tsx";
-import { tokens } from "../tokens.ts";
+import { tokens } from "./tokens.ts";
 import * as stories from "./TokensPage.stories.tsx";
 import { TokensPage } from "./TokensPage.tsx";
 

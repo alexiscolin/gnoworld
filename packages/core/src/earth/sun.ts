@@ -16,7 +16,7 @@ const RADIAN = Math.PI / 180;
 const TURN = Math.PI * 2;
 
 /** An angle in radians, brought within half a turn either way. */
-export const within = (angle: number): number => {
+const within = (angle: number): number => {
   const wrapped = angle % TURN;
   if (wrapped > Math.PI) return wrapped - TURN;
   return wrapped <= -Math.PI ? wrapped + TURN : wrapped;

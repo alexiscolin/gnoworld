@@ -24,7 +24,7 @@ import { sha256 } from "./sha256.ts";
 import { seedShare } from "./shares.ts";
 import { surfaceOf, type Surface } from "./surface.ts";
 
-export { CONTINENTS_SEA, ofContinents } from "./continents.ts";
+export { ofContinents } from "./continents.ts";
 
 export interface Recipe {
   /** The class mixed under the world's own, and its share of the surface, 0.4 at most: the dominant keeps 60%. */
