@@ -15,6 +15,7 @@ import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
 import { Row } from "./MenuRow.tsx";
 import { Trigger } from "./Trigger.tsx";
+import buttonStyles from "../Button/Button.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -107,8 +108,6 @@ export type MenuItem =
       onSelect: () => void;
       /** A choice among the items (one network of several): a radio of the menu, checked or not. */
       checked?: boolean;
-      /** Its act is still being read: said to assistive technology (aria-busy). */
-      busy?: boolean;
       /** A word of the item as a chip at its end ("Testnet"). */
       note?: string;
       /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
@@ -135,6 +134,8 @@ export interface MenuProps {
   lead?: ReactNode;
   /** The words of a trigger with a lead, read and not drawn. */
   wordsHidden?: boolean;
+  /** An act of its items is still being read: the trigger, which stays in view as the panel closes, says so (a spinner, aria-busy). */
+  busy?: boolean;
   /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
   openAtOnce?: boolean;
   /** Open now at this point of the screen, as a right-click's menu does: each new object asks once. */
@@ -153,6 +154,7 @@ export function Menu({
   lead,
   wordsHidden = false,
   openAtOnce = false,
+  busy = false,
   at,
 }: MenuProps) {
   // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
@@ -178,7 +180,7 @@ export function Menu({
   return (
     <>
       <Trigger
-        attrs={trigger}
+        attrs={busy ? { ...trigger, "aria-busy": true } : trigger}
         plain={false}
         icon={icon === undefined ? undefined : { name: icon, size, emphasis }}
         tabbable
@@ -186,6 +188,7 @@ export function Menu({
       >
         {lead}
         {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
+        {busy ? <span className={buttonStyles["spinner"]} aria-hidden="true" /> : null}
       </Trigger>
       <div {...panel} aria-label={label} onKeyDown={move}>
         {items.map((item, at) => (

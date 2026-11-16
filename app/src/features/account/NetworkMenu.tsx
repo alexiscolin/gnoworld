@@ -28,10 +28,10 @@ export function NetworkMenu({ name }: { name: string }) {
       emphasis="plain"
       size="s"
       openAtOnce
+      busy={busy !== undefined}
       items={site.universes.map((each) => ({
         label: each.name,
         checked: each.id === here,
-        busy: busy === each.id,
         ...(each.testnet ? { note: "Testnet" } : {}),
         onSelect: () => {
           setBusy(each.id);

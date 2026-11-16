@@ -389,8 +389,8 @@ it("draws an icon trigger as a bar's tool when its icon says so", () => {
   expect(screen.getByRole("button", { name: "Link" }).hasAttribute("data-tool")).toBe(true);
 });
 
-// A menu that chooses one of several (the network switch, D13501): the chosen item is a radio of the menu, checked, and an item whose
-// act is still being read says so, so a screen reader and the eye both know. Items with neither stay plain menu items.
+// A menu that chooses one of several (the network switch, D13501): the chosen item is a radio of the menu, checked, and a menu whose
+// act is still being read says so on its trigger, which stays in view, so a screen reader and the eye both know. Items with neither stay plain menu items.
 async function opened(items: Parameters<typeof Menu>[0]["items"]) {
   render(<Menu trigger="Network" label="Choose the network" items={items} />);
   await userEvent.click(screen.getByRole("button", { name: "Network" }));
@@ -408,12 +408,22 @@ describe("Menu, a choice among items", () => {
     expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
   });
 
-  it("marks an item that is working aria-busy, and no other", async () => {
-    await opened([
-      { label: "Onyx", checked: true, onSelect: vi.fn() },
-      { label: "gno.land", checked: false, busy: true, onSelect: vi.fn() },
-    ]);
-    expect(screen.getByRole("menuitemradio", { name: "gno.land" }).getAttribute("aria-busy")).toBe("true");
-    expect(screen.getByRole("menuitemradio", { name: "Onyx" }).hasAttribute("aria-busy")).toBe(false);
+  it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", async () => {
+    render(
+      <Menu
+        trigger="Network"
+        label="Choose the network"
+        busy
+        items={[{ label: "Onyx", checked: true, onSelect: vi.fn() }]}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Network" });
+    expect(trigger.getAttribute("aria-busy")).toBe("true");
+    expect(trigger.querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
+
+  it("says nothing of busy when it is not", () => {
+    render(<Menu trigger="Network" label="Choose the network" items={[{ label: "Onyx", onSelect: vi.fn() }]} />);
+    expect(screen.getByRole("button", { name: "Network" }).hasAttribute("aria-busy")).toBe(false);
   });
 });

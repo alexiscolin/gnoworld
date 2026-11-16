@@ -4,7 +4,7 @@ import soon from "../ComingSoon/ComingSoon.module.css";
 import type { MenuItem } from "./Popover.tsx";
 import styles from "./Popover.module.css";
 
-// A row of the menu: an act, a choice (a radio, checked or not, busy while its act is read) or one yet to come.
+// A row of the menu: an act, a choice (a radio, checked or not) or one yet to come.
 export function Row({ item, onAct }: { item: MenuItem; onAct: (act: () => void) => void }) {
   const words = (
     <>
@@ -38,7 +38,6 @@ export function Row({ item, onAct }: { item: MenuItem; onAct: (act: () => void) 
       className={look.join(" ")}
       data-tone={item.tone}
       aria-checked={item.checked}
-      aria-busy={item.busy === true ? true : undefined}
       onClick={() => {
         onAct(item.onSelect);
       }}

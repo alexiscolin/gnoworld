@@ -91,11 +91,17 @@ describe("the network control", () => {
     expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
   });
 
-  it("shows the item working while the chain is read", async () => {
+  it("shows the work on the trigger, which stays in view when the menu closes, while the chain is read", async () => {
     chain.readPage.mockReturnValue(new Promise(() => undefined));
-    await draw("/r/gov/dao");
+    const hide = vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(function (this: HTMLElement) {
+      this.hidden = true;
+    });
+    const box = await draw("/r/gov/dao");
     await choose("gno.land");
-    expect(radio("gno.land").getAttribute("aria-busy")).toBe("true");
+    hide.mockRestore();
+    expect(document.querySelector<HTMLElement>("[role='menu']")?.hidden).toBe(true);
+    expect(trigger(box).getAttribute("aria-busy")).toBe("true");
+    expect(trigger(box).querySelector("[aria-hidden='true']")).not.toBeNull();
     expect(at()).toBe("/r/gov/dao");
   });
 

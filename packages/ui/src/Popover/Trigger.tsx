@@ -7,6 +7,7 @@ interface Attrs {
   ref: Ref<HTMLButtonElement>;
   popoverTarget: string;
   "aria-haspopup": "dialog" | "menu";
+  "aria-busy"?: true;
 }
 
 // What opens a popover's panel: the button look as given, the plain class alone (words as they are), or an icon-only
