@@ -1107,6 +1107,7 @@ def mutants():
     yield from each(ih, 'sh -s -- --stamp "$new/land.py"', "sh -s -- --stamp", "hooks", "install_hooks writes the tools found into land")
     yield from each(ih, 'git cat-file -e "$ref:tools/agent-github/install.sh" && git show', "git show", "hooks", "install_hooks links no land from a commit without its installer")
     yield from each(ih, 'rm -rf "${new:?}" && mkdir -m 700 "$new"', 'rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land"; rm -rf "${new:?}" && mkdir -m 700 "$new"', "hooks", "a refused reinstall keeps the old land")
+    yield from each(ih, '\trm -rf "${new:?}"\n', "\n", "hooks", "a reinstall leaves no folder of the new land")
     yield from each(ld, 'runs = ap.runs([n for n in g("diff", "--no-renames", "--name-only", "-z", base, tip).split("\\0") if n])', "runs = ap.runs(names)", "hooks", "land's workflow files are the branch's own, never a merge of main's")
     yield from each(ld, "#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I", "#!/usr/bin/env -S -i LC_ALL=C python3 -I", "hooks", "the repository's land runs nowhere")
     yield from each("scripts/agent_pr.py", "    if not title or len(title) > 256 or", "    if False or len(title) > 256 or", "hooks", "a pull request's text needs a title")
@@ -1172,12 +1173,14 @@ def mutants():
         ("    except ValueError:\n        return", "    except OSError:\n        return", "a profile's settings that are no JSON left as they are"),
         ('        shutil.copyfile(path, ', '        (lambda *a: None)(path, ', "a copy of a profile's settings kept before they change"),
         ("for x in wanted[key] if x not in lst]", "for x in wanted[key]]", "a twin added once to a profile"),
+        ("    except AttributeError:\n        lists = None", "    except ZeroDivisionError:\n        lists = None", "a profile's settings of the wrong shape left as they are"),
+        (' + sorted(glob.glob(os.path.join(glob.escape(home), ".claude-*")))', "", "every profile, ~/.claude-* too"),
+        ("        if os.path.islink(profile):", "        if False:", "no profile through a folder that is a link"),
+        ("    except OSError:\n        return", "    except ZeroDivisionError:\n        return", "a profile's settings that cannot be opened left as they are"),
     ):
         yield from each(mr, find, replace, "hooks", f"machine_rules.py writes {why}")
     yield from each(ih, 'main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)', "main=$(git rev-parse --show-toplevel)", "hooks",
                     "install_hooks roots this machine's twins at the main checkout, from a worktree too (D13413)")
-    yield from each(ih, '[ -z "$profiles" ] || git show "$ref:scripts/machine_rules.py"', ': || git show "$ref:scripts/machine_rules.py"', "hooks",
-                    "install_hooks writes no profile where none is (D13413)")
     # The instructions every session reads: its own tree's, to commands and to the file tools, and those of the home and temporary folders.
     for path in ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of the file tools (7z, R4, S4)")

@@ -556,7 +556,7 @@ if part siblings; then
 # them: a Read or Edit rule as a gitignore pattern (its permissions page: * within one segment, ** across), the sandbox's by
 # Claude Code 2.1.318's own source (* is [^/]*, ** is .*, a deny covers its path and all under it, a link resolved).
 python3 -I - "$here/../.claude/settings.json" "$here/machine_rules.py" "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)" <<'PY' || fail "a sibling worktree's closed files are open to this session (F4890, F4891, F4892)"
-import functools, json, os, re, runpy, sys
+import functools, glob, json, os, re, runpy, subprocess, sys, tempfile
 
 # The committed file holds the session's own tree's rules and those of no machine's folders; machine_rules.py derives this machine's
 # twins from them, which install_hooks.sh writes into every Claude profile (D13413). Claude Code adds the user's lists to the project's
@@ -655,6 +655,35 @@ if os.path.exists(local):
     assert kin <= set(lp.get("deny", [])), ("the main checkout's local settings leave instructions open to the sessions without 7w3's rules", sorted(kin - set(lp.get("deny", []))))
 else:
     print(f"siblings: SKIPPED (no {local}: the local settings every session reads are not judged)")
+# This machine's twins in every profile (D13413), when this tree's main checkout is one of this user's, not a clone in a temporary
+# folder: a relative rule added since the last install_hooks.sh guards no other tree until it runs (the security review of D13413).
+# They are main's, which install_hooks.sh installs, not this branch's: a branch's new rule is judged once it is main's.
+temporary = {"/private/tmp", "/tmp", os.path.realpath(tempfile.gettempdir())}
+here_main = os.path.realpath(real_main)
+# The object itself, whatever a replace ref shows, as install_hooks.sh reads it; the branch, never a tag or a file named main.
+main_settings = subprocess.run(["git", "--no-replace-objects", f"--git-dir={sys.argv[3]}", "show", "refs/heads/main:.claude/settings.json"], capture_output=True, text=True)
+# The profiles machine_rules.py writes: a folder that is a link is none of them; one whose settings are no file holds no twin, said.
+profiles = []
+for q in [os.path.join(HOME, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(HOME), ".claude-*"))):
+    if os.path.islink(q) or not os.path.lexists(os.path.join(q, "settings.json")):
+        continue
+    if os.path.isfile(os.path.join(q, "settings.json")):
+        profiles.append(q)
+    else:
+        print(f"siblings: {q}'s settings are no file: its twins are not judged")
+if profiles and main_settings.returncode == 0 and not any(here_main == r or here_main.startswith(r + "/") for r in temporary):
+    twins_here = mr["rules"](json.loads(main_settings.stdout), here_main, HOME, os.getuid())
+    for q in profiles:
+        try:
+            ps = json.load(open(os.path.join(q, "settings.json")))
+            held = set(ps.get("permissions", {}).get("deny", [])) | set(ps.get("sandbox", {}).get("filesystem", {}).get("denyWrite", []))
+        except (OSError, ValueError, AttributeError, TypeError):
+            print(f"siblings: {q}'s settings cannot be read as Claude Code reads them: its twins are not judged")
+            continue
+        missing = [r for r in twins_here["deny"] + twins_here["denyWrite"] if r not in held]
+        assert not missing, f"{q}'s settings lack {len(missing)} of this machine's twins of the committed rules (e.g. {missing[0]}): run install_hooks.sh (D13413)"
+else:
+    print("siblings: SKIPPED (no Claude profile, no main, or this tree's main checkout is a temporary one: the twins installed are not judged)")
 
 
 @functools.cache  # each pattern once: rebuilt, it was 0.8 s of the section's 0.9 (R5)
@@ -3050,11 +3079,15 @@ esac
 # the main one, "$i-wt" its worktrees' folder; a copy of each settings file is kept, nothing in them is lost, and none is added twice.
 # A profile holding a twin already and other keys keeps them; one that is not JSON or is a link is left as it is, the others written.
 main_i=$(cd "$i" && pwd -P) h6="$i/home6"
-mkdir -p "$h6/.claude" "$h6/.claude-w" "$h6/.claude-bad" "$h6/.claude-link" && echo '{}' >"$h6/.claude-w/settings.json" && echo '{' >"$h6/.claude-bad/settings.json"
+mkdir -p "$h6/.claude" "$h6/.claude-w" "$h6/.claude-bad" "$h6/.claude-link" "$h6/.claude-shape" "$h6/.claude-dir/settings.json" "$t/elsewhere-profile" &&
+	echo '{}' >"$h6/.claude-w/settings.json" && echo '{' >"$h6/.claude-bad/settings.json" && echo '{"permissions": null}' >"$h6/.claude-shape/settings.json" &&
+	echo '{}' >"$t/elsewhere-profile/settings.json" && ln -s "$t/elsewhere-profile" "$h6/.claude-folderlink"
 printf '{"permissions": {"deny": ["Read(~/.x)", "Read(/%s/.env)"]}, "sandbox": {"filesystem": {"allowWrite": ["~/.y"], "denyWrite": ["~/.z"]}}, "hooks": {"Stop": []}}\n' "$main_i" >"$h6/.claude/settings.json"
 echo '{}' >"$t/linked-settings.json" && ln -s "$t/linked-settings.json" "$h6/.claude-link/settings.json" && cp "$h6/.claude/settings.json" "$t/settings-before.json"
 (cd "$i" && HOME="$h6" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed writing this machine's rules: $(cat "$t/out")"
-grep -q "claude-bad: not JSON" "$t/out" && grep -q "claude-link: a link" "$t/out" && [ "$(cat "$h6/.claude-bad/settings.json")" = '{' ] && [ -L "$h6/.claude-link/settings.json" ] &&
+grep -q "claude-bad: not JSON" "$t/out" && grep -q "claude-link: a link" "$t/out" && grep -q "claude-shape: not settings as Claude Code reads them" "$t/out" &&
+	grep -q "claude-dir: unreadable" "$t/out" && grep -q "claude-folderlink: a link" "$t/out" && [ "$(cat "$t/elsewhere-profile/settings.json")" = '{}' ] &&
+	[ "$(cat "$h6/.claude-bad/settings.json")" = '{' ] && [ "$(cat "$h6/.claude-shape/settings.json")" = '{"permissions": null}' ] && [ -L "$h6/.claude-link/settings.json" ] &&
 	[ "$(cat "$t/linked-settings.json")" = '{}' ] || fail "install_hooks.sh did not leave a profile that is not JSON, or a link, as it was: $(cat "$t/out")"
 python3 -I - "$here/machine_rules.py" "$here/../.claude/settings.json" "$main_i" "$h6" "$t/settings-before.json" <<'PY' || fail "install_hooks.sh did not write this machine's rules into every profile, or lost what a profile held"
 import filecmp, glob, json, os, runpy, sys
@@ -3084,8 +3117,17 @@ mr, settings, main, home = runpy.run_path(sys.argv[1]), json.load(open(sys.argv[
 assert set(mr["rules"](settings, main, home, os.getuid())["deny"]) <= set(json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"])
 PY
 git -C "$i" worktree remove --force "$t/wt-i"
-(cd "$i" && HOME="$i/home8" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && ! grep -q "rule(s)" "$t/out" && [ ! -e "$i/home8/.claude" ] ||
+(cd "$i" && HOME="$i/home8" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && ! grep -q "install_hooks: .*claude" "$t/out" && [ ! -e "$i/home8/.claude" ] ||
 	fail "install_hooks.sh wrote a profile where none was: $(cat "$t/out")"
+# A home folder whose name holds a space is one folder, its profile written.
+h9="$i/home 9" && mkdir -p "$h9/.claude" && echo '{}' >"$h9/.claude/settings.json"
+(cd "$i" && HOME="$h9" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && grep -q "home 9/.claude: [1-9][0-9]* rule(s)" "$t/out" ||
+	fail "install_hooks.sh did not write a profile in a home folder whose name holds a space: $(cat "$t/out")"
+# A reinstall over an installed land replaces it whole: the link, a stamped copy, no folder of the new one left (F13464's path, which
+# the owner's reinstall takes after every merge).
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed reinstalling land: $(cat "$t/out")"
+[ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && head -1 "$lh/share/land/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C (/[^ /@]+)+/python3 -I' &&
+	[ ! -e "$lh/share/land/new" ] && ! grep -q "no new land installed" "$t/out" || fail "install_hooks.sh did not replace an installed land whole: $(cat "$t/out")"
 # A reinstall that cannot install the new land keeps the old one, linked and whole (F13464: #33's install removed it first).
 cp "$lh/share/land/land.py" "$t/land_before.py"
 (cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh oldland >"$t/out" 2>&1) || fail "install_hooks.sh failed on a reinstall it refused: $(cat "$t/out")"

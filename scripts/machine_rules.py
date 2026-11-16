@@ -1,10 +1,11 @@
-"""machine_rules.py <settings.json's text> <main checkout> [<profile folder>...]: the twins of .claude/settings.json's rules on this
+"""machine_rules.py <settings.json's text> <main checkout>: the twins of .claude/settings.json's rules on this
 machine (D13413). A relative rule guards a session's own tree alone, while its tools reach further: the main checkout from a worktree
 session (the file tools, and its shell through git's shared folder), every worktree and their folder from the chief's (its --add-dir of
 that folder), and the temporary folder from every shell. Those folders are each machine's, so the committed file names none, and
-install_hooks.sh writes these into every Claude profile's user settings, each a list that adds to the project's (D13414 keeps the
-seven rules above the main checkout out: no session writes there). With no profile named, it prints them as JSON."""
+install_hooks.sh has this write them into every Claude profile's user settings (~/.claude and ~/.claude-*), each a list that adds to
+the project's (D13414 keeps the six rules above the main checkout out: no session writes there)."""
 import datetime
+import glob
 import json
 import os
 import re
@@ -53,9 +54,16 @@ def write(profile, wanted):
     try:
         with open(path) as f:
             s = json.load(f)
+    except OSError:
+        return "unreadable, left as it is"
     except ValueError:
         return "not JSON, left as it is"
-    lists = (s.setdefault("permissions", {}).setdefault("deny", []), s.setdefault("sandbox", {}).setdefault("filesystem", {}).setdefault("denyWrite", []))
+    try:
+        lists = (s.setdefault("permissions", {}).setdefault("deny", []), s.setdefault("sandbox", {}).setdefault("filesystem", {}).setdefault("denyWrite", []))
+    except AttributeError:
+        lists = None
+    if lists is None or not all(isinstance(x, list) for x in lists):
+        return "not settings as Claude Code reads them, left as it is"
     added = [(lst, x) for lst, key in zip(lists, ("deny", "denyWrite")) for x in wanted[key] if x not in lst]
     if added:
         shutil.copyfile(path, f"{path}.bak-install-hooks-{datetime.datetime.now():%Y%m%d%H%M%S}")
@@ -70,8 +78,10 @@ def write(profile, wanted):
 
 
 if __name__ == "__main__":
-    wanted = rules(json.loads(sys.argv[1]), sys.argv[2], os.path.expanduser("~"), os.getuid())
-    if len(sys.argv) == 3:
-        print(json.dumps(wanted, indent=1))
-    for profile in sys.argv[3:]:
-        print(f"install_hooks: {profile}: {write(profile, wanted)}")
+    home = os.path.expanduser("~")
+    wanted = rules(json.loads(sys.argv[1]), sys.argv[2], home, os.getuid())
+    for profile in [os.path.join(home, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(home), ".claude-*"))):
+        if os.path.islink(profile):  # its settings are another folder's, wherever the link leads
+            print(f"install_hooks: {profile}: a link, left as it is")
+        elif os.path.lexists(os.path.join(profile, "settings.json")):
+            print(f"install_hooks: {profile}: {write(profile, wanted)}")
