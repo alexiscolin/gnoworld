@@ -91,6 +91,23 @@ describe("the network control", () => {
     expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
   });
 
+  it("keeps a realm the other chain holds but draws no page for (no Render): the chain says it exists", async () => {
+    chain.readPage.mockResolvedValue({ ok: false, failure: { kind: "no-page", next: "" }, source: missing.source });
+    await draw("/r/gov/dao");
+    await choose("gno.land");
+    await settled(() => at() === "/net/gnoland/r/gov/dao");
+    expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
+  });
+
+  it("keeps a realm the target's worlds list, with no chain asked", async () => {
+    chain.readPage.mockRejectedValue(new Error("down"));
+    await draw("/net/gnoland/r/gov/dao");
+    await choose("Onyx");
+    await settled(() => at() === "/r/gov/dao");
+    expect(chain.readPage).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toMatch(/not on Onyx/i);
+  });
+
   it("shows the work on the trigger, which stays in view when the menu closes, while the chain is read", async () => {
     chain.readPage.mockReturnValue(new Promise(() => undefined));
     const hide = vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(function (this: HTMLElement) {
