@@ -21,20 +21,13 @@ esac
 for arg in "$dir" "$branch" "$base"; do
 	case $arg in -*) echo "worktree.sh: $arg starts with -, which git would read as an option" >&2; exit 2 ;; esac
 done
-# It may run outside the sandbox: it makes and removes the folders of one root alone, in this user's home, where no
-# session's shell writes but its own folder (the file tools still can), and which no argument moves. The folder's parent is resolved, so a
+# It may run outside the sandbox: it makes and removes the folders of one root alone, the main checkout's "-wt" folder beside it
+# (D13415), in this user's home, where no session's shell writes but its own folder (the file tools still can), and which no argument
+# moves: the main checkout is git's shared folder's parent, found below from the .git the settings deny every session. The folder's parent is resolved, so a
 # `..`, a link on the way or another path is refused, and compared with the root as written, never resolved; the name's letters
 # are spelled out, as sh's [a-z] takes a capital or an accented letter in a UTF-8 locale (bash 3.2). The folder is then named by
 # that resolved path, so no trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as
 # the folder is refused, as git makes the branch before failing on one, and removes the tree a link leads to, wherever it is.
-root=$HOME/Server/gnoworld-wt
-case $dir in */*) ;; *) dir=$root/$dir ;; esac # a bare name is a folder of the root
-name=$(basename "$dir")
-parent=$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P) || parent=
-case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac
-[ "$parent" = "$root" ] || { echo "worktree.sh: $dir is not $root/<name>, <name> in a-z, 0-9 and -, once resolved" >&2; exit 1; }
-dir=$root/$name
-[ ! -L "$dir" ] || { echo "worktree.sh: $dir is a link; name the folder itself" >&2; exit 1; }
 # A caller's git folders are never this run's: a work tree, an index or an object folder of another place.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
 src=$(pwd -P)
@@ -49,6 +42,15 @@ else
 	GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)
 fi
 export GIT_COMMON_DIR
+root=$(dirname "$GIT_COMMON_DIR")-wt
+case $root in "${HOME:?worktree.sh: no home folder}"/?*) ;; *) echo "worktree.sh: $root, the main checkout's worktrees' folder, is not in your home" >&2; exit 1 ;; esac
+case $dir in */*) ;; *) dir=$root/$dir ;; esac # a bare name is a folder of the root
+name=$(basename "$dir")
+parent=$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P) || parent=
+case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac
+[ "$parent" = "$root" ] || { echo "worktree.sh: $dir is not $root/<name>, <name> in a-z, 0-9 and -, once resolved" >&2; exit 1; }
+dir=$root/$name
+[ ! -L "$dir" ] || { echo "worktree.sh: $dir is a link; name the folder itself" >&2; exit 1; }
 # Nor a hook or an fsmonitor of that folder, whose .git/hooks and config the file tools can still write: a post-checkout
 # hook would run as the tree is made, an fsmonitor as the base is compared.
 GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false

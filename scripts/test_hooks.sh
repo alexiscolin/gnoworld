@@ -6135,15 +6135,15 @@ for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
-# It runs outside the sandbox, so it makes and removes the folders of one root alone, $HOME/Server/gnoworld-wt, where no session
-# writes but its own folder. With this user's own home it refuses a folder anywhere else, naming that root,
-# and makes nothing; the other cases give it a home of this run's ($home). The base is no commit, so a fence switched off (a
-# harness mutant) stops there, never making a tree in the real root, and still fails on the message.
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree outside \$HOME/Server/gnoworld-wt: $out"
-printf '%s\n' "$out" | grep -qF "is not $HOME/Server/gnoworld-wt/<name>" || fail "worktree.sh did not name the root it requires: $out"
-[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+# It runs outside the sandbox, so it makes and removes the folders of one root alone, the main checkout's "-wt" folder beside it
+# (D13415), in this user's home, where no session writes but its own folder. With this user's own home, which this run's main
+# checkout is not in, it refuses, naming the root, and makes nothing; the other cases give it a home holding the checkout ($home).
+# The base is no commit, so a fence switched off (a harness mutant) stops there, never making a tree, and still fails on the message.
 wsr=$(cd "$ws" && pwd -P)
-home="$wsr/home" wr="$wsr/home/Server/gnoworld-wt"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree with a root outside its home: $out"
+printf '%s\n' "$out" | grep -qF "$wsr/src-wt, the main checkout's worktrees' folder, is not in your home" || fail "worktree.sh did not name the root it requires: $out"
+[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+home="$wsr" wr="$wsr/src-wt"
 mkdir -p "$wr" "$ws/.githooks" && cp "$hooks/records.sh" "$ws/.githooks/"
 wt() { (cd "$ws/src" && HOME="$home" sh "$here/worktree.sh" "$@"); }
 wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
@@ -6154,7 +6154,7 @@ wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$w
 [ -d "$wr/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
 [ "$(cd "$wr/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wr/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
 [ -z "$(git -C "$wr/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wr/new" status --porcelain)"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree outside \$HOME/Server/gnoworld-wt: $out"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree with a root outside its home: $out"
 [ -d "$wr/new" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/new" || fail "worktree.sh's refused remove of a tree outside its root touched it"
 wt "$wr/new" other HEAD >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
 mkdir "$wr/empty" && wt "$wr/empty" another HEAD >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
@@ -6168,21 +6168,21 @@ done
 # made: another absolute path, another home's root, a .. out of the root or a lone .., a link out of it on the way, a folder in a
 # worktree, a name with a capital, a dot, an underscore, a space, or an accented letter, which sh's [a-z] takes in a UTF-8 locale
 # (bash 3.2, macOS's sh: U and e-acute; dash, Linux's, reads bytes). The locale is set here, whatever the caller's.
-mkdir -p "$ws/elsewhere" "$wsr/home2/Server/gnoworld-wt" && ln -s "$ws/elsewhere" "$wr/away"
+mkdir -p "$ws/elsewhere" "$wsr/other-wt" && ln -s "$ws/elsewhere" "$wr/away"
 n=0
-for d in "$ws/elsewhere/a" "$wsr/home2/Server/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
+for d in "$ws/elsewhere/a" "$wsr/other-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
 	"$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
 	n=$((n + 1))
 	out=$(LC_ALL=en_US.UTF-8 && export LC_ALL && wt "$d" "fence$n" HEAD 2>&1) && fail "worktree.sh made a tree at $d, which is not <root>/<name>: $out"
 	printf '%s\n' "$out" | grep -qF "is not $wr/<name>" || fail "worktree.sh refused $d for another reason than its root: $out"
 	! git -C "$ws/src" rev-parse -q --verify "fence$n" >/dev/null || fail "worktree.sh made the branch of $d, which is not <root>/<name>"
 done
-[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/home2/Server/gnoworld-wt")" ] && [ ! -e "$wsr/home/Server/outside" ] && [ ! -e "$wr/new/inner" ] ||
+[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/other-wt")" ] && [ ! -e "$wsr/outside" ] && [ ! -e "$wr/new/inner" ] ||
 	fail "worktree.sh made a folder out of its root"
 [ "$(ls -A "$wr" | tr '\n' ' ')" = "away empty new " ] || fail "worktree.sh made a folder for a name it refuses: $(ls -A "$wr")"
 # The root is compared as written, never resolved: through a home that is a link, a folder is refused.
 ln -s "$home" "$ws/homelink"
-out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/Server/gnoworld-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
+out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/src-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
 [ ! -e "$wr/via" ] || fail "worktree.sh made a folder through a root that is a link"
 # A link named as the folder is refused, what it leads to untouched: git (2.50) makes the branch, then fails on it. So is it
 # with a trailing slash, which leads through the link.
@@ -6196,12 +6196,12 @@ done
 out=$(cd "$ws/src" && env -u HOME sh "$here/worktree.sh" "$wr/nohome" nohome HEAD 2>&1) && fail "worktree.sh made a tree with no home: $out"
 [ ! -e "$wr/nohome" ] && ! git -C "$ws/src" rev-parse -q --verify nohome >/dev/null || fail "worktree.sh made a folder or a branch with no home"
 # A relative path, or one whose .. stays in the root, is the folder it resolves to.
-wt "../home/Server/gnoworld-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
+wt "../src-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/rel" || fail "worktree.sh did not make the folder a relative path resolves to"
 # remove <dir>: a clean worktree of this repository under the root, from another tree; its files deleted, ignored ones included,
 # never what a link in it leads to; its branch kept; and no other tree's record touched, not even one whose folder is gone, which
 # git worktree prune would take: a session can point another tree's record at nothing.
-wt remove "$wr/../gnoworld-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
+wt remove "$wr/../src-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
 [ ! -e "$wr/rel" ] || fail "worktree.sh left the folder it removed"
 wt "$wr/stale" stale HEAD >/dev/null 2>&1 && rm -r "$wr/stale" || fail "the stale worktree of this case could not be made"
 wt "$wr/clean" clean HEAD >/dev/null 2>&1 || fail "the clean worktree of this case could not be made"

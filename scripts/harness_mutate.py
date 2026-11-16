@@ -1420,7 +1420,8 @@ def mutants():
     # It may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
     # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.
     yield from each("scripts/worktree.sh", '[ "$parent" = "$root" ] ||', "true ||", "hooks", "worktree.sh makes and removes the folders of its root alone (F5058)")
-    yield from each("scripts/worktree.sh", "root=$HOME/Server/gnoworld-wt", "root=$HOME/Server", "hooks", "worktree.sh's root is $HOME/Server/gnoworld-wt (F5058)")
+    yield from each("scripts/worktree.sh", 'root=$(dirname "$GIT_COMMON_DIR")-wt', 'root=$(dirname "$GIT_COMMON_DIR")', "hooks", "worktree.sh's root is the main checkout's -wt folder (D13415)")
+    yield from each("scripts/worktree.sh", 'case $root in "${HOME:?worktree.sh: no home folder}"/?*) ;; *)', "case $root in *) ;; x)", "hooks", "worktree.sh's root is in the user's home (D13415)")
     yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -L) || parent=", "hooks", "worktree.sh resolves the folder's parent, never through a link (F5058)")
     for char in "._":
         yield from each("scripts/worktree.sh", "*[!abcdefghijklmnopqrstuvwxyz0123456789-]*)", f"*[!{char}abcdefghijklmnopqrstuvwxyz0123456789-]*)", "hooks", f"worktree.sh refuses a {char} in its folder's name (F5058)")
