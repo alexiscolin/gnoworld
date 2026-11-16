@@ -152,6 +152,14 @@ describe("POST /ask: a question to the loop", () => {
     expect(signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("marks the question of a fixed ask shared for the loop's tools, and a person's own never", async () => {
+    const ask = asking({ kind: "spent" });
+    const { post } = await served({ ask });
+    await post(JARVIS_PATHS.ask, question());
+    await post(JARVIS_PATHS.ask, { ask: "here", room: ROOM, lines: [] });
+    expect(ask.mock.calls.map(([handed]) => "shared" in handed && handed.shared)).toEqual([false, true]);
+  });
+
   it("answers the loop's answer with its text and the buttons its tools kept, as the door's schema reads it", async () => {
     const kept = { digests: [], proposals: [], buttons: [{ button: fly, read: { profile: "onyx", height: 7 } }] };
     const { post } = await served({
@@ -165,6 +173,25 @@ describe("POST /ask: a question to the loop", () => {
       markdown: "GovDAO is on Onyx.",
       buttons: [fly],
     });
+  });
+
+  // D13508, F13582: Jarvis's own door too: a fixed ask's answer carries its flights alone, an own question's both.
+  it("drops an action button from the answer to a fixed ask, and keeps it on an own question", async () => {
+    const action = {
+      type: "action",
+      label: "Vote",
+      action: { realm: "gno.land/r/gov/dao", function: "Vote", args: {}, why: "to vote" },
+      chainId: "onyx-1",
+    } as AnswerButton;
+    const kept = cards([fly, action]);
+    const { post } = await served({ ask: asking({ kind: "answer", cost: 7, text: "Here.", cards: kept }) });
+    const typesOf = async (body: unknown) =>
+      ((await (await post(JARVIS_PATHS.ask, body)).json()) as { buttons: { type: string }[] }).buttons.map(
+        (b) => b.type,
+      );
+    expect(await typesOf({ ask: "here", room: ROOM, lines: [] })).toEqual(["fly"]);
+    expect(await typesOf({ ask: "catch-up", room: ROOM, lines: [] })).toEqual(["fly"]);
+    expect(await typesOf(question())).toEqual(["fly", "action"]);
   });
 
   it("sends no digest and no proposal an answer holds, which the wire has no place for", async () => {

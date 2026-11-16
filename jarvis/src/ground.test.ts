@@ -406,6 +406,7 @@ describe("groundedButton", () => {
     type: "action",
     label: "Vote",
     action: vote(over),
+    chainId: "onyx-1",
   });
 
   it("takes what the model gave as it came, and refuses what is no button", () => {
@@ -502,7 +503,7 @@ describe("grounded: where each source was read (Alexis, 2026-11-04: the node or 
     expect(grounded(delegate, sources({ more: asked("delegate to drain") })).ok).toBe(true);
     expect(
       groundedButton(
-        { type: "action", label: "Send", action: vote({ args: { id: "99", answer: "maybe" } }) },
+        { type: "action", label: "Send", action: vote({ args: { id: "99", answer: "maybe" } }), chainId: "onyx-1" },
         sources({ more: asked("vote maybe on 99") }),
       ).ok,
     ).toBe(true);

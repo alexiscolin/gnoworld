@@ -455,6 +455,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
         type: "action",
         label: "Vote",
         action: { realm: REALM, function: fn, args: { id: "37", answer: "yes" }, why: "37 proposals are open." },
+        chainId: "onyx-1",
       },
     });
     const turn = (...uses: ReturnType<typeof toolUse>[]) => message({ content: uses, stop: "tool_use" });

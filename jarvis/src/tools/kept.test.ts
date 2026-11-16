@@ -43,12 +43,19 @@ describe("keepCards: a question's own cards", () => {
     kept.keep({ kind: "digest", realm: "gno.land/r/demo/poll", read: read(), digest: digest() });
     kept.keep({ kind: "proposal", read: read(), action: action() });
     kept.keep({ kind: "button", button: fly() });
-    kept.keep({ kind: "button", button: { type: "action", label: "Vote", action: action() }, read: read() });
+    kept.keep({
+      kind: "button",
+      button: { type: "action", label: "Vote", action: action(), chainId: "onyx-1" },
+      read: read(),
+    });
     // Strict: a button kept with no read carries no `read` field at all.
     expect(kept.cards()).toStrictEqual({
       digests: [{ realm: "gno.land/r/demo/poll", read: read(), digest: digest() }],
       proposals: [{ read: read(), action: action() }],
-      buttons: [{ button: fly() }, { button: { type: "action", label: "Vote", action: action() }, read: read() }],
+      buttons: [
+        { button: fly() },
+        { button: { type: "action", label: "Vote", action: action(), chainId: "onyx-1" }, read: read() },
+      ],
     });
   });
 

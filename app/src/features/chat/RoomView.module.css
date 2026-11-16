@@ -193,6 +193,12 @@
     letter-spacing: 0.06em;
     /* raw: the frames set it on the name's baseline, a pixel under the row's centre */
     translate: 0 1px;
+    /* raw: the frames' 22 px box, held whatever the font's metrics make of two letters (a runner's mono was a pixel narrower) */
+    inline-size: 22px;
+    /* layout: the letters centred in it, as a grid's one cell */
+    display: grid;
+    /* layout: the cell's middle */
+    justify-items: center;
   }
 
   /* The face opens its author's card, as the name does. */

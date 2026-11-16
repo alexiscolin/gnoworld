@@ -10,23 +10,19 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisAsk,
-  JarvisBudget,
-  JarvisBudgets,
-  JarvisChange,
-  JarvisChangeRequest,
   JarvisDigest,
   JarvisDigestRequest,
   JarvisMadeDigest,
   JarvisPaidAnswer,
   JARVIS_LANGUAGES,
   JarvisQuestion,
-  JarvisSettings,
   JarvisState,
   JarvisTranslate,
   JarvisTranslation,
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
+import { JarvisBudget, JarvisBudgets, JarvisChange, JarvisChangeRequest, JarvisSettings } from "./jarvisAdmin.ts";
 
 // What Jarvis hands the client, as data. Each builder makes a fresh value inside the test.
 const action = () => ({
@@ -223,7 +219,17 @@ describe("AnswerButton", () => {
   it("flies to a place by its path, or opens a proposed action", () => {
     for (const place of ["/", "/earth", "/w/bubble", "/e/defi-hub", "/net/onyx/", "/net/onyx/w/bubble"])
       expect(button({ type: "fly", label: "Go there", place })).toBe(true);
-    expect(button({ type: "action", label: "Vote", action: action() })).toBe(true);
+    expect(button({ type: "action", label: "Vote", action: action(), chainId: "onyx-1" })).toBe(true);
+  });
+
+  // D13508, F13580: an action names the chain it was checked on, one of the universes' chain ids
+  // (app/data/universes.json, compared in jarvis's cards.test.ts).
+  it("takes an action checked on a known chain alone: required, onyx-1 or gnoland-1", () => {
+    expect(button({ type: "action", label: "Vote", action: action(), chainId: "gnoland-1" })).toBe(true);
+    expect(button({ type: "action", label: "Vote", action: action() })).toBe(false);
+    expect(button({ type: "action", label: "Vote", action: action(), chainId: "evil-1" })).toBe(false);
+    expect(button({ type: "action", label: "Vote", action: action(), chainId: "" })).toBe(false);
+    expect(button({ type: "fly", label: "Go", place: "/", chainId: "onyx-1" })).toBe(false);
   });
 
   it.each([
@@ -244,14 +250,16 @@ describe("AnswerButton", () => {
     expect(button({ type: "fly", label: "Go", place: `/w/${text(JARVIS_CAPS.place - 2)}` })).toBe(false);
     expect(button({ type: "fly", label: text(JARVIS_CAPS.label), place: "/" })).toBe(true);
     expect(button({ type: "fly", label: text(JARVIS_CAPS.label + 1), place: "/" })).toBe(false);
-    expect(button({ type: "action", label: "", action: action() })).toBe(false);
+    expect(button({ type: "action", label: "", action: action(), chainId: "onyx-1" })).toBe(false);
   });
 
   it("refuses a button of another kind, an action carrying coins and a field a button does not have", () => {
     expect(button({ type: "link", label: "Open", href: "https://evil.example" })).toBe(false);
-    expect(button({ type: "action", label: "Vote", action: { ...action(), send: "5ugnot" } })).toBe(false);
+    expect(button({ type: "action", label: "Vote", action: { ...action(), send: "5ugnot" }, chainId: "onyx-1" })).toBe(
+      false,
+    );
     expect(button({ type: "fly", label: "Go", place: "/", action: action() })).toBe(false);
-    expect(button({ type: "action", label: "Vote", action: action(), place: "/" })).toBe(false);
+    expect(button({ type: "action", label: "Vote", action: action(), chainId: "onyx-1", place: "/" })).toBe(false);
   });
 });
 
