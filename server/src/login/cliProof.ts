@@ -7,7 +7,7 @@ import { ripemd160, Secp256k1, Secp256k1Signature, sha256 } from "@cosmjs/crypto
 import { jsonOf } from "@gnoworld/core";
 import { Address, toAddress } from "@gnoworld/schemas";
 import { z } from "zod";
-import type { Expected } from "./login.ts";
+import type { Expected } from "./verify.ts";
 
 const CLI_CHAIN = "gnoworld-link";
 const MAX_FILE = 4096;

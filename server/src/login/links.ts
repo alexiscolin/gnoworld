@@ -7,7 +7,7 @@ import { Address, type Challenge, type Proof } from "@gnoworld/schemas";
 import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import { cliSafe } from "./cliProof.ts";
-import { verifyProof, verifies, type Expected, type Verify } from "./login.ts";
+import { verifyProof, verifies, type Expected, type Verify } from "./verify.ts";
 import { droppers, makeRelease, type Release } from "./release.ts";
 
 export const LINK_TABLES = `

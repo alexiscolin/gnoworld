@@ -11,7 +11,8 @@ import { cliFile, cliKey, type CliKey } from "../testing/cliSigner.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { cliSafe, cliVerify } from "./cliProof.ts";
 import { makeLinks, type LinkKind, type Links, type Verifiers } from "./links.ts";
-import { makeLogin, makeSigned, type Verify } from "./login.ts";
+import { makeLogin, makeSigned } from "./login.ts";
+import type { Verify } from "./verify.ts";
 
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const MINUTE = 60_000;

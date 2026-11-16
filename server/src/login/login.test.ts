@@ -9,18 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import {
-  LOGIN_TABLES,
-  makeLogin,
-  makeSigned,
-  NONCE_ACTION,
-  NONCE_LINK,
-  NONCE_HOST,
-  verifies,
-  verifyProof,
-  type Login,
-  type Verify,
-} from "./login.ts";
+import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_LINK, NONCE_HOST, type Login } from "./login.ts";
+import { verifies, verifyProof, type Verify } from "./verify.ts";
 import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");

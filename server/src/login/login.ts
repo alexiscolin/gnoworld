@@ -5,9 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { Address, type Challenge, type VerifyRequest } from "@gnoworld/schemas";
 import { z } from "zod";
-import { verifies, verifyProof, type Expected, type Verify } from "./verify.ts";
-
-export { verifies, verifyProof, type Expected, type Verify };
+import { verifies, verifyProof, type Verify } from "./verify.ts";
 
 export const LOGIN_TABLES = `
 CREATE TABLE nonces (nonce TEXT PRIMARY KEY, chain TEXT NOT NULL, text TEXT NOT NULL, expires_at INTEGER NOT NULL) STRICT;
