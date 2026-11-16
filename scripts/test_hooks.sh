@@ -6614,7 +6614,7 @@ const base = (files) => (l) =>
       l === "design-reviewer" ? (design ? design(p, o) : { findings: [], framesMissing: false })
       : (l || "").startsWith("fix round") ? { fixed: [{ id: "design-reviewer-1-1", commit: "fd" }], notes: "", branch: "b" }
       : base(files)(l, p, o));
-    for (const file of ["app/src/scene/space.ts", "packages/core/src/planet/look.ts", "packages/core/src/cosmos/cosmos.ts", "packages/core/src/space/drift.ts"]) {
+    for (const file of ["app/src/scene/space.ts", "packages/core/src/planet/look.ts", "packages/core/src/cosmos/warmth.ts", "packages/core/src/space/cell.ts"]) {
       const d = await withDesign([file]);
       ok(d.labels.includes("design-reviewer"), `a change of ${file} alone started no design-reviewer: ${d.labels}`);
       ok(d.r.status === "ready for the chief", `a clean design review of ${file} did not end ready: ${d.r.status}`);

@@ -37,19 +37,19 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "cellIn", "write", "light", "unit", "moodAt", "lattice", "field", "side", "ringAt", "tintOf", "densityAt", "driftAt", "turnAt", "wrapTo", "nearestCell", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep", "frameRate", "isDue", "carryOver", "frameWait", "judgeFrames"]
+FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "light", "unit", "field", "side", "driftAt", "turnAt", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
-    ("frame_arrow.ts", "export const wrapTo = (): number[] => {\n  return [1];\n};\n", FRAME),
+    ("frame_arrow.ts", "export const unitOf = (): number[] => {\n  return [1];\n};\n", FRAME),
     ("frame_closure.ts", "export function driftAt(): () => number {\n  return () => 1;\n}\n", FRAME),
-    ("frame_arrow_closure.ts", "export const wrapTo = (): (() => number) => () => 1;\n", FRAME),
+    ("frame_arrow_closure.ts", "export const unitOf = (): (() => number) => () => 1;\n", FRAME),
     ("frame_method.ts", "export class Torus {\n  follow(): number[] {\n    return [1];\n  }\n}\n", FRAME),
     ("frame_property.ts", "export const cells = {\n  follow(): number[] {\n    return [1];\n  },\n};\n", FRAME),
     # By whole names; an index walks an array, where for...of is refused; a test stays under the tests' list.
     ("frame_longer.ts", "export function drawing(): number[] {\n  return [1];\n}\n", None),
-    ("frame_index.ts", "export function moodAt(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
+    ("frame_index.ts", "export function cellHash(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
     ("frame_off.test.ts", 'import { expect, test } from "vitest";\n\ntest.skip("x", () => {\n  expect(1).toBe(1);\n});\n', "no-restricted-syntax: A test is never switched off"),
-    ("frame_plain.ts", "export function moodAt(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
+    ("frame_plain.ts", "export function cellHash(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
     ("frame_setup.ts", "export function newMood(): number[] {\n  return [0, 0];\n}\n", None),
     # The block replaces core's list: what that list holds still holds here.
     ("frame_module.ts", "export const SEEN = new Set<string>();\n", MODULE),
