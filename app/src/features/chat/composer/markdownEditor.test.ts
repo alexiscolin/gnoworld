@@ -108,7 +108,7 @@ describe("the composer's Markdown, to the editor and back", () => {
     }
   });
 
-  // fast-check found `~~~~a~~` (F13632, seed 1772115532): the reader leaves a tilde run of 3+ as text, so no `~~` inside it strikes.
+  // fast-check found a run of four tildes before `a~~` (F13632, seed 1772115532): the reader leaves a run of 3+ as text, so no `~~` in it strikes.
   it("leaves the room's reading of a tilde run of three or more as it was", () => {
     for (const md of ["~~~~a~~", "~~~a~~", "~~~~a~~~~", "a ~~~~a~~ b", "~~a~~ ~~~b~~", "`~~~a~~` ~~~b~~"]) {
       expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
