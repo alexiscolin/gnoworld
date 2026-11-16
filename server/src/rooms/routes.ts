@@ -6,7 +6,7 @@ import { CreateRoom, RoomName, type Address, type MadeRoom } from "@gnoworld/sch
 import { Hono, type Context } from "hono";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import { visitor48Of, visitorOf } from "../visitor.ts";
+import { anyFull, takeAll, visitor48Of, visitorOf, VISITORS_PER_BLOCK, type Allowances } from "../visitor.ts";
 import type { Log } from "@gnoworld/service/log";
 import { mayCreateRoom, type Roles } from "../roles/roles.ts";
 import { EARTH_PER_DAY, type Rooms } from "./create.ts";
@@ -52,15 +52,13 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, proxy, 
   // C12: the account's 3 a day (create.ts) alone left throwaway accounts as many rooms as they wished: a visitor (a /64) and
   // its address block (a /48, four visitors) have a day's allowance too, taken only for a room made.
   const byVisitor = limiter({ max: 2 * EARTH_PER_DAY, windowMs: DAY_MS, keys: 100_000 });
-  const byBlock = limiter({ max: 8 * EARTH_PER_DAY, windowMs: DAY_MS, keys: 100_000 });
-  const allowances = (c: Context) =>
-    [
-      [byVisitor, visitorOf(c, proxy)],
-      [byBlock, visitor48Of(c, proxy)],
-    ] as const;
+  const byBlock = limiter({ max: VISITORS_PER_BLOCK * 2 * EARTH_PER_DAY, windowMs: DAY_MS, keys: 100_000 });
+  const allowances = (c: Context): Allowances => [
+    [byVisitor, visitorOf(c, proxy)],
+    [byBlock, visitor48Of(c, proxy)],
+  ];
   // Whether the try may go on: no allowance spent, and one of the tries taken.
-  const mayTry = (c: Context, who: Address) =>
-    !allowances(c).some(([each, key]) => each.full(key, now())) && tries.take(who, now());
+  const mayTry = (c: Context, who: Address) => !anyFull(allowances(c), now()) && tries.take(who, now());
   const refuse = refuserOf(log, "room_refused", refusals);
   const account = (c: Context): Address | undefined => sessionOf(c, session);
   // Who acts, and whether on that world: a session and the right, before anything else is read.
@@ -79,10 +77,10 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, proxy, 
     const verdict = await check(EARTH, name).catch((): "unchecked" => "unchecked");
     if (verdict !== "pass") return refuse(c, verdict === "hide" ? "name" : "unchecked");
     // The allowances again, with no await up to their take: parallel tries all passed mayTry while the counters were at 0.
-    if (allowances(c).some(([each, key]) => each.full(key, now()))) return refuse(c, "limit");
+    if (anyFull(allowances(c), now())) return refuse(c, "limit");
     const result = rooms.earth(who, name);
     if (typeof result === "string") return refuse(c, result === "day" ? "limit" : result);
-    for (const [each, key] of allowances(c)) each.take(key, now());
+    takeAll(allowances(c), now());
     log("room_made", { room: result.made, account: who });
     return c.json({ room: result.made } satisfies MadeRoom, 201);
   };

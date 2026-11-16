@@ -9,7 +9,7 @@ import { guard, refuserOf, type Refusals, type Guarded, sessionOf } from "../gua
 import { limiter } from "../limit.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { hiddenRoom, mayRead, searchable, type Typed } from "../rooms/types.ts";
-import { visitor48Of, visitorOf } from "../visitor.ts";
+import { visitor48Of, visitorOf, VISITORS_PER_BLOCK } from "../visitor.ts";
 import type { Search } from "./index.ts";
 import type { Found, Query } from "./query.ts";
 import { snippetOf } from "./snippet.ts";
@@ -18,7 +18,7 @@ import { snippetOf } from "./snippet.ts";
 const SEARCH_PER_MINUTE = 20;
 const SEARCH_ACCOUNT_PER_MINUTE = 60;
 /** Requests a minute from one address block (a /48, one customer at most providers): four visitors', so a few accounts of one block cannot keep the whole's second full (C12). */
-const SEARCH_BLOCK_PER_MINUTE = 4 * SEARCH_PER_MINUTE;
+const SEARCH_BLOCK_PER_MINUTE = VISITORS_PER_BLOCK * SEARCH_PER_MINUTE;
 /** Searches a second across every visitor: the index is one synchronous connection, so per-visitor limits do not bound its load. */
 const SEARCH_PER_SECOND = 10;
 
