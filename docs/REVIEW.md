@@ -61,7 +61,8 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
 "The gate"):
 
 1. **No tokens first.** check.sh on the committed tree, then GitHub's gate, StrykerJS on the changed tier-1 lines among
-   its jobs: a surviving mutant is a missing test, found without a model. No job fails on a survivor (F13184, open): it stays in its job's log, and the reviewer reads it there.
+   its jobs: a surviving mutant is a missing test, found without a model. Past the config's low share of survivors the job fails (F13184),
+   and the first ten survivors are warnings of the risk job, which the reviewer reads with no login (the rest in its log).
 2. **The red pass, once per branch.** Before any code, the `test-auditor` reviews the branch's
    failing tests against the plan: complete, relevant, riskiest paths first, the threat model's
    abuse cases present. Tier-1 and harness code alone. A fixer's tests get none.

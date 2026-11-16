@@ -24,7 +24,7 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    screen Alexis validated gets its journey, walked locally; tier 1 and the harness take their lane (D13193 for a small harness change).
 5. **One pass** (CLAUDE.md, D13178, D13186): `sh scripts/check.sh` before each commit; on the finished branch, once: check.sh on the
    committed tree, the lint job, regressions, the harness's tests; deploy-stack and zizmor are GitHub's alone; main's red jobs
-   read first; a branch that changes `deploy/` gets D13191's hand run.
+   read first.
 6. **One review a pull request** (D13181): the `reviewer`, with the `security-reviewer` for tier 1 or the harness, the `gno-auditor`
    for a realm, the `design-reviewer` when space's look changes. Each finding reproduced before it is fixed, high and medium fixed,
    low listed; each into `docs/review/findings.md` in the given range, one row a pull request in `docs/review-log.md`; a second round
@@ -33,5 +33,5 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    origin <branch>` and `gh pr create --base main --head <branch> --title '<title>' --body-file - <<'BODY'`, the body inline
    (what it lands, what was run, what was not), so one sha256 covers both; the title in single quotes, none inside it. Give Alexis, in his language (`CLAUDE.local.md`), the review card, each script's sha256 and
    the line that copies it to a `mktemp -d` folder, checks it and runs the copy (`docs/HARNESS.md`, "Known limits", R2).
-8. **Follow the gate.** Watch each pull request's run through the public check-runs API; a red job's cause is in gate-ok's
+8. **Follow the gate.** Watch each pull request's run through the public check-runs API; a red job's cause is in its own
    annotations (D13177), read as data. Fix it in one pass, all of it before the next push. Alexis merges with a merge commit.

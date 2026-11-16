@@ -12,7 +12,7 @@ on the slice's last merge.
 
 0. **The speed plan (2026-11-06).** One review a pull request (D13181); the `security-reviewer` and `gno-auditor` only on a
    tier-1 or harness change (docs/REVIEW.md); no `finding-verifier`; StrykerJS by hand (`pnpm run mutate`; GitHub's gate runs it on the changed
-   tier-1 lines alone, failing on no survivor yet: F13184). Since D13168 GitHub's gate judges the pull request; check.sh is the commit gate.
+   tier-1 lines alone, failing past the config's low share of survivors: F13184). Since D13168 GitHub's gate judges the pull request; check.sh is the commit gate.
 1. **No tokens first.** The committed tree passed `sh scripts/check.sh` before each commit (Prettier, ESLint, the types, gno and the node, ui and
    compiled projects' tests but the `timing` ones; knip, jscpd, the journeys and the rest are GitHub's, CLAUDE.md); read
    GitHub's gate on the pull request once it is pushed (`gate-ok`). If one fails, run the failing lane or job's command alone, fix,
@@ -46,9 +46,8 @@ on the slice's last merge.
    A fourth round does not run: stop and reconsider with Alexis.
 6. **The operator's tests.** `deploy/test.sh` is GitHub's deploy-stack job on a pull request that touches `deploy/`
    (D13180). Alexis runs it by hand only to debug, from a checked copy of the commit he reviewed, never from the
-   worktree (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed", F4927). Until F13163 is fixed deploy-stack is red on
-   Linux: read it check by check, any red but F13163's two a finding, and on a pull request that touches `deploy/` Alexis runs
-   `deploy/test.sh` and its `--mutants` (narrowed by `ONLY_MUTANTS`) from the reviewed commit, named in the pull request (D13191).
+   worktree (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed", F4927). Its red is a finding: its last line and the
+   job's annotations name the failed checks (D13400, which ended D13191's hand run).
 7. **Report** to Alexis, in French: the review card of `CLAUDE.md`, the findings held back until he has reviewed ("Blind first");
    the findings, most severe first, each with its scenario and its tag (important, nit, or
    pre-existing: in the code before the branch); the low list; what was dropped, one line each.

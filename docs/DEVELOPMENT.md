@@ -235,8 +235,8 @@ development or test-GPU build only; a production build holds no trace of it.
   never skips. `memory.test.ts` runs the real codecs at their cap in a child with the image's flags and reads the peak resident memory,
   which must stay under the container's 256 MiB. What needs Docker (the reader's isolation, its way out, its guard rules) is
   `deploy/test-links.sh`, which `deploy/test.sh` sources: GitHub's deploy-stack job runs `deploy/test.sh` on a change to `deploy/` or to what the
-  images build from, the reader and what it fetches included (D13180, D13203). While F13163 keeps deploy-stack red on Linux, a change to
-  `deploy/` also gets the hand run, from the commit you reviewed (docs/OPERATIONS.md, D13191), and deploy-stack is read check by check; it needs the network for its controls (`example.com`).
+  images build from, the reader and what it fetches included (D13180, D13203); its last line names its failed checks, which the job's
+  annotation shows with no login. It needs the network for its controls (`example.com.`).
 
 ## Jarvis's evals
 
