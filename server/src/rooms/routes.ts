@@ -78,6 +78,8 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, proxy, 
     if (may !== "ok") return refuse(c, may === "day" ? "limit" : may);
     const verdict = await check(EARTH, name).catch((): "unchecked" => "unchecked");
     if (verdict !== "pass") return refuse(c, verdict === "hide" ? "name" : "unchecked");
+    // The allowances again, with no await up to their take: parallel tries all passed mayTry while the counters were at 0.
+    if (allowances(c).some(([each, key]) => each.full(key, now()))) return refuse(c, "limit");
     const result = rooms.earth(who, name);
     if (typeof result === "string") return refuse(c, result === "day" ? "limit" : result);
     for (const [each, key] of allowances(c)) each.take(key, now());

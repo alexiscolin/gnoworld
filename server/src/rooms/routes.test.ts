@@ -592,4 +592,15 @@ describe("the Earth's rooms a visitor and an address block make", () => {
     expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 24 });
     expect((await create(earth("far"), { who: "acc25", peer: "2001:db8:2:1::1" })).status).toBe(201);
   });
+  it("holds 20 accounts behind one visitor, all sent at once, to 6 rooms a day", async () => {
+    withAccounts(20);
+    const { create, db } = setup({ max: 100 });
+    const burst = await Promise.all(
+      Array.from({ length: 20 }, (_, n) =>
+        Promise.resolve(create(earth(`p${String(n)}`), { who: `acc${String(n + 1)}` })),
+      ),
+    );
+    expect(burst.filter(({ status }) => status === 201)).toHaveLength(6);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 6 });
+  });
 });
