@@ -1,4 +1,7 @@
+import { mkdtempSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "@gnoworld/service/db";
 import { makeChecker, VERDICT_TABLES } from "../moderation/check.ts";
@@ -13,6 +16,7 @@ import { answer } from "../testing/answers.ts";
 import { logger } from "@gnoworld/service/log";
 import { guestSaid, idleRooms, ROOM_SAID, roomCounts, sweepIdle } from "./earth.ts";
 import { EARTH_TABLES, makeRooms, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
+import { migrations } from "../migrations.ts";
 import { ensureRooms, ROOM_TABLES } from "./rooms.ts";
 
 const DAY = 24 * 60 * 60_000;
@@ -245,5 +249,27 @@ describe("a room older than 14 days, active, with the verdicts capped (F13500)",
     said("#earth/a", T0 - 1000);
     line("#earth/b", T0 - 1000);
     expect([...roomCounts(db, T0 - DAY)]).toEqual([["#earth/a", 1]]);
+  });
+});
+
+describe("the backfill of room_said from the verdicts (F13501)", () => {
+  it("keeps a room only accounts spoke in from the first sweep, and adds to a guest's count", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "backfill-")), "db.sqlite");
+    const before = openDatabase(file, migrations.slice(0, 33));
+    ensureRooms(before, ["earth"], T0 - 40 * DAY);
+    const made = makeRooms({ db: before, send: () => true, now: () => T0 - 20 * DAY, max: 20 });
+    made.earth(A, "talk");
+    made.earth(A, "mixed");
+    const verdict = before.prepare("INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'h', ?, ?)");
+    verdict.run("m1", "#earth/talk", "pass", T0 - 2 * DAY);
+    verdict.run("m2", "#earth/mixed", "pass", T0 - 2 * DAY);
+    verdict.run("m3", "#earth/mixed", "hide", T0 - 2 * DAY);
+    guestSaid(before)("#earth/mixed", T0 - 2 * DAY);
+    before.close();
+    const db = openDatabase(file, migrations);
+    opened.push(db);
+    const rooms = makeRooms({ db, send: () => true, now: () => T0, max: 20 });
+    expect(sweepIdle(db, rooms, { now: T0, reserved: () => false })).toEqual([]);
+    expect(roomCounts(db, T0 - 3 * DAY).get("#earth/mixed")).toBe(2);
   });
 });

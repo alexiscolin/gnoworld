@@ -12,6 +12,14 @@ export const ROOM_SAID = `
 CREATE TABLE room_said (room TEXT NOT NULL, hour INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (room, hour)) STRICT;
 `;
 
+// Until room_said counted accounts' lines too it held guests' alone, accounts' past lines being in the verdicts: add them, by the
+// hour as hourOf computes it, to what a guest left there (F13501). A hidden line is none.
+export const ROOM_SAID_BACKFILL = `
+INSERT INTO room_said (room, hour, n)
+SELECT room, at / 3600000, count(*) FROM verdicts WHERE action <> 'hide' GROUP BY room, at / 3600000
+ON CONFLICT (room, hour) DO UPDATE SET n = n + excluded.n;
+`;
+
 const HOUR_MS = 60 * 60_000;
 /** The hour a time falls in, as room_said counts them. */
 const hourOf = (at: number): number => Math.floor(at / HOUR_MS);
