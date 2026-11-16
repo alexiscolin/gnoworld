@@ -223,7 +223,7 @@ for route in /budgets /ask /translate /digest /nothing-here; do
 done
 expect "jarvis's 401 repeats no key, the right one or the wrong one sent" \
 	"$(door wrong GET /budgets | grep -cF -e "$(cat "$JARVIS_DOOR_KEY_FILE")" -e kkkkkkkkkkkkkkkk || true)" 0
-expect "jarvis serves the door's key" "$(door right GET /budgets)" '200 {"ask":3,"translate":1}'
+expect "jarvis serves the door's key" "$(door right GET /budgets)" '200 {"ask":3,"translate":1,"spent":{"ask":0,"translate":0},"reserved":{"ask":0,"translate":0}}'
 expect "the door's key is in no log of jarvis's, the server's or the reader's, and no container's description" \
 	"$({ docker logs "$jarvis"; docker logs "$server"; docker logs "$reader"; } 2>&1 | grep -cF "$(cat "$JARVIS_DOOR_KEY_FILE")" || true) $(docker inspect "$jarvis" "$server" "$reader" | grep -cF "$(cat "$JARVIS_DOOR_KEY_FILE")" || true)" "0 0"
 
@@ -247,7 +247,7 @@ expect "the server holds the admin API's address on its network" \
 
 # Who reaches jarvis: the server by its name, with the door's key; nothing on the internal network, nor the guard's network,
 # where jarvis's way out's address is no listener of its own.
-expect "the server reads jarvis's budgets by its name, not through its way out" "$(door right GET /budgets)" '200 {"ask":3,"translate":1}'
+expect "the server reads jarvis's budgets by its name, not through its way out" "$(door right GET /budgets)" '200 {"ask":3,"translate":1,"spent":{"ask":0,"translate":0},"reserved":{"ask":0,"translate":0}}'
 expect "jarvis, off by default, answers a question off" "$(door right POST /ask "$ask_body")" '200 {"status":"off"}'
 expect "nothing on the internal network reaches jarvis" "$(answering "$inside" "$JARVIS_ADDRESS:8081" jarvis:8081)" ""
 out_address=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$jarvis_out\").IPAddress}}" "$jarvis")
@@ -454,7 +454,7 @@ if [ "$allowed" = ok ]; then
 	jarvis=$(docker compose -p "$project" $files --profile jarvis ps -q jarvis)
 	expect "jarvis switched on starts, its start checking gnomcp through the reader" "$(docker inspect --format '{{.State.Health.Status}}' "$jarvis")" healthy
 	expect "jarvis on answers 401 to a request with no key" "$(door none POST /ask "$ask_body" | cut -c1-3)" 401
-	expect "jarvis on serves the door's key" "$(door right GET /budgets)" '200 {"ask":3,"translate":1}'
+	expect "jarvis on serves the door's key" "$(door right GET /budgets)" '200 {"ask":3,"translate":1,"spent":{"ask":0,"translate":0},"reserved":{"ask":0,"translate":0}}'
 else
 	echo "skip  jarvis switched on is not started: $allowed; its proofs wait for the evals (docs/OPERATIONS.md, \"Switching Jarvis on\")"
 fi
