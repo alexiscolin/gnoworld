@@ -206,31 +206,34 @@ test("flies from the cosmos to a world's page, and lands as the world comes into
   expect((await flightOf(page)).neared).toBe(true);
 });
 
-// The counts wobble from a round to the next (a trace: 34 to 40, textures 15 to 18, never climbing), what a view draws near its end. A
-// leak is what never comes back: every read above the one before. A count of a few values cannot climb through five reads by wobble
-// alone, and a leak of one a flight (four a read) climbs through all of them.
-const climbs = (counts: number[]) => counts.every((count, at) => at === 0 || count > (counts[at - 1] ?? Infinity));
+// The counts wobble from a round to the next (a trace: geometries 34 to 40, a drop of 6 between reads, textures 15 to 18), what a view draws
+// near its end. A leak is a slope: the least-squares slope of the five reads, at most half the smallest leak worth catching (one a flight, four
+// flights a read: 4 a read, so 2), is a wobble; above it, a leak. The bound comes from the leak, not from a tolerance on the wobble.
+const LEAK = 4;
+const leaks = (counts: number[]) => {
+  const middle = (counts.length - 1) / 2;
+  const spread = counts.reduce((sum, _, at) => sum + (at - middle) ** 2, 0);
+  return counts.reduce((sum, count, at) => sum + (at - middle) * count, 0) / spread > LEAK / 2;
+};
 
-test("a count that never comes back is a leak, one that wobbles is none", () => {
-  for (const wobbling of [
+test("a count that keeps climbing is a leak, one that wobbles is none", () => {
+  const wobbles = [
     [34, 40, 38, 41, 39],
+    [40, 34, 38, 41, 39],
     [15, 17, 16, 18, 16],
     [15, 16, 16, 17, 17],
     [40, 39, 38, 40, 41],
-  ])
-    expect(climbs(wobbling), wobbling.join()).toBe(false);
-  // One leaked a flight, four a read, under the wobble of the traces above.
-  for (const wobble of [
-    [0, 2, -1, 1, 0],
-    [1, -1, 0, 2, 1],
-    [0, 0, 0, 0, 0],
-  ])
-    expect(climbs(wobble.map((w, at) => 15 + 4 * (at + 1) + w)), wobble.join()).toBe(true);
+    [0, 6, 0, 6, 0],
+    [6, 0, 6, 0, 6],
+  ];
+  for (const wobbling of wobbles) expect(leaks(wobbling), wobbling.join()).toBe(false);
+  // One leaked a flight, four a read, under each of those wobbles.
+  for (const wobble of wobbles) expect(leaks(wobble.map((w, at) => w + LEAK * at)), wobble.join()).toBe(true);
 });
 
 // The bar, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP).
 // Every kind of place, half pages' flights, driven through the router; a world page's own warming is no flight's.
-test("leaves the GPU's resources at their baseline and the heap within a tenth after twenty flights there and back", async ({
+test("leaves no GPU resource climbing and the heap within a tenth after twenty flights there and back", async ({
   page,
 }) => {
   test.setTimeout(600_000);
@@ -270,7 +273,7 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   }
   // A page that frames its planet close flies once more as it settles: at least the twenty asked.
   expect((await flightOf(page)).flights).toBeGreaterThanOrEqual(before.flights + 20);
-  expect(climbs(reads.map((read) => read.geometries)), "geometries climb a read after another").toBe(false);
-  expect(climbs(reads.map((read) => read.textures)), "textures climb a read after another").toBe(false);
+  expect(leaks(reads.map((read) => read.geometries)), "geometries climb read after read").toBe(false);
+  expect(leaks(reads.map((read) => read.textures)), "textures climb read after read").toBe(false);
   expect(await heap()).toBeLessThanOrEqual(before.heap * 1.1);
 });
