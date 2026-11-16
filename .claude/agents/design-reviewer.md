@@ -25,7 +25,7 @@ changes every screen that uses it):
    (the frame's file, and your render's path or the story or route it came from) and the difference in numbers where you can measure it
    (pixels, hex colours). Not a difference: the three things above, anti-aliasing, a sample person's name.
 
-A 3D view (anything drawn on a canvas, `app/src/scene/`) is judged on its quality, not only its geometry: the frames are the floor,
+A 3D view (anything drawn on a canvas, `app/src/space/`) is judged on its quality, not only its geometry: the frames are the floor,
 never the ceiling (Alexis, 2026-11-01). Render it on the best renderer at hand and say which it was: a software renderer proves no
 quality, so then name what stays unverified. Compare picture beside picture: light and shadow, materials and maps, atmosphere and
 rims, depth, glow, the stars, the image's grade. Here anti-aliasing counts, as do banding, blur and square points. For a view that

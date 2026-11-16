@@ -1899,7 +1899,7 @@ def design_mutants():
     yield from each("scripts/check_docs.py", "problems or decisions or orphans", "problems or orphans", "hooks", "check_docs fails on a decision written twice")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
-        ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
+        ('["app/src/space/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
         ('"packages/core/src/cosmos/", "packages/core/src/space/"]', '"packages/core/src/space/"]', "starts the design-reviewer for a change of the cosmos"),
         ("    ...(gate.files.some(space)\n", "    ...(false\n", "starts the design-reviewer for how space looks"),
         ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),
