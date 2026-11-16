@@ -330,7 +330,7 @@ test("draws its panel and names as frame 4's rail, ending on its last world", as
     canvas.style.visibility = "hidden";
   });
   await expect(rail(page)).toHaveScreenshot("rail.png", {
-    mask: [rail(page).locator("li img")],
+    mask: [rail(page).locator("li img, li [data-fallback] > *")],
     maxDiffPixelRatio: 0.01,
     ...SLOW,
   });
