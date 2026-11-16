@@ -367,15 +367,30 @@ JS
 gnomcp_read() { docker exec -e TOOL="$1" -e ARGS="$2" "$jarvis" /nodejs/bin/node -e "$read_js" 2>&1 || true; }
 expect "gnomcp reads Onyx's node through the reader" "$(gnomcp_read gno_status '{"profile":"onyx"}')" read
 expect "gnomcp reads gno.land's node through the reader" "$(gnomcp_read gno_status '{"profile":"gnoland"}')" read
-# gno.land's indexer, live, times out now and then (F13163): three tries, the last one's answer judged.
+# gno.land's indexer, live, times out now and then (F13163): three tries, the last one's answer judged; "outage" when all three
+# were gnomcp's own word for the indexer down (error_unavailable, indexer unreachable), never our reader's or gnomcp's fault.
 indexer_read() {
-	tries=0
-	until got=$(gnomcp_read gno_history '{"profile":"gnoland","realm":"gno.land/r/gnoland/home"}') && [ "$got" = read ] || [ "$tries" -ge 2 ]; do
-		tries=$((tries + 1)) && sleep 5
+	tries=0 down=0
+	until got=$(gnomcp_read gno_history '{"profile":"gnoland","realm":"gno.land/r/gnoland/home"}') && [ "$got" = read ]; do
+		case $got in "failed: "*error_unavailable* | "failed: "*"indexer unreachable"*) down=$((down + 1)) ;; esac
+		tries=$((tries + 1)) && [ "$tries" -lt 3 ] || break
+		sleep 5
 	done
+	[ "$down" -lt 3 ] || got=outage
 	echo "$got"
 }
-expect "gnomcp reads gno.land's indexer through the reader (three tries at most)" "$(indexer_read)" read
+# An outage of gno.land's indexer on all three tries is theirs, not ours (D13702): a warning, the check skipped and counted for nothing.
+# The two reads above go through the same reader, so a fault of ours still fails there; any other wrong answer here fails too.
+indexer_check() {
+	got=$(indexer_read)
+	if [ "$got" = outage ]; then
+		echo "::warning title=deploy-stack::gno.land's indexer was unreachable on all three tries; its live read is skipped (D13702)"
+		echo "skip  gnomcp reads gno.land's indexer through the reader: the indexer is down"
+	else
+		expect "gnomcp reads gno.land's indexer through the reader (three tries at most)" "$got" read
+	fi
+}
+indexer_check
 # gnomcp's audit reaches the reader's log as tool, result and duration alone: a planted argument of a read never does.
 planted=zzplantedargumentzz
 gnomcp_read gno_render "{\"profile\":\"gnoland\",\"realm\":\"gno.land/r/$planted/home\"}" >/dev/null
