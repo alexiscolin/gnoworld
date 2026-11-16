@@ -2,7 +2,8 @@
 // saved lines and the place it asked to go back to, from the device, the room's pins, from the server, and the acts
 // that change them, built from the store and the shown room alone.
 import { foldEdits, type Line } from "@gnoworld/core";
-import { HIDE_IDS, pageModerationApi } from "../../lib/api/moderation.ts";
+import { HIDE_IDS } from "@gnoworld/schemas";
+import { pageModerationApi } from "../../lib/api/moderation.ts";
 import { own } from "../../store/record.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { cardsIn } from "./cardsIn.ts";

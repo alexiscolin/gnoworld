@@ -34,3 +34,6 @@ export type PinList = z.infer<typeof PinList>;
 /** What a page sends to pin or unpin: a room and a line's id, never the line. */
 export const PinRequest = z.strictObject({ room: RoomId, msgid: PinId });
 export type PinRequest = z.infer<typeof PinRequest>;
+
+/** The most ids a hide carries, for the page and the server alike: a line and the 50 edits the search keeps of it. */
+export const HIDE_IDS = 51;

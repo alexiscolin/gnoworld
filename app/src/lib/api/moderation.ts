@@ -1,14 +1,11 @@
 // The browser's client of an owner's moderation (server/src/moderation/routes.ts, mounted at /api/moderation): hide a
 // line of a room, mute an account in the room's world. The room, the line and the account are checked before any is sent.
-import { Address, PinId, RoomId } from "@gnoworld/schemas";
+import { Address, HIDE_IDS, PinId, RoomId } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 import { pageFetch } from "../query/policy.ts";
 
 const Done = z.object({ ok: z.literal(true) });
-
-/** The most ids a hide carries: a line and the 50 edits the search keeps of it (the server's MAX_EDITS + 1). */
-export const HIDE_IDS = 51;
 
 // Distinct line ids, one to HIDE_IDS.
 const sound = (ids: readonly string[]) =>

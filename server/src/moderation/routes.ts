@@ -2,7 +2,7 @@
 // account in the room's world, with the bot's own means (the link's REDACT, the mutes' table and SAMODE): no table, schema or Ergo right is new.
 // Each comes from a listed Origin in JSON (guard.ts) with the login's session; the right (mayModerate), a mute's scope and its target are checked
 // before the link is asked anything; an account makes 30 requests a minute; each act is logged with the acting account, the owner and `as`.
-import { Address, PinRequest } from "@gnoworld/schemas";
+import { Address, HIDE_IDS, PinRequest } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
@@ -11,7 +11,6 @@ import { limiter } from "../limit.ts";
 import { asOf, type Right } from "../roles/mayModerate.ts";
 import { isLineOf, type Fetched } from "../irc/fetch.ts";
 import { worldOf } from "../rooms/rooms.ts";
-import { MAX_EDITS } from "../search/index.ts";
 import { visitorOf } from "../visitor.ts";
 
 export interface ModerationOptions {
@@ -38,13 +37,13 @@ export interface ModerationOptions {
 
 // A line's id as a pin names it, and not a word an IRC line would read as its trailing part.
 // The line and each edit folded into it, redacted in one request: no more than the edits the search index keeps of a line
-// (MAX_EDITS); a second limiter charges each id.
+// (HIDE_IDS); a second limiter charges each id.
 const Hide = z.strictObject({
   room: PinRequest.shape.room,
   msgids: z
     .array(PinRequest.shape.msgid.check(z.regex(/^[^:]/)))
     .min(1)
-    .max(MAX_EDITS + 1)
+    .max(HIDE_IDS)
     .refine((ids) => new Set(ids).size === ids.length),
 });
 const Mute = z.strictObject({ room: PinRequest.shape.room, account: Address });
