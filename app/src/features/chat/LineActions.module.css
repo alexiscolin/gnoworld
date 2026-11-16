@@ -55,10 +55,8 @@
       /* layout: one row, whatever its width */
       flex-wrap: nowrap;
       /* layout: the bar's own scroll, its start pinned */
-      overflow-x: auto;
+      overflow: auto hidden;
       scroll-snap-type: x proximity;
-      /* raw: the scroll bar's track would add its own height to the row */
-      scrollbar-width: none;
     }
 
     .bar button {

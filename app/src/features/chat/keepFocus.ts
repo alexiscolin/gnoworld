@@ -4,7 +4,7 @@ import { useMedia } from "./useMedia.ts";
 
 /** A press on a button leaves the focus where it is: a phone folds the shell header while a chat field has it (ChatScreen.module.css), and a
  * blur at the press would move the button from under the finger before the click. Also keeps the on-screen keyboard up. */
-export function keepFocus(event: SyntheticEvent): void {
+function keepFocus(event: SyntheticEvent): void {
   if (event.target instanceof Element && event.target.closest("button") !== null) event.preventDefault();
 }
 
