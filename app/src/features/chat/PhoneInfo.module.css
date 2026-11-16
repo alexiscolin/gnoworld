@@ -5,15 +5,14 @@
     dialog:has(.sheet) {
       inline-size: 100%;
       max-inline-size: none;
-      block-size: 100dvh;
+      block-size: 100dvb;
       max-block-size: none;
       /* layout: the browser centres a modal dialog with its margins; the sheet fills the screen */
       margin: 0;
       padding-block: max(var(--space-m), env(safe-area-inset-top)) max(var(--space-s), env(safe-area-inset-bottom));
       padding-inline: max(var(--space-s), env(safe-area-inset-left)) max(var(--space-s), env(safe-area-inset-right));
       border-radius: 0;
-      overflow-y: auto;
-      overscroll-behavior: contain;
+      overflow: auto;
     }
   }
 

@@ -102,13 +102,13 @@
     --chat-inset: var(--space-s);
   }
 
-  /* A phone's full chat (under 900 px): the visual viewport's height, which viewport.ts keeps in --chat-vh (100dvh where it is unset), so
+  /* A phone's full chat (under 900 px): the visual viewport's height, which viewport.ts keeps in --chat-vh (100dvb where it is unset), so
      the on-screen keyboard never covers the composer; a header of 44 px rows, whose height the arrival's pill stands under; and no room
      kept free over the lines for that pill, which floats over them instead of leaving an empty band. */
   @media (width < 900px) {
     .screen[data-full] {
       inset-block: calc(var(--flash-room) + var(--chat-vtop, 0px)) auto;
-      block-size: calc(var(--chat-vh, 100dvh) - var(--flash-room));
+      block-size: calc(var(--chat-vh, 100dvb) - var(--flash-room));
     }
 
     .screen[data-full][data-compact] [data-region="header"] {

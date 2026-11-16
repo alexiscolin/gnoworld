@@ -1,6 +1,6 @@
 // The full chat on a phone is as tall as the visual viewport: iOS Safari and Chrome (since 108) leave the layout viewport, and so `dvh`,
 // whole under the on-screen keyboard, which would cover the composer. The screen's CSS reads these two properties and falls back to
-// `100dvh` where they are unset (ChatScreen.module.css).
+// `100dvb` where they are unset (ChatScreen.module.css).
 import { useEffect, type RefObject } from "react";
 
 /** The screen's two properties: the visual viewport's height and how far it is scrolled from the layout viewport's top. */

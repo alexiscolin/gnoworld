@@ -20,7 +20,6 @@
 
   .body {
     overflow: auto;
-    overscroll-behavior: contain;
     padding: var(--space-s) var(--space-xs) max(var(--space-m), env(safe-area-inset-bottom));
   }
 }

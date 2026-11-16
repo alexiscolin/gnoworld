@@ -173,7 +173,7 @@
     .box .field textarea {
       /* layout: a share of the screen, so a long draft scrolls in its field and the foot stays in view */
       --_share: 0.3;
-      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh, 100dvh) * var(--_share)));
+      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh, 100dvb) * var(--_share)));
       overflow: auto;
     }
   }
