@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { grouped } from "../format.ts";
-import { BAR_MIN, LEFT, plotOf, tickWord } from "./dayPlot.ts";
+import { BAR_MIN, DATE_GAP, LEFT, plotOf, tickWord } from "./dayPlot.ts";
 import styles from "./DayChart.module.css";
 
 const DOT = 1.4;
@@ -17,12 +17,13 @@ export interface DayPlotProps {
   follow?: boolean;
 }
 
-// The date under a slot: the first at the plot's edge, the last as the axis' "now", then one in every few, none too near the last.
+// The date under a slot: the first at the plot's edge, the last as the axis' "now", then one in every few, none within a date's room of the last.
 function DateWord({
   at,
   last,
   every,
   x,
+  w,
   h,
   now,
   word,
@@ -31,6 +32,7 @@ function DateWord({
   last: number;
   every: number;
   x: number;
+  w: number;
   h: number;
   now: string;
   word: string;
@@ -42,7 +44,7 @@ function DateWord({
       </text>
     );
   }
-  if (at % every !== 0 || at + every * 0.6 >= last) return null;
+  if (at % every !== 0 || w - x < DATE_GAP) return null;
   return (
     <text className={styles["tk"]} x={x} y={h - 4} textAnchor={at === 0 ? "start" : "middle"}>
       {word}
@@ -126,6 +128,7 @@ export function DayPlot({ counts, named, scale, now, w, h, follow = false }: Day
               last={last}
               every={plot.every}
               x={at === last ? w : at === 0 ? LEFT + at * plot.slot : plot.center(at)}
+              w={w}
               h={h}
               now={now}
               word={named(at)}

@@ -8,6 +8,8 @@ const BAR_MAX = 18;
 export const BAR_MIN = 3;
 const BAR_SHARE = 0.62;
 const DATES = 6;
+/** The room one date word needs, in pixels: two dates, or a date and the axis' "now", never nearer. */
+export const DATE_GAP = 56;
 
 // The nicest steps a linear axis has: about three of them to the peak, each 1, 2, 5 or 10 of a power of ten.
 function niceTicks(peak: number) {
@@ -71,7 +73,7 @@ export function plotOf({
     base: TOP + plotH,
     slot,
     bar: Math.max(BAR_MIN, Math.min(slot * BAR_SHARE, BAR_MAX)),
-    every: Math.max(1, Math.ceil(counts.length / DATES)),
+    every: Math.max(1, Math.ceil(counts.length / DATES), Math.ceil(DATE_GAP / slot)),
     center: (at) => LEFT + at * slot + slot / 2,
   };
 }
