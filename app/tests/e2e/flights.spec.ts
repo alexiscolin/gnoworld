@@ -11,8 +11,6 @@ const FRAME = { width: 1728, height: 1080 };
 // Small enough for twenty flights on the gate's software GPU, wide enough for a computer's layout.
 const SMALL = { width: 1000, height: 700 };
 const SLOW = { timeout: 90_000 };
-// Geometries a view may hold more or less than another of the same place, over twenty flights: a leak adds one a flight.
-const WOBBLE = 2;
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 
 test.describe.configure({ timeout: 240_000 });
@@ -235,8 +233,9 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   };
   await test.step("one round of each kind first", round);
   await steady();
-  // The count wobbles by a geometry or two from a round to the next (a trace: 38 to 40, never climbing), what a view draws near
-  // its end: the baseline is the highest of three warm rounds, and a leak is what twenty flights add above it.
+  // The counts wobble from a round to the next (a trace: 34 to 40, never climbing), what a view draws near its end: the baseline is the
+  // highest of the warm reads, and a leak is what the rounds add above it, as the lowest of the last three reads (a count going up and
+  // down is no leak; one a flight is twelve or more over five rounds).
   let warmed = await gpu();
   for (const rounds of [2, 3]) {
     await test.step(`round ${String(rounds)}`, round);
@@ -247,14 +246,17 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
       textures: Math.max(warmed.textures, now.textures),
     };
   }
-  const before = { ...warmed, heap: await heap(), flights: (await flightOf(page)).flights };
-  for (let flight = 0; flight < 20; flight += 4)
+  const before = { heap: await heap(), flights: (await flightOf(page)).flights };
+  const reads: { geometries: number; textures: number }[] = [];
+  for (let flight = 0; flight < 20; flight += 4) {
     await test.step(`flights ${String(flight + 1)} to ${String(flight + 4)}`, round);
-  await steady();
+    await steady();
+    reads.push(await gpu());
+  }
   // A page that frames its planet close flies once more as it settles: at least the twenty asked.
   expect((await flightOf(page)).flights).toBeGreaterThanOrEqual(before.flights + 20);
-  const after = await gpu();
-  expect(after.geometries).toBeLessThanOrEqual(before.geometries + WOBBLE);
-  expect(after.textures).toBeLessThanOrEqual(before.textures);
+  const last = reads.slice(-3);
+  expect(Math.min(...last.map((read) => read.geometries))).toBeLessThanOrEqual(warmed.geometries);
+  expect(Math.min(...last.map((read) => read.textures))).toBeLessThanOrEqual(warmed.textures);
   expect(await heap()).toBeLessThanOrEqual(before.heap * 1.1);
 });
