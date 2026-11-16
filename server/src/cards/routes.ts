@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { CardRemove, RoomId, VerdictId, VERDICTS_ASKED, type Address, type LinkCard } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import { type Context, Hono } from "hono";
-import { z } from "zod";
+import { commaList } from "../commaList.ts";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Guarded, type Refusals } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { mayWithin, type Right } from "../roles/mayModerate.ts";
@@ -37,10 +37,7 @@ const refusals = {
   not_found: ["not_found", 404],
 } as const satisfies Refusals;
 
-const Ids = z
-  .string()
-  .transform((list) => list.split(","))
-  .pipe(z.array(VerdictId).min(1).max(VERDICTS_ASKED));
+const Ids = commaList(VerdictId, VERDICTS_ASKED);
 const KEY = /^[0-9a-f]{64}$/;
 const tag = (body: string | Uint8Array): string => `"${createHash("sha256").update(body).digest("hex").slice(0, 32)}"`;
 

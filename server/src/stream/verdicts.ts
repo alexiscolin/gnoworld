@@ -5,7 +5,7 @@ import { sessionOf } from "../guard.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { type ApiError, LineVerdicts, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { z } from "zod";
+import { commaList } from "../commaList.ts";
 import { limiter } from "../limit.ts";
 import { once, RoomName, stateOf } from "./stream.ts";
 
@@ -24,10 +24,7 @@ interface Options {
 }
 
 // The ids: msgids, one word each, at most VERDICTS_ASKED; the room as the stream takes it (RoomName).
-const Ids = z
-  .string()
-  .transform((list) => list.split(","))
-  .pipe(z.array(VerdictId).min(1).max(VERDICTS_ASKED));
+const Ids = commaList(VerdictId, VERDICTS_ASKED);
 
 export function verdictRoutes({ db, readable, session, visitor, now }: Options): Hono {
   const limit = limiter({ max: VERDICTS_PER_MINUTE, windowMs: 60_000, keys: 100_000 });

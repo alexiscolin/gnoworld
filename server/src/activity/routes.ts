@@ -7,6 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type ActivityRooms, type ApiError } from "@gnoworld/schemas";
 import { Hono } from "hono";
 import { z } from "zod";
+import { commaList } from "../commaList.ts";
 import { worldRooms } from "../rooms/rooms.ts";
 import type { Activity } from "./activity.ts";
 
@@ -26,10 +27,7 @@ export function activityRoutes(activity: Activity, options: Options): Hono {
     .string()
     .max(64)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-  const Worlds = z
-    .string()
-    .transform((list) => list.split(","))
-    .pipe(z.array(Slug).min(1).max(25));
+  const Worlds = commaList(Slug, 25);
   const app = new Hono();
   app.get("/", (c) => {
     const asked = c.req.queries("worlds") ?? [];
