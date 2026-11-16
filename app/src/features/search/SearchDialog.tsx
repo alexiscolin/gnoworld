@@ -3,7 +3,7 @@
 // preview at the right.
 import type { StoreRow } from "@gnoworld/core";
 import { Dialog } from "@gnoworld/ui";
-import { useEffect, type KeyboardEvent } from "react";
+import { useEffect, useEffectEvent, type KeyboardEvent } from "react";
 import { placeOf, type UniverseView } from "../../places.ts";
 import { itemOf, realmChat } from "./discover/realms.ts";
 import { useDiscover } from "./discover/useDiscover.ts";
@@ -15,6 +15,7 @@ import { LIST_ID } from "./PlaceResults.tsx";
 import styles from "./SearchDialog.module.css";
 import { useGo } from "./useGo.ts";
 import { usePalette } from "./usePalette.ts";
+import { usePaletteHistory } from "./usePaletteHistory.ts";
 
 const NO_WORLDS: never[] = [];
 
@@ -35,8 +36,7 @@ export default function SearchDialog({
 }: {
   universe: UniverseView;
   open: boolean;
-  /** `going`: closed by a place chosen, whose own navigation follows. */
-  onClose: (going: boolean) => void;
+  onClose: () => void;
   /** The namespace a full Plan's "+N" opens on. */
   start?: string;
 }) {
@@ -53,9 +53,17 @@ export default function SearchDialog({
   useEffect(() => {
     document.getElementById(`${LIST_ID}-${String(active)}`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
+  // On a phone the open palette is a history entry (usePaletteHistory.ts), pushed as it opens and, as it closes, taken off.
+  const history = usePaletteHistory();
+  const push = useEffectEvent(history.push);
+  useEffect(() => {
+    if (open) push();
+  }, [open]);
+  // `going`: closed by a place chosen, whose own navigation follows.
   const closeFor = (going: boolean) => () => {
     palette.reset();
-    onClose(going);
+    history.leave(going);
+    onClose();
   };
   const close = closeFor(false);
   const { go, chat, copy, copySaid } = useGo(universe, closeFor(true));

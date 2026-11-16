@@ -8,7 +8,6 @@ import type { UniverseView } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { afterLoad } from "../../later.ts";
 import { opensPalette, SEARCH_HASH } from "./chord.ts";
-import { usePaletteHistory } from "./usePaletteHistory.ts";
 
 const loadDialog = () => import("./SearchDialog.tsx");
 const SearchDialog = lazy(loadDialog);
@@ -39,7 +38,6 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [start, setStart] = useState("");
   const { pathname, hash } = useLocation();
   const [at, setAt] = useState(pathname);
-  const history = usePaletteHistory();
   const [seenHash, setSeenHash] = useState(hash);
   if (seenHash !== hash) {
     setSeenHash(hash);
@@ -55,7 +53,6 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
     setStart("");
     setAsked(true);
     setOpen(true);
-    history.push();
   });
   useEffect(() => {
     const controller = new AbortController();
@@ -99,9 +96,8 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
             start={start}
             universe={universe}
             open={open}
-            onClose={(going) => {
+            onClose={() => {
               setOpen(false);
-              history.leave(going);
             }}
           />
         </Suspense>

@@ -3,7 +3,7 @@ import { act, useState, type ReactElement } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { all, button, click, mount, one, settled } from "../../../tests/mount.tsx";
 import {
   calling,
   CUR,
@@ -89,11 +89,12 @@ describe("the quick actions", () => {
     expect(market).toHaveBeenCalledTimes(1);
   });
 
-  it("opens Poll's dialog from its item", () => {
+  it("opens Poll's dialog from its item, once its code has come", async () => {
     // jsdom has no popover API: the menu hides its panel as an item is chosen.
     Object.assign(HTMLElement.prototype, { hidePopover: () => undefined });
     const box = draw(<QuickActions pills="hub" poll={POLL} />);
     click(button(box, "Poll"));
+    await settled(() => box.querySelector("dialog") !== null);
     expect(one(box, "dialog").textContent).toContain("Ask a poll");
   });
 });
