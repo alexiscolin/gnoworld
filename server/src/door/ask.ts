@@ -7,8 +7,7 @@ import { plainWords } from "@gnoworld/core";
 import { z } from "zod";
 import { JarvisQuestion, type Address, type JarvisAnswer, type JarvisAsk } from "@gnoworld/schemas";
 import type { Context, Hono } from "hono";
-import { getCookie } from "hono/cookie";
-import { json, type Guarded } from "../guard.ts";
+import { json, type Guarded, tokenOf } from "../guard.ts";
 import { callsOf, forRelay, type Asked, type Called, type Result } from "./calls.ts";
 import type { Day } from "./day.ts";
 import { frontOf, type Front } from "./front.ts";
@@ -123,7 +122,7 @@ export function askRoutes(options: Options): Hono<Guarded> {
     if (day.paused(who, started)) return say(c, "paused", { account: who });
     if (quota.unlimited(who)) return undefined;
     if (day.capped(who, started)) return say(c, "capped", { account: who });
-    const born = options.signedAt(getCookie(c, "__Host-session"));
+    const born = options.signedAt(tokenOf(c));
     const aged = born !== undefined && started - born >= SESSION_MS;
     return heard && aged ? undefined : say(c, "early", { account: who });
   };

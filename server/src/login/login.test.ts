@@ -9,18 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import {
-  LOGIN_TABLES,
-  makeLogin,
-  makeSigned,
-  NONCE_ACTION,
-  NONCE_LINK,
-  NONCE_HOST,
-  verifies,
-  verifyProof,
-  type Login,
-  type Verify,
-} from "./login.ts";
+import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_LINK, NONCE_HOST, type Login } from "./login.ts";
+import { verifies, verifyProof, type Verify } from "./verify.ts";
 import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -85,7 +75,8 @@ describe("challenge", () => {
     expect(made.expiresAt).toBe("2026-10-22T12:05:00.000Z");
     expect(made.text).toBe(
       [
-        "Sign in to gnoworld (login, version 1)",
+        "Sign in to gnoworld (login, version 2)",
+        `Sign only if your browser's address bar shows ${DOMAIN}.`,
         "",
         `Domain: ${DOMAIN}`,
         `Nonce: ${made.nonce}`,
@@ -93,6 +84,19 @@ describe("challenge", () => {
         "Expires: 2026-10-22T12:05:00.000Z",
       ].join("\n"),
     );
+  });
+
+  it("names the challenge's own host on both lines, whatever host it was asked for", () => {
+    const { login } = setup();
+    const made = login.challenge("onyx-1", "other.test:8443");
+    if (typeof made === "string") throw new Error(made);
+    expect(made.text.split("\n").slice(0, 5)).toEqual([
+      "Sign in to gnoworld (login, version 2)",
+      "Sign only if your browser's address bar shows other.test:8443.",
+      "",
+      "Domain: other.test:8443",
+      `Nonce: ${made.nonce}`,
+    ]);
   });
 
   it("keeps the text under the SDK's limit with the longest domain a host can have", () => {
@@ -677,6 +681,46 @@ describe("the token", () => {
     expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
   });
 
+  const tokensOf = async (login: Login, me: Wallet, n: number): Promise<string[]> => {
+    const made: string[] = [];
+    for (let at = 0; at < n; at += 1) {
+      const text = challenge(login);
+      const result = await login.verify(
+        { nonce: text.nonce, address: me.address, proof: me.sign("onyx-1", text.text) },
+        anyone,
+        DOMAIN,
+      );
+      if (typeof result === "string") throw new Error(result);
+      made.push(result.token);
+    }
+    return made;
+  };
+
+  it("logs out the account's other tokens in one go, this token and every other account's staying", async () => {
+    const { db, login } = setup();
+    const me = wallet();
+    const mine = await tokensOf(login, me, 3);
+    const other = await token(login);
+    login.logoutOthers(mine[1]);
+    expect(mine.map((made) => login.session(made))).toEqual([undefined, me.address, undefined]);
+    expect(login.session(other.token)).toBe(other.address);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 2 });
+  });
+
+  it("ends nothing for an absent, unknown, ended or expired token", async () => {
+    const { db, clock, login } = setup();
+    const me = wallet();
+    const [old, ended, kept] = await tokensOf(login, me, 3);
+    login.logout(ended);
+    clock.now += 20 * DAY;
+    const [fresh] = await tokensOf(login, me, 1);
+    clock.now += 10 * DAY;
+    expect([login.session(old), login.session(kept)]).toEqual([undefined, undefined]);
+    for (const given of [undefined, "A".repeat(43), ended, old]) login.logoutOthers(given);
+    expect(login.session(fresh)).toBe(me.address);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 3 });
+  });
+
   it.each([MINUTE, 0])(
     "keeps an account's 10 newest tokens, %i ms apart: its 11th login ends the oldest, no other account's",
     async (apart) => {
@@ -1005,6 +1049,44 @@ describe("the admin console's login", () => {
     expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
     expect(typeof signed.issue("onyx-1", CONSOLE, { head: ["A change"], action: "{}" })).toBe("object");
     expect(admin.challenge("onyx-1", CONSOLE)).toBe("full");
+  });
+
+  it("writes the same two-line head as the public site's login, with its own host", () => {
+    const { admin } = consoleSetup();
+    const made = admin.challenge("onyx-1", CONSOLE);
+    if (typeof made === "string") throw new Error(made);
+    expect(made.text.split("\n").slice(0, 4)).toEqual([
+      "Sign in to gnoworld (login, version 2)",
+      `Sign only if your browser's address bar shows ${CONSOLE}.`,
+      "",
+      `Domain: ${CONSOLE}`,
+    ]);
+  });
+
+  it("ends nothing through logoutOthers for a public session signed more than an hour ago", async () => {
+    const { clock, site, admin } = consoleSetup();
+    const me = wallet();
+    const signInWith = async (login: Login, host: string) => {
+      const made = login.challenge("onyx-1", host);
+      if (typeof made === "string") throw new Error(made);
+      const result = await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+        host,
+      );
+      if (typeof result === "string") throw new Error(result);
+      return result.token;
+    };
+    const old = await signInWith(site, DOMAIN);
+    clock.now = T0 + 2 * 60 * MINUTE;
+    const kept = await signInWith(site, DOMAIN);
+    const mine = await signInWith(admin, CONSOLE);
+    // The console refuses the old token as a session, so it acts for no one.
+    admin.logoutOthers(old);
+    expect([site.session(kept), admin.session(mine)]).toEqual([me.address, me.address]);
+    // Its own live token ends the account's other tokens, as on the public site.
+    admin.logoutOthers(mine);
+    expect([site.session(kept), admin.session(mine)]).toEqual([undefined, me.address]);
   });
 
   it("leaves the public site's count the global one, the console's nonces in it, while the console counts its own", () => {

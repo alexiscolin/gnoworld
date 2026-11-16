@@ -4,8 +4,9 @@
   GIT_CONFIG variable, commit-tree), no forced push; any other push asks first; git's own
   folders, never a command's (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE, --git-dir, --work-tree,
   core.worktree): a commit pointed at another one runs that folder's hooks, or none;
-- no recursive delete (rm -r, find -delete or -exec rm) of a path from a variable that may be empty, which
-  reaches / or the current folder: only ${name:?}, which stops the shell first;
+- no recursive delete (rm -r, find -delete or -exec rm) of a path from a variable that may be empty, when what remains of the path
+  with each expansion removed is empty, relative, a folder's whole contents, or the project's, the home's or a temp root's own folder
+  or one above them (`rm -rf "$TMPDIR/x"` passes): ${name:?} stops the shell first;
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey by its name (a copy under another name passes: the parser's canary,
   the lock of the key stores is the wall), no fetched realm page or RPC node, no raw call to one from curl, wget (a scheme or none)
   or an interpreter's words; the sandbox's network list does not hold in every session. Loading the gno skill before a .gno
@@ -45,6 +46,9 @@ INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
 GIT_PLACES = {"GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE"}  # where git reads its hooks, config and work tree
 CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}  # where git looks for its global config: one of the command's own can set a hooks folder
 HOMED = []  # the VAR=value words that gave one of them a value, wherever the line has them
+HOOK_KEYS = ("hookspath", "include.path", "includeif.")  # config keys that set where git's hooks are, or include a file that does
+# git config's flags that only read: with one of the --get family, a command that reads a key (and no flag that writes).
+CONFIG_READS = {"--get", "--get-all", "--get-regexp", "--local", "--global", "--system", "--worktree", "--show-origin", "--show-scope"}
 # Where git looks for its programs, the secret scan's among them: a folder of the command's own first in either puts a fake in front.
 PROGRAM_HOMES = {"PATH", "GIT_EXEC_PATH"}
 PATHED = []  # the words that may have given one of them a value, wherever the line has them
@@ -56,6 +60,7 @@ SETS_PROGRAM_HOME = re.compile(
     r"(?<![\w$-])(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?:\[[^\]]*\])?\+?="
     r"|\$\{[!~^=+#]*(?:\([A-Za-z]+\))?(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?:\[[^\]]*\])?:{0,2}="
     r"|(?<![\w$-])(?:typeset|declare|local|integer|float|set\s+-A)\b[^;&|\n]*(?<![\w$-])(?:PATH|path|GIT_EXEC_PATH|BASH_ENV|ENV|ZDOTDIR)(?![\w=-])")
+RTK_OPTIONS = re.compile(r"-v+|--verbose|--ultra-compact|--skip-env|-h|--help|--")
 SETTERS = {"export", "declare", "typeset", "readonly", "local"}  # builtins that give a variable a value or export it
 # git's global options whose argument may come as the next word (git 2.53), beside -c and -C; --git-dir and --work-tree are refused.
 GIT_TAKES_ARG = {"-c", "-C", "--namespace", "--config-env", "--attr-source", "--shallow-file"}
@@ -138,6 +143,18 @@ def unwrap(words):
             words = words[1:]
         elif words[0] in KEYWORDS:
             words = words[1:]
+        elif os.path.basename(words[0]) == "rtk" and words[1:2] == ["proxy"]:  # rtk's token-saving proxy: the program after it runs as is
+            words = words[2:]
+            while words[:1] and RTK_OPTIONS.fullmatch(words[0]):  # its own options (rtk 0.37 `proxy --help`), and `--` ends them
+                done = words[0] == "--"
+                words = words[1:]
+                if done:
+                    break
+            else:
+                if words[:1] and words[0].startswith("-"):
+                    refuse("an option of rtk proxy the guard does not know: write the command out")
+        elif os.path.basename(words[0]) == "rtk" and words[1:2] and words[1].startswith("-") and words[1] not in ("--version", "-V", "-h", "--help"):
+            refuse("an option of rtk before its subcommand, which may be proxy's: write the command out")
         elif os.path.basename(words[0]) in WRAPPERS:
             env = os.path.basename(words[0]) == "env"
             words = words[1:]
@@ -211,7 +228,11 @@ def scan(text):
                 end = next((k for k in range(i + 1, len(text)) if text[k] == "`" and text[k - 1] != "\\"), None)
         if end is not None:  # the whole span one word, its opening and closing marks swapped too but a backtick's
             # A ${...}'s `name:-word` is no command: read after `:`, as a value's words, its substitutions in their turn.
-            spans.append(text[i + 1:end] if c == "`" else ": " + text[i + 2:end] if after == "{" else text[i + 2:end])
+            # `$((...))` is arithmetic when its inner `(` closes just before its own `)`, as in zsh and bash (`$((echo a); (b))` and
+            # `$((echo a) )` are commands): read after `:` as words, its substitutions in their turn.
+            arithmetic = c == "$" and after == "(" and text[i + 2:i + 3] == "(" and closing(text, i + 2) == end - 1
+            spans.append(text[i + 1:end] if c == "`" else ": " + text[i + 2:end] if after == "{" else ": " + text[i + 3:end - 1]
+                         if arithmetic else text[i + 2:end])
             starts.append(i + 1 if c == "`" else i + 2)
             out.append(c + "".join(SHIELDED.get(x, x) for x in text[i + 1:end + 1]))
             i = end + 1
@@ -253,6 +274,11 @@ def reads_text(command):
     return True
 
 
+class Kept(list):
+    """What bodies() found, and whether it read the whole text (`settled`: no quote, heredoc or form it cannot settle left open)."""
+    settled = False
+
+
 def bodies(text):
     """The text of a text that zsh never globs, as (start, end, kind) offsets: a heredoc's body no shell reads ("body", or "quoted"
     when its mark is quoted and its substitutions run nothing either), and a quote's text ("text": its `$(...)` and backticks are
@@ -260,7 +286,7 @@ def bodies(text):
     second line, are no qualifiers). Read as the shell reads them: past quotes, comments, arithmetic and ${...},
     inside $(...), backticks and processes; each body after the line that opens it, to its mark. A form this reader cannot settle (a
     continued line, a case's patterns, a mark it cannot read or never finds) ends the reading: what follows stays commands."""
-    found, waiting, stack, i = [], [], [["code", None, 0]], 0  # a context: its kind, what closes it, where its command starts
+    found, waiting, stack, i = Kept(), [], [["code", None, 0]], 0  # a context: its kind, what closes it, where its command starts
     if "\\\n" in text:  # zsh joins a continued line in an unquoted body, not in a quoted one
         return found
     while i < len(text):
@@ -339,6 +365,7 @@ def bodies(text):
             i += 1
         else:
             i += 1
+    found.settled = True
     return found
 
 
@@ -400,10 +427,26 @@ def shell_line(words):
     return ((words[i], words[i + 1:]) if i < len(words) else ("", [])) if given else None  # and $0 and the arguments it is given
 
 
+def syntax_check(words):
+    """Whether a shell is given `-n` alone and then file names: it parses them and runs nothing. After `--` a name may be a variable's
+    (no value of it is an option); else names are plain words, as `+n` or `-c` among them would undo -n or run a line."""
+    rest = words[1:]
+    if rest[:1] != ["-n"]:
+        return False
+    rest = rest[1:]
+    if rest[:1] == ["--"]:
+        names, plain = rest[1:], lambda w: not re.match(r"[<>&|;(=]", w) and w != "-"
+    else:
+        names, plain = rest, lambda w: re.fullmatch(r"[\w./@%:,][\w./@%:,-]*", w)
+    return bool(names) and all(plain(w) for w in names)
+
+
 def reads_unseen(words):
     """Whether a shell, or source or `.`, runs commands the guard cannot read: from a pipe, a redirected file, a here-string or a
     process; a heredoc's lines are read, and a script named as a file is the harness's limit."""
     program, args = os.path.basename(words[0]), words[1:]
+    if program in SHELLS and syntax_check(words):
+        return False
     # stdin named by any path (`/dev/./stdin`, `~/../../dev/stdin`), its descriptors (`/dev/fd/0`), a glob or a variable
     # naming the file (`/dev/std?n`, `$f`), or zsh's =(...) process.
     named = lambda w: (w.startswith("=(") or os.path.basename(w) == "stdin" or "/fd/" in w
@@ -434,26 +477,50 @@ def reads_unseen(words):
     return not heredoc
 
 
+def reads_hooks_path(raw):
+    """Whether a command only reads: grep or rg (but for rg's --pre, which runs a program), or git config with one of the --get flags
+    and no flag that writes, and no -c, include or the like among git's options (a `rtk proxy` before them is read through)."""
+    if any(w[:1] in ("<", ">", "&") for w in raw if w):  # `grep k f >> .git/config` writes
+        return False
+    raw = raw[2:] if raw[:2] == ["rtk", "proxy"] and len(raw) > 2 else raw
+    program = os.path.basename(raw[0])
+    if program in ("grep", "rg"):
+        return not any(w.startswith(("--pre", "--hostname-bin")) for w in raw)
+    if program != "git":
+        return False
+    at = subcommand(raw)
+    flags = [w for w in raw[at + 1:] if w.startswith("-")]
+    return (raw[at:at + 1] == ["config"] and not any(k in w.lower() for w in raw[1:at] for k in HOOK_KEYS)
+            and any(w.startswith("--get") for w in flags) and all(w in CONFIG_READS for w in flags))
+
+
 def commands(text):
     """The words of each simple command in a shell line, looking inside a shell's -c, `eval`, env -S, `$(...)`, `<(...)`, `>(...)`,
     backticks and ${...}; and a value given, as words a command may run. Each word read: a quoted heredoc body's substitutions run
     nothing."""
     kept = bodies(text)
+    if re.search(r"(^|[ \t;&|()])#[^\n]*\\\n", text, re.M):  # a comment's backslash joins no line in zsh, a quote's would
+        refuse("a comment ending in a backslash, which zsh does not continue: the next line runs; write it without")
+    if "\\\n" in text and "$((" in text.replace("\\\n", ""):  # scan() reads the joined text: `$((cmd)\⏎)` and `$(\⏎(cmd)\⏎)` are commands
+        refuse("$((...)) across a continued line, which the shell may read as a command: write it on one line")
     text = text.replace("\\\n", "")  # a continued line is one line to the shell
     # The substitutions of the whole text, and of each line, its quotes read as quotes and as characters (an apostrophe
     # in a comment or a body would open a quote in the whole text's reading, hiding every later `$(...)`, and an unquoted body's `it's
     # $(cmd)` runs cmd); a quoted body's run nothing.
     _, spans, _, starts = scan(text)
     found = list(zip(starts, spans))
+    # A line of plain code is read as it stands, its quotes as quotes; any other (a text with a heredoc, or one bodies() could not
+    # settle, a line a quote holds from an earlier line) is read once more with its quotes as blanks, an apostrophe there is no quote.
+    plain = lambda at: kept.settled and "<<" not in text and "$'" not in text and not any(a < at < b for a, b, kind in kept if kind == "text")
     for offset, line in zip(itertools.accumulate([0] + [len(line) + 1 for line in text.split("\n")]), text.split("\n")):
-        for reading in (line, re.sub("['\"]", " ", line)):
+        for reading in (line,) if plain(offset) else (line, re.sub("['\"]", " ", line)):
             found += [(offset + at, inner) for inner, at in zip(*scan(reading)[1:4:2])]
     for at, inner in dict.fromkeys(found):
         if not any(a <= at < b for a, b, kind in kept if kind == "quoted"):
             yield from commands(inner)
     for raw in simple_commands(text, kept):
         # A config file included (include.path, includeIf) sets what it likes, hooksPath and core.worktree too.
-        if any(w.upper().startswith("GIT_CONFIG") or any(k in w.lower() for k in ("hookspath", "include.path", "includeif.")) for w in raw):
+        if any(w.upper().startswith("GIT_CONFIG") for w in raw) or any(k in w.lower() for w in raw for k in HOOK_KEYS) and not reads_hooks_path(raw):
             refuse("git's hooks overridden (core.hooksPath, a config file included, a GIT_CONFIG variable)")
         # zsh's options that change what a line reads: globsubst globs every value, qualifiers included,
         # and emulate sh or ksh sets it; promptsubst runs a prompt's substitutions, print -P's; braceccl and extendedglob turn `-{n}`
@@ -624,8 +691,64 @@ def check_git(words, strict=True):
     return pushing
 
 
+NAME = re.compile(r"[A-Za-z_]\w*|\d|[#?$!-]")  # what follows a `$`: a name, a digit, or one of $#, $?, $$, $!, $-
+
+
+def remains(path):
+    """What remains of a path once each expansion is removed (a NUL marks where one was), or None when one is no plain variable: a
+    substitution, a backtick, a list ("$@", ${a[@]}) or one left open. Arithmetic and variables are scalars."""
+    if re.search(BRACE, path):  # a brace gives several words, an empty member among them
+        return None
+    out, i = [], 0
+    while i < len(path):
+        c, after = path[i], path[i + 1:i + 2]
+        if c == "`" or c == "$" and re.match(r"[@*]|argv\b", path[i + 1:]):
+            return None
+        if c != "$":
+            out.append(c)
+            i += 1
+            continue
+        if after in ("(", "{"):
+            end = closing(path, i + 1, "()" if after == "(" else "{}")
+            if end is None:
+                return None
+            body = path[i + 2:end]
+            if after == "(" and not (body.startswith("(") and closing(path, i + 2) == end - 1 and not re.search(r"[$`]", body)):
+                return None  # a command's output, or arithmetic that runs one
+            if after == "{" and re.search(r"^[@*]|argv\b|\[[@*]\]|[/.~$`]", body):
+                return None  # a list, or a default (`${u:-/..}`, `:+`, `:=`) that may be a path itself
+            i = end + 1
+        else:
+            found = NAME.match(path, i + 1)
+            i = found.end() if found else i + 1
+            if path[i:i + 1] in ("[", ":"):  # zsh's subscript and modifiers (`$x[2,1]`, `$x:h`) change the value
+                return None
+        out.append("\0")
+    return "".join(out)
+
+
+def reaches(path):
+    """Whether an empty variable could take a recursive delete of `path` to a folder it must never remove: what remains of it once
+    each expansion is removed is empty or relative, ends in a folder's whole contents (its last name only expansions, dots or a
+    glob), or is the project's, the home's or a temp root's own folder or one above them (read through links and `..`)."""
+    left = remains(path)
+    if left is None:
+        return True
+    folder = os.path.expanduser(left.replace("\0", ""))
+    last = left.rstrip("/").rsplit("/", 1)[-1]
+    if not folder.startswith("/") or re.fullmatch(r"[.\0]*", last) or re.search(r"[*?\[]", last) or left.startswith("\0") and re.search(r"[*?\[]", left):
+        return True  # empty or relative, or the whole contents of a folder, or a glob that matches what an empty value leaves
+    folder = os.path.realpath(folder)
+    roots = [os.path.realpath(k) for k in (ROOT, "/tmp", "/private/tmp", os.environ.get("TMPDIR") or "/tmp")]
+    # A path that starts with an expansion may be anything when it is empty: only inside the project or a temp root, $TMPDIR itself apart.
+    if left.startswith("\0") and not re.match(r"\$(TMPDIR\b|\{TMPDIR\})", path) and not any(folder.startswith(r.rstrip("/") + "/") for r in roots):
+        return True
+    kept = (ROOT, os.path.expanduser("~"), "/tmp", "/private/tmp", os.environ.get("TMPDIR") or "/tmp")
+    return any(os.path.commonpath([folder, os.path.realpath(k)]) == folder for k in kept)
+
+
 def deletes_unguarded(words):
-    """Whether rm -r, or find with -delete or -exec rm, takes a path from a variable that may be empty."""
+    """Whether rm -r, or find with -delete or -exec rm, takes a path from a variable that may be empty and reaches one."""
     program = os.path.basename(words[0])
     if program == "find":
         paths = list(itertools.takewhile(lambda w: w not in ("(", "!") and (not w.startswith("-") or FIND_OPTION.fullmatch(w)), words[1:]))
@@ -637,13 +760,15 @@ def deletes_unguarded(words):
         deletes = any(re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*", w) or w == "--recursive" for w in flags)
     else:
         return False
-    return deletes and any(UNGUARDED.search(p) for p in paths)
+    return deletes and any(UNGUARDED.search(p) and reaches(p) for p in paths)
 
 
 def runs_worktree_sh(words):
     """Whether a simple command runs a script named worktree.sh, itself or through a shell."""
     if os.path.basename(words[0]) in SHELLS:
-        words = [w for w in words[1:] if not w.startswith("-")]
+        if syntax_check(words):
+            return False
+        words = [w for w in words[1:] if not w.startswith(("-", "+"))]
     return bool(words) and os.path.basename(words[0]) == "worktree.sh"
 
 
@@ -690,7 +815,7 @@ try:
 except (OSError, ValueError):  # no list to read is no harness: a subagent's write is refused
     harnessed = True
 if harnessed:
-    refuse("a subagent writes no harness file, by any tool: it reports the change it needs, and its session asks Alexis, whose Terminal applies it (D240)")
+    refuse("a subagent writes no harness file, by any tool: it reports the change it needs, and its session builds it in a copy for Alexis's land (D240, D13213)")
 if tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
     refuse("a realm page or an RPC node: read it with gno_render or gno_read")
 elif tool == "Bash":

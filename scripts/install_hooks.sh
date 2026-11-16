@@ -35,3 +35,20 @@ git config pull.ff only
 	echo "install_hooks: git still takes its hooks from $(git rev-parse --git-path hooks), set in a config this cannot change; remove it there" >&2
 	exit 1
 }
+# land (D13211), the owner's one command for a pull request, and agent-pr's code it reuses, from the same commit, beside the GitHub
+# repository origin names, which it lands to; a commit without it installs none.
+if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
+	url=$(git config --get remote.origin.url) || url=
+	case $url in git@github.com:*) repo=${url#git@github.com:} ;; https://github.com/*) repo=${url#https://github.com/} ;; *) repo= ;; esac
+	repo=${repo%.git}
+	case $repo in */*/* | /* | */ | '') echo "install_hooks: origin ($url) is no GitHub repository, so land would have none to land to" >&2; exit 1 ;; esac
+	share=$HOME/.local/share/land
+	mkdir -p "$HOME/.local/bin" "$share"
+	chmod 700 "$share"
+	rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land" # a link there would take the write elsewhere
+	git show "$ref:scripts/land.py" >"$share/land.py"
+	git show "$ref:scripts/agent_pr.py" >"$share/agent_pr.py"
+	chmod 755 "$share/land.py"
+	printf '%s\n' "$repo" >"$share/repo"
+	ln -s "$share/land.py" "$HOME/.local/bin/land"
+fi

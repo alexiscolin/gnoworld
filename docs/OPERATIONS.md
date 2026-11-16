@@ -245,7 +245,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   address share one count, so a burst of them refuses all such lines for a minute (logged as `limit`).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person
   and send the signature itself, so the cookie lands with it. The server cannot tell; only a
-  wallet that shows the requesting site and refuses another domain's text can; that Adena does so is not checked here. The 90-day cap and logout bound it.
+  wallet that shows the requesting site and refuses another domain's text can; that Adena does so is not checked here. The signed text asks the person to check the address bar (D13600). The 90-day cap, logout and "Log out my other sessions" bound it.
 
 ### The content security policy
 
@@ -316,7 +316,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   room it re-entered by SAJOIN after a restart, where it is a plain member.
 - **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
-- **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
+- **`GET /api/stream`** is public: 25 rooms a stream, 32 streams a visitor (nginx's `limit_conn`), 2,000 in all (the online target), a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
   and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it. A HEAD is
   refused with 405 and takes no place.
@@ -491,7 +491,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 - **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
   `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
-  call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
+  call), `moderation_shape` (an answer of an unknown shape), `moderation_category` (a category beyond the 13, ignored: its name in the log's reason field, once a process, to add to the list), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
   `card_backlog` and `card_queue_full` (the link cards' queue, as the two above); `irc_nick_taken` (above); `redact_refused`, `unknown_room`

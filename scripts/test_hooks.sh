@@ -7,6 +7,9 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 unset GIT_REFLOG_ACTION
 # records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not.
 unset GIT_NO_REPLACE_OBJECTS
+# GitHub sets it in every step: left set, each check_docs and check_regressions a case runs annotates as well (repo_files.report,
+# F13435), and the night's controls failed on it; the cases that want it set it themselves.
+unset GITHUB_ACTIONS
 # The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in a person's
 # shell.
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
@@ -1572,6 +1575,21 @@ good_rules "$d"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
+# On GitHub its refusal is one annotation holding the header and its lines, twenty at most and how many more, escaped as GitHub's
+# toolkit escapes a message (F13435: a problem matcher kept the header alone).
+i=0 && while [ $i -lt 25 ]; do i=$((i + 1)) && printf 'Run `scripts/gone%s%%.sh`.\n' "$i"; done >"$d/.claude/rules/x.md"
+out=$(GITHUB_ACTIONS=true python3 -I "$docs" "$d" 2>/dev/null) && fail "check_docs accepted docs naming 25 missing files"
+printf '%s\n' "$out" | grep -c '^::error title=check_docs::' | grep -qx 1 || fail "check_docs gave its refusal on GitHub as no single annotation: $out"
+python3 -I - "$out" <<'PY' || fail "check_docs's annotation is not its header, twenty lines and how many more, escaped: $out"
+import sys
+line = next(l for l in sys.argv[1].splitlines() if l.startswith("::error title=check_docs::"))
+lines = line.split("::", 2)[2].split("%0A")
+assert lines[0] == "check_docs: these docs name files that do not exist:", lines[0]
+assert len(lines) == 22 and lines[-1] == "  +5 more", lines[-3:]
+assert all(l.startswith("  .claude/rules/x.md: scripts/gone") and l.endswith("%25.sh") for l in lines[1:21]), lines[1:3]
+PY
+out=$(python3 -I "$docs" "$d" 2>/dev/null) || :
+[ -z "$out" ] || fail "check_docs annotated off GitHub: $out"
 rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
@@ -1940,6 +1958,33 @@ done
 printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
 out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
 printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
+# Both ledgers merge by union (.gitattributes, D13408): two branches appending rows to each merge clean, every row kept. A row
+# both sides change is kept twice, and check_docs refuses it in either ledger: union never hides a collision.
+u="$t/union" && mkdir -p "$u/docs/review" && git -C "$u" init -q -b base && cp "$here/../.gitattributes" "$u/.gitattributes" && : >"$u/CLAUDE.md" && good_rules "$u"
+ug() { git -C "$u" -c user.name=t -c user.email=t@t "$@"; }
+row_d() { printf '| 2026-11-16 | %s | why | where |\n' "$1" >>"$u/docs/decisions.md"; }
+row_f() { printf '| %s | 2026-11-16 | r | `x` | %s | %s | %s |\n' "$1" "$2" "$3" "$4" >>"$u/docs/review/findings.md"; }
+printf '| Date | Decision | Why | Where it lives |\n|---|---|---|---|\n' >"$u/docs/decisions.md" && row_d "D9000: the base" && row_d "D9000, amended after the review: kept"
+printf '| Id | Date | By | Where | What | Status | Evidence |\n|---|---|---|---|---|---|---|\n' >"$u/docs/review/findings.md" && row_f F9000 "the base" claimed —
+ug add -A && ug commit -qm base && ug branch -q two && ug branch -q edit1 && ug branch -q edit2
+row_d "D9001: one" && row_f F9001 one claimed — && ug commit -qam one
+ug switch -q two && row_d "D9002: two" && row_f F9002 two claimed — && ug commit -qam two
+out=$(ug merge -q --no-edit base 2>&1) || fail "two branches appending to both ledgers did not merge clean by union: $out"
+[ "$(grep -c '^| 2026-11-16 | D900' "$u/docs/decisions.md")" = 4 ] && [ "$(grep -c '^| F900' "$u/docs/review/findings.md")" = 3 ] ||
+	fail "the union merge of both ledgers lost a row: $(cat "$u/docs/decisions.md" "$u/docs/review/findings.md")"
+out=$(python3 -I "$docs" "$u" 2>&1) || fail "check_docs refused two ledgers merged by union, every row once: $out"
+for side in 1 2; do
+	ug switch -q "edit$side" && sed -i.bak "s/^| F9000 .*/| F9000 | 2026-11-16 | r | \`x\` | the base | rejected | side $side |/; s/^| 2026-11-16 | D9000: the base .*/| 2026-11-16 | D9000: the base, side $side | why | where |/; s/^| 2026-11-16 | D9000, amended after the review: kept .*/| 2026-11-16 | D9000, amended after the review: kept, side $side | why | where |/" "$u/docs/review/findings.md" "$u/docs/decisions.md" &&
+		rm "$u/docs/review/findings.md.bak" "$u/docs/decisions.md.bak" && ug commit -qam "side $side"
+done
+out=$(ug merge -q --no-edit edit1 2>&1) || fail "a row both sides changed did not merge by union: $out"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a union merge that kept a row both sides changed twice: $out"
+printf '%s\n' "$out" | grep -qF "  F9000: the id is used twice" || fail "check_docs did not name the finding a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000: written twice" || fail "check_docs did not name the decision a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000 amended: written twice" || fail "check_docs did not name the amended row a union merge kept twice: $out"
+[ "$(printf '%s\n' "$out" | grep -c '  D9000')" = 2 ] || fail "check_docs named the decision's rows other than once each: $out"
+grep -v '^| F9000 .* side 1 |$' "$u/docs/review/findings.md" >"$u/f.md" && mv "$u/f.md" "$u/docs/review/findings.md"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a decision a union merge kept twice, the findings clean: $out"
 fi
 
 if part instructions; then
@@ -2060,7 +2105,7 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; : >"$SHARD_ROOT/slept"; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; : >"$SHARD_ROOT/slept"; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ] || { echo "the planted reason of hooks" >&2; exit 1; }; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
@@ -2074,7 +2119,7 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's); ONLY names the blocks to run, none for all.
-printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\n        open(os.environ["SHARD_ROOT"] + "/slept", "a").close()\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\n        open(os.environ["SHARD_ROOT"] + "/slept", "a").close()\nos.path.exists("BROKEN_probe") and print("the planted reason of probe"); sys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
 cp "$here/harness_mutate.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
@@ -2176,6 +2221,7 @@ printf '%s\n' "$out" | grep -q "^FAIL  killed, yet listed in GAPS: planted keep1
 for suite in hooks probe; do
 	out=$(PROBED=1 BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"
 	printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not stop on $suite failing on an untouched tree: $out"
+	printf '%s\n' "$out" | grep -qx "  the planted reason of $suite" || fail "harness_mutate hid why $suite failed on its untouched copy: $out"
 	[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate judged mutants after a failed control: $out"
 	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
 done
@@ -2593,7 +2639,7 @@ mv "$t/scan_secrets.away" "$hk/scan_secrets.sh"
 fresh
 # A staged harness file is committed in a person's Terminal alone, never in the sandbox: every file of .githooks/records.sh's list,
 # by name and as it is on disk, its name in any case, with a space or an accent; a path that only looks like one is not.
-harnessed() { said "is committed in Alexis's Terminal alone"; }
+harnessed() { said "never reaches a commit from Claude Code's sandbox"; }
 for f in 'scripts/my file.sh' .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
 	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts CLAUDE.md; do
@@ -2608,7 +2654,7 @@ fresh
 for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
 	for f in packages/core/package.json app/vite.config.ts; do
 		mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
-		(cd "$c2" && env "$v=1" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+		(cd "$c2" && env "$v=1" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 			fail "pre-commit let a staged $f through in the sandbox with $v=1 (D241)"
 		git -C "$c2" reset -q && rm "$c2/$f"
 	done
@@ -2627,7 +2673,7 @@ done
 # reads): the list alone refuses it, on a disk that keeps case or not.
 ic="$t/icase" && git init -q "$ic" && git -C "$ic" update-index --add --cacheinfo "100644,$(echo planted | git -C "$ic" hash-object -w --stdin),Scripts/tool.sh"
 out=$(cd "$ic" && sh "$hk/pre-commit" 2>&1 >/dev/null) && fail "pre-commit let Scripts/tool.sh through in the sandbox: $out"
-printf '%s\n' "$out" | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit did not read Scripts/tool.sh as the harness file scripts/ holds, case-blind (F151, D241): $out"
+printf '%s\n' "$out" | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit did not read Scripts/tool.sh as the harness file scripts/ holds, case-blind (F151, D241): $out"
 for f in app/src/scripts/a.ts scriptsx/a.ts app/src/config.ts docs/stryker.config.json.md packages/core/src/args/args.ts; do
 	mkdir -p "$c2/$(dirname "$f")" && echo x >"$c2/$f" && git -C "$c2" add "$f"
 	precommit || fail "pre-commit refused $f, which only looks like a harness file"
@@ -2664,7 +2710,7 @@ harnessed || fail "pre-commit let the deletion of a harness file through in the 
 git -C "$c2" reset -q && git -C "$c2" mv scripts/moved.sh moved.sh
 harnessed || fail "pre-commit let a harness file moved out of the harness through in the sandbox (D241)"
 fresh && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
-(cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-merge-commit let a merge bring a harness file in the sandbox (D241)"
 fresh
 # SANDBOX_RUNTIME unset is no way out: the sandbox cannot open the hook for writing, whatever its environment says, and
@@ -2672,14 +2718,14 @@ fresh
 echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
 outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$hk/pre-commit" 2>&1 >/dev/null); }
 chmod a-w "$hk/pre-commit"
-outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
+outside_ | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
 # Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence.
 command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
-(cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
 chmod u+w "$hk/pre-commit"
 outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal"
-outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
+outside_ SANDBOX_RUNTIME=1 | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
 fresh
 # Through git itself, which hands its hooks GIT_INDEX_FILE for `commit -a` and `commit -- <path>`: the same
 # checks, on what that commit holds; an empty commit checks nothing and passes.
@@ -2696,7 +2742,7 @@ gc -m "fix: a path alone" -- a.ts || fail "git commit -- <path>, through the hoo
 echo unformatted >>"$c2/a.ts"
 gc -m "fix: an unformatted path" -- a.ts && fail "git commit -- <path>, through the hooks, let its unformatted path through"
 fresh && echo '# x' >>"$c2/scripts/check_docs.py"
-(cd "$c2" && git -c core.hooksPath="$hk" commit -qam "fix: a harness file" 2>&1) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && git -c core.hooksPath="$hk" commit -qam "fix: a harness file" 2>&1) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "git commit -a, through the hooks, took a harness file in the sandbox, or refused it for another reason than D241"
 fresh
 gc --allow-empty -m "chore: nothing" || fail "an empty commit, through the hooks, was refused"
@@ -2723,7 +2769,7 @@ fake=$(git -C "$c3" commit-tree -m planted "$staged_tree")
 [ -n "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref's case staged nothing"
 git -C "$c3" replace "$head" "$fake"
 [ -z "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref planted hides nothing: the case proves nothing"
-(cd "$c3" && sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c3" && sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-commit read HEAD through a replace ref, which hid a staged harness file (F132)"
 git -C "$c3" replace -d "$head" >/dev/null
 fi
@@ -2921,6 +2967,23 @@ in_i env PATH="$t/moving:$PATH" sh scripts/install_hooks.sh tweak >/dev/null 2>&
 [ -e "$t/moved" ] && [ "$(git -C "$i" rev-parse tweak)" = "$(git -C "$i" rev-parse planted)" ] || fail "the moving git moved nothing: the case proves nothing"
 installed "$tweaked" || fail "install_hooks.sh installed from a branch moved while it ran, not the commit it was given (L3)"
 ran "install_hooks.sh, its branch moved"
+# land (D13211): a commit holding it installs it in ~/.local/bin, agent-pr's code it reuses beside it, and the repository origin names,
+# which must be GitHub's; the installed command finds its code through its link. A commit without it installs no land.
+[ ! -e "$HOME/.local/share/land/repo" ] || [ "$(cat "$HOME/.local/share/land/repo")" != o/r ] || fail "install_hooks.sh installed land from a commit without it"
+git -C "$i" checkout -q -b landed main && cp "$here/land.py" "$here/agent_pr.py" "$i/scripts/"
+git -C "$i" add -A && in_i git commit -qm "feat: land" && git -C "$i" checkout -q main && git -C "$i" remote add origin git@github.com:o/r.git
+lh="$i/home/.local"
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) || fail "install_hooks.sh failed with land in its commit"
+[ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && [ -x "$lh/share/land/land.py" ] && cmp -s "$lh/share/land/agent_pr.py" "$here/agent_pr.py" &&
+	[ "$(cat "$lh/share/land/repo")" = o/r ] || fail "install_hooks.sh did not install land, its code and its repository"
+out=$(python3 -I "$lh/bin/land" x 2>&1) && fail "the installed land took an argument: $out"
+printf '%s\n' "$out" | grep -q "^usage: land" || fail "the installed land did not run through its link: $out"
+git -C "$i" remote set-url origin https://example.com/o/r.git
+git -C "$i" config --unset merge.ff
+(cd "$i" && HOME="$i/home2" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) && fail "install_hooks.sh installed land for an origin that is not GitHub's"
+[ "$(git -C "$i" config merge.ff)" = false ] || fail "install_hooks.sh refused land's origin before setting git's merges, a half install"
+[ ! -e "$i/home2/.local" ] || fail "install_hooks.sh wrote land's folder before refusing its origin"
+git -C "$i" remote remove origin
 git -C "$i" branch -f tweak "$tweaked"
 reinstall
 # A replace ref makes git show other bytes for an object: the install and a person's command read the objects themselves.
@@ -4004,9 +4067,9 @@ sh_ 'echo x >|/tmp/f && git status' 0
 # A recursive delete takes no path from a variable that may be empty (a folder emptied by a find -delete
 # whose variable was unset): ${name:?} stops the shell first. BSD's and GNU's options before find's paths, a
 # wrapper, or a :? in a comment or another command change nothing.
-for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}/x" -delete' 'find "$dir" -exec rm -f {} +' \
+for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}" -delete' 'find "$dir" -exec rm -f {} +' \
 	'rm -r "$dir"' 'rm -fr $dir/*' 'rm -R -- "$1"' 'rm --recursive "$(git rev-parse --show-toplevel)/x"' \
-	'find "${dir:-.}" -delete' "sh -c 'rm -r \"\$d\"'" 'rm -r $(pwd)/x' 'cd x && /usr/bin/find "$TMPDIR/x" -delete' \
+	'find "${dir:-.}" -delete' "sh -c 'rm -r \"\$d\"'" 'rm -r $(pwd)/x' 'cd x && /usr/bin/find "$TMPDIR/$x" -delete' \
 	'find -x "$d" -delete' 'find -E "$d" -delete' 'find -d "$d" -delete' 'find -s "$d" -delete' 'find -Ex "$d" -delete' \
 	'find -f "$d" -delete' 'find -D tree "$d" -delete' 'find -O3 "$d" -delete' 'find -- "$d" -delete' \
 	'rm -rf `pwd`/x' 'find "$d" -execdir rm -rf {} \;' 'find "$d" -ok rm {} \;' 'find "$d" -exec /bin/rm {} +' \
@@ -4636,6 +4699,139 @@ sh scripts/worktree.sh u v w; true"; do
 	at_ "$root" "$cmd" 2
 done
 sh_ "sh scripts/worktree.sh x y z" 2
+# Narrowed refusals (the owner's review of 2026-11-16: about 200 of 288 refusals were false). Each narrowing passes what it
+# misread, and keeps its planted bypass refused.
+# A `$(...)` is read as the shell reads it: a quote inside it is a quote (`print(next(...))` in a python string is no glob
+# qualifier, `$(date)` in single quotes is text); a line a quote or a heredoc's body holds from an earlier line is read both ways,
+# as an apostrophe there is no quote. `$((...))` is arithmetic, unless what closes it is not `))`.
+for cmd in 'jid=$(python3 -I -c '"'"'import json; print(next(j["id"] for j in json.load(open("x"))["jobs"]))'"'"')' \
+	'printf '"'"'%s\n'"'"' '"'"'t0=$(date +%s)'"'"' > f.sh' \
+	'printf '"'"'%s\n'"'"' '"'"'t0=$(date +%s)'"'"' '"'"'echo "$(( $(date +%s) - t0 )) s"'"'"' > f.sh' \
+	'a=$(python3 -I -c '"'"'print(max(1, 2))'"'"')
+b=$(python3 -I -c '"'"'print(min(1, 2))'"'"')' \
+	'echo "$(( $(date +%s) - t0 )) s"' 'n=$((n + 1))' 'echo $((a * (b + 1))) $(( n ))'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'echo $(echo '"'"'x'"'"' $(gnokey list))' 'echo $(( $(gnokey list) + 1 ))' 'echo $(($(gnokey list)))' 'echo $(( `gnokey list` + 1 ))' \
+	'echo $((echo a); (gnokey list))' 'echo $((echo a)|(gnokey list))' 'echo $((gnokey list) )' 'echo "$(( 1 + $(rm -r "$d") ))"' \
+	'echo $( (gnokey list))' 'x=$(echo '"'"'a'"'"'; ls *(e:id:))' \
+	"sh <<EOF
+echo it's \$(ls *(e:id:)) isn't
+EOF" "cat <<EOF | sh
+echo it's \$(ls *(e:id:)) isn't
+EOF" '# "
+echo "a
+echo it'"'"'s $(ls *(e:id:)) isn'"'"'t"' '# "
+case x in x) echo "a
+echo it'"'"'s $(ls *(e:id:)) isn'"'"'t" ;; esac' 'echo $((echo a);$x)' 'rm -rf build/"$x".o'; do
+	sh_ "$cmd" 2
+done
+# rtk proxy runs the program after it: read as that program, a shell or worktree.sh among them, and git as git is.
+for cmd in 'rtk proxy git log -n 3' 'rtk proxy git diff > /tmp/x.patch' 'rtk proxy git diff "$ref"' 'rtk proxy sh -n scripts/check.sh'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rtk proxy git commit --no-verify -m x' 'rtk proxy git commit -nm x' 'rtk proxy sh scripts/worktree.sh a b' \
+	'rtk proxy bash < /tmp/f.sh' 'rtk proxy rm -rf "$x"' 'rtk proxy sh -c "gnokey list"'; do
+	sh_ "$cmd" 2
+done
+# Reading core.hooksPath (or include.path) is no override: git config with a read flag and nothing that writes, grep and rg. Setting it,
+# by -c, a config command, a GIT_CONFIG variable or an include, stays refused, and so does a read hiding one in the same command.
+for cmd in 'git config --get core.hooksPath' 'git config --get-all core.hooksPath' 'git config --get-regexp hooksPath' \
+	'git -C . config --local --get core.hooksPath' 'git config --show-origin --get core.hooksPath' '/usr/bin/git config --get include.path' \
+	'rtk proxy git config --get core.hooksPath' 'grep -n hooksPath scripts/guard.py' 'rg hooksPath' 'grep -rn core.hooksPath docs && git status'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'git config core.hooksPath x' 'git config --add core.hooksPath x' 'git config --get --add core.hooksPath x' \
+	'git config --get core.hooksPath --file x' 'git config --get core.hooksPath --add x' 'rtk proxy git config core.hooksPath x' 'rg --pre git hooksPath .' \
+	'git config --replace-all --get core.hooksPath x' 'git config --unset core.hooksPath' \
+	'git -c core.hooksPath=x config --get y' 'git -c core.hooksPath=x commit -m x' 'git --config-env=core.hooksPath=X config --get y' \
+	'GIT_CONFIG_COUNT=1 git config --get core.hooksPath' 'GIT_CONFIG_COUNT=1 grep hooksPath x' 'time git config --get core.hooksPath' \
+	'echo core.hooksPath' 'git config --get core.hooksPath; git config core.hooksPath x' 'git commit -m x -c include.path=y' \
+	'grep x -f core.hooksPath; git -c core.hooksPath=y commit -m x' 'git config --get x $(git config core.hooksPath y)'; do
+	sh_ "$cmd" 2
+done
+# A recursive delete is refused when what remains of its path, each expansion removed, is empty, relative, or the project's, the
+# home's or the temp root's own folder or one above them, or ends in a folder's whole contents (an expansion or a glob as its
+# last name): the variable may be empty. A name's start or end beside one, a folder of its own, passes. A substitution or a list
+# is no variable: refused wherever it stands.
+for cmd in 'rm -rf /private/tmp/claude-501/ht/x' 'rm -rf "$TMPDIR/foo"' 'rm -rf /private/tmp/claude-501/b-"$n"' 'rm -rf "$x"/private/tmp/claude-501/ht/y' \
+	'rm -rf "$TMPDIR/ht-$n"' 'rm -rf /tmp/"${d:-x}"/y' 'rm -rf /tmp/x-$((n + 1))' 'find "$TMPDIR/x" -delete' 'rm -r /tmp/"$d"/a/b' \
+	'find /tmp/"$out"/obj -name x -delete' 'rm -rf "$x"'"$root"'/dist'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rm -rf "$x"' 'rm -rf "$HOME/$x"' 'rm -rf /private/tmp/$x' 'rm -rf /tmp/"$x"' 'rm -rf "$x"/' 'rm -rf ./"$x"' 'rm -rf "$TMPDIR/$x"' \
+	'rm -rf /private/tmp/claude-501/ht/"$x"' 'rm -rf "$d"/*' 'rm -rf "$d/"*' 'rm -rf "$d"/.*' 'rm -rf "$TMPDIR/foo/$x/.."' 'rm -rf build/"$x"' \
+	'rm -rf ~/$x' 'rm -rf ~/"$x"' 'rm -rf '"$(dirname "$HOME")"'/$x' 'rm -rf /$x' 'rm -rf $x$y' 'rm -rf "$(pwd)/x"' 'rm -rf "$@"' 'rm -rf "$d"/"$@"' \
+	'rm -rf "${a[@]}/x"' 'rm -rf "$TMPDIR/`pwd`"' 'rm -rf "${d:-.}"' 'rm -rf "$dir"/.' 'rm -rf "$ROOT"/..' 'rm -rf "${TMPDIR:?}/$x"' \
+	'find "$x" -delete' 'find "$HOME/$x" -delete' 'find "$TMPDIR/$x" -exec rm -r {} +' 'find "$(pwd)/x" -delete' \
+	'rm -rf '"$root"'"$x"' 'rm -rf '"$(dirname "$root")"'"$x"' 'rm -rf '"$HOME"'"$x"' 'rm -rf '"$(dirname "$HOME")"'"$x"' 'rm -rf /tmp"$x"' \
+	'rm -rf /private/tmp"$x"' 'rm -rf "${d"/x' 'rm -rf /tmp/x/"${d"y' 'rm -rf "/tmp/x-$((pwd) )"' 'rm -rf "/tmp/x-$(( $(pwd) ))"' 'rm -rf "'"$root"'/$x"' 'rm -rf '"$root"'/"$x"' 'rm -rf '"$(dirname "$root")"'/"$x"' \
+	'rm -rf "'"$(dirname "$(dirname "$root")")"'/$x"'; do
+	sh_ "$cmd" 2
+done
+# The temp root is TMPDIR when it is set: a path an empty variable leaves at it is refused, and the same path is no root otherwise.
+tmp_() { # $1: TMPDIR, $2: a shell command, $3: the exit code expected
+	code=0
+	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$2" | TMPDIR="$1" python3 -I "$gd" >/dev/null 2>&1 || code=$?
+	[ "$code" = "$3" ] || fail "guard gave $code, not $3, for TMPDIR=$1: $2"
+}
+tmp_ /nonexistent-guard-tmp/x 'rm -rf /nonexistent-guard-tmp/x"$y"' 2
+tmp_ /nonexistent-guard-tmp/y 'rm -rf /nonexistent-guard-tmp/x"$y"' 0
+tmp_ /nonexistent-guard-tmp/x 'rm -rf "$x"/nonexistent-guard-tmp/x/y' 0
+tmp_ /nonexistent-guard-tmp/z 'rm -rf "$x"/nonexistent-guard-tmp/x/y' 2
+# sh -n only parses: a syntax check of files runs nothing, so it passes, worktree.sh among them, after `--` whatever the file's
+# name, else when each name is plain words. Any other option beside -n (-nc, -xn, -n -c, -n -s, +n, a redirection) is no pure check.
+for cmd in 'sh -n -- "$f"' 'sh -n scripts/x.sh' 'sh -n scripts/worktree.sh' 'bash -n -- "$f" scripts/y.sh' 'sh -n scripts/check.sh scripts/worktree.sh'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'sh -n "$f"' 'sh -n scripts/*.sh' 'sh -n -x scripts/worktree.sh' 'sh -nx scripts/worktree.sh' 'sh -xn scripts/worktree.sh' \
+	'sh -nc scripts/worktree.sh' 'sh -n -c scripts/worktree.sh' 'sh -n -s scripts/worktree.sh' 'sh -n +n scripts/worktree.sh' \
+	'sh -n -- scripts/worktree.sh < /dev/null' 'sh +n -n scripts/worktree.sh' 'sh scripts/worktree.sh' 'sh -n -c "sh scripts/worktree.sh x y z"' \
+	'sh -n -c "git commit --no-verify -m x"' 'sh -n < /tmp/f.sh' 'echo x | sh -n' 'git status --get core.hooksPath' 'sh -n scripts/x.sh && sh scripts/worktree.sh x y z' 'cd docs && sh -n scripts/worktree.sh; sh scripts/worktree.sh x'; do
+	sh_ "$cmd" 2
+done
+# Review fixes. A brace expansion, a `$name` followed by `[` or `:` (zsh's subscript and modifiers) and a `${...}` default holding a
+# `/`, `.`, `~` or `$` can each leave an empty member or a dropped part, so a delete naming one is refused; a path that starts
+# with an expansion is allowed only inside the project or a temp root (`$TMPDIR/x` is one); `$((` across a continued line is
+# no arithmetic; rtk proxy's own options are skipped, any other is refused; a read is no read with a redirection beside it.
+for cmd in 'rm -rf "$PWD"/{dist,"$sub"}' 'find "$PWD"/{dist,"$sub"} -delete' 'rm -rf ~/{a,$x}' 'rm -rf /private/tmp/claude-501/b2u/{dist,$x}' \
+	'rm -rf "/opt/data$x[2,1]"' 'find "/private/tmp/x${u:-/..}" -delete' 'rm -rf /tmp/x/"${u:+/}"' 'rm -rf /tmp/x/"${u:=.}"' \
+	'rm -rf /tmp/x/"${u:-~}"' 'rm -rf /tmp/x/"${u:-$v}"' 'rm -rf /tmp/x/"$p":h' 'rm -rf /tmp/x/"${u:-a.b}"-y' 'rm -rf /tmp/x/{a..c}$n' \
+	'rm -rf "$DESTDIR"/usr/local' 'rm -rf "$x"/opt/homebrew' 'rm -rf "$x"/Volumes' 'rm -rf "${x:-/}"/usr' 'rm -r "$d"/a/b' \
+	'rm -rf "$d/build"' 'find "$out/obj" -name x -delete' 'rm -rf "${d:-x}/y"'; do
+	sh_ "$cmd" 2
+done
+sh_ 'echo $((bash < /tmp/f.sh)\
+)' 2
+sh_ 'echo $((eval "$x")\
+)' 2
+for cmd in 'rtk proxy -v git log -n 3' 'rtk proxy --skip-env git status' 'rtk proxy -- git status' 'rtk proxy -vv --ultra-compact git status'; do
+	sh_ "$cmd" 0
+done
+for cmd in 'rtk proxy -v bash < /tmp/f.sh' 'rtk proxy --verbose bash < /tmp/f.sh' 'rtk proxy -v eval "$x"' 'rtk proxy -v zsh -s < /tmp/f.sh' \
+	'echo x | rtk proxy -v sh' 'rtk proxy -vv sh scripts/worktree.sh a b' 'rtk -v proxy bash < /tmp/f.sh' 'rtk proxy -x git status' \
+	'rtk proxy -- bash < /tmp/f.sh' 'grep -h hooksPath /tmp/cfg >> .git/config' 'git config --get core.hooksPath >> .git/config' \
+	'rg hooksPath 2>/dev/null'; do
+	sh_ "$cmd" 2
+done
+# F9: `$'\''` is an ANSI-C quote whose escaped quote does not end it; reading it as plain quotes hid what follows from a reading
+# that blanks quotes, so a text with `$'` is read both ways. F10: a glob character in a delete's last name, or anywhere after a
+# leading expansion, can match whatever an empty variable leaves. F12: a comment ending in a backslash is no continued line.
+for cmd in "echo \"\$( git commit --no-verify -m x; echo \$'\\'' ) ' \"" "echo \"\$( rm -rf \"\$x\"; echo \$'\\'' ) ' \"" \
+	"echo \"\$( sh scripts/worktree.sh a b c; echo \$'\\'' ) ' \"" 'rm -rf "$x"/[!.]*' 'rm -rf "$x"/.[!.]*' 'rm -rf "$x"/[a-z]*' \
+	'rm -rf "$x"/[[:alpha:]]*' 'rm -rf "$x"/*-*' 'rm -rf /tmp/x/"$y"*' 'rm -rf "$x"/a*/b' 'rm -rf "$x"/private/tmp/claude-501/ht/a*/b' 'rm -rf /tmp/x/a"$y"?' 'echo hi #\
+git commit --no-verify -m x'; do
+	sh_ "$cmd" 2
+done
+# A comment that opens a later line ends in a backslash; a $( and its ( split by a continued line, read joined as arithmetic.
+sh_ 'echo x
+#\
+bash < /tmp/f.sh' 2
+sh_ 'echo $(\
+(bash < /tmp/f.sh)\
+)' 2
+sh_ 'echo a \
+b' 0
 # A subagent edits no harness file with Edit or Write: the sandbox stops a shell's writes, never the file tools', so a subagent refused in a shell could still rewrite
 # stryker.config.json with Edit. The harness is
 # .githooks/records.sh's list, in the tree the file sits in, however its path is written; the session itself, with no agent_id
@@ -5467,6 +5663,17 @@ python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(in
 fi
 
 if part regressions; then
+# F13435: check_regressions's refusal on GitHub is one annotation of its header and problems, through repo_files.report.
+out=$(cd "$here" && GITHUB_ACTIONS=true python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("check_regressions", "check_regressions: the safety net shrank:", ["a test is gone: a > %s" % n for n in range(3)])' 2>/dev/null) || :
+[ "$out" = "::error title=check_regressions::check_regressions: the safety net shrank:%0A  a test is gone: a > 0%0A  a test is gone: a > 1%0A  a test is gone: a > 2" ] ||
+	fail "repo_files.report gave no single annotation of a refusal's lines: $out"
+grep -q 'report("check_regressions", "check_regressions: the safety net shrank' "$here/check_regressions.py" || fail "check_regressions does not report its problems through repo_files.report"
+err=$(cd "$here" && python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("t", "h:", ["a\r\n::error title=gate-ok::forged", " ::warning title=forged::ok"])' 2>&1 >/dev/null) || :
+[ "$err" = "h:
+  a\r\n::error title=gate-ok::forged
+  \\ ::warning title=forged::ok" ] || fail "repo_files.report let an item's newline, or its leading ::, start a command line: $err"
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
 # An exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` adds an ignore that
@@ -6042,6 +6249,45 @@ for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc p
 	[ ! -e "$wr/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
 	git -C "$ws/src" reset -q --hard "$installed"
 done
+# A base equal to main as GitHub serves it (git ls-remote of origin) is no session's plumbing, as no session pushes main: its harness
+# may differ from this tree's (a worktree whose branch was merged), its package files never. A base past or behind the served main, or
+# a remote that does not answer, is refused as before.
+git init -q --bare "$ws/origin.git" && git -C "$ws/src" remote add origin "$ws/origin.git"
+mkdir -p "$ws/src/scripts" && for f in scripts/guard.py CLAUDE.md; do echo merged >>"$ws/src/$f"; done
+git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "main moved on" && served=$(git -C "$ws/src" rev-parse HEAD) && git -C "$ws/src" push -q origin HEAD:main
+git -C "$ws/src" reset -q --hard "$installed"
+out=$(wt "$wr/merged" merged "$served" 2>&1) || fail "worktree.sh refused main as GitHub serves it, whose harness alone differs: $out"
+[ "$(git -C "$wr/merged" rev-parse HEAD)" = "$served" ] || fail "worktree.sh's tree of the served main is not at it"
+out=$(wt remove "$wr/merged" 2>&1) || fail "worktree.sh could not remove the served main's tree: $out"
+git -C "$ws/src" reset -q --hard "$served" && git -C "$ws/src" commit -q --allow-empty -m "past main" && past=$(git -C "$ws/src" rev-parse HEAD) && git -C "$ws/src" reset -q --hard "$installed"
+git -C "$ws/src" checkout -q "$served" -- scripts/guard.py && git -C "$ws/src" commit -qm "a session's plumbing" && forged=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q --hard "$installed"
+for case in "past:$past" "forged:$forged"; do
+	out=$(wt "$wr/${case%%:*}" "${case%%:*}" "${case#*:}" 2>&1) && fail "worktree.sh made a tree of a base that is not the served main, its harness not this tree's (${case%%:*}): $out"
+	printf '%s\n' "$out" | grep -qF scripts/guard.py || fail "worktree.sh refused a base that is not the served main without naming its harness file: $out"
+done
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+	git -C "$ws/src" checkout -q "$served" -- scripts/guard.py CLAUDE.md && echo merged >>"$ws/src/$f"
+	git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "main's $f moved" && moved=$(git -C "$ws/src" rev-parse HEAD)
+	git -C "$ws/src" push -q -f origin HEAD:main && git -C "$ws/src" reset -q --hard "$installed"
+	out=$(wt "$wr/pkgs" pkgs "$moved" 2>&1) && fail "worktree.sh made a tree of the served main whose $f is not this tree's: $out"
+	printf '%s\n' "$out" | grep -qF "$f" && ! printf '%s\n' "$out" | grep -qF scripts/guard.py || fail "worktree.sh did not name the served main's $f alone: $out"
+done
+# GitHub's ssh address is read over https, which needs no key: here https://github.com/test/gnoworld.git leads to the test's remote, and
+# ssh to nothing.
+git -C "$ws/src" push -q -f origin "$served:main" && git -C "$ws/src" remote set-url origin git@github.com:test/gnoworld.git
+git -C "$ws/src" config "url.$ws/origin.git.insteadOf" https://github.com/test/gnoworld.git
+out=$(GIT_SSH_COMMAND=false wt "$wr/https" https "$served" 2>&1) || fail "worktree.sh did not read GitHub's ssh address over https: $out"
+out=$(wt remove "$wr/https" 2>&1) || fail "worktree.sh could not remove the tree read over https: $out"
+git -C "$ws/src" config --unset "url.$ws/origin.git.insteadOf" && git -C "$ws/src" remote set-url origin "$ws/origin.git" && git -C "$ws/src" push -q -f origin "$served:main" && git -C "$ws/src" branch -q -f flip "$served"
+mkdir -p "$ws/racebin" && printf '#!/bin/sh\ncase " $* " in *" worktree add "*" flip "*) "%s" -C "%s" update-ref refs/heads/flip %s ;; esac\nexec "%s" "$@"\n' \
+	"$(command -v git)" "$ws/src" "$forged" "$(command -v git)" >"$ws/racebin/git" && chmod +x "$ws/racebin/git"
+out=$(PATH="$ws/racebin:$PATH" wt "$wr/raced" raced flip 2>&1) || fail "worktree.sh refused the served main named by a branch: $out"
+[ "$(git -C "$wr/raced" rev-parse HEAD)" = "$served" ] || fail "worktree.sh checked out what a branch led to after its checks, not the base it checked"
+out=$(wt remove "$wr/raced" 2>&1) || fail "worktree.sh could not remove the raced tree: $out"
+git -C "$ws/src" remote set-url origin "$ws/nowhere.git"
+out=$(wt "$wr/lost" lost "$served" 2>&1) && fail "worktree.sh took a base for the served main with no remote answering: $out"
+git -C "$ws/src" remote remove origin
 echo changed >>"$ws/src/app/package.json"
 out=$(wt "$wr/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
 git -C "$ws/src" checkout -q -- app/package.json
@@ -7390,6 +7636,150 @@ grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "
 	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
 fi
 
+if part land; then
+# land: the owner's one command for a pull request (D13211, D13213), against local stand-ins for GitHub, gh and gitleaks. After his y it
+# pushes the one branch a bundle holds, from GitHub's main, and opens the pull request; before, it lists what he approves: the subjects,
+# each harness file with its lines added and removed, the declaration lines, any workflow file, how the branch on GitHub changes, 16 hex
+# of the tip. It refuses what is not one branch named as its files, a file that is a link, a drop folder of more, a secret, a branch
+# not from main; an N pushes nothing.
+ld="$t/land" && mkdir -p "$ld/github/o" "$ld/space" "$ld/state" "$ld/bin"
+ld=$(cd "$ld" && pwd -P)
+lg() { git -c user.name=t -c user.email=t@t -c init.defaultBranch=main -c core.hooksPath=/dev/null "$@"; }
+lg init -q "$ld/s" && mkdir -p "$ld/s/.githooks" "$ld/s/scripts" && cp "$hooks/records.sh" "$hooks/commit-msg" "$ld/s/.githooks/" && secrets_into "$ld/s/scripts/"
+echo a >"$ld/s/scripts/x.sh" && echo r >"$ld/s/README.md"
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm base && lg init -q --bare "$ld/github/o/r.git" && lg -C "$ld/s" push -q "$ld/github/o/r.git" main
+printf 'o/r\n' >"$ld/state/repo"
+lg -C "$ld/s" checkout -qb feat && echo b >>"$ld/s/scripts/x.sh" && mkdir -p "$ld/s/.github/workflows" && echo 'on: push' >"$ld/s/.github/workflows/w.yml"
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "feat: a change" -m "Harness-changed: scripts/x.sh - a test
+Removed-test: a > b - merged" && tip=$(lg -C "$ld/s" rev-parse HEAD)
+offer() { lg -C "$ld/s" bundle create -q "$ld/space/$1.bundle" "${2:-$1}" && printf 'feat: a change\n\nThe body.\n' >"$ld/space/$1.md"; }
+offer feat
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s/git.log"\ncase " $* " in *" push "*) [ ! -e "%s/race" ] || "%s" -C "%s/github/o/r.git" update-ref refs/heads/feat "$(cat "%s/race")" ;; esac\nexec "%s" "$@"\n' \
+	"$ld" "$ld" "$(command -v git)" "$ld" "$ld" "$(command -v git)" >"$ld/bin/git" && chmod +x "$ld/bin/git"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s/gh.log"\ncase $2 in list) [ ! -e "%s/pr" ] || echo https://github.com/o/r/pull/1; case " $* " in *" --state=open "*) ;; *) [ ! -e "%s/prclosed" ] || echo https://github.com/o/r/pull/0 ;; esac ;; create) : >"%s/pr"; for a; do case $a in --body-file=*) cat "${a#--body-file=}" >"%s/body" ;; esac; done; echo https://github.com/o/r/pull/1 ;; esac\n' "$ld" "$ld" "$ld" "$ld" "$ld" >"$ld/bin/gh"
+printf '#!/bin/sh\nfor a; do case $a in --log-opts=*) for w in ${a#--log-opts=}; do case $w in *..*) r=$w ;; esac; done ;; esac; last=$a; done\ncase $1 in\ndir) ! grep -rq PLANTEDTOKEN "$last" ;;\nstdin) ! grep -q PLANTEDTOKEN ;;\ngit) echo "INF $(git -C "$last" rev-list --count "$r") commits scanned."; ! git -C "$last" log -p --format= "$r" | grep PLANTEDTOKEN ;;\nesac\n' >"$ld/bin/gitleaks"
+chmod +x "$ld/bin/gh" "$ld/bin/gitleaks"
+sed -e "s|^GITHUB = .*|GITHUB = \"file://$ld/github\"|" -e "s|^TOOLS = .*|TOOLS = \"$ld/bin:/usr/bin:/bin\"|" -e "s|^STATE = .*|STATE = \"$ld/state\"|" \
+	-e "s|^SPACE = .*|SPACE = \"$ld/space/\"|" "$here/land.py" >"$ld/land.py" && cp "$here/agent_pr.py" "$ld/agent_pr.py"
+grep -q "^GITHUB = \"file://" "$ld/land.py" && grep -q "^SPACE = \"$ld/space/\"" "$ld/land.py" || fail "land's constants could not be pointed at the stand-ins"
+grep -qx 'SPACE = f"/private/tmp/claude-{os.getuid()}/land/"' "$here/land.py" && grep -qx 'GITHUB = "https://github.com"' "$here/land.py" || fail "the shipped land reads another drop folder or pushes elsewhere than GitHub"
+landed() { printf '%s\n' "$1" | python3 -I "$ld/land.py" 2>&1; }
+remote() { lg -C "$ld/github/o/r.git" rev-parse -q --verify "refs/heads/$1" || :; }
+out=$(landed n) || fail "land failed on an N: $out"
+for line in "land: feat, 1 commit(s) on main" "  $(lg -C "$ld/s" rev-parse --short HEAD) feat: a change" "harness files touched (2):" "  scripts/x.sh  +1 -0" \
+	"  .github/workflows/w.yml  +1 -0" "declaration lines (2):" "  Harness-changed: scripts/x.sh - a test" "  Removed-test: a > b - merged" "pull request: feat: a change" \
+	"WORKFLOW FILES, which run on GitHub once pushed: .github/workflows/w.yml" "on GitHub: a new branch feat" "tip: $(printf '%.16s' "$tip")"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "land did not list: $line
+$out"
+done
+printf '%s\n' "$out" | grep -q "nothing pushed" && [ -z "$(remote feat)" ] && [ -e "$ld/space/feat.bundle" ] || fail "land pushed, or took the drop, on an N: $out"
+# The drop folder named through /tmp, a link to /private/tmp on macOS and none on Linux: both sides of the inside check read it the
+# same way (PR #17's red on GitHub: agent_pr.take turned /tmp/ into /private/tmp/ on the file's side alone, and Linux has no
+# /private). Its copy is made under /tmp itself, whatever TMPDIR is (a Mac's is under /var/folders). Any other link on the way is
+# refused still.
+lt=$(mkdir -p "/tmp/claude-$(id -u)" && mktemp -d "/tmp/claude-$(id -u)/land.XXXXXX") && mkdir "$lt/space" && cp "$ld/space/feat.bundle" "$ld/space/feat.md" "$lt/space/"
+case $lt in /tmp/*) ;; *) fail "mktemp did not name the drop folder through /tmp: $lt" ;; esac
+sed "s|^SPACE = .*|SPACE = \"$lt/space/\"|" "$ld/land.py" >"$ld/land_tmp.py"
+out=$(printf 'n\n' | python3 -I "$ld/land_tmp.py" 2>&1) && code=0 || code=$?
+rm -r "${lt:?}" # before any verdict: a failure leaves nothing outside the test's folder
+[ "$code" = 0 ] || fail "land failed on an N, its drop folder named through /tmp: $out"
+printf '%s\n' "$out" | grep -qxF "tip: $(printf '%.16s' "$tip")" || fail "land did not list a drop folder named through /tmp: $out"
+ln -s "$ld" "$ld/via" && sed "s|^SPACE = .*|SPACE = \"$ld/via/space/\"|" "$ld/land.py" >"$ld/land_via.py"
+out=$(printf 'n\n' | python3 -I "$ld/land_via.py" 2>&1) && fail "land read a drop folder reached through a link: $out"
+printf '%s\n' "$out" | grep -qF "a folder of its path is missing or a link" || fail "land did not refuse a drop folder reached through a link: $out"
+rm "$ld/via" "$ld/land_tmp.py" "$ld/land_via.py"
+out=$(landed y) || fail "land failed on a y: $out"
+[ "$(remote feat)" = "$tip" ] || fail "land did not push the bundle's tip: $out"
+[ "$(cat "$ld/body")" = "The body." ] || fail "land did not open the pull request with its body alone: [$(cat "$ld/body")]"
+grep -q -- "-c credential.helper= -c credential.helper=!gh auth git-credential push -q --force-with-lease=refs/heads/feat: file://$ld/github/o/r.git $tip:refs/heads/feat" "$ld/git.log" ||
+	fail "land did not push the tip with gh's login alone and a lease: $(grep ' push ' "$ld/git.log")"
+grep -qxF "pr create --repo=o/r --base=main --head=feat --title=feat: a change --body-file=$ld/state/tmp/$(ls "$ld/state/tmp" 2>/dev/null)/body.md" "$ld/gh.log" ||
+	grep -q "^pr create --repo=o/r --base=main --head=feat --title=feat: a change --body-file=" "$ld/gh.log" || fail "land did not open the pull request: $(cat "$ld/gh.log")"
+[ ! -e "$ld/space/feat.bundle" ] && [ ! -e "$ld/space/feat.md" ] && [ -z "$(ls -A "$ld/state/tmp")" ] || fail "land left the drop or its private copy"
+printf '%s\n' "$out" | grep -qxF "land: pushed $(printf '%.16s' "$tip"); https://github.com/o/r/pull/1" || fail "land did not say what it pushed: $out"
+# A fix on top moves the branch on; a branch rebuilt replaces it, said before the y; the pull request already open is said.
+echo c >>"$ld/s/README.md" && lg -C "$ld/s" commit -qam "fix: on top" && offer feat
+out=$(landed y) && printf '%s\n' "$out" | grep -qxF "on GitHub: feat moves on from $(printf '%.12s' "$tip")" && printf '%s\n' "$out" | grep -q "the pull request was there" ||
+	fail "land did not move the branch on, or opened a second pull request: $out"
+tip2=$(lg -C "$ld/s" rev-parse HEAD) && lg -C "$ld/s" commit -q --amend -m "fix: rebuilt" && offer feat
+out=$(landed y) && printf '%s\n' "$out" | grep -qxF "on GitHub: feat at $(printf '%.12s' "$tip2") is REPLACED" && [ "$(remote feat)" = "$(lg -C "$ld/s" rev-parse HEAD)" ] ||
+	fail "land did not say the branch is replaced, or did not push it: $out"
+# Each refusal pushes nothing and leaves the drop for the session to fix.
+before=$(remote feat)
+refused() { out=$(landed y) && fail "land took $1: $out"; [ "$(remote feat)" = "$before" ] || fail "land pushed $1"; rm -f "$ld/space"/*; }
+lg -C "$ld/s" branch -q other main && lg -C "$ld/s" bundle create -q "$ld/space/feat.bundle" feat other && printf 't\n\nb\n' >"$ld/space/feat.md" && refused "a bundle of two branches"
+lg -C "$ld/s" tag v1 && offer feat v1 && refused "a bundle of a tag"
+offer feat other && refused "a bundle whose branch is not its files' name"
+offer feat && mv "$ld/space/feat.md" "$ld/feat.md" && ln -s "$ld/feat.md" "$ld/space/feat.md" && refused "a drop file that is a link"
+offer feat && offer other && refused "a drop folder of two pull requests"
+# Each scan reads its part: a file's content (the history), the pull request's title and body, a commit's author (the commits whole).
+lg -C "$ld/s" checkout -q -B feat main && echo PLANTEDTOKEN >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a file" && offer feat
+refused "a branch with a secret in a file"
+lg -C "$ld/s" checkout -q -B feat main && echo s >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: clean" && offer feat && printf 'feat: PLANTEDTOKEN\n\nb\n' >"$ld/space/feat.md"
+refused "a pull request with a secret in its title"
+offer feat && printf 'feat: t\n\nthe body PLANTEDTOKEN\n' >"$ld/space/feat.md" && refused "a pull request with a secret in its body"
+lg -C "$ld/s" checkout -q -B feat main && echo a >"$ld/s/README.md" && (GIT_AUTHOR_NAME=PLANTEDTOKEN && export GIT_AUTHOR_NAME && lg -C "$ld/s" commit -qam "feat: an author") && offer feat
+refused "a commit whose author holds a secret"
+# A message whose scissors line commit-msg would cut, holding what it refuses below; a file name holding a newline, which would add a
+# line to the listing; a refusal quoting a flagged line shown escaped, never as the Terminal would read it.
+lg -C "$ld/s" checkout -q -B feat main && echo k >"$ld/s/README.md" && printf 'feat: fine\n\n# ------------------------ >8 ------------------------\nCo-Authored-By: a bot <b@b>\n' >"$ld/msg"
+lg -C "$ld/s" commit -q --cleanup=verbatim -a -F "$ld/msg" && offer feat && refused "a message holding a scissors line"
+lg -C "$ld/s" checkout -q -B feat main && mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "ci: a name" && offer feat && refused "a file name holding a newline"
+lg -C "$ld/s" checkout -q -B feat main && printf 'PLANTEDTOKEN\033[8m\n' >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a flagged line" && offer feat
+out=$(landed y) && fail "land took a branch with a secret: $out"
+! printf '%s' "$out" | grep -q "$(printf '\033')" && printf '%s\n' "$out" | grep -qF '\x1b[8m' || fail "land printed a refusal's escape as the Terminal reads it: $out"
+rm -f "$ld/space"/*
+# git's object checks: a commit whose tree holds a .git entry, which fsck refuses, is fetched by none of land's copies.
+lg -C "$ld/s" checkout -q -B feat main && blob=$(echo x | lg -C "$ld/s" hash-object -w --stdin)
+tree=$(printf '100644 blob %s\t.git\n' "$blob" | lg -C "$ld/s" mktree) && lg -C "$ld/s" checkout -q main && lg -C "$ld/s" branch -q -f feat "$(lg -C "$ld/s" commit-tree "$tree" -p main -m "feat: a dot git")"
+offer feat && refused "a commit fsck refuses"
+# Only y answers yes: Enter alone, a Y, a yes or no answer at all pushes nothing.
+lg -C "$ld/s" checkout -q -B feat main && echo n >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: an answer" && offer feat
+for answer in "" Y yes; do out=$(landed "$answer") && printf '%s\n' "$out" | grep -q "nothing pushed" && [ "$(remote feat)" = "$before" ] || fail "land pushed on the answer [$answer]: $out"; done
+out=$(python3 -I "$ld/land.py" </dev/null 2>&1) && printf '%s\n' "$out" | grep -q "nothing pushed" && [ "$(remote feat)" = "$before" ] || fail "land pushed with no answer: $out"
+rm -f "$ld/space"/*
+# The harness list comes from GitHub's main: a branch that rewrites records.sh changes neither the listing nor runs in the Terminal.
+lg -C "$ld/s" checkout -q -B feat main && echo z >>"$ld/s/scripts/x.sh" && printf ': >"%s/planted"\nharness() ( true )\n' "$ld" >"$ld/s/.githooks/records.sh"
+lg -C "$ld/s" commit -qam "feat: the list rewritten" -m "Harness-changed: scripts/x.sh - t" -m "Harness-changed: .githooks/records.sh - t" && offer feat
+out=$(landed n) && printf '%s\n' "$out" | grep -qxF "  scripts/x.sh  +1 -0" && printf '%s\n' "$out" | grep -q "^  .githooks/records.sh  +2 " && [ ! -e "$ld/planted" ] ||
+	fail "land listed, or ran, the branch's own harness list: $out"
+rm -f "$ld/space"/*
+offer feat && : >"$ld/space/notes.txt" && refused "a drop folder holding another file"
+lg -C "$ld/s" checkout -q --orphan alone && lg -C "$ld/s" commit -qm alone && lg -C "$ld/s" branch -q -f feat alone && offer feat && refused "a branch not from main"
+# What the owner reads is what is: a character the Terminal would not show as itself (an escape that hides or redraws the listing, a
+# bidi control) refuses the land; a file name git would quote (a workflow named outside ASCII) is listed as it is.
+lg -C "$ld/s" checkout -q -B feat main && echo e >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "$(printf 'feat: hidden\033[8m')" && offer feat
+refused "a subject holding a terminal escape"
+lg -C "$ld/s" checkout -q -B feat main && mkdir -p "$ld/s/.github/workflows" && echo 'on: push' >"$ld/s/.github/workflows/é.yml" && lg -C "$ld/s" add -A &&
+	lg -C "$ld/s" commit -qm "ci: a workflow" -m "Harness-changed: .github/workflows/é.yml - a test" && offer feat
+out=$(landed n) && printf '%s\n' "$out" | grep -qxF "WORKFLOW FILES, which run on GitHub once pushed: .github/workflows/é.yml" ||
+	fail "land did not list a workflow file whose name git quotes: $out"
+rm -f "$ld/space"/*
+# What pre-push and commit-msg held for a push: never main; the base's commit-msg on each message (an attribution line refused).
+lg -C "$ld/s" checkout -q -B feat main && echo m >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: to main"
+cp -R "$ld/s" "$ld/m" && lg -C "$ld/m" checkout -q -B main feat && lg -C "$ld/m" bundle create -q "$ld/space/main.bundle" main && printf 't\n\nb\n' >"$ld/space/main.md"
+out=$(landed y) && fail "land took a branch named main: $out"
+[ "$(lg -C "$ld/github/o/r.git" rev-parse main)" != "$(lg -C "$ld/m" rev-parse main)" ] || fail "land pushed main"
+rm -rf "$ld/m" "$ld/space"/*
+lg -C "$ld/s" checkout -q -B feat main && echo c >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a change" -m "Co-Authored-By: a bot <b@b>" && offer feat
+refused "a commit with an attribution line"
+# A pull request's file: a title of 1 to 256 characters on its first line; the files named as a branch, a v2 bundle.
+lg -C "$ld/s" checkout -q -B feat main && echo t >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a title" && offer feat && printf '\n\nno title\n' >"$ld/space/feat.md"
+refused "a pull request with no title"
+lg -C "$ld/s" branch -q -f Feat_x feat && offer Feat_x && refused "a branch named outside a-z, 0-9 and -"
+printf 'not a bundle\n' >"$ld/space/feat.bundle" && printf 't\n\nb\n' >"$ld/space/feat.md" && refused "a file that is no v2 bundle"
+offer feat && printf '%0257d\n\nb\n' 0 >"$ld/space/feat.md" && refused "a title of 257 characters"
+# The lease: the branch moved on GitHub between the listing and the push is not overwritten.
+offer feat && lg -C "$ld/github/o/r.git" rev-parse main >"$ld/race"
+out=$(landed y) && fail "land overwrote a branch that moved on GitHub after its listing: $out"
+[ "$(remote feat)" = "$(cat "$ld/race")" ] || fail "land's push replaced the branch that moved: $(remote feat)"
+rm -f "$ld/race" "$ld/space"/*
+# A pull request closed or merged under that branch's name is no open one: a new one is opened.
+offer feat && rm -f "$ld/pr" && : >"$ld/prclosed" && : >"$ld/gh.log" && out=$(landed y) && grep -q "^pr create " "$ld/gh.log" || fail "land opened no pull request where none is open, a closed one there: $out"
+out=$(python3 -I "$ld/land.py" feat 2>&1) && fail "land took an argument: $out"
+fi
+
 if part ci; then
 # GitHub judges main: the two workflows read the repository and nothing more, pin every action and
 # download, run on a pull request, a push to main or by hand and never on a fork's privileged events, and hand their verdict to one
@@ -7516,9 +7906,9 @@ def annotated(lines):
                 out.append((m.get("severity", "error"), re.search(pats[0]["regexp"], lines[i]).group(pats[0]["message"])))
     return out
 FAILED = ["FAIL  the reader resolves a name of its own network (the control): wanted [some], got [0]", "test_hooks: stryker_lines.py did not say what it kept",
-          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer", "check_docs: these docs name files that do not exist:",
-          "check_regressions: the safety net shrank, and no commit says why:", "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
-          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit:",
+          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer",
+          "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
+          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit: scripts/a.sh, scripts/b.py",
           "\x1b[31mERROR: Coverage for lines (80%) does not meet global threshold (85%)\x1b[39m",
           "12:00:00 (4242) ERROR MutationTestReportHelper Final mutation score 70.00 under breaking threshold 85, setting exit code to 1 (failure)."]
 for line in FAILED:
@@ -7865,6 +8255,9 @@ grep -q "no commit 0000000000000000000000000000000000000000" "$c/err" || fail "c
 undeclared 'printf "y\n" >scripts/new.py'
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a harness file no commit declares (F089)"
 grep -qF "scripts/new.py" "$c/err" || fail "ci_changes.sh did not name the undeclared harness file: $(cat "$c/err")"
+# On its one line, the one GitHub's matcher keeps (F13435: PR #17's changes job lost the list printed under it).
+grep -qx "ci_changes.sh: harness files changed with no \`Harness-changed: <path> - why\` line in a commit: scripts/new.py" "$c/err" ||
+	fail "ci_changes.sh named the undeclared files elsewhere than on its refusal's line: $(cat "$c/err")"
 changes push "$base" "$c/base" && fail "ci_changes.sh passed on a push a harness file no commit declares (F089)"
 (cd "$c/repo" && git commit -q --allow-empty -m declare -m "Harness-changed: scripts/new.py")
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh took a declaration with no reason"

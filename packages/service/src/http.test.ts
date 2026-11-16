@@ -2,7 +2,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
-import { serverOptions, stop, TIMEOUTS } from "./http.ts";
+import { isJsonType, serverOptions, stop, TIMEOUTS } from "./http.ts";
 
 // server/src/app.test.ts and jarvis/src/http.test.ts read these through their servers; this file holds what the
 // package's own tests must see, as StrykerJS counts them.
@@ -45,5 +45,28 @@ describe("stop", () => {
     await stopped;
     await closed;
     expect(server.listening).toBe(false);
+  });
+});
+
+describe("isJsonType", () => {
+  it.each([
+    "application/json",
+    "Application/JSON",
+    "application/json; charset=utf-8",
+    "application/json ;charset=utf-8",
+  ])("takes %s as JSON", (type) => {
+    expect(isJsonType(type)).toBe(true);
+  });
+
+  it.each([
+    undefined,
+    "",
+    "text/json",
+    "application/jsonx",
+    "application/json-patch+json",
+    "x application/json",
+    "application/jsonx; a=b",
+  ])("refuses %s", (type) => {
+    expect(isJsonType(type)).toBe(false);
   });
 });

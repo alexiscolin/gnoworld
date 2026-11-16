@@ -21,7 +21,7 @@ import tempfile
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
 from hidden import HIDDEN
-from repo_files import BENCH_FILE, benches, git, worktree
+from repo_files import BENCH_FILE, benches, git, report, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
@@ -453,8 +453,8 @@ problems += [f"a check's setting changed: {s}" for s in changed_settings(setting
 # The tree, not base..HEAD: pre-commit runs this before the commit exists, as the line for the tests above.
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
-    print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
-          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:). An ignore written with a name is read as the name, "
-          "not its value: write the glob quoted:", *problems, sep="\n  ", file=sys.stderr)
+    report("check_regressions", "check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
+           " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:). An ignore written with a name is read as the name, "
+           "not its value: write the glob quoted:", problems)
     sys.exit(1)
 print("check_regressions: no test gone or switched off, no floor lower, no bench gone or looser, no gap or ignore added, no approved screenshot changed")

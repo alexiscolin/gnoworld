@@ -28,7 +28,9 @@ function slots(perVisitor: number, total: number) {
 }
 
 // The chat's places and the Earth's apart: a stream that follows the Earth's room alone takes the Earth's.
-export function admission({ perVisitor = 4, total = 1000, earthTotal = 1000 }: Budgets) {
+// 32 an address is nginx's own limit (deploy/web/nginx.conf, `limit_conn open 32`), so a shared Wi-Fi is not turned away
+// sooner than the proxy would; 2,000 in all is the online target (the load test's CROWD, docs/OPERATIONS.md).
+export function admission({ perVisitor = 32, total = 2000, earthTotal = 2000 }: Budgets) {
   const chat = slots(perVisitor, total);
   const earth = slots(perVisitor, earthTotal);
   return {

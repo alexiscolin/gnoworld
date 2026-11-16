@@ -7,7 +7,7 @@ import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { jsonOf } from "@gnoworld/core";
 import { ASK_WAIT_S, JARVIS_KEY_HEADER, type ApiError } from "@gnoworld/schemas";
-import { readBody, serverOptions } from "@gnoworld/service/http";
+import { isJsonType, readBody, serverOptions } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
 import type { Secret } from "@gnoworld/service/settings";
 
@@ -153,7 +153,7 @@ async function replyOf({ route, method, ready }: Asked, request: IncomingMessage
     return refused("unsupported", 405, { allow: METHODS.filter((known) => known in route).join(", ") });
   }
   if (method === "GET") return handler(undefined, signal);
-  if (!isJson(request.headers["content-type"])) return refused("unsupported", 415);
+  if (!isJsonType(request.headers["content-type"])) return refused("unsupported", 415);
   const text = await readBody(request, MAX_BYTES);
   // The rest of the body is left unread, its connection closed once the refusal is written.
   if (text === undefined) return refused("too_large", 413, { close: true });
@@ -161,6 +161,3 @@ async function replyOf({ route, method, ready }: Asked, request: IncomingMessage
   if (body === undefined) return refused("refused", 400);
   return handler(body, signal);
 }
-
-// `application/json`, in any case, with any parameter.
-const isJson = (type: string | undefined) => type?.split(";")[0]?.trim().toLowerCase() === "application/json";

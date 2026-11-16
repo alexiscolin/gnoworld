@@ -14,7 +14,7 @@ import {
 } from "./cliProof.ts";
 
 const MEMO =
-  "Link g1aaa to g1bbb on gnoworld.test. From now on each of them moderates every world the other owns on onyx-1. Code SECRETMEMOMARK";
+  "Link g1aaa to g1bbb on gnoworld.test. From now on each of them moderates every world the other owns on onyx-1. Sign only if your browser's address bar shows gnoworld.test. Code SECRETMEMOMARK";
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 

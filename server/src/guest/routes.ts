@@ -6,7 +6,7 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import type { Config } from "../config.ts";
-import { guard, json, type Guarded } from "../guard.ts";
+import { guard, json, type Guarded, sessionOf } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { accountKey } from "../moderation/check.ts";
 import { visitor48Of, visitorOf } from "../visitor.ts";
@@ -56,9 +56,7 @@ export function guestFrom(db: DatabaseSync, settings: Settings, outside: Outside
     guard(origins, (c, cause) => (cause === "origin" ? answer(c, "forbidden", 403) : answer(c, "unsupported", 415))),
   );
   // An account's session wins, whatever guest cookie it also holds: an account speaks as itself, never as anon/.
-  app.use(async (c, next) =>
-    session(getCookie(c, "__Host-session")) === undefined ? next() : answer(c, "forbidden", 403),
-  );
+  app.use(async (c, next) => (sessionOf(c, session) === undefined ? next() : answer(c, "forbidden", 403)));
 
   app.post("/", async (c) => {
     if (!Body.safeParse(await json(c)).success) return answer(c, "refused", 400);

@@ -4,7 +4,7 @@
       "owner": "gnoworld-failure",
       "pattern": [
         {
-          "regexp": "^((?:FAIL  |test_hooks: |test\\.sh: \\d+ check\\(s\\) failed|check_docs: |check_regressions: the safety net shrank|probe: \\d+ of the harness's promises do not hold|ci_changes\\.sh: |--- FAIL: ).*)$",
+          "regexp": "^((?:FAIL  |test_hooks: |test\\.sh: \\d+ check\\(s\\) failed|probe: \\d+ of the harness's promises do not hold|ci_changes\\.sh: |--- FAIL: ).*)$",
           "message": 1
         }
       ]

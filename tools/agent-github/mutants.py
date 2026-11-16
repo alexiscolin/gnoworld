@@ -9,6 +9,7 @@ import tempfile
 
 here = pathlib.Path(__file__).resolve().parent
 H, G, I = "agent-pr", "agent_pr_guard.py", "install.sh"
+SOURCE = {H: here.parent.parent / "scripts" / "agent_pr.py"}  # agent-pr's code, which land reuses (D13211)
 MUTANTS = [
     (H, [("#!/usr/bin/env -S -i LC_ALL=C", "#!/usr/bin/env -S LC_ALL=C")], "the environment is emptied"),
     (H, [("    if not (OWNER.fullmatch(owner) and NAME.fullmatch(name)) or name.endswith(\".git\") or \"..\" in name:", "    if not owner or not name:")], "the repository is owner/name"),
@@ -73,7 +74,7 @@ MUTANTS = [m for m in MUTANTS if all(w in m[2] for w in sys.argv[1:])]
 for name, pairs, label in MUTANTS:
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as d:
         for f in (H, G, I, "SKILL.md", "test.sh"):
-            shutil.copy(here / f, pathlib.Path(d) / f)
+            shutil.copy(SOURCE.get(f, here / f), pathlib.Path(d) / f)
         target = pathlib.Path(d) / name
         text = target.read_text()
         missing = [a for a, _ in pairs if text.count(a) != 1]
@@ -85,7 +86,7 @@ for name, pairs, label in MUTANTS:
             text = text.replace(a, b)
         target.write_text(text)
         (pathlib.Path(d) / H).chmod(0o755)
-        p = subprocess.run(["sh", str(pathlib.Path(d) / "test.sh")], capture_output=True, text=True)
+        p = subprocess.run(["sh", str(pathlib.Path(d) / "test.sh"), str(pathlib.Path(d) / H)], capture_output=True, text=True)
     first = next((l for l in p.stderr.splitlines() if l.startswith("FAIL")), "")
     print(("killed   " if p.returncode else "SURVIVED ") + label + ("   " + first[:100] if p.returncode else ""))
     if not p.returncode:
