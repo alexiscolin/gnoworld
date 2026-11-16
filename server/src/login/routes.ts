@@ -4,10 +4,10 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ChallengeRequest, TicketRequest, VerifyRequest, type ApiError, type Me, type Ticket } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { setCookie } from "hono/cookie";
 import { routePath } from "hono/route";
 import type { Config } from "../config.ts";
-import { guard, json, type Guarded } from "../guard.ts";
+import { guard, json, SESSION_COOKIE, tokenOf, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
 import { visitorOf as readVisitor } from "../visitor.ts";
@@ -30,7 +30,6 @@ export function loginRoutes(
   { log, origins, proxy, newAccountsPerHour, now, tickets }: Options,
 ): Hono<Guarded> {
   // __Host-: sent only to the host that set it, over HTTPS, for every path, so no sibling site sets it.
-  const session = "__Host-session";
   const cookie = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" } as const;
   const calls = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
   const created = limiter({ max: newAccountsPerHour, windowMs: 60 * 60_000, keys: 100_000 });
@@ -79,7 +78,7 @@ export function loginRoutes(
     if (!body.success) return refuse(c, "body");
     const result = await login.verify(body.data, () => created.take(who, now()), c.get("host"));
     if (typeof result === "string") return refuse(c, result);
-    setCookie(c, session, result.token, { ...cookie, maxAge: result.maxAge });
+    setCookie(c, SESSION_COOKIE, result.token, { ...cookie, maxAge: result.maxAge });
     log("login", { route: routePath(c, -1), account: body.data.address });
     return c.json({ address: body.data.address } satisfies Me);
   });
@@ -87,18 +86,18 @@ export function loginRoutes(
   app.post("/ticket", async (c) => {
     if (!mintsByVisitor.take(visitorOf(c), now())) return refuse(c, "limit");
     if (!TicketRequest.safeParse(await json(c)).success) return refuse(c, "body");
-    const address = login.session(getCookie(c, session));
+    const address = login.session(tokenOf(c));
     if (address === undefined) return answer(c, "unauthenticated", 401);
     if (!mintsByAccount.take(address, now())) return refuse(c, "limit");
     return c.json({ ticket: tickets.mint(address) } satisfies Ticket);
   });
 
   // Nobody is an answer, a 200: a visitor's page asks it on every load, and a 401 would be logged as an error.
-  app.get("/me", (c) => c.json({ address: login.session(getCookie(c, session)) ?? null } satisfies Me));
+  app.get("/me", (c) => c.json({ address: login.session(tokenOf(c)) ?? null } satisfies Me));
 
   app.post("/logout", (c) => {
-    login.logout(getCookie(c, session));
-    setCookie(c, session, "", { ...cookie, maxAge: 0 });
+    login.logout(tokenOf(c));
+    setCookie(c, SESSION_COOKIE, "", { ...cookie, maxAge: 0 });
     return c.body(null, 204);
   });
 

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "../login/login.ts";
+import { ROOM_SAID } from "../rooms/earth.ts";
 import type { Rules } from "../roles/roles.ts";
 import { accountKey, checkAgain, makeChecker, VERDICT_TABLES, withBreaker } from "./check.ts";
 import { answer } from "../testing/answers.ts";
@@ -37,7 +38,7 @@ afterEach(() => {
 });
 
 const setup = (provider: (text: string) => Promise<Answer | "unchecked">, thresholds = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, ROOM_SAID]);
   opened.push(db);
   db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
   const clock = { now: T0 };
@@ -64,6 +65,43 @@ const setup = (provider: (text: string) => Promise<Answer | "unchecked">, thresh
   const rows = () => z.array(Row).parse(db.prepare("SELECT * FROM verdicts ORDER BY msgid").all());
   return { db, clock, check, asked, rows, lines };
 };
+
+describe("a line counted in room_said (F13510): the Earth's idleness and daily counts read it alone", () => {
+  const said_ = (db: DatabaseSync) => db.prepare("SELECT room, n FROM room_said ORDER BY room, hour").all();
+
+  it("counts a line that passes, once, in its room's hour", async () => {
+    const { check, db } = setup(() => Promise.resolve(answer()));
+    await check(said("hello there", "m1"));
+    await check(said("hello again", "m2"));
+    expect(said_(db)).toEqual([{ room: "#bubble", n: 2 }]);
+  });
+
+  it("counts no hidden line", async () => {
+    const { check, db } = setup(() => Promise.resolve(answer()));
+    await check(said("buy spam", "m1"));
+    expect(said_(db)).toEqual([]);
+  });
+
+  it("counts a line once when it comes back checked again, and an unchecked one as a line", async () => {
+    const answers: (Answer | "unchecked")[] = ["unchecked", answer()];
+    const { check, db } = setup(() => Promise.resolve(answers.shift() ?? answer()));
+    await check(said("hello", "m1"));
+    expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
+    await check(said("hello", "m1"));
+    await check(said("hello", "m1"));
+    expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
+  });
+
+  // F13517: a hide that could not be sent turns `unchecked` uncounted; its retry must not take another line's count.
+  it("keeps an honest line's count when a hide sent again is retried and hidden", async () => {
+    const { check, db } = setup(() => Promise.resolve(answer()));
+    await check(said("hello there", "m1"));
+    await check(said("buy spam", "m2"));
+    checkAgain(db, "m2");
+    await check(said("buy spam", "m2"));
+    expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
+  });
+});
 
 describe("checking a message", () => {
   it("hides on a rule and calls no provider", async () => {
@@ -387,7 +425,7 @@ describe("checking a message", () => {
   });
 
   it("sends no line of a room that is not public to the provider: its rules still hide, else it passes (3m)", async () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, ROOM_SAID]);
     opened.push(db);
     db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
     const asked: string[] = [];
@@ -412,7 +450,7 @@ describe("checking a message", () => {
   });
 
   it("records why a members room's line passed unasked: members_room, with no answer (F574)", async () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, ROOM_SAID]);
     opened.push(db);
     db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
     const check = makeChecker({

@@ -5,8 +5,7 @@
 import { type Address, SEARCH_PAGE, SearchQuery, type SearchPage } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import { type Context, Hono } from "hono";
-import { getCookie } from "hono/cookie";
-import { guard, refuserOf, type Refusals, type Guarded } from "../guard.ts";
+import { guard, refuserOf, type Refusals, type Guarded, sessionOf } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { hiddenRoom, mayRead, searchable, type Typed } from "../rooms/types.ts";
@@ -133,7 +132,7 @@ export function searchRoutes({
   const app = new Hono<Guarded>();
   app.use(guard(origins, refuse));
   app.get("/", (c) => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     // Counted before anything is read: a refused request is load too.
     if (!(who === undefined ? byVisitor.take(visitorOf(c, proxy), now()) : byAccount.take(who, now())))
       return refuse(c, "limit");

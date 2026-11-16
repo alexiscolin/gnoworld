@@ -38,6 +38,7 @@ const PINNED: readonly string[] = [
   "3b078fa5616921aadf0bc85333fdb75534fafab9744dd8db75ed93ae9e8542a0",
   "c222b625fd7958f92dabcf6655df3c3b72581adaf0a2286a145b578f96e4fecd",
   "ad069afedb3f470712aa5819dc93d160c14e209fd6ea7c835ae05db953117260",
+  "0a104767c73fc0ad362db0f0cf7df0c22f9affd59fefa33f8f7aed36d4259416",
 ];
 
 const sha = (text: string): string => createHash("sha256").update(text).digest("hex");

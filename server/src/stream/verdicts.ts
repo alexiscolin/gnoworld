@@ -1,11 +1,11 @@
 // GET /api/verdicts?room=<room>&ids=<msgid,...>: the latest verdict of
 // each line asked, for the lines a page shows older than the stream's replay. Answered for a room the reader may
 // read alone, as the stream and GET /api/rooms are; a visitor's requests limited, refused ones counted.
+import { sessionOf } from "../guard.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { type ApiError, LineVerdicts, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { getCookie } from "hono/cookie";
-import { z } from "zod";
+import { commaList } from "../commaList.ts";
 import { limiter } from "../limit.ts";
 import { once, RoomName, stateOf } from "./stream.ts";
 
@@ -24,10 +24,7 @@ interface Options {
 }
 
 // The ids: msgids, one word each, at most VERDICTS_ASKED; the room as the stream takes it (RoomName).
-const Ids = z
-  .string()
-  .transform((list) => list.split(","))
-  .pipe(z.array(VerdictId).min(1).max(VERDICTS_ASKED));
+const Ids = commaList(VerdictId, VERDICTS_ASKED);
 
 export function verdictRoutes({ db, readable, session, visitor, now }: Options): Hono {
   const limit = limiter({ max: VERDICTS_PER_MINUTE, windowMs: 60_000, keys: 100_000 });
@@ -37,7 +34,7 @@ export function verdictRoutes({ db, readable, session, visitor, now }: Options):
     const room = RoomName.safeParse(once(c.req.queries("room")));
     const ids = Ids.safeParse(once(c.req.queries("ids")));
     if (!room.success || !ids.success) return c.json({ error: "refused" } satisfies ApiError, 400);
-    if (!readable(room.data, session(getCookie(c, "__Host-session")))) {
+    if (!readable(room.data, sessionOf(c, session))) {
       return c.json({ error: "forbidden" } satisfies ApiError, 403);
     }
     const asked = [...new Set(ids.data)];

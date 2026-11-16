@@ -67,6 +67,25 @@ describe("POST /card", () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+  // F13516: one reading of "is the body JSON" for the server's guard, Jarvis and this reader: the media type is `application/json`,
+  // in any case, with any parameter, and nothing longer.
+  it.each([["application/jsonx"], ["application/json-patch+json"], ["application/jsonx; charset=utf-8"]])(
+    "answers 415 to %s, which only begins like JSON",
+    async (type) => {
+      const { post, read } = await start();
+      expect((await post('{"url":"https://example.com/"}', "/card", { "content-type": type })).status).toBe(415);
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([["Application/JSON"], ["application/json; charset=utf-8"], ["APPLICATION/JSON ;charset=utf-8"]])(
+    "takes %s as JSON, in any case and with any parameter",
+    async (type) => {
+      const { post } = await start();
+      expect((await post('{"url":"https://example.com/"}', "/card", { "content-type": type })).status).toBe(200);
+    },
+  );
+
   it("answers 422 with the kind of the failure alone, and logs the kind alone, never the URL", async () => {
     const url = "https://secret-host.example.com/private/path?token=abc";
     const { post, log } = await start({ read: () => Promise.reject(new Refused("private")) });

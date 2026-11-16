@@ -4,6 +4,7 @@
 import { LineTranslations, RoomId, VerdictId, JARVIS_LANGUAGES, TRANSLATIONS_ASKED } from "@gnoworld/schemas";
 import { Hono } from "hono";
 import { z } from "zod";
+import { commaList } from "../commaList.ts";
 import { baseRefusals, guard, refuserOf, sessionOf, type Guarded, type Refusals } from "../guard.ts";
 import type { CardRoutesOptions } from "../cards/routes.ts";
 import { limiter } from "../limit.ts";
@@ -22,10 +23,7 @@ export interface TranslationRoutesOptions extends Pick<
 
 const refusals = { ...baseRefusals, forbidden: ["forbidden", 403] } as const satisfies Refusals;
 
-const Ids = z
-  .string()
-  .transform((list) => list.split(","))
-  .pipe(z.array(VerdictId).min(1).max(TRANSLATIONS_ASKED));
+const Ids = commaList(VerdictId, TRANSLATIONS_ASKED);
 
 export function translationRoutes({
   flow,

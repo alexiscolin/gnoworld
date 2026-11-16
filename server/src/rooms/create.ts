@@ -3,6 +3,7 @@
 // read-only (+m) and unlisted (+s), its name and its place in the world's cap kept. The reconciler
 // (reconcile.ts) puts the modes back from what Ergo says, so a room Ergo lost comes back as it was.
 import type { DatabaseSync } from "node:sqlite";
+import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import type { Command } from "../irc/lines.ts";
 import { mainRoom, worldOf } from "./rooms.ts";
@@ -118,8 +119,13 @@ export function makeRooms({
   const RealmRow = z.object({ yes: z.number() }).optional();
   const sql = roomSql(db);
   const stateOf = (room: string) => State.parse(sql.state.get(room));
-  const open = (room: string, world: string) => {
-    sql.add.run(room, world, now());
+  // The rows go in one transaction (F13511: a stop between them left an orphan row and a realm answering 500 for ever); the
+  // JOIN and the SAMODEs follow once it committed.
+  const open = (room: string, world: string, rows: () => void = () => undefined) => {
+    transaction(db, () => {
+      sql.add.run(room, world, now());
+      rows();
+    });
     send("JOIN", [room]);
     // Open to accounts, and to all: Ergo makes a room invite-only (+i).
     send("SAMODE", [room, "+M"]);
@@ -148,9 +154,7 @@ export function makeRooms({
       const may = mayEarth(maker, name);
       if (may !== "ok") return may;
       const room = `${mainRoom("earth")}/${name}`;
-      const made = open(room, "earth");
-      sql.made.run(room, maker, now());
-      return made;
+      return open(room, "earth", () => sql.made.run(room, maker, now()));
     },
     maker: (room) => Maker.parse(sql.maker.get(room))?.maker,
     create(world, name) {
@@ -163,8 +167,7 @@ export function makeRooms({
     realm(room, reserve, path) {
       const may = mayRealm(room, reserve);
       if (may !== "ok") return may;
-      sql.realm.run(room, path ?? null);
-      return open(room, worldOf(room));
+      return open(room, worldOf(room), () => sql.realm.run(room, path ?? null));
     },
     tagRealm(room, path) {
       sql.tag.run(path, room);

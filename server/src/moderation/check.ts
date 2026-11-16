@@ -8,6 +8,7 @@ import type { Said } from "../irc/link.ts";
 import type { Log } from "@gnoworld/service/log";
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
+import { guestSaid } from "../rooms/earth.ts";
 import { editsOwn, lineKnown } from "./edits.ts";
 import type { Answer, Category } from "./provider.ts";
 import { lineRate } from "./rate.ts";
@@ -120,6 +121,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
   const known = lineKnown(db);
+  // A line that passes (or waits unchecked) is a line of its room; a hidden one is none. Counted once, when first claimed.
+  const countLine = guestSaid(db);
   // An edit's line: none, its author's, another's, or one it never checked.
   const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
     edits === undefined ? "none" : !known(edits) ? "unknown" : owns(edits, key) ? "own" : "other";
@@ -142,7 +145,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const { room, account, msgid, text } = said;
     const at = lineTime(said, now);
     const hashed = accountKey(pepper, account);
-    const claimed = sql.claim.run(msgid, room, hashed, at).changes > 0 || sql.retry.run(at, msgid).changes > 0;
+    const fresh = sql.claim.run(msgid, room, hashed, at).changes > 0;
+    const claimed = fresh || sql.retry.run(at, msgid).changes > 0;
     if (!claimed) return sql.pending.get(msgid) === undefined ? "seen" : "busy";
     const settle = (verdict: Verdict, { why, answer }: { why?: string; answer?: Answer } = {}): Verdict => {
       const reason = verdict.action === "hide" ? verdict.reason : (why ?? null);
@@ -153,6 +157,9 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
         ...used.map((part) => (part === null ? null : JSON.stringify(part))),
         msgid,
       );
+      // Counted once, when first settled: a retry that hides it later leaves the count (F13503), which only spares a room
+      // longer; taking it back could erase another line's count and archive an active room (F13517).
+      if (fresh && verdict.action !== "hide") countLine(room, at);
       return verdict;
     };
     const rules = rulesOf(room);

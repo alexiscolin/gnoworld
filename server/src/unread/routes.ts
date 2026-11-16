@@ -11,8 +11,9 @@ import type { Unread } from "./store.ts";
 /** An account's calls a minute: its counts, and its places (a page posts one every 5 s, so 12 a minute; 30 leaves room for reloads). */
 const COUNTS_PER_MINUTE = 60;
 const PLACES_PER_MINUTE = 30;
-/** Place writes a second across every account: the index is one synchronous connection, so per-account limits do not bound its load. */
-const PLACES_PER_SECOND = 20;
+/** Place writes a second across every account: the index is one synchronous connection, so per-account limits do not bound its load. A write costs 0.018 ms (measured), so 500 a second is 1% of a core; 100 readers
+ * at one place every 5 s were 20 a second, the old cap. */
+const PLACES_PER_SECOND = 500;
 /** How long an account's count is kept before it is made again. */
 const KEPT_MS = 5_000;
 const KEPT_ACCOUNTS = 10_000;
@@ -57,7 +58,9 @@ export function unreadRoutes({
   app.post("/", async (c) => {
     const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
-    if (!writes.take(who, now()) || !together.take("all", now())) return refuse(c, "limit");
+    // A full second refuses without spending the account's allowance; an account over its own spends no site token.
+    if (together.full("all", now()) || !writes.take(who, now()) || !together.take("all", now()))
+      return refuse(c, "limit");
     const body = UnreadPlaces.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
     unread.places(

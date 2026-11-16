@@ -57,8 +57,8 @@ export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; re
   };
 }
 
-/** The Earth's public rooms nobody writes in are archived once an hour and at start. The archive is a decision on the lines the
- * verdicts hold, which the reconciler does not read: it only puts Ergo as the database says, at once for each room swept (keeping's archive). */
+/** The Earth's public rooms nobody writes in are archived once an hour and at start. The archive is a decision on the lines
+ * room_said counts, which the reconciler does not read: it only puts Ergo as the database says, at once for each room swept (keeping's archive). */
 export function sweeping(
   db: DatabaseSync,
   rooms: Rooms,
