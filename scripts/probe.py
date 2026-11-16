@@ -37,11 +37,11 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "light", "unit", "field", "side", "driftAt", "turnAt", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
+FRAME_NAMES = ["tick", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
     ("frame_arrow.ts", "export const unitOf = (): number[] => {\n  return [1];\n};\n", FRAME),
-    ("frame_closure.ts", "export function driftAt(): () => number {\n  return () => 1;\n}\n", FRAME),
+    ("frame_closure.ts", "export function settle(): () => number {\n  return () => 1;\n}\n", FRAME),
     ("frame_arrow_closure.ts", "export const unitOf = (): (() => number) => () => 1;\n", FRAME),
     ("frame_method.ts", "export class Torus {\n  follow(): number[] {\n    return [1];\n  }\n}\n", FRAME),
     ("frame_property.ts", "export const cells = {\n  follow(): number[] {\n    return [1];\n  },\n};\n", FRAME),
@@ -256,7 +256,7 @@ try:
         for folder in ("space", "frame"):
             lint_cases(FRAME_CORE, f"packages/core/src/{folder}/__probe__", f"core {folder}")
             shutil.rmtree(f"packages/core/src/{folder}/__probe__")
-        # Elsewhere in core a `field` or a `sample` is nobody's frame.
+        # Elsewhere in core a `field` or a `side` is nobody's frame.
         lint_cases([("frame_elsewhere.ts", "export function field(): number[] {\n  return [1];\n}\n", None)], HERE, "core elsewhere")
         shutil.rmtree(HERE)
 
