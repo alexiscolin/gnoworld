@@ -188,7 +188,7 @@ export default defineConfig({
         functions: 85,
         branches: 85,
         statements: 85,
-        "packages/core/**": { lines: 99.9, functions: 100, branches: 92.3, statements: 99.7 },
+        "packages/core/**": { lines: 99.9, functions: 100, branches: 96, statements: 99.9 },
         "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,packages/core/src/args,app/src/sw,server/src/ergo}/**":
           { lines: 100, functions: 100, statements: 100, branches: 97.2 },
         "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,packages/schemas/src/realmPath.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}":
