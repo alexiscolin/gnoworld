@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { migrations } from "../migrations.ts";
 import { cliFile, cliKey, type CliKey } from "../testing/cliSigner.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { cliVerify } from "./cliProof.ts";
+import { cliSafe, cliVerify } from "./cliProof.ts";
 import { makeLinks, type LinkKind, type Links, type Verifiers } from "./links.ts";
 import { makeLogin, makeSigned, type Verify } from "./login.ts";
 
@@ -106,9 +106,28 @@ describe("the text a link asks to sign", () => {
     const [a, b] = [wallet(), wallet()];
     const made = s.started(a, b);
     expect(made.text).toBe(
-      `Link ${b.address} to ${a.address} on ${HOST}. From now on each of them moderates the rooms of every world the other owns on ${CHAIN}. Nothing else is granted. Code ${made.nonce}`,
+      `Link ${b.address} to ${a.address} on ${HOST}. From now on each of them moderates the rooms of every world the other owns on ${CHAIN}. Nothing else is granted. Sign only if your browser's address bar shows ${HOST}. Code ${made.nonce}`,
     );
     expect(Nonce.safeParse(made.nonce).success).toBe(true);
+  });
+
+  it("stays one line of text the command line signs as a memo, with a long host and the most accounts it joins", async () => {
+    const s = setup();
+    const host = `${"a".repeat(253)}:65535`;
+    const [a, b] = [wallet(), wallet()];
+    for (let at = 0; at < 8; at += 1) await s.link(wallet(), a);
+    const made = s.started(a, b, { host, kind: "cli" });
+    expect(made.text).toContain(`. Sign only if your browser's address bar shows ${host}. Code ${made.nonce}`);
+    expect(cliSafe(made.text)).toBe(true);
+  });
+
+  // The settings bound no host's length (isOrigin takes any URL.parse takes): the host is written twice, so past about 600
+  // characters no command-line code fits a memo and the start answers "text". A bound in the settings would remove this limit.
+  it("answers text, never a code the command line cannot sign, for a host so long the text outgrows a memo", async () => {
+    const s = setup();
+    const [a, b] = [wallet(), wallet()];
+    for (let at = 0; at < 8; at += 1) await s.link(wallet(), a);
+    expect(s.ask(a, b, { host: "a".repeat(1000), kind: "cli" })).toBe("text");
   });
 
   it("gives a code ten minutes, no more", () => {
@@ -121,7 +140,7 @@ describe("a link names every account it joins, and is spent only as a link", () 
   const joining = (list: Address[]): string =>
     list.length === 1 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list.at(-1) ?? ""}`;
   const plural = ({ b, a, others, nonce }: { b: Address; a: Address; others: Address[]; nonce: string }): string =>
-    `Link ${b} to ${a} on ${HOST}, joining ${joining(others)}. From now on each of these accounts moderates the rooms of every world any of them owns on ${CHAIN}. Nothing else is granted. Code ${nonce}`;
+    `Link ${b} to ${a} on ${HOST}, joining ${joining(others)}. From now on each of these accounts moderates the rooms of every world any of them owns on ${CHAIN}. Nothing else is granted. Sign only if your browser's address bar shows ${HOST}. Code ${nonce}`;
 
   it("names the account already linked to A in the text B signs, so B never joins a name it did not see", async () => {
     const s = setup();
@@ -149,7 +168,7 @@ describe("a link names every account it joins, and is spent only as a link", () 
     await s.link(c, a);
     const made = s.started(a, c);
     expect(made.text).toBe(
-      `Link ${c.address} to ${a.address} on ${HOST}. From now on each of them moderates the rooms of every world the other owns on ${CHAIN}. Nothing else is granted. Code ${made.nonce}`,
+      `Link ${c.address} to ${a.address} on ${HOST}. From now on each of them moderates the rooms of every world the other owns on ${CHAIN}. Nothing else is granted. Sign only if your browser's address bar shows ${HOST}. Code ${made.nonce}`,
     );
   });
 

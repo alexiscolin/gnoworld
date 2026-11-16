@@ -138,7 +138,9 @@ describe("logging in", () => {
 
   it("writes the domain of the Origin the challenge came from, port included", async () => {
     const { app } = setup({ origins: ["http://localhost:5173", ORIGIN] });
-    expect((await challenge(app, { origin: "http://localhost:5173" })).text).toContain("Domain: localhost:5173\n");
+    const { text } = await challenge(app, { origin: "http://localhost:5173" });
+    expect(text).toContain("Domain: localhost:5173\n");
+    expect(text).toContain("Sign only if your browser's address bar shows localhost:5173.\n");
   });
 
   it("takes any origin of the list", async () => {

@@ -200,7 +200,10 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
   };
 
   return {
-    challenge: (chainId, domain) => signed.issue(chainId, domain, { head: ["Sign in to gnoworld (login, version 1)"] }),
+    challenge: (chainId, domain) =>
+      signed.issue(chainId, domain, {
+        head: ["Sign in to gnoworld (login, version 2)", `Sign only if your browser's address bar shows ${domain}.`],
+      }),
 
     async verify(request, mayCreate, host) {
       const proved = await signed.prove(request, host);

@@ -85,7 +85,8 @@ describe("challenge", () => {
     expect(made.expiresAt).toBe("2026-10-22T12:05:00.000Z");
     expect(made.text).toBe(
       [
-        "Sign in to gnoworld (login, version 1)",
+        "Sign in to gnoworld (login, version 2)",
+        `Sign only if your browser's address bar shows ${DOMAIN}.`,
         "",
         `Domain: ${DOMAIN}`,
         `Nonce: ${made.nonce}`,
@@ -93,6 +94,19 @@ describe("challenge", () => {
         "Expires: 2026-10-22T12:05:00.000Z",
       ].join("\n"),
     );
+  });
+
+  it("names the challenge's own host on both lines, whatever host it was asked for", () => {
+    const { login } = setup();
+    const made = login.challenge("onyx-1", "other.test:8443");
+    if (typeof made === "string") throw new Error(made);
+    expect(made.text.split("\n").slice(0, 5)).toEqual([
+      "Sign in to gnoworld (login, version 2)",
+      "Sign only if your browser's address bar shows other.test:8443.",
+      "",
+      "Domain: other.test:8443",
+      `Nonce: ${made.nonce}`,
+    ]);
   });
 
   it("keeps the text under the SDK's limit with the longest domain a host can have", () => {
@@ -1005,6 +1019,18 @@ describe("the admin console's login", () => {
     expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
     expect(typeof signed.issue("onyx-1", CONSOLE, { head: ["A change"], action: "{}" })).toBe("object");
     expect(admin.challenge("onyx-1", CONSOLE)).toBe("full");
+  });
+
+  it("writes the same two-line head as the public site's login, with its own host", () => {
+    const { admin } = consoleSetup();
+    const made = admin.challenge("onyx-1", CONSOLE);
+    if (typeof made === "string") throw new Error(made);
+    expect(made.text.split("\n").slice(0, 4)).toEqual([
+      "Sign in to gnoworld (login, version 2)",
+      `Sign only if your browser's address bar shows ${CONSOLE}.`,
+      "",
+      `Domain: ${CONSOLE}`,
+    ]);
   });
 
   it("leaves the public site's count the global one, the console's nonces in it, while the console counts its own", () => {

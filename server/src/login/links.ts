@@ -78,7 +78,7 @@ function linkText(who: {
     others.length === 0
       ? "each of them moderates the rooms of every world the other owns"
       : "each of these accounts moderates the rooms of every world any of them owns";
-  return `Link ${subject} to ${by} on ${host}${joined}. From now on ${grant} on ${chain}. Nothing else is granted. Code ${nonce}`;
+  return `Link ${subject} to ${by} on ${host}${joined}. From now on ${grant} on ${chain}. Nothing else is granted. Sign only if your browser's address bar shows ${host}. Code ${nonce}`;
 }
 
 /** How long after its signature a session may link and unlink (10 minutes). */

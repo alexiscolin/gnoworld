@@ -526,14 +526,13 @@ since Adena's SDK is young (0.1.x) and its docs lag its code.
   hears them, so `lib/adena` registers once and passes account and network changes to the
   store. A change of account or network ends the old account's session.
 - **One request at a time.** A new popup closes the open one, so requests queue.
-- **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld",
-  the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
+- **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld", a line asking
+  to sign only if the browser's address bar shows the site's address (D13600), the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
   most). The server checks it with `verifyArbitrarySignature`, always passing the signer,
   the chain id (`gnoland-1`, `onyx-1`) and the exact text, since with nothing to check it
   says yes. The server then checks the nonce (unused, unexpired) and the domain itself.
   Session and multisig accounts cannot sign in.
-- **A login lasts 30 days on a device,** renewed on use and revocable in the settings and
-  by moderators. Ergo checks a token the server issued, so a reconnect needs no new
+- **A login lasts 30 days on a device,** renewed on use and revocable in the settings and by moderators. Ergo checks a token the server issued, so a reconnect needs no new
   signature and no chain read (§7).
 - **Before "sign in Adena",** the network is read again and compared with the universe's
   chain. Adena is asked to switch, or to add a community chain and then switch; it never
