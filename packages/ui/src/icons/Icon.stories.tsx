@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Cluster } from "../compositions/index.ts";
-import { Icon, ICON_NAMES } from "./Icon.tsx";
+import { Icon } from "./Icon.tsx";
+import { ICON_NAMES } from "../Overview/iconNames.ts";
 
 const meta = { component: Icon, args: { name: "search" } } satisfies Meta<typeof Icon>;
 export default meta;

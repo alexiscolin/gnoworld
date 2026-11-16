@@ -1,5 +1,5 @@
 // The tokens of tokens.css as data, for the token page: the file stays the one list.
-import css from "./tokens.css?raw";
+import css from "../tokens.css?raw";
 
 export interface Token {
   name: string;

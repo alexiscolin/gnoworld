@@ -10,8 +10,6 @@ export interface IconProps {
 // The icons that point along the text: they turn right to left (docs/DESIGN-SYSTEM.md, "Icons").
 const DIRECTIONAL = new Set<IconName>(["arrow", "arrow-up-right", "reply", "list-bulleted", "list-numbered", "quote"]);
 
-export const ICON_NAMES = Object.keys(GLYPHS) as IconName[];
-
 /** An icon, hidden from assistive technology: the control around it carries the words. */
 export function Icon({ name, size = "m" }: IconProps) {
   return (

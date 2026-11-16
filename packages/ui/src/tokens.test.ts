@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import css from "./tokens.css?raw";
-import { groups, parseTokens, tokens } from "./tokens.ts";
+import { groups, parseTokens, tokens } from "./TokensPage/tokens.ts";
 
 const value = (name: string) => tokens().find((token) => token.name === name)?.value;
 // docs/DESIGN-SYSTEM.md, "Colour": the base colours, and the four the frames draw that no base colour mixes to exactly.
