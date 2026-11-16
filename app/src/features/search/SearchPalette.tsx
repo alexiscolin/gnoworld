@@ -2,12 +2,13 @@
 // rail's second tab open it too, by an event. The palette is a chunk of its own, fetched once the page rests and kept
 // after, so its first opening is at once; a new page closes it (a place chosen, Go explore).
 import { IconButton } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
 import { useLocation } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { afterLoad } from "../../later.ts";
 import { opensPalette, SEARCH_HASH } from "./chord.ts";
+import { usePaletteHistory } from "./usePaletteHistory.ts";
 
 const loadDialog = () => import("./SearchDialog.tsx");
 const SearchDialog = lazy(loadDialog);
@@ -38,17 +39,24 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [start, setStart] = useState("");
   const { pathname, hash } = useLocation();
   const [at, setAt] = useState(pathname);
+  const history = usePaletteHistory();
+  const [seenHash, setSeenHash] = useState(hash);
+  if (seenHash !== hash) {
+    setSeenHash(hash);
+    if (seenHash === SEARCH_HASH && at === pathname) setOpen(false);
+  }
   if (at !== pathname) {
     setAt(pathname);
     // The address /list leads to asks it open.
     setOpen(hash === SEARCH_HASH);
     if (hash === SEARCH_HASH) setAsked(true);
   }
-  const show = () => {
+  const show = useEffectEvent(() => {
     setStart("");
     setAsked(true);
     setOpen(true);
-  };
+    history.push();
+  });
   useEffect(() => {
     const controller = new AbortController();
     afterLoad(
@@ -91,8 +99,9 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
             start={start}
             universe={universe}
             open={open}
-            onClose={() => {
+            onClose={(going) => {
               setOpen(false);
+              history.leave(going);
             }}
           />
         </Suspense>

@@ -35,7 +35,8 @@ export default function SearchDialog({
 }: {
   universe: UniverseView;
   open: boolean;
-  onClose: () => void;
+  /** `going`: closed by a place chosen, whose own navigation follows. */
+  onClose: (going: boolean) => void;
   /** The namespace a full Plan's "+N" opens on. */
   start?: string;
 }) {
@@ -52,11 +53,12 @@ export default function SearchDialog({
   useEffect(() => {
     document.getElementById(`${LIST_ID}-${String(active)}`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
-  const close = () => {
+  const closeFor = (going: boolean) => () => {
     palette.reset();
-    onClose();
+    onClose(going);
   };
-  const { go, chat, copy, copySaid } = useGo(universe, close);
+  const close = closeFor(false);
+  const { go, chat, copy, copySaid } = useGo(universe, closeFor(true));
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };

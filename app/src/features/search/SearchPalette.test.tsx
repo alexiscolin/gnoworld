@@ -3,7 +3,7 @@ import { act } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
-import { all, button, click, modals, nth, one, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, noMedia, nth, one, settled } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { SearchButton, SearchPalette } from "./SearchPalette.tsx";
@@ -40,6 +40,14 @@ function Page() {
         }}
       >
         Leave
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          Promise.resolve(navigate(-1)).catch(reportError);
+        }}
+      >
+        Back
       </button>
     </>
   );
@@ -96,6 +104,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   localStorage.clear();
+  noMedia();
   vi.stubGlobal("reportError", reported);
   seen.file.mockReturnValue(undefined);
   seen.here.mockResolvedValue({ ok: true, value: { worlds: [{ world: "bubble", here: 7 }] } });
@@ -207,6 +216,38 @@ describe("closing the palette", () => {
     await openIt(box);
     type(field(box), "bub");
     expect(await reopened(box)).toHaveProperty("value", "");
+  });
+});
+
+describe("the palette in a phone's history", () => {
+  const phone = (matches: boolean) => {
+    vi.stubGlobal("matchMedia", () => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  };
+
+  it("pushes #search as it opens, so Back closes it and stays on the page", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    expect(at(box)).toBe("/#search");
+    click(button(box, "Back"));
+    await settled(() => !isOpen(box));
+    expect(at(box)).toBe("/");
+  });
+
+  it("goes back one entry when Close ends it, leaving no #search behind", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    click(button(box, "Close"));
+    await settled(() => !isOpen(box));
+    expect(at(box)).toBe("/");
+  });
+
+  it("pushes nothing on a computer", async () => {
+    phone(false);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    expect(at(box)).toBe("/");
   });
 });
 
