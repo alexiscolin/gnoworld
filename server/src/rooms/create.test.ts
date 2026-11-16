@@ -385,6 +385,18 @@ describe("a room anyone makes on the Earth", () => {
     expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
   });
 
+  // F13679: the count is `created_at > start`, so a row stops counting at exactly 30 days, and counts 1 ms before.
+  it("counts a room up to 1 ms before 30 days, and no more at exactly 30 days", () => {
+    const { rooms, clock } = setup({ earthRowsMax: 1 });
+    rooms.earth(A, "a");
+    rooms.archive("earth", "a");
+    const month = 30 * 24 * 60 * 60_000;
+    clock.now = T0 + month - 1;
+    expect(rooms.mayEarth(B, "b")).toBe("full");
+    clock.now = T0 + month;
+    expect(rooms.mayEarth(B, "b")).toBe("ok");
+  });
+
   it("indexes the rooms by their date, so the window's count is a range read, not a scan", () => {
     const { db } = setup();
     const plan = db.prepare("EXPLAIN QUERY PLAN SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?").all(0);
