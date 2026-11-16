@@ -2,8 +2,9 @@
 import { createRef, useEffect } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
-import { all, click, modals, mount, one, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, mount, one, settled } from "../../../tests/mount.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
+import { PlacePageProvider } from "./placePage.ts";
 import { PhoneInfo } from "./PhoneInfo.tsx";
 
 // The small view of space needs the store, the router and an engine: Info's own tests read the links, these the sheet.
@@ -48,6 +49,23 @@ const sheet = (open: boolean, onClose: () => void) =>
     </MemoryRouter>,
   );
 
+const sheetWithPage = (onClose: () => void) =>
+  mount(
+    <MemoryRouter>
+      <PlacePageProvider value={<p data-plate="x">the page</p>}>
+        <PhoneInfo
+          open
+          onClose={onClose}
+          place={place}
+          talking={undefined}
+          room={undefined}
+          people={null}
+          panelRef={createRef()}
+        />
+      </PlacePageProvider>
+    </MemoryRouter>,
+  );
+
 describe("the info sheet of a phone", () => {
   it("holds the full chat's info when open, under the place's name", () => {
     const box = sheet(true, () => undefined);
@@ -78,6 +96,37 @@ describe("the info sheet of a phone", () => {
     one(box, "aside").append(inside);
     click(inside);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a link to a place on its own page open, scrolling to it with no history entry", () => {
+    const onClose = vi.fn();
+    const scrolled = vi.fn();
+    Object.assign(HTMLElement.prototype, { scrollIntoView: scrolled });
+    const box = sheet(true, onClose);
+    const target = document.createElement("section");
+    target.id = "page";
+    const jump = document.createElement("a");
+    jump.setAttribute("href", "#page");
+    one(box, "aside").append(target, jump);
+    const before = location.hash;
+    click(jump);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(scrolled).toHaveBeenCalledOnce();
+    expect(location.hash).toBe(before);
+  });
+
+  it("opens the place's page in the sheet itself, with a way back to the info", async () => {
+    const onClose = vi.fn();
+    const box = sheetWithPage(onClose);
+    click(button(box, "Its page"));
+    await settled(() => all(box, "[data-plate]").length === 1);
+    expect(all(box, "dialog")).toHaveLength(1);
+    expect(all(box, "aside")).toEqual([]);
+    expect(one(box, "h2").textContent).toBe("Its page");
+    click(button(box, "Back to Info"));
+    expect(all(box, "[data-plate]")).toEqual([]);
+    expect(one(box, "aside").getAttribute("aria-label")).toBe("golf");
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("mounts the planet's view only once open", async () => {

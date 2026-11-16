@@ -11,8 +11,9 @@ export interface DialogProps {
   open: boolean;
   /** Asked to close, by Esc or Close: the page sets open to false. */
   onClose: () => void;
-  /** 760 px, for the lightbox and the passport; "sheet" for the search's large sheet, Discover's; 490 otherwise. */
-  wide?: boolean | "sheet";
+  /** 760 px, for the lightbox and the passport; "sheet" for the search's large sheet, Discover's; "screen" for the phone's whole-screen
+   * sheet (under 900 px, kept inside the notch and the bars; the standard 490 px from 900 px up); 490 otherwise. */
+  wide?: boolean | "sheet" | "screen";
   /** The line above the title, in the one label style, read with the description. */
   kicker?: string;
   /** No Close button, where the page draws another way out; Esc still asks to close. */
@@ -161,7 +162,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       className={["appears", surface(styles["dialog"])].join(" ")}
-      data-width={wide === "sheet" ? "sheet" : wide ? "wide" : "standard"}
+      data-width={typeof wide === "string" ? wide : wide ? "wide" : "standard"}
       data-side={side}
       aria-labelledby={titleId}
       aria-describedby={describedBy || undefined}
