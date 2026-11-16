@@ -388,3 +388,42 @@ it("draws an icon trigger as a bar's tool when its icon says so", () => {
   );
   expect(screen.getByRole("button", { name: "Link" }).hasAttribute("data-tool")).toBe(true);
 });
+
+// A menu that chooses one of several (the network switch, D13501): the chosen item is a radio of the menu, checked, and a menu whose
+// act is still being read says so on its trigger, which stays in view, so a screen reader and the eye both know. Items with neither stay plain menu items.
+async function opened(items: Parameters<typeof Menu>[0]["items"]) {
+  render(<Menu trigger="Network" label="Choose the network" items={items} />);
+  await userEvent.click(screen.getByRole("button", { name: "Network" }));
+}
+
+describe("Menu, a choice among items", () => {
+  it("draws an item with `checked` as a menuitemradio, checked or not, and the rest as menu items", async () => {
+    await opened([
+      { label: "Onyx", checked: true, onSelect: vi.fn() },
+      { label: "gno.land", checked: false, onSelect: vi.fn() },
+      { label: "Settings", onSelect: vi.fn() },
+    ]);
+    expect(screen.getByRole("menuitemradio", { name: "Onyx" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("menuitemradio", { name: "gno.land" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", () => {
+    render(
+      <Menu
+        trigger="Network"
+        label="Choose the network"
+        busy
+        items={[{ label: "Onyx", checked: true, onSelect: vi.fn() }]}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Network" });
+    expect(trigger.getAttribute("aria-busy")).toBe("true");
+    expect(trigger.querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
+
+  it("says nothing of busy when it is not", () => {
+    render(<Menu trigger="Network" label="Choose the network" items={[{ label: "Onyx", onSelect: vi.fn() }]} />);
+    expect(screen.getByRole("button", { name: "Network" }).hasAttribute("aria-busy")).toBe(false);
+  });
+});

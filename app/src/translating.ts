@@ -140,7 +140,7 @@ const leftOf = (id: string, answer: LineTranslations | undefined): boolean =>
   [...answer.pending, ...(answer.later ?? [])].includes(id);
 
 // Puts a line's outcome in the store; whether it is to be asked again (left for later or still being made, a bounded number of times).
-// A request the network dropped leaves its lines for later too.
+// A request the network dropped, or the server failed (a 5xx), leaves its lines for later too.
 function settleLine(each: Want, answer: LineTranslations | undefined, dropped: boolean): boolean {
   const { of } = each;
   const key = keyOf(of);
@@ -163,7 +163,7 @@ function settle(batch: readonly Want[], result: Result<LineTranslations>): numbe
   }
   const answer = result.ok ? result.value : undefined;
   if (answer?.halt !== undefined) halt(answer.halt);
-  const dropped = !result.ok && result.reason === "network";
+  const dropped = !result.ok && (result.reason === "network" || result.reason === "unavailable");
   const waiting = batch.filter((each) => settleLine(each, answer, dropped));
   if (waiting.length > 0) again(waiting);
   return 0;

@@ -5,17 +5,17 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   type ToggleEvent,
 } from "react";
 import { buttonLook, type IconControlSize } from "../Button/control.ts";
-import { Icon, type IconName } from "../icons/Icon.tsx";
-import { Chip } from "../Chip/Chip.tsx";
+import { type IconName } from "../icons/Icon.tsx";
 import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
-import { Trigger } from "./Trigger.tsx";
-import soon from "../ComingSoon/ComingSoon.module.css";
+import { row } from "./MenuRow.tsx";
+import { triggerButton } from "./Trigger.tsx";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -88,7 +88,7 @@ export function Popover({
   const { open, trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <Trigger {...{ plain, icon, tabbable, label, attrs: trigger }}>{words}</Trigger>
+      {triggerButton({ plain, icon, tabbable, label, attrs: trigger, children: words })}
       <div {...panel} aria-label={label} data-wide={wide ? "" : undefined}>
         {lazy && !open ? null : children}
       </div>
@@ -106,6 +106,10 @@ interface Entry {
 export type MenuItem =
   | (Entry & {
       onSelect: () => void;
+      /** A choice among the items (one network of several): a radio of the menu, checked or not. */
+      checked?: boolean;
+      /** A word of the item as a chip at its end ("Testnet"). */
+      note?: string;
       /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
       tone?: "danger";
     })
@@ -130,6 +134,8 @@ export interface MenuProps {
   lead?: ReactNode;
   /** The words of a trigger with a lead, read and not drawn. */
   wordsHidden?: boolean;
+  /** An act of its items is still being read: the trigger, which stays in view as the panel closes, says so (a spinner, aria-busy). */
+  busy?: boolean;
   /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
   openAtOnce?: boolean;
   /** Open now at this point of the screen, as a right-click's menu does: each new object asks once. */
@@ -148,6 +154,7 @@ export function Menu({
   lead,
   wordsHidden = false,
   openAtOnce = false,
+  busy,
   at,
 }: MenuProps) {
   // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
@@ -161,60 +168,43 @@ export function Menu({
   const apart = items.findIndex((item) => "onSelect" in item && item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
   useLayoutEffect(() => {
-    if (open) panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+    if (open) panelRef.current?.querySelector<HTMLElement>("[role^='menuitem']")?.focus();
   }, [open, panelRef]);
+  // Before an item's own click, whichever it is: the menu closes and the trigger holds the focus as the item acts, which a browser that
+  // never focused it does not give back on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+  const close = (event: MouseEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element) || event.target.closest("button:not([aria-disabled])") === null) return;
+    event.currentTarget.hidePopover();
+    trigger.ref.current?.focus();
+  };
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Tab") {
       event.currentTarget.hidePopover();
       return;
     }
-    rove(event, "[role='menuitem']", ["ArrowUp", "ArrowDown"]);
+    rove(event, "[role^='menuitem']", ["ArrowUp", "ArrowDown"]);
   };
   return (
     <>
-      <Trigger
-        attrs={trigger}
-        plain={false}
-        icon={icon === undefined ? undefined : { name: icon, size, emphasis }}
-        tabbable
-        label={words}
-      >
-        {lead}
-        {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
-      </Trigger>
-      <div {...panel} aria-label={label} onKeyDown={move}>
+      {triggerButton({
+        attrs: trigger,
+        busy,
+        plain: false,
+        icon: icon === undefined ? undefined : { name: icon, size, emphasis },
+        tabbable: true,
+        label: words,
+        children: (
+          <>
+            {lead}
+            {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
+          </>
+        ),
+      })}
+      <div {...panel} aria-label={label} onClickCapture={close} onKeyDown={move}>
         {items.map((item, at) => (
           <Fragment key={item.label}>
             {at === apart ? <div role="separator" className={styles["separator"]} /> : null}
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className={["lit", "tint", "full-start", styles["item"], "soon" in item ? soon["soon"] : undefined].join(
-                " ",
-              )}
-              {...("soon" in item
-                ? { "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
-                : {
-                    "data-tone": item.tone,
-                    onClick: () => {
-                      panelRef.current?.hidePopover();
-                      // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
-                      // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
-                      trigger.ref.current?.focus();
-                      item.onSelect();
-                    },
-                  })}
-            >
-              {"onSelect" in item && item.tone === "danger" ? <Icon name="alert" /> : null}
-              {item.icon === undefined ? null : <Icon name={item.icon} />}
-              {item.label}
-              {"soon" in item ? (
-                <span className={styles["soon"]}>
-                  <Chip>{item.why ?? "Soon"}</Chip>
-                </span>
-              ) : null}
-            </button>
+            {row(item)}
           </Fragment>
         ))}
       </div>

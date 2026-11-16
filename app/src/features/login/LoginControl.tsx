@@ -57,8 +57,8 @@ export function useLogin() {
   };
 }
 
-/** The way in, its step and why the last login stopped, for `login` as `useLogin` holds it; `network`, the network's name the button
- * carries after its words. */
+/** The way in, its step and why the last login stopped, for `login` as `useLogin` holds it; `network`, the network's name drawn beside
+ * the button, in its pill. */
 export function LoginControl({
   login,
   logIn,

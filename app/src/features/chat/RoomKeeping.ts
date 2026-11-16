@@ -2,6 +2,7 @@
 // saved lines and the place it asked to go back to, from the device, the room's pins, from the server, and the acts
 // that change them, built from the store and the shown room alone.
 import { foldEdits, type Line } from "@gnoworld/core";
+import { HIDE_IDS } from "@gnoworld/schemas";
 import { pageModerationApi } from "../../lib/api/moderation.ts";
 import { own } from "../../store/record.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
@@ -81,8 +82,18 @@ export function useRoomKeeping(room: string | undefined, pinning: Pinning) {
     moderate:
       held?.may === true
         ? {
-            // The line shown and its last edit are two ids at Ergo: both go, in one request.
-            hide: (id) => api.hide(room, [...new Set([id, newestOf(id)])]),
+            // Ergo keeps the line and each edit at its own id, and nothing bounds the edits: all go, HIDE_IDS to a request,
+            // and the first refusal ends it (a hide sent again is the same hide).
+            hide: async (id) => {
+              const { folded } = foldEdits(lines ?? []);
+              const ids = [
+                ...new Set([id, ...(lines ?? []).filter((each) => folded.get(each.id) === id).map((each) => each.id)]),
+              ];
+              let done: Done = { ok: true };
+              for (let from = 0; from < ids.length && done.ok; from += HIDE_IDS)
+                done = await api.hide(room, ids.slice(from, from + HIDE_IDS));
+              return done;
+            },
             mute: (account) => api.mute(room, account),
           }
         : undefined,

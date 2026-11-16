@@ -82,6 +82,7 @@ function Body({
       blocks={state.page.blocks}
       via={state.via}
       call={call}
+      page={link ?? call.realm}
       {...(origin === undefined ? {} : { origin })}
       {...(link === undefined ? {} : { more: link })}
     />

@@ -190,6 +190,8 @@ export function show(place: Place | undefined, to: (href: string) => void): void
   releasing = false;
   if (place === undefined) {
     if (space !== undefined) space.covered = true;
+    // Nothing looks at the moons while space is covered; the next place asked for feeds them again.
+    stopMoons();
     return;
   }
   if (offer.state === "undecided") {

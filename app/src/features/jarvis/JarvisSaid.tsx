@@ -12,7 +12,7 @@ export interface JarvisSaidProps {
   room: string;
   msgid: string;
   read: (room: string, msgid: string) => Promise<Result<KeptAnswer>>;
-  card: Omit<AnswerCardProps, "answer" | "asker">;
+  card: Omit<AnswerCardProps, "id" | "answer" | "asker">;
   /** What stands while the answer is read, and when it cannot be drawn. */
   fallback?: ReactNode;
 }
@@ -32,7 +32,7 @@ export function JarvisSaid({ room, msgid, read, card, fallback = null }: JarvisS
     queryClient,
   );
   return data?.answer.status === "answered" ? (
-    <AnswerCard answer={data.answer} asker={data.asker} {...card} />
+    <AnswerCard id={`${room} ${msgid}`} answer={data.answer} asker={data.asker} {...card} />
   ) : (
     fallback
   );

@@ -113,9 +113,9 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
       </div>
       <SearchPalette universe={universe} />
       <div className={styles["end"]}>
-        <p className={`${styles["network"] ?? ""} ${pilled ? (styles["pilled"] ?? "") : ""}`}>
+        <div className={`${styles["network"] ?? ""} ${pilled ? (styles["pilled"] ?? "") : ""}`}>
           <Network name={universe.name} testnet={universe.testnet} />
-        </p>
+        </div>
         {/* One item of the phone's header row: the controls with the account; the network and the account, whose menu holds the
             passport, never drop (DESIGN-SYSTEM.md, Layout). */}
         <Account universe={universe} />

@@ -30,6 +30,7 @@ export function PinnedForms({ pinned, options }: PinnedFormsProps) {
         return found === undefined ? null : (
           <ActionForm
             key={keyOf(index, call)}
+            cardId={keyOf(index, call)}
             action={call.action}
             label={call.label}
             chain={found.chain}
@@ -59,6 +60,7 @@ export function PinnedBar({ part, actions, universe, at }: PinnedBarProps) {
     ) : (
       <ActionForm
         key={card}
+        cardId={card}
         action={call.action}
         label={call.label}
         chain={found.chain}

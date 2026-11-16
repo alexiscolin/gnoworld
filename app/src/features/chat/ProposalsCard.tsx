@@ -76,6 +76,7 @@ export default function ChatProposals() {
               <Row proposal={proposal} href={link(proposal)} />
               {at === undefined ? null : (
                 <ActionForm
+                  cardId={`proposal ${String(proposal.id)}`}
                   action={{ realm: GOVDAO, function: "MustVoteOnProposalSimple", args: { pid: String(proposal.id) } }}
                   label="Vote"
                   chain={at.chain}
