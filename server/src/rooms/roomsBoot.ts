@@ -67,6 +67,7 @@ export function roomsBoot(app: Hono, config: Config, parts: Parts): { stop: () =
       log: parts.log,
       nameCheck: parts.nameCheck,
       origins,
+      proxy: trustedProxy,
       now: Date.now,
     }),
   );

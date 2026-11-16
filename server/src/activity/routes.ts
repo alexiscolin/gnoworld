@@ -35,7 +35,7 @@ export function activityRoutes(activity: Activity, options: Options): Hono {
     if (!parsed.success) return c.json({ error: "refused" } satisfies ApiError, 400);
     const who = sessionOf(c, session);
     const rooms = [...new Set(parsed.data)].flatMap((world) =>
-      worldRooms(db, world)
+      worldRooms(db, world, now())
         .filter((room) => visible(room, who))
         .map((room) => ({ world, room })),
     );

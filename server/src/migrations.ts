@@ -17,7 +17,14 @@ import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
 import { STRIKE_TABLES } from "./moderation/strikes.ts";
 import { PIN_TABLES } from "./pins/pins.ts";
-import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
+import {
+  EARTH_TABLES,
+  EARTH_WINDOW_INDEX,
+  REALM_PATH,
+  REALM_TABLES,
+  ROOM_LISTING_INDEXES,
+  ROOM_STATE,
+} from "./rooms/create.ts";
 import { ROOM_SAID, ROOM_SAID_BACKFILL } from "./rooms/earth.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { SEARCH_TABLES } from "./search/index.ts";
@@ -64,4 +71,6 @@ export const migrations: readonly string[] = [
   SAID_TABLES,
   TRANSLATION_TABLES,
   ROOM_SAID_BACKFILL,
+  EARTH_WINDOW_INDEX,
+  ROOM_LISTING_INDEXES,
 ];

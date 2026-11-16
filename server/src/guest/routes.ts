@@ -9,7 +9,7 @@ import type { Config } from "../config.ts";
 import { guard, json, type Guarded, sessionOf } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { accountKey } from "../moderation/check.ts";
-import { visitor48Of, visitorOf } from "../visitor.ts";
+import { anyFull, takeAll, visitor48Of, visitorOf, VISITORS_PER_BLOCK } from "../visitor.ts";
 import type { Log } from "@gnoworld/service/log";
 import { makeGuests, NamesTaken } from "./guests.ts";
 import { makeGuestMutes } from "./mutes.ts";
@@ -39,7 +39,7 @@ export function guestFrom(db: DatabaseSync, settings: Settings, outside: Outside
   const say = makeSay({ ...outside, now, mutes, thresholds: moderation.thresholds });
   const perVisitor = limiter({ max: limits.perVisitor, windowMs: 60 * 60_000, keys: 100_000 });
   // The /48 is one customer at most providers: sixty /64s of it take no more than four times one visitor's names.
-  const perBucket = limiter({ max: 4 * limits.perVisitor, windowMs: 60 * 60_000, keys: 100_000 });
+  const perBucket = limiter({ max: VISITORS_PER_BLOCK * limits.perVisitor, windowMs: 60 * 60_000, keys: 100_000 });
   const inAll = limiter({ max: limits.perHour, windowMs: 60 * 60_000, keys: 1 });
   // __Host-: sent only to the host that set it, over HTTPS, for every path. No Max-Age: it lasts the browser's visit.
   const cookie = "__Host-guest";
@@ -74,9 +74,8 @@ export function guestFrom(db: DatabaseSync, settings: Settings, outside: Outside
       [perBucket, wide],
       [inAll, "all"],
     ] as const;
-    if (asked.some(([each, key]) => each.full(key, at)) || guests.alive() >= limits.living)
-      return answer(c, "too_many", 429);
-    for (const [each, key] of asked) each.take(key, at);
+    if (anyFull(asked, at) || guests.alive() >= limits.living) return answer(c, "too_many", 429);
+    takeAll(asked, at);
     try {
       const made = guests.mint(who);
       setCookie(c, cookie, made.token, options);

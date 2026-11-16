@@ -10,12 +10,16 @@ import {
   EARTH_ROOMS_MAX,
   EARTH_ROWS_MAX,
   EARTH_TABLES,
+  EARTH_WINDOW_INDEX,
+  LIVE_EARTH_SQL,
+  ROOM_LISTING_INDEXES,
+  ROWS_IN_WINDOW_SQL,
   makeRooms,
   REALM_PATH,
   REALM_TABLES,
   ROOM_STATE,
 } from "./create.ts";
-import { ensureRooms, listRooms, realmPaths, ROOM_TABLES } from "./rooms.ts";
+import { ensureRooms, listRooms, LISTED_SQL, realmPaths, ROOM_TABLES, WORLD_LISTED_SQL, worldRooms } from "./rooms.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const opened: DatabaseSync[] = [];
@@ -28,7 +32,15 @@ const setup = ({
   earthMax,
   earthRowsMax,
 }: { max?: number; earthMax?: number; earthRowsMax?: number } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [
+    ROOM_TABLES,
+    ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    EARTH_WINDOW_INDEX,
+    ROOM_LISTING_INDEXES,
+  ]);
   opened.push(db);
   ensureRooms(db, ["bubble", "earth"], T0);
   const link = { up: true };
@@ -352,12 +364,130 @@ describe("a room anyone makes on the Earth", () => {
     expect(rooms.earth(B, "b")).toBe("full");
   });
 
-  it("keeps 5,000 rooms at most, archived ones included, so making and archiving frees no place for ever", () => {
+  it("keeps 5,000 rooms at most, archived ones included, so making and archiving frees no place within the 30-day window", () => {
     expect(EARTH_ROWS_MAX).toBe(5000);
     const { rooms } = setup({ earthRowsMax: 2 });
     rooms.earth(A, "a");
     rooms.earth(B, "b");
     rooms.archive("earth", "a");
+    expect(rooms.earth(B, "c")).toBe("full");
+  });
+
+  // C12 (the 2026-11-15 audit): 5,000 rooms made then archived with throwaway keys blocked creation for ever.
+  it("counts the rooms made over a 30-day window: archived, they free no place for 29 days, and one at 31", () => {
+    const { rooms, clock } = setup({ earthRowsMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    rooms.archive("earth", "a");
+    rooms.archive("earth", "b");
+    expect(rooms.earth(B, "c")).toBe("full");
+    clock.now += 29 * 24 * 60 * 60_000;
+    expect(rooms.earth(B, "c")).toBe("full");
+    expect(rooms.mayEarth(B, "c")).toBe("full");
+    clock.now += 2 * 24 * 60 * 60_000;
+    expect(rooms.mayEarth(B, "c")).toBe("ok");
+    expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
+  });
+
+  // F13679: the count is `created_at > start`, so a row stops counting at exactly 30 days, and counts 1 ms before.
+  it("counts a room up to 1 ms before 30 days, and no more at exactly 30 days", () => {
+    const { rooms, clock } = setup({ earthRowsMax: 1 });
+    rooms.earth(A, "a");
+    rooms.archive("earth", "a");
+    const month = 30 * 24 * 60 * 60_000;
+    clock.now = T0 + month - 1;
+    expect(rooms.mayEarth(B, "b")).toBe("full");
+    clock.now = T0 + month;
+    expect(rooms.mayEarth(B, "b")).toBe("ok");
+  });
+
+  // F13676 (Alexis: "Garde son nom, quitte canal et liste"): the rows past the window stay, the bot's channels and walks do not.
+  it("lists the live rooms and the window's archived ones, and leaves an archived Earth room made before the window", () => {
+    const { rooms, clock, db } = setup();
+    for (const [maker, name] of [
+      [A, "old"],
+      [A, "kept"],
+      [B, "live"],
+    ] as const)
+      rooms.earth(maker, name);
+    rooms.archive("earth", "old");
+    clock.now += 31 * 24 * 60 * 60_000;
+    rooms.earth(B, "new");
+    rooms.archive("earth", "kept");
+    db.prepare("UPDATE rooms SET created_at = ? WHERE name = '#earth/kept'").run(clock.now - 1000);
+    expect(listRooms(db, clock.now).map(({ name }) => name)).toEqual([
+      "#bubble",
+      "#earth",
+      "#earth/kept",
+      "#earth/live",
+      "#earth/new",
+    ]);
+    expect(worldRooms(db, "earth", clock.now)).toEqual(["#earth", "#earth/kept", "#earth/live", "#earth/new"]);
+    expect(listRooms(db).map(({ name }) => name)).toContain("#earth/old");
+    expect(rooms.earth(B, "old")).toBe("exists");
+    expect(rooms.maker("#earth/old")).toBe(A);
+  });
+
+  it("leaves a moderator's archived Earth room past the window too, and an old archived room of another world stays", () => {
+    const { rooms, clock, db } = setup();
+    rooms.create("earth", "crew");
+    rooms.create("bubble", "attic");
+    rooms.archive("earth", "crew");
+    rooms.archive("bubble", "attic");
+    clock.now += 31 * 24 * 60 * 60_000;
+    const names = listRooms(db, clock.now).map(({ name }) => name);
+    expect(names).toContain("#bubble/attic");
+    expect(names).not.toContain("#earth/crew");
+  });
+
+  it("leaves an archived room at exactly the window's end (the count's `>`) and lists it one millisecond before", () => {
+    const { rooms, db } = setup();
+    rooms.earth(A, "edge");
+    rooms.archive("earth", "edge");
+    const month = 30 * 24 * 60 * 60_000;
+    expect(listRooms(db, T0 + month - 1).map(({ name }) => name)).toContain("#earth/edge");
+    expect(listRooms(db, T0 + month).map(({ name }) => name)).not.toContain("#earth/edge");
+  });
+
+  // The statements the code runs are explained, never a copy of them: no scan of every room or every Earth row.
+  it("reads the window's count and the rooms listed through indexes, never a scan of every row", () => {
+    const { db } = setup();
+    const plan = (text: string, ...params: (string | number)[]) =>
+      z
+        .array(z.object({ detail: z.string() }))
+        .parse(db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params))
+        .map(({ detail }) => detail);
+    const used = [
+      ...plan(ROWS_IN_WINDOW_SQL, 0),
+      ...plan(LIVE_EARTH_SQL),
+      ...plan(LISTED_SQL, 0),
+      ...plan(WORLD_LISTED_SQL, "earth", "earth", 0),
+    ];
+    expect(used.join("\n")).toMatch(/earth_rooms_by_date/);
+    // The list's dates come from the primary key of earth_rooms, for the listed rooms alone.
+    expect(plan(WORLD_LISTED_SQL, "earth", "earth", 0).join("\n")).toMatch(/earth_rooms.*name=\?/);
+    expect(used.join("\n")).toMatch(/rooms_live/);
+    expect(used.join("\n")).toMatch(/rooms_archived_by_date/);
+    expect(used.filter((detail) => /^SCAN (rooms|earth_rooms|e|r)\b(?! USING)/.test(detail))).toEqual([]);
+  });
+
+  it("keeps a room past the window as it was: its row, its name, its maker, archived, never destroyed", () => {
+    const { rooms, clock, db } = setup({ earthRowsMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    rooms.archive("earth", "a");
+    clock.now += 31 * 24 * 60 * 60_000;
+    expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
+    expect(rooms.earth(A, "a")).toBe("exists");
+    expect([rooms.exists("#earth/a"), rooms.archived("#earth/a"), rooms.maker("#earth/a")]).toEqual([true, true, A]);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 3 });
+  });
+
+  it("keeps the live cap whatever the window: live rooms made long ago still fill it", () => {
+    const { rooms, clock } = setup({ earthMax: 2 });
+    rooms.earth(A, "a");
+    rooms.earth(B, "b");
+    clock.now += 31 * 24 * 60 * 60_000;
     expect(rooms.earth(B, "c")).toBe("full");
   });
 });

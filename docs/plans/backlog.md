@@ -233,6 +233,16 @@ Built on `pingpong`, now in `main` without its tests (the radical mode, withdraw
 review, `deploy/test.sh` green; D13918). The Mac demo is cancelled (D13171): the demo of 2026-11-12 could run from the
 workshop (D13045), and the hosting will be a Hetzner VM (D13172, not built).
 
+Before going live (the automatic deploy's part, D13172, another pull request: the Caddy front and the Hetzner VM):
+
+1. Per-address limits at the proxy, D13675's remainder (D13677): 8 IPv4 addresses empty the site's search second, 28 addresses
+   or 7 /48s keep the Earth rooms' window full.
+2. nginx's `worker_connections` and `nofile`: about 1,000 visitors today (the 2026-11-16 audit's item 13).
+3. nginx counts each IPv6 address apart, so a /64 bypasses the per-visitor limits (the 2026-11-15 security audit, medium).
+4. The open security findings out of the public ledger before real users: private GitHub advisories and a SECURITY.md.
+5. The deploy itself, as D13172 says: VM, Caddy, GHCR, a deploy workflow, rollback, secrets, backups of SQLite and Ergo, alerts,
+   OPERATIONS.md for the VM.
+
 | What | State | Plan |
 |---|---|---|
 | The realm plate (Try it, Around it, the detail widgets) and its journeys | Built, the journeys brought back to the new plate (D13992) | [slice-realm-plate.md](slice-realm-plate.md) |

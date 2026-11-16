@@ -622,7 +622,9 @@ describe("the limits: 20 a minute a visitor, 60 an account, the keys bounded", (
     expect((await t.ask(t.q("quorum"))).status).toBe(429);
     for (let i = 0; i < 60; i++) expect((await t.ask(t.q("quorum"), { who: "bob" })).status).toBe(200);
     expect((await t.ask(t.q("quorum"), { who: "bob" })).status).toBe(429);
-    expect((await t.ask(t.q("quorum"), { who: "alice", peer: "203.0.113.7" })).status).toBe(200);
+    // C12: the 80 of the address block (20 + 60) are spent, so alice behind the same address waits; another block is free.
+    expect((await t.ask(t.q("quorum"), { who: "alice", peer: "203.0.113.7" })).status).toBe(429);
+    expect((await t.ask(t.q("quorum"), { who: "alice", peer: "198.51.100.7" })).status).toBe(200);
   });
 
   it("does not let a cookie that is no session be a key of its own: it counts as its visitor", async () => {
@@ -930,6 +932,45 @@ describe("the cost at the cap (F13770, F13772)", () => {
     for (let i = 0; i < 21; i++) await t.ask(t.q("quorum"));
     for (let i = 0; i < 5; i++) expect((await t.ask(t.q("quorum"), { peer: "203.0.113.50" })).status).toBe(200);
     expect((await t.ask(t.q("quorum"), { peer: "203.0.113.51" })).status).toBe(429);
+  });
+});
+
+// C12: ten accounts, each within its own minute, kept the site's second full. A /48 (four times a visitor, 80 a minute, as the
+// guests' names) is limited too, before the shared second, so a block at its limit spends nothing of it.
+describe("the limit of an address block, before the whole's", () => {
+  const peerIn = (block: number, k: number) => `2001:db8:${String(block)}:${String(k)}::1`;
+
+  it("stops the 81st request of one /48 whatever the /64 and whoever asks, and counts another /48 apart", async () => {
+    const t = filled();
+    for (let k = 1; k <= 8; k++)
+      for (let i = 0; i < 10; i++) expect((await t.ask(t.q("quorum"), { peer: peerIn(1, k) })).status).toBe(200);
+    const refused = await t.ask(t.q("quorum"), { peer: peerIn(1, 9) });
+    expect([refused.status, await refused.json(), refused.headers.get("cache-control")]).toEqual([
+      429,
+      { error: "too_many" },
+      "no-store",
+    ]);
+    expect((await t.ask(t.q("quorum"), { peer: peerIn(2, 1) })).status).toBe(200);
+    t.clock.now += MINUTE;
+    expect((await t.ask(t.q("quorum"), { peer: peerIn(1, 9) })).status).toBe(200);
+  });
+
+  it("counts the accounts of one /48 together: 80 in a minute, the 81st refused", async () => {
+    const t = filled();
+    for (let i = 0; i < 40; i++)
+      expect((await t.ask(t.q("quorum"), { who: "bob", peer: peerIn(1, 1) })).status).toBe(200);
+    for (let i = 0; i < 40; i++)
+      expect((await t.ask(t.q("quorum"), { who: "alice", peer: peerIn(1, 2) })).status).toBe(200);
+    expect((await t.ask(t.q("quorum"), { who: "team", peer: peerIn(1, 3) })).status).toBe(429);
+    expect((await t.ask(t.q("quorum"), { who: "team", peer: peerIn(2, 3) })).status).toBe(200);
+  });
+
+  it("spends nothing of the shared second on a request its block refused: another block still searches", async () => {
+    const t = setup({ global: 85 });
+    t.search.add(said("m1"));
+    for (let k = 1; k <= 8; k++) for (let i = 0; i < 10; i++) await t.ask(t.q("quorum"), { peer: peerIn(1, k) });
+    for (let i = 0; i < 20; i++) await t.ask(t.q("quorum"), { peer: peerIn(1, 9) });
+    for (let i = 0; i < 5; i++) expect((await t.ask(t.q("quorum"), { peer: peerIn(2, 1) })).status).toBe(200);
   });
 });
 
