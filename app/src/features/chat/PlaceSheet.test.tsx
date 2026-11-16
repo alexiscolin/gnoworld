@@ -28,6 +28,7 @@ describe("a place's page on a phone", () => {
   it("offers its control only for a place whose route gave a plate", () => {
     expect(all(at(<Plate />, <PageButton onOpen={() => undefined} />), "button")).toHaveLength(1);
     expect(all(at(null, <PageButton onOpen={() => undefined} />), "button")).toEqual([]);
+    expect(all(at(undefined, <PageButton onOpen={() => undefined} />), "button")).toEqual([]);
   });
 
   it("draws the plate in the plate's own frame: its panel, its container, its scroller", async () => {

@@ -206,3 +206,43 @@ describe("the dock when the server does not answer", () => {
     expect(mine()?.querySelector("div[class*='lead']")).toBeNull();
   });
 });
+
+describe("the screen's header", () => {
+  const at = (entry: string, phone: boolean) => {
+    vi.stubGlobal("fetch", roomsAnswer(200));
+    // jsdom has none, and a browser's is none while the document is not fully active.
+    vi.stubGlobal("visualViewport", null);
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: phone && query === "(max-width: 899px)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    drawer()(
+      <MemoryRouter initialEntries={[entry]}>
+        <StoreProvider>
+          <Grab />
+          <ChatPanel world="bubble" place={place} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    act(() => {
+      state().loginActions.signedOut();
+    });
+    return () => document.querySelector("[aria-label='Back']") !== null;
+  };
+
+  it("is the phone's, with its back, in the full chat of a phone", async () => {
+    const back = at("/?chat=full", true);
+    await settled(back);
+    expect(back()).toBe(true);
+  });
+
+  it("is the desktop's, with no back, on a computer", async () => {
+    const back = at("/?chat=full", false);
+    await settled(() => document.querySelector("[data-chat-screen]") !== null);
+    expect(back()).toBe(false);
+  });
+});

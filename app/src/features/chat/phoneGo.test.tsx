@@ -1,19 +1,21 @@
 // @vitest-environment jsdom
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { BrowserRouter, MemoryRouter, useLocation, useNavigate } from "react-router";
+import { BrowserRouter, MemoryRouter, useLocation, useNavigate, useNavigationType } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { canGoBack, useChatBack, usePhoneGo } from "./phoneGo.ts";
 
 let root: Root | undefined;
 let host: HTMLElement;
-const held: { back?: () => void; go?: (to: string) => void } = {};
+const held: { back?: () => void; go?: (to: string) => void; type?: string } = {};
 
 function Probe() {
   const going = usePhoneGo();
   const back = useChatBack();
   const navigate = useNavigate();
+  const type = useNavigationType();
   useEffect(() => {
+    held.type = type;
     held.back = back;
     held.go = (to) => {
       Promise.resolve(navigate(to)).catch(reportError);
@@ -66,6 +68,7 @@ describe("a phone's own way to a place", () => {
     phone(true);
     draw(["/", "/w/govdao"]);
     expect(shown()).toBe("here /w/govdao?chat=full");
+    expect(held.type, "a replace, not a push").toBe("REPLACE");
     act(() => {
       held.back?.();
     });
@@ -95,6 +98,28 @@ describe("the chat's back", () => {
       held.back?.();
     });
     expect(shown()).toBe("here /");
+  });
+
+  it("steps back to the entry before when it is ours, which is not home", () => {
+    phone(true);
+    history.replaceState({ idx: 1 }, "");
+    draw(["/saved", "/w/govdao?chat=full"]);
+    act(() => {
+      held.back?.();
+    });
+    expect(shown()).toBe("here /saved");
+    expect(held.type).toBe("POP");
+  });
+
+  it("goes home, not to the entry before, when the chat opened the tab", () => {
+    phone(true);
+    history.replaceState({ idx: 0 }, "");
+    draw(["/saved", "/w/govdao?chat=full"]);
+    act(() => {
+      held.back?.();
+    });
+    expect(shown()).toBe("here /");
+    expect(held.type, "replacing the chat's entry").toBe("REPLACE");
   });
 
   it("goes home, replacing the entry, when the chat was the first entry", () => {

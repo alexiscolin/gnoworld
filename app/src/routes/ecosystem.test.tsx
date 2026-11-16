@@ -1,6 +1,9 @@
 import type { RouteObject } from "react-router";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { render } from "../../tests/render.tsx";
+const phone = vi.hoisted(() => ({ goes: false }));
+vi.mock("../features/chat/phoneGo.ts", () => ({ usePhoneGo: () => phone.goes }));
+
 import Ecosystem, { clientLoader as loader, ErrorBoundary } from "./ecosystem.tsx";
 
 const route = (path: string): RouteObject => ({ path, Component: Ecosystem, loader, ErrorBoundary });
@@ -15,5 +18,18 @@ describe("an ecosystem's page", () => {
     const html = await render(route(pattern), path);
     expect(html).toContain('role="alert"');
     expect(html).toMatch(/No ecosystem/i);
+  });
+});
+
+describe("an ecosystem's page on a phone", () => {
+  test("draws nothing while the phone is sent home", async () => {
+    // No loader: the page itself is what draws, as the build's fallback does.
+    const page: RouteObject = { path: "/e/:ecosystem", Component: Ecosystem };
+    expect(await render(page, "/e/tokens")).toContain('role="alert"');
+    phone.goes = true;
+    const html = await render(page, "/e/tokens");
+    phone.goes = false;
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toMatch(/No ecosystem/i);
   });
 });

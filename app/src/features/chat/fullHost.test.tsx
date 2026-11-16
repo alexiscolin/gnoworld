@@ -9,15 +9,15 @@ vi.mock("./Chat.tsx", async () => {
   const { usePlacePage } = await import("./placePage.ts");
   return { Chat: () => <p data-testid="chat">{usePlacePage()}</p> };
 });
-const asked = vi.hoisted(() => ({ full: false }));
+const asked = vi.hoisted(() => ({ full: false, going: false }));
 vi.mock("./full.ts", () => ({
   asksFull: (params: URLSearchParams) => params.get("chat") === "full",
   useChatAlone: () => asked.full,
 }));
 
-vi.mock("./phoneGo.ts", () => ({ usePhoneGo: () => false }));
+vi.mock("./phoneGo.ts", () => ({ usePhoneGo: () => asked.going }));
 
-const { DockedChatHost, PlaceChat } = await import("./fullHost.tsx");
+const { chatHeld, DockedChatHost, PlaceChat } = await import("./fullHost.tsx");
 
 const chatOf = (slug: string): ChatProps => ({
   world: slug,
@@ -297,5 +297,81 @@ describe("the shell's chat host, drawn on the server", () => {
     const server = await import("./fullHost.tsx");
     vi.stubGlobal("document", undefined);
     expect(() => renderToString(<server.DockedChatHost />)).not.toThrow();
+  });
+});
+
+describe("a page a phone is being sent away from", () => {
+  afterEach(() => {
+    asked.going = false;
+    asked.full = false;
+    document.body.replaceChildren();
+  });
+
+  const draw = (page: () => ReactNode) => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(
+        <>
+          <DockedChatHost />
+          <PlaceChat chat={chatOf("a")} page={page} />
+        </>,
+      );
+    });
+    return root;
+  };
+
+  it("draws neither its page nor its chat while it goes", () => {
+    asked.going = true;
+    const page = vi.fn(() => <section data-testid="page" />);
+    const root = draw(page);
+    expect(page).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-testid=chat]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("draws its page when it stays", () => {
+    const root = draw(() => <section data-testid="page" />);
+    expect(document.querySelector("[data-testid=page]")).not.toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
+describe("the shell's chat once no page holds it", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it("is let go once the last page that held it has left", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const show = (chat: ChatProps | undefined) => {
+      act(() => {
+        root.render(
+          <>
+            <DockedChatHost />
+            {chat === undefined ? null : <PlaceChat chat={chat} page={(dock) => <section>{dock}</section>} />}
+          </>,
+        );
+      });
+    };
+    show(chatOf("a"));
+    expect(chatHeld()).toBe(true);
+    show(undefined);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(chatHeld()).toBe(false);
+    act(() => {
+      root.unmount();
+    });
   });
 });

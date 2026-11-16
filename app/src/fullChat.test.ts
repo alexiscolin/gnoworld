@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { fullChatHref, phoneGoes } from "./fullChat.ts";
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fullChatHref, markFullEarly, phoneGoes } from "./fullChat.ts";
 
 const at = (path: string) => {
   const [rest = "", hash] = path.split("#", 2);
@@ -54,5 +55,38 @@ describe("a link kept in the full chat", () => {
     expect(fullChatHref("/w/x?a=1#top")).toBe("/w/x?a=1&chat=full#top");
     expect(fullChatHref("/w/x#top")).toBe("/w/x?chat=full#top");
     expect(fullChatHref("/universe?a=1")).toBe("/universe?a=1");
+  });
+});
+
+describe("the address before React draws", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    history.replaceState(null, "", "/");
+    delete document.documentElement.dataset["chat"];
+  });
+  const from = (path: string, phone: boolean) => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: phone && query === "(max-width: 899px)" }));
+    history.replaceState({ idx: 3 }, "", path);
+    markFullEarly();
+  };
+
+  it("takes a phone's place to its full chat in the address and marks the root, keeping the history's state", () => {
+    from("/w/govdao?room=dev", true);
+    expect(location.pathname + location.search).toBe("/w/govdao?room=dev&chat=full");
+    expect(history.state).toEqual({ idx: 3 });
+    expect(document.documentElement.dataset["chat"]).toBe("full");
+  });
+
+  it("leaves a computer's address, marking the root only for a chat opened full", () => {
+    from("/w/govdao", false);
+    expect(location.pathname + location.search).toBe("/w/govdao");
+    expect(document.documentElement.dataset["chat"]).toBeUndefined();
+    from("/w/govdao?chat=full", false);
+    expect(document.documentElement.dataset["chat"]).toBe("full");
+  });
+
+  it("does not rewrite a phone's cosmos address, which only the router can send home", () => {
+    from("/universe", true);
+    expect(location.pathname).toBe("/universe");
   });
 });

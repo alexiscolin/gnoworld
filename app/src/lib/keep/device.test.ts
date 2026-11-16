@@ -230,7 +230,7 @@ describe("a field read from the device", () => {
 
 describe("a field written to the device", () => {
   it("removes the key for its default", () => {
-    put("settings", { quality: "low", calm: false });
+    put("settings", { quality: "low", calm: false, phone3d: false });
     const device = pageDevice();
     device.read("settings");
     expect(device.write("settings", DEFAULT_SETTINGS)).toBe(true);
