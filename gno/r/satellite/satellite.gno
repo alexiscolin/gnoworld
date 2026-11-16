@@ -107,6 +107,12 @@ func liveRental(world string, now int) (rental, bool) {
 	return r, r.liveAt(now)
 }
 
+// taken reports whether world is live or held; no if-init, so mutate.py can drop a branch.
+func taken(world string, now int) bool {
+	_, live := liveRental(world, now)
+	return live || now < holdOf(world)
+}
+
 func worldsOf(payer address) []string {
 	v := payers.Get(payer.String())
 	if v == nil {
@@ -146,7 +152,7 @@ func Rent(cur realm, world, text string, days int) {
 	now := clock()
 	payer := cur.Previous().Address()
 	// A world taken down stays empty until its paid end, its payer included.
-	if r, _ := get(world); r.liveAt(now) || now < holdOf(world) {
+	if taken(world, now) {
 		panic("this world has a satellite")
 	}
 	live, ended := countLive(payer, now)
