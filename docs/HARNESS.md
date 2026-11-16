@@ -35,14 +35,14 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
   (so two branches side by side never take the same ones), makes its worktree and brief, opens its session in a herdr pane through one
   script that alone leaves the sandbox (`~/.claude/skills/herdr-branch/scripts/open.sh`), merges each finished branch into
   the slice's integration branch, reads GitHub's gate, runs the slice's last `/pre-merge`, with the `design-reviewer` once more over every 3D view, then the dream.
-  The worktrees live beside the main checkout, in `~/Server/gnoworld-wt/`, which no branch session's sandbox writes: the
-  chief's session starts with that folder added (`claude --add-dir ~/Server/gnoworld-wt` in the main checkout, or the owner
-  types `/add-dir ~/Server/gnoworld-wt` once in it), for its worktrees and its merges there; never in a settings file,
+  The worktrees live beside the main checkout, in its "-wt" folder (`<main checkout>-wt/`, D13415), which no branch session's
+  sandbox writes: the chief's session starts with that folder added (`claude --add-dir <main checkout>-wt` in the main checkout,
+  or the owner types `/add-dir <main checkout>-wt` once in it), for its worktrees and its merges there; never in a settings file,
   which every branch session would read too. Its sandbox writes no folder outside its checkout, the temp folder and the caches, so
   it needs the folder added from the first move.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`), in
-  `~/Server/gnoworld-wt/`, where no session's shell writes but its own folder (its file tools still can), the one root where the script makes or removes a folder
+  the worktrees' folder, where no session's shell writes but its own folder (its file tools still can), the one root where the script makes or removes a folder
   (`worktree.sh remove`); it writes no other session's worktree, by any tool. Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
@@ -143,7 +143,7 @@ cache, every test of the node, ui and compiled projects but the `timing` ones. T
 `.claude/`), `deploy/`, `evals/` and `tools/` get no type check; `deploy/`, tier 1, gets its related tests, the others none before the
 night: their suites are their own, `test_hooks.sh`, `probe.py` and `deploy/test.sh` on GitHub and by hand while the
 change is written (`ONLY=<section> sh scripts/test_hooks.sh`, `python3 -I scripts/probe.py`, with `.node-version`'s Node first on the
-PATH, `~/.nvm/versions/node/v<version>/bin`), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
+PATH, as any version manager puts it there, or in nvm's default folder, D13416), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
 elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed. So a
 series built in a scratch clone under the temp folder, whose `.git/hooks` the sandbox writes, gets no verdict there (D13407, F13415): its
 product commits are committed in the worktree with the clone's dates (the same hashes) and check.sh runs on that committed tree; a
@@ -252,7 +252,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   `records.sh`'s list but `.claude/`, whose `tmp/` is the slices' shared folder and whose other parts Claude Code
   loads have their bans, a project CLAUDE.md in it included; no ban reaches StrykerJS's copy of the tree in `.stryker-tmp/`,
   which a merge check writes (a `wiring` case, read as the sandbox reads its paths; D242); another
-  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/`. Their network
+  worktree is no folder of theirs, as every one sits in the worktrees' folder. Their network
   list names the npm and Go registries and github.com alone, and does not hold in every session. One command of the project's settings leaves the
   sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
   removes, in its one root; the guard lets it run only alone, its words plain, from the project's
@@ -299,7 +299,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   auto memory). Settings files are refused everywhere, and
   `EnterWorktree` goes. It holds the file tools alone: commands are the sandbox's, and MCP tools and hooks are neither's. A session
   holds it once its tree's settings do; the chief's, once the main checkout's do.
-- **Worktrees out of the temp folder:** `~/Server/gnoworld-wt/`, beside
+- **Worktrees out of the temp folder:** the worktrees' folder, `<main checkout>-wt/`, beside
   the main checkout. No branch session's sandbox has a write root there but its own tree, so its commands write no sibling's files, move none
   and plant no folder there (a sibling's git state, its index and HEAD in the shared `.git`, stays theirs to write);
   the chief's session, which adds the folder, is held by the twins there, by one spelling (no link on the way), and above the
@@ -377,7 +377,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   `hooks`, `statusline.sh`, `plugins`, `dev-mods`, `agents`, `commands`, the file itself, `~/.claude.json`), the
   same of the second profile `~/.claude-work`, launchd's agents, zsh's startup files and what they source, the
   tools' config (`~/.config`, `~/.npmrc`, `~/.gitconfig`, `~/.docker`), python3's user site, `~/.ssh`, `~/.nvm`,
-  every project's settings under `~/Server`, and the main checkout's git config and hooks. A deny holds in every
+  every project's settings in the folder holding the checkouts, and the main checkout's git config and hooks. A deny holds in every
   mode, bypass included.
 
 The guard and the hooks are a seatbelt, not a wall: `main` takes pull requests alone (D13165), and what holds whatever happens
@@ -417,7 +417,7 @@ costs context in every session.
   rule's fixed part and of a literal rule's folders, not of the folder a `*` stands for: a command can move a whole worktree out
   of `gnoworld-wt/`, write its closed files there and move it back (probed on `packages/core`, whose `package.json` only a glob
   holds; the section `siblings` prints it as a known gap), or plant a whole folder there for herdr's `open.sh`, which opens a
-  session in any folder of the branch's name. In `~/Server/gnoworld-wt/` no branch session's command reaches a sibling, and `open.sh`
+  session in any folder of the branch's name. In the worktrees' folder no branch session's command reaches a sibling, and `open.sh`
   opens a folder git made there alone. It stays open for the chief's own session, whose `--add-dir` gives it that folder: a
   folder there moves out and back by its commands (the live probe prints it). And the file tools of a session without the write block
   still write other trees, plant a folder there that `open.sh` would open (a branch's command forges the list git keeps of its

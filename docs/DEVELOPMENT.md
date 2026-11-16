@@ -44,7 +44,7 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 Each branch works in a worktree of its own, made from the root of a checkout whose packages are
 installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
 `sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
-`~/Server/gnoworld-wt` (made once, in your shell), where no session's shell writes but its own
+the worktrees' folder, `<main checkout>-wt` beside the main checkout in your home (made once, in your shell, D13415), where no session's shell writes but its own
 folder (its file tools still can), which it may also be given in full.
 Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
 outside the sandbox and must touch no other, and a base whose harness,
@@ -65,7 +65,7 @@ A branch with an upstream is deleted in your shell: in a session `git branch -D`
 `.git/config`, so it deletes the branch but keeps its `branch.<name>` section, which a new branch
 of that name would inherit. A branch `worktree.sh` made has no such section.
 After a merge that changes the lockfile, install in the main checkout
-(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
+(`pnpm install --frozen-lockfile`, with `.node-version`'s Node first on the PATH).
 
 A session writes its own worktree only: never another session's, by any tool, nor runs a command
 that writes there. So a merge into a part's branch that changes the harness is the owner's, in
@@ -81,7 +81,7 @@ checkout without touching it:
 
 ```sh
 T=~/.cache/gno-toolchains/onyx-v1.5.1
-mkdir -p $T/src && git -C ~/Server/gno archive v1.5.1 | tar -x -C $T/src
+mkdir -p $T/src && git -C <your gno checkout> archive v1.5.1 | tar -x -C $T/src
 (cd $T/src && go build -o $T/gno ./gnovm/cmd/gno && cd contribs/gnodev && go build -o $T/gnodev .)
 GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p/nt/* into $T/gnohome
 ```
@@ -123,7 +123,7 @@ What each step catches, the hooks, the permissions, the reviews and how the harn
 itself: [HARNESS.md](HARNESS.md).
 
 To mutate only your own files with StrykerJS, from the repository root and on the pinned Node (the
-`PATH` check.sh sets, `~/.nvm`'s `.node-version` Node first): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
+`PATH` check.sh sets: `.node-version`'s Node, from the PATH or nvm's default folder, D13416): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
 value. It replaces the config's `mutate` list (its log says `Found 2 of 935 file(s)`), keeps the
 incremental file whole and takes no `--`. Two forms fail: `pnpm run mutate -- --mutate a.ts` hands
 StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every later token reaches

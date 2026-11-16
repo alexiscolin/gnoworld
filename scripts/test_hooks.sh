@@ -519,6 +519,15 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
+# No instruction, doc or script a session or a contributor reads names a folder of one machine (D13411, D13417): the owner's own
+# go to an untracked CLAUDE.local.md; nvm's default folder may be named, never a version of it.
+machine_paths() { (cd "$1" && git grep -nE '~/Server|/Users/[a-z]|claude-[0-9]+/|\.nvm/versions/node/v[0-9]' -- CLAUDE.md .claude docs/HARNESS.md \
+	docs/DEVELOPMENT.md docs/OPERATIONS.md 'scripts/*.sh' evals/run.sh ':!scripts/test_hooks.sh' || :); }
+mp="$t/machine" && mkdir -p "$mp/docs" && git -C "$mp" init -q &&
+	printf '%s\n' '~/Server/x' '/Us''ers/someone/x' '/private/tmp/claude-501/land/' '$HOME/.nvm/versions/node/v24.22.0/bin' >"$mp/docs/HARNESS.md" && git -C "$mp" add -A
+[ "$(machine_paths "$mp" | wc -l | tr -d ' ')" = 4 ] || fail "the scan for one machine's folders misses one of four planted (D13417): $(machine_paths "$mp")"
+machine=$(machine_paths "$here/..")
+[ -z "$machine" ] || fail "a file names a folder of one machine (D13417): $machine"
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh" && git -C "$nv" init -q
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"

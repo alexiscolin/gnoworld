@@ -149,7 +149,7 @@ set to that commit (read it once, right after you reviewed it: a session can mov
 add `--mutants` to the last line when the branch changes `deploy/`:
 
 ```sh
-( repo=~/Server/gnoworld sha=$(/usr/bin/git -C ~/Server/gnoworld rev-parse --verify '<the commit you reviewed>^{commit}')
+( repo=<your main checkout> sha=$(/usr/bin/git -C "$repo" rev-parse --verify '<the commit you reviewed>^{commit}')
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 PYTHONNOUSERSITE=1 # no git config of the home folder, no python3 user site
 /bin/mkdir -p ~/.local/state && d=$(/usr/bin/mktemp -d ~/.local/state/gnoworld-test.XXXXXX) &&
 	/usr/bin/git -C "$repo" archive "$sha" | /usr/bin/tar -x -C "$d" &&
