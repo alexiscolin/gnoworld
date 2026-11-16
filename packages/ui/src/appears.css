@@ -1,0 +1,34 @@
+/* What comes in over the page and goes out again shares one rule, the floating surfaces, the dialog, the bell's panel and the welcome card:
+   shut, it is faded out, and leaves at 70% of the enter's time on the exit's curve; open (a popover shown, a dialog open, `data-open`) it
+   fades in on the standard curve. display and overlay keep it drawn until it is done. What differs, the caller sets: how long
+   it takes (--appear-time, the enter's), the scale it grows from (--appear-grow) and the offset it comes from (--appear-from).
+   At no specificity, so each one's own rule wins wherever the sheets load. */
+@layer components {
+  :where(.appears) {
+    opacity: 0;
+    scale: var(--appear-grow);
+    translate: var(--appear-from);
+    transition:
+      opacity calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      scale calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      translate calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      overlay calc(var(--appear-time) * 0.7 * var(--motion-scale)) allow-discrete,
+      display calc(var(--appear-time) * 0.7 * var(--motion-scale)) allow-discrete;
+  }
+
+  :where(.appears):is(:popover-open, [open], [data-open]) {
+    opacity: 1;
+    scale: none;
+    translate: none;
+    transition-duration: calc(var(--appear-time) * var(--motion-scale));
+    transition-timing-function: var(--ease-standard);
+  }
+
+  @starting-style {
+    :where(.appears):is(:popover-open, [open], [data-open]) {
+      opacity: 0;
+      scale: var(--appear-grow);
+      translate: var(--appear-from);
+    }
+  }
+}

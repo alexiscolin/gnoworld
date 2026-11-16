@@ -30,7 +30,7 @@ export function buttonLook(
 }
 
 /** An icon-only control's look, square, as the attributes its module reads: what IconButton and an icon trigger wear. */
-export function iconLook(emphasis: "outline" | "plain", size: IconControlSize, tool?: boolean) {
+export function iconLook(emphasis: "solid" | "outline" | "plain", size: IconControlSize, tool?: boolean) {
   return {
     className: pill(styles["button"], styles["square"]),
     "data-emphasis": emphasis,

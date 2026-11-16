@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
-import { Anchor } from "../link.tsx";
-import { Tooltip } from "../Tooltip/Tooltip.tsx";
+import { Pressable } from "../Pressable.tsx";
+import { Soon } from "../ComingSoon/ComingSoon.tsx";
 import styles from "./NavItem.module.css";
 
 interface Shared {
@@ -52,6 +52,8 @@ function End({ meta, badge }: Pick<Shared, "meta" | "badge">) {
   );
 }
 
+const nothing = () => undefined;
+
 // The item's control: a link, a button that acts, or one to come, inert.
 function Main({
   face,
@@ -71,20 +73,15 @@ function Main({
   };
   if (soon === true)
     return (
-      <Tooltip label="Coming soon">
-        <button type="button" {...look} aria-disabled="true" aria-label={`${label}, coming soon`}>
-          {face}
-        </button>
-      </Tooltip>
+      <Soon name={label} className={look.className}>
+        {face}
+      </Soon>
     );
-  return href === undefined ? (
-    <button type="button" {...look} onClick={onClick}>
+  // With no address and no act it is the item in view: a button that does nothing.
+  return (
+    <Pressable href={href} onClick={onClick ?? nothing} {...look}>
       {face}
-    </button>
-  ) : (
-    <Anchor href={href} {...look}>
-      {face}
-    </Anchor>
+    </Pressable>
   );
 }
 
@@ -100,7 +97,7 @@ export function NavItem({ children, current = false, lead, badge, meta, href, on
   // The whole pill is the link, its sides and its count too: ui's `covers`.
   return (
     <div
-      className={["column-item", styles["item"]].join(" ")}
+      className={["lit", "column-item", styles["item"]].join(" ")}
       data-nav-item=""
       data-current={current ? "" : undefined}
       data-unread={unseen(badge) ? "" : undefined}

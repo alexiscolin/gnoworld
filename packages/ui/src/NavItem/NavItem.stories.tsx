@@ -11,6 +11,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Plain: Story = {};
 export const Current: Story = { args: { current: true, badge: { count: "96", said: "96 unread" } } };
+export const Soon: Story = { args: { soon: true, children: "Media", badge: { count: "2", said: "2 unread" } } };
 export const Column: Story = {
   render: () => (
     <Stack space="3xs">

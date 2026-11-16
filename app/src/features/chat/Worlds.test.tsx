@@ -72,7 +72,9 @@ describe("Worlds, the pictures of the real planets", () => {
   it("keeps ui's disc for a world with no picture", () => {
     const box = mount(<Worlds universe={UNIVERSE} worlds={[UNSEEN, EARTH]} current="earth" />);
     expect(all(box, "[data-fallback]")).toHaveLength(1);
-    expect(one(box, "[data-fallback] img").getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
+    // The disc is ui's Planet, asked of nobody (D13220): no picture stands in.
+    expect(all(box, "[data-fallback] .disc")).toHaveLength(1);
+    expect(all(box, "[data-fallback] img")).toHaveLength(0);
   });
 
   it("writes no text in a row: the name is the link's accessible name", () => {

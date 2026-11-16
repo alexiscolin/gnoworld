@@ -219,7 +219,7 @@ test.describe("a world's rooms", () => {
     await page.route("**/api/rooms*", (route) => route.abort());
     await page.goto("/w/bubble?chat=full");
     await hydrated(page);
-    await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "The server is not answering." })).toBeVisible();
     await page.unroute("**/api/rooms*");
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(roomsNav(page).getByRole("link")).toHaveCount(3);

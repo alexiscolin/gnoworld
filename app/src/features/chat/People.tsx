@@ -60,7 +60,7 @@ export function People({ members, connected, me, onMessage, canFollow = false, l
                 {onMessage !== undefined && account && me !== undefined && nick !== me ? (
                   <button
                     type="button"
-                    className={styles["person"]}
+                    className={["lit", styles["person"]].join(" ")}
                     onClick={() => {
                       onMessage(nick);
                     }}

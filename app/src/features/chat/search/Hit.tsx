@@ -14,7 +14,7 @@ export function Hit({ hit, current, onOpen }: { hit: SearchHit; current: boolean
       <button
         type="button"
         data-hit=""
-        className={styles["hit"]}
+        className={["lit", styles["hit"]].join(" ")}
         aria-current={current ? "true" : undefined}
         onClick={() => {
           onOpen(hit);

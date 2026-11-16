@@ -6,6 +6,9 @@
 
     /* The top layer inherits from where the dialog sits in the page: a centred empty state would centre its words. */
     text-align: start;
+    --appear-time: var(--motion-base);
+    --appear-grow: 0.98;
+    --appear-from: 0 var(--space-2xs);
     --_enter: calc(var(--motion-base) * var(--motion-scale));
     --_leave: calc(var(--motion-base) * 0.7 * var(--motion-scale));
     --_ease: var(--ease-in);
@@ -15,34 +18,10 @@
     padding: var(--space-m);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-popover);
-    /* Shut, it leaves as it came, a little faster: the exit's own curve and 70% of the enter's time. display and overlay keep it drawn, in
-       the top layer, until it is done. */
-    opacity: 0;
-    scale: 0.98;
-    translate: 0 var(--space-2xs);
-    transition:
-      opacity var(--_leave) var(--_ease),
-      scale var(--_leave) var(--_ease),
-      translate var(--_leave) var(--_ease),
-      overlay var(--_leave) allow-discrete,
-      display var(--_leave) allow-discrete;
   }
 
   .dialog[open] {
-    opacity: 1;
-    scale: 1;
-    translate: none;
     --_ease: var(--ease-standard);
-
-    transition-duration: var(--_enter);
-  }
-
-  @starting-style {
-    .dialog[open] {
-      opacity: 0;
-      scale: 0.98;
-      translate: 0 var(--space-2xs);
-    }
   }
 
   .dialog[data-width="wide"] {

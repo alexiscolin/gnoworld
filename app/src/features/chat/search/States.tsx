@@ -1,6 +1,7 @@
 // What the chat's search shows apart from results: before typing, and nothing found (the canvas's States frame).
 import { shortAddress } from "@gnoworld/schemas";
 import { Button, Chip, Cluster, Stack } from "@gnoworld/ui";
+import { ErrorView, errorKind } from "../../errors/index.ts";
 import { isUnread } from "../../../lib/query/client.ts";
 import { pageRecent } from "../../../lib/keep/recent.ts";
 import { roomLabel } from "../names.ts";
@@ -109,18 +110,13 @@ export function Trouble({ search }: { search: Search }) {
   if (isUnread<{ reason?: string }>(search.error) && search.error.read.reason === "too_many")
     return <p role="status">Busy, try again in a moment.</p>;
   return (
-    <Stack space="xs">
-      <p role="alert">The search is out of reach.</p>
-      <Cluster>
-        <Button
-          emphasis="solid"
-          onClick={() => {
-            search.refetch().catch(reportError);
-          }}
-        >
-          Try again
-        </Button>
-      </Cluster>
-    </Stack>
+    <ErrorView
+      kind={errorKind(search.error)}
+      size="inline"
+      urgent
+      onRetry={() => {
+        search.refetch().catch(reportError);
+      }}
+    />
   );
 }

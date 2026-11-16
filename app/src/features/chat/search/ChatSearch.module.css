@@ -49,14 +49,6 @@
     text-align: start;
   }
 
-  .hit:hover {
-    background: var(--color-fill);
-  }
-
-  .hit[aria-current="true"] {
-    background: var(--color-fill-hover);
-  }
-
   .row {
     /* layout: the head over the words */
     display: grid;

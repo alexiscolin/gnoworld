@@ -12,10 +12,6 @@
     transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
-  .row:hover {
-    --_fill: var(--color-fill);
-  }
-
   .row[data-look="divided"] {
     border-block-end: var(--line-width) solid var(--color-line);
     border-radius: 0;
@@ -31,6 +27,7 @@
   /* Current is said on what takes the focus: the row, or its link when it is one. */
   .row:is([aria-current="true"], :has(.link[aria-current="true"])) {
     --_fill: var(--color-fill-hover);
+    --lit-fill: var(--color-fill-hover);
     --_weight: 500;
   }
 
