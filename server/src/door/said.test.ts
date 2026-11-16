@@ -50,6 +50,7 @@ const act = (label: string, why = "Vote on the poll") => ({
   type: "action" as const,
   label,
   action: { realm: "gno.land/r/demo/boards", function: "CreateThread", args: {}, why },
+  chainId: "onyx-1" as const,
 });
 const withButtons = (markdown: string, buttons: Offered["answer"]["buttons"]): Offered["answer"] => ({
   ...answer(markdown),

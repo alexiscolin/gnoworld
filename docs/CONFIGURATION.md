@@ -116,7 +116,7 @@ Read when on alone:
 | `JARVIS_OUTPUT_TOKENS` | `1000` | 1 to 1000 | Output tokens of a call |
 | `JARVIS_CALL_TIMEOUT_S` | `60` | 1 to 600 | A model call's time |
 | `JARVIS_RETRIES` | `2` | `0`, `1`, `2` | Retries of a call |
-| `JARVIS_TOOL_RESULT_KIB` | `16` | 1 to 64 | A tool result's size |
+| `JARVIS_TOOL_RESULT_KIB` | `16` | 1 to 64 | A tool result's size, and each skill file's: the largest, `audit.md` (15,938 B), stops the start under 16 |
 | `JARVIS_MODEL`, `JARVIS_MODEL_FAST`, `JARVIS_MODEL_DEEP` | `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-opus-5-5` | the models of `jarvis/src/prices.ts` | The answering, sorting and hard-code models |
 | `JARVIS_GNOSCOPE` | off | `on`, `off` | gnoscope's tools |
 | `JARVIS_GNOSCOPE_URL` | `https://gnoscope.com/mcp` | https, no credentials | gnoscope's server |

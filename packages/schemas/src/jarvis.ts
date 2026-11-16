@@ -4,9 +4,7 @@
 // are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). The
 // door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
 // also a line's translation and a realm's digest.
-import { Address } from "./address.ts";
 import { PROPOSAL_ARGS_CAPS, CallArgs, funcName, Key } from "./data.ts";
-import { ChallengeRequest } from "./login.ts";
 import { ChainId, RealmPath } from "./realmPath.ts";
 import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
@@ -69,10 +67,18 @@ export type Digest = z.infer<typeof Digest>;
 /** A place's path, as the app's places have them (`/`, `/w/bubble`, `/net/onyx/`): lower-case words, never `//`. */
 const Place = z.string().check(z.minLength(1), z.maxLength(JARVIS_CAPS.place), z.regex(/^(?:\/[a-z0-9-]+)*\/?$/));
 
-/** A button on an answer: fly to a place, or open a proposed action's call card. */
+// The chains an action is checked on: the universes' chain ids (app/data/universes.json, which a test compares).
+const Checked = z.enum(["onyx-1", "gnoland-1"]);
+
+/** A button on an answer: fly to a place, or open a proposed action's call card on the chain it was checked on (D13508). */
 export const AnswerButton = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("fly"), label: text(JARVIS_CAPS.label), place: Place }),
-  z.strictObject({ type: z.literal("action"), label: text(JARVIS_CAPS.label), action: ProposedAction }),
+  z.strictObject({
+    type: z.literal("action"),
+    label: text(JARVIS_CAPS.label),
+    action: ProposedAction,
+    chainId: Checked,
+  }),
 ]);
 export type AnswerButton = z.infer<typeof AnswerButton>;
 
@@ -180,38 +186,6 @@ export const JarvisAsk = z.union([
   z.strictObject({ ...Explain, chain: z.optional(ChainId), lines }),
 ]);
 export type JarvisAsk = z.infer<typeof JarvisAsk>;
-
-const count = (max: number) => z.int().check(z.gte(1), z.lte(max));
-
-/** One of jarvis's two budgets a day, in whole dollars, as its settings take them. */
-export const JarvisBudget = z.strictObject({ budget: z.enum(["ask", "translate"]), dollars: count(DOOR_CAPS.dollars) });
-export type JarvisBudget = z.infer<typeof JarvisBudget>;
-
-/** Both of jarvis's budgets a day, in whole dollars. */
-export const JarvisBudgets = z.strictObject({ ask: count(DOOR_CAPS.dollars), translate: count(DOOR_CAPS.dollars) });
-export type JarvisBudgets = z.infer<typeof JarvisBudgets>;
-
-/** One change an admin signs afresh (ADR-0002 §6): a quota, an account's quota taken off or given back, a budget. */
-export const JarvisChange = z.discriminatedUnion("setting", [
-  z.strictObject({ setting: z.literal("quota"), questions: count(DOOR_CAPS.quota) }),
-  z.strictObject({ setting: z.literal("quota_unnamed"), questions: count(DOOR_CAPS.quota) }),
-  z.strictObject({ setting: z.literal("unlimited"), account: Address, unlimited: z.boolean() }),
-  z.extend(JarvisBudget, { setting: z.literal("budget") }),
-]);
-export type JarvisChange = z.infer<typeof JarvisChange>;
-
-/** A change asked for on a chain, whose challenge the admin's wallet signs as a login's. */
-export const JarvisChangeRequest = z.extend(ChallengeRequest, { change: JarvisChange });
-
-/** What the admin API answers: the quotas, the accounts with no quota, and jarvis's budgets, or none when it did not
- * answer. */
-export const JarvisSettings = z.strictObject({
-  quota: count(DOOR_CAPS.quota),
-  quotaUnnamed: count(DOOR_CAPS.quota),
-  unlimited: z.array(Address).check(z.maxLength(DOOR_CAPS.unlimited)),
-  budgets: z.nullable(JarvisBudgets),
-});
-export type JarvisSettings = z.infer<typeof JarvisSettings>;
 
 /** The languages a line is translated into, by their ISO 639-1 code: a bounded list, so a line has a bounded
  * number of translations. */

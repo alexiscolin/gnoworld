@@ -1,7 +1,7 @@
 // An answer of Jarvis as a card, among the chat's lines: "AI CONCIERGE", violet, "AI · may be wrong". Its Markdown is drawn through
 // core's chat reader and the chat's own drawing, no image and no HTML; a link on gnoweb or the app's own origin is an anchor, any other is
 // a button behind the leaving warning. Its buttons: fly goes to a place; an action opens the call card only once vm/qfuncs lists its
-// function with exactly its arguments' names, never coins. A label with a hidden character draws no button: its words are a machine's.
+// function with exactly its arguments' names, never coins, and only on the chain it was checked on (otherwise a short line). A label with a hidden character draws no button: its words are a machine's.
 import type { ReadOptions } from "@gnoworld/chain/read";
 import { holdsHidden, type AnswerButton, type JarvisAnswer } from "@gnoworld/schemas";
 import { Button, Card, Stack } from "@gnoworld/ui";
@@ -36,6 +36,11 @@ function Action({
   options,
   onFly,
 }: Pick<AnswerCardProps, "id" | "chain" | "options" | "onFly"> & { button: AnswerButton }) {
+  // The check ran on the chain the button carries (D13508): on another network the card never opens, and the person is told.
+  if (button.type === "action" && button.chainId !== chain.chainId)
+    return (
+      <p className="meta">{`"${button.label}" was checked on ${button.chainId}: it runs there, not on ${chain.chainId}.`}</p>
+    );
   if (button.type === "action")
     return (
       <ActionForm

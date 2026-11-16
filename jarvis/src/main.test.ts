@@ -1,6 +1,15 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -273,8 +282,15 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
     expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toEqual({
       ask: 3,
       translate: 1,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
     });
-    expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
+    expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({
+      ask: 3,
+      translate: 2,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
+    });
   });
 
   // An operator who lowers a budget's setting and starts jarvis again learns the file keeps its own.
@@ -439,6 +455,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
         type: "action",
         label: "Vote",
         action: { realm: REALM, function: fn, args: { id: "37", answer: "yes" }, why: "37 proposals are open." },
+        chainId: "onyx-1",
       },
     });
     const turn = (...uses: ReturnType<typeof toolUse>[]) => message({ content: uses, stop: "tool_use" });
@@ -554,6 +571,19 @@ describe("jarvis's process: a start it refuses", { timeout: 60_000 }, () => {
     expect(pids.some(running)).toBe(false);
     expect(gnomcp.starts().map(({ cwd }) => existsSync(cwd))).toEqual(pids.map(() => false));
     expect(existsSync(join(dir, "jarvis.db-wal"))).toBe(false);
+  });
+
+  // F13520: the skills' per-file cap is the tool result's cap as configured, never a second number that must agree.
+  it("stops at start on a skill file past JARVIS_TOOL_RESULT_KIB, naming it, and loads the same one under a larger cap", async () => {
+    const { env, dir } = await setup();
+    const skills = join(dir, "skills");
+    mkdirSync(join(skills, "a"), { recursive: true });
+    writeFileSync(join(skills, "a", "SKILL.md"), `---\nname: a\ndescription: d\n---\n\n${"x".repeat(9 * 1024)}\n`);
+    const small = start({ ...env, JARVIS_SKILLS_DIR: skills, JARVIS_TOOL_RESULT_KIB: "8" });
+    expect(await exited(small)).not.toBe(0);
+    expect(small.out.stderr).toContain("skills: a/SKILL.md: past 8192 bytes");
+    const large = start({ ...env, JARVIS_SKILLS_DIR: skills, JARVIS_TOOL_RESULT_KIB: "16" });
+    await listening(large);
   });
 
   it("stops at start, never listening, when gnomcp refuses to start", async () => {

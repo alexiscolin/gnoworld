@@ -6,6 +6,9 @@ import { JARVIS_KEY_HEADER } from "@gnoworld/schemas";
 import { Secret } from "@gnoworld/service/settings";
 import { jarvisClient } from "./jarvis.ts";
 
+// A day with nothing spent and nothing reserved, beside the caps.
+const IDLE = { ask: 0, translate: 0 };
+
 // The door's one call to jarvis a question, on the network the two share, tested against a fake jarvis.
 interface Heard {
   method: string;
@@ -57,7 +60,7 @@ const QUESTION = () => ({
   lines: [{ speaker: 1, text: "the poll closes today", time: "2026-11-04T12:00:00.000Z" }],
 });
 const ANSWERED = () => ({ status: "answered", markdown: "The poll closes today.", buttons: [], cost: 1234 });
-const BUDGETS = () => ({ ask: 45, translate: 5 });
+const BUDGETS = () => ({ ask: 45, translate: 5, spent: IDLE, reserved: IDLE });
 const live = () => new AbortController().signal;
 
 // The door proves itself to jarvis with its key, in one header of every request.
@@ -240,11 +243,11 @@ describe("jarvis's budgets", () => {
   });
 
   it("are changed with POST /budgets, one budget in whole dollars, jarvis answering both", async () => {
-    const jarvis = await fakeJarvis([json({ ask: 30, translate: 5 })]);
+    const jarvis = await fakeJarvis([json({ ask: 30, translate: 5, spent: IDLE, reserved: IDLE })]);
     const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
     expect(await client.setBudget({ budget: "ask", dollars: 30 })).toEqual({
       ok: true,
-      budgets: { ask: 30, translate: 5 },
+      budgets: { ask: 30, translate: 5, spent: IDLE, reserved: IDLE },
     });
     const [heard] = jarvis.heard;
     expect([heard?.method, heard?.path, heard?.headers["content-type"]]).toEqual([

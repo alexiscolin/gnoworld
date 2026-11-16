@@ -44,23 +44,20 @@ export {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisAsk,
-  JarvisBudget,
-  JarvisBudgets,
-  JarvisChange,
-  JarvisChangeRequest,
   JarvisDigest,
   JarvisDigestRequest,
   JARVIS_LANGUAGES,
   JarvisMadeDigest,
   JarvisPaidAnswer,
   JarvisQuestion,
-  JarvisSettings,
   JarvisState,
   JarvisTranslate,
   JarvisTranslation,
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
+export { JarvisBudget, JarvisBudgets, JarvisChange, JarvisChangeRequest, JarvisSettings } from "./jarvisAdmin.ts";
+export { flightsAlone, isFixedAsk } from "./jarvisShared.ts";
 export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
 export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";

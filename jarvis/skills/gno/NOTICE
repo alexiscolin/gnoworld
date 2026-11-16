@@ -1,6 +1,10 @@
 This folder is the `gno` skill of gnomcp 0.11.0 (https://github.com/gnoverse/gno-mcp, its `skills/gno/`),
-copied unchanged into gnoworld for Jarvis on 2026-11-04, with gnomcp's LICENSE, the Apache License 2.0, beside it.
-gnoworld's own files here are this NOTICE alone.
+copied into gnoworld for Jarvis on 2026-11-04, with gnomcp's LICENSE, the Apache License 2.0, beside it. On 2026-11-16
+five files past Jarvis's tool-result cap of 16 KiB were split at headings into parts, none of their text lost: SKILL.md
+(then references/skill-2.md), references/interrealm.md, patterns.md, security.md and gnokey.md (then `-2`, and `-3` for
+security). A part ends with the line `*Continued in `<next part>`.*` and the next one begins with `*Continues `<part>`.*`; those
+lines taken out, the parts joined in order are the file as gnomcp ships it, and the hashes below are of that file.
+gnoworld's own files here are this NOTICE alone, and those lines.
 
 Each file's SHA-256 as gnomcp 0.11.0 ships it:
 

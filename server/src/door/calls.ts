@@ -4,6 +4,8 @@
 // before the call leaves the table, so a later ask finds the answer kept or none in flight.
 import {
   EXPLAIN_VERSION,
+  flightsAlone,
+  isFixedAsk,
   type Address,
   type JarvisAnswer,
   JarvisAsk,
@@ -80,6 +82,13 @@ const keepable = (ask: JarvisQuestion, called: Called): boolean =>
     called.answer.keep === true &&
     called.answer.version === EXPLAIN_VERSION);
 
+// A fixed ask's answer is served to everyone who asks the same, built from anyone's lines: its flights alone (D13508). Taken off
+// where the call ends, so the asker, the readers who join it and every later one, kept or served, get the same.
+const shared = (ask: JarvisQuestion, called: Called): Called =>
+  called.ok && called.answer.status === "answered" && isFixedAsk(ask)
+    ? { ok: true, answer: { ...called.answer, buttons: flightsAlone(called.answer.buttons) } }
+    : called;
+
 export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Deps) {
   const flights = new Map<string, Promise<Outcome>>();
   // What an answer does to the account's quota, its share, and the answers kept. A call is never stopped
@@ -99,9 +108,12 @@ export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Dep
       // A function's explanation is given no line of the room: it reads the code alone, so every room may share it.
       const lines = isExplain(ask) ? [] : recent(room, "ask" in ask ? "" : who);
       if (!quota.take(who, await named(who), started)) return { full: true };
-      const called = await jarvis.ask(
-        { ...ask, lines, ...(chain === undefined || !isExplain(ask) ? {} : { chain }) },
-        new AbortController().signal,
+      const called = shared(
+        ask,
+        await jarvis.ask(
+          { ...ask, lines, ...(chain === undefined || !isExplain(ask) ? {} : { chain }) },
+          new AbortController().signal,
+        ),
       );
       settle(asked, called);
       return { full: false, called };
