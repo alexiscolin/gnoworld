@@ -59,7 +59,7 @@ export function useThreads(page: Page) {
       open === undefined ? undefined : (
         <Failing
           key={open.from}
-          fallback={<Standing word="Could not open the thread." close={close} />}
+          fallback={() => <Standing word="Could not open the thread." close={close} />}
           renew={() => {
             Panel = lazy(load);
           }}

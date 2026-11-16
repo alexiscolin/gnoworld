@@ -29,6 +29,15 @@ describe("NavItem", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
+  it("keeps its words in the item's own ink while it is to come: the `bare` utility would override it", () => {
+    render(
+      <NavItem soon badge={{ count: "2", said: "2 unread" }}>
+        Media
+      </NavItem>,
+    );
+    expect(screen.getByRole("button", { name: "Media, coming soon" }).classList.contains("bare")).toBe(false);
+  });
+
   it("with no address and no act is the item in view, marked, pressing it does nothing", () => {
     render(<NavItem current>Here</NavItem>);
     expect(screen.getByRole("button", { name: "Here" }).getAttribute("aria-current")).toBe("true");

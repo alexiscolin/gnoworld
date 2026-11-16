@@ -46,7 +46,11 @@ export function EmptyState(props: EmptyStateProps) {
     return (
       <Stack space="xs">
         <p role={props.urgent === true ? "alert" : "status"}>{props.line}</p>
-        {props.onRetry === undefined ? null : <Button onClick={props.onRetry}>Try again</Button>}
+        {props.onRetry === undefined ? null : (
+          <Cluster>
+            <Button onClick={props.onRetry}>Try again</Button>
+          </Cluster>
+        )}
       </Stack>
     );
   const { line, action } = props;

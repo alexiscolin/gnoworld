@@ -182,7 +182,8 @@ describe("the rail", () => {
 
   it("names each world's link by its name alone: its planet says nothing more", () => {
     const { box } = rail();
-    expect(worlds(box).every((link) => link.querySelector("img")?.getAttribute("alt") === "")).toBe(true);
+    // Neither a picture with words nor a named fallback (ui's Planet, D13220) under any link.
+    expect(worlds(box).every((link) => link.querySelector('[role="img"], img:not([alt=""])') === null)).toBe(true);
   });
 
   it("ends on its last world, with no link after it (frames 6 and 17, 8p)", () => {

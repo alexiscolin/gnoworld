@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { TokenAnswer } from "@gnoworld/schemas/indexer";
 import { Card, Cell, DayChart, Figures, Progress, Sidebar, Stack, type Figure } from "@gnoworld/ui";
 import { PersonLink } from "../../features/chat/index.ts";
-import { ErrorView, useWhere } from "../../features/errors/index.ts";
+import { ErrorView, errorKind, useWhere } from "../../features/errors/index.ts";
 import { amountText, plain, short } from "../../lib/chainText.ts";
 import { DAY_MS } from "../../lib/days.ts";
 import { isUnread, queryClient } from "../../lib/query/client.ts";
@@ -128,7 +128,7 @@ export function TokenBlock({ realm }: { realm: string }) {
     return missing ? null : (
       <Cell span={12}>
         <ErrorView
-          kind="unavailable"
+          kind={errorKind(read.error)}
           size="inline"
           where={where}
           onRetry={() => {

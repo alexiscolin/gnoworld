@@ -1,3 +1,4 @@
+import { Planet } from "../Planet/Planet.tsx";
 import styles from "./PlanetThumb.module.css";
 
 export interface PlanetThumbProps {
@@ -25,12 +26,6 @@ function isOwn(src: string): boolean {
   return /^\/(?![\\/])/.test(src);
 }
 
-const FALLBACK = `data:image/svg+xml,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><radialGradient id='g' cx='35%' cy='30%'>" +
-    "<stop offset='0' stop-color='#8fa3c7'/><stop offset='1' stop-color='#2a3350'/></radialGradient></defs>" +
-    "<rect width='64' height='64' fill='url(#g)'/></svg>",
-)}`;
-
 /** A place's picture in a disc, its edge by its kind. */
 export function PlanetThumb({ src, name, kind = "world", size = "m", decorative = false, magnify }: PlanetThumbProps) {
   const own = isOwn(src);
@@ -42,14 +37,25 @@ export function PlanetThumb({ src, name, kind = "world", size = "m", decorative 
       data-size={size}
       data-magnify={magnify === true ? "" : undefined}
     >
-      <img
-        src={own ? src : FALLBACK}
-        alt={decorative ? "" : name}
-        referrerPolicy="no-referrer"
-        loading="lazy"
-        decoding="async"
-        className={styles["picture"]}
-      />
+      {own ? (
+        <img
+          src={src}
+          alt={decorative ? "" : name}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
+          className={styles["picture"]}
+        />
+      ) : (
+        // The fallback asks nobody: the design system's Planet, in the place's colour, named as the picture was.
+        <span
+          role={decorative ? undefined : "img"}
+          aria-label={decorative ? undefined : name}
+          className={styles["picture"]}
+        >
+          <Planet name={name} fill />
+        </span>
+      )}
     </span>
   );
 }

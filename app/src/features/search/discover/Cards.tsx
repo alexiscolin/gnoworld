@@ -2,7 +2,7 @@
 // detail; the arrows move among the cards.
 import { isAddress, STYLES, type ShelfId, type StoreRow, type TodayRow } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
-import { EmptyState, Grid as Columns, Sidebar, Stack } from "@gnoworld/ui";
+import { EmptyState, Grid as Columns, Icon, Sidebar, Stack } from "@gnoworld/ui";
 import type { KeyboardEvent } from "react";
 import { discOf } from "../../../lib/worldDisc.ts";
 import { WorldPlanet } from "../../../WorldPlanet.tsx";
@@ -125,12 +125,12 @@ function SeeAll({ shelf, show }: { shelf: ShelfId; show: (id: ShelfId) => void }
   return (
     <button
       type="button"
-      className={styles["all"]}
+      className={["with-icon", styles["all"]].join(" ")}
       onClick={() => {
         show(shelf);
       }}
     >
-      See all<span className="visually-hidden"> {nameOfShelf(shelf)}</span> →
+      See all<span className="visually-hidden"> {nameOfShelf(shelf)}</span> <Icon name="arrow" size="s" />
     </button>
   );
 }

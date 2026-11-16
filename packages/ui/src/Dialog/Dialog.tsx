@@ -160,7 +160,7 @@ export function Dialog({
   return (
     <dialog
       ref={dialogRef}
-      className={surface(styles["dialog"])}
+      className={["appears", surface(styles["dialog"])].join(" ")}
       data-width={wide === "sheet" ? "sheet" : wide ? "wide" : "standard"}
       data-side={side}
       aria-labelledby={titleId}

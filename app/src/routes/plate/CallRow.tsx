@@ -2,7 +2,7 @@
 // as the proposal's call card (the design system's Disclosure, the plate's rows): the labels and their values, the caller's face and full address,
 // the time read in words, the result as a chip.
 import type { ReactNode } from "react";
-import { Avatar, Chip, Cluster, Disclosure, Grid, grouped, Stack } from "@gnoworld/ui";
+import { Avatar, Card, Chip, Cluster, Disclosure, Grid, grouped, Stack } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { PersonLink } from "../../features/chat/index.ts";
 import { Fact } from "../../features/calls/index.ts";
@@ -58,37 +58,33 @@ export function CallRow({
           </span>
         }
       >
-        <div className={styles["card"]}>
-          <div className={styles["inside"]}>
-            <Stack space="s">
-              <span className="label">{`Call · ${universe}`}</span>
-              <h5 className={styles["name"]}>{func ?? "Unknown function"}</h5>
-              <Stack as="dl" space="xs">
-                <Line label="Function">{func ?? "unknown"}</Line>
-                <Line label="Caller">
-                  {caller === null ? (
-                    "unknown"
-                  ) : (
-                    <Stack space="3xs">
-                      <PersonLink address={caller}>
-                        <Cluster space="xs" wrap="no">
-                          <Avatar address={caller} name={who} size="s" decorative />
-                          <span>{who}</span>
-                        </Cluster>
-                      </PersonLink>
-                      <span className="data-text">{caller}</span>
-                    </Stack>
-                  )}
-                </Line>
-                <Line label="Time">{time === null ? "not read" : readable(time)}</Line>
-                <Line label="Block">{grouped(height)}</Line>
-                <Line label="Result">
-                  <Chip tone={success ? "mine" : "danger"}>{success ? "Succeeded" : "Failed"}</Chip>
-                </Line>
-              </Stack>
-            </Stack>
-          </div>
-        </div>
+        <Card compact>
+          <span className="label">{`Call · ${universe}`}</span>
+          <h5 className={styles["name"]}>{func ?? "Unknown function"}</h5>
+          <Stack as="dl" space="xs" className={styles["values"]}>
+            <Line label="Function">{func ?? "unknown"}</Line>
+            <Line label="Caller">
+              {caller === null ? (
+                "unknown"
+              ) : (
+                <Stack space="3xs">
+                  <PersonLink address={caller}>
+                    <Cluster space="xs" wrap="no">
+                      <Avatar address={caller} name={who} size="s" decorative />
+                      <span>{who}</span>
+                    </Cluster>
+                  </PersonLink>
+                  <span className="data-text">{caller}</span>
+                </Stack>
+              )}
+            </Line>
+            <Line label="Time">{time === null ? "not read" : readable(time)}</Line>
+            <Line label="Block">{grouped(height)}</Line>
+            <Line label="Result">
+              <Chip tone={success ? "mine" : "danger"}>{success ? "Succeeded" : "Failed"}</Chip>
+            </Line>
+          </Stack>
+        </Card>
       </Disclosure>
     </div>
   );

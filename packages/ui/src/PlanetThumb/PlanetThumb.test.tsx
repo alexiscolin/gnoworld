@@ -86,6 +86,7 @@ describe("PlanetThumb", () => {
     for (const each of asked)
       if (!each.startsWith("data:")) expect(new URL(each, "https://site.test/list").origin).toBe("https://site.test");
     expect(container.querySelector("[data-fallback]")).not.toBeNull();
+    expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("img", { name: "Bubble" })).toBeTruthy();
   });
 
@@ -93,7 +94,20 @@ describe("PlanetThumb", () => {
     const { container } = render(<PlanetThumb src="https://evil.example/a.png" name="Bubble" />);
     expect(container.querySelector("[data-fallback]")?.getAttribute("data-fallback")).toBe("");
     expect(container.querySelector("[data-fallback]")?.className).not.toBe("");
-    expect(container.querySelector("img")?.className).not.toBe("");
+    expect(screen.getByRole("img", { name: "Bubble" }).className).not.toBe("");
+    const own = render(<PlanetThumb src="/a.png" name="A" />);
+    expect(own.container.querySelector("img")?.className).not.toBe("");
+  });
+
+  // The fallback is the design system's Planet, from the tokens (D13220): no picture is asked, and the place keeps its name.
+  it("falls back to a Planet, named by its place, decoration when the row names it", () => {
+    const { container, unmount } = render(<PlanetThumb src="https://evil.example/a.png" name="Bubble" />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("img", { name: "Bubble" }).querySelector(".disc")).not.toBeNull();
+    unmount();
+    const quiet = render(<PlanetThumb src="https://evil.example/a.png" name="Bubble" decorative />);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(quiet.container.querySelector("[data-fallback] .disc")).not.toBeNull();
   });
 
   it("refuses a foreign src whatever the kind, the size or the other props say", () => {
@@ -131,6 +145,8 @@ describe("PlanetThumb", () => {
       const { container, unmount } = render(<PlanetThumb src={src} name="Bubble" />);
       for (const img of container.querySelectorAll("img"))
         expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+      // The fallback asks for nothing at all, so it sends nothing.
+      if (src.startsWith("https:")) expect(container.querySelector("img")).toBeNull();
       unmount();
     }
   });

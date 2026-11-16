@@ -151,19 +151,20 @@ test.describe("a chunk of the chat that cannot be fetched", () => {
   // The worker would serve the chunk from its cache, which a route does not see.
   test.use({ serviceWorkers: "block" });
 
-  test("leaves the Rooms control's place with a word on a phone, the page and its lines standing", async ({ page }) => {
-    await page.route(/\/assets\/RoomsDrawer-[\w-]+\.js$/, (route) => route.abort());
-    await open(page, { width: 390, as: "guest-chunkxx" });
-    await expect(page.getByText("The rooms could not load.")).toBeVisible({ timeout: 20_000 });
+  // The chunk refused, the page opened: a chunk that cannot come says a new version is out (errorKind), in its place alone.
+  async function refused(page: Page, { chunk, width, as }: { chunk: RegExp; width: number; as: string }) {
+    await page.route(chunk, (route) => route.abort());
+    await open(page, { width, as });
+    await expect(page.getByText("A new version is out.")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("This world could not load")).toHaveCount(0);
     await expect(lines(page)).toHaveCount(2);
+  }
+
+  test("leaves the Rooms control's place with a word on a phone, the page and its lines standing", async ({ page }) => {
+    await refused(page, { chunk: /\/assets\/RoomsDrawer-[\w-]+\.js$/, width: 390, as: "guest-chunkxx" });
   });
 
   test("leaves the people's place with a word for a visitor, the page and its lines standing", async ({ page }) => {
-    await page.route(/\/assets\/People-[\w-]+\.js$/, (route) => route.abort());
-    await open(page, { width: 1280, as: "guest-chunkyy" });
-    await expect(page.getByText("Who is here could not load.")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("This world could not load")).toHaveCount(0);
-    await expect(lines(page)).toHaveCount(2);
+    await refused(page, { chunk: /\/assets\/People-[\w-]+\.js$/, width: 1280, as: "guest-chunkyy" });
   });
 });

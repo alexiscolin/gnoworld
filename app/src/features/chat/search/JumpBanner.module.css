@@ -11,6 +11,13 @@
     font-weight: 500;
   }
 
+  /* The arrow down: the design system's arrow turned a quarter, after the words. */
+  .down {
+    /* layout: the icon in the button's line */
+    display: inline-flex;
+    rotate: 90deg;
+  }
+
   /* The found message among the room's lines. */
   .found {
     border-radius: var(--radius-m);

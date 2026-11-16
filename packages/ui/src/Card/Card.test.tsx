@@ -93,6 +93,24 @@ describe("Card", () => {
     for (const card of both) expect(within(card).getByRole("heading").id).toBe(card.getAttribute("aria-labelledby"));
   });
 
+  // A card with no header (CallRow's, which keeps its own h5) points at no title it lacks (D13221).
+  it("names itself by nothing when it has no header, and by its header's title when it has one", () => {
+    const { container } = render(
+      <Card compact>
+        <h5>call</h5>
+      </Card>,
+    );
+    const card = container.querySelector("article");
+    expect(card?.hasAttribute("aria-labelledby")).toBe(false);
+    render(
+      <Card compact>
+        {false}
+        <Card.Header title="Titled" />
+      </Card>,
+    );
+    expect(screen.getByRole("article", { name: "Titled" })).toBeTruthy();
+  });
+
   it("shows no state when it has none", () => {
     render(
       <Card>

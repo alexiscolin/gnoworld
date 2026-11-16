@@ -13,6 +13,11 @@ export type IconButtonProps = Face & {
   label: string;
   size?: IconControlSize;
   emphasis?: "outline" | "plain";
+  /** Filled with the accent, as Button's solid look: the composer's Send. Wins over `emphasis`. */
+  solid?: boolean;
+  /** What it does in a form: `submit` sends it. */
+  type?: "button" | "submit";
+  disabled?: boolean;
   pressed?: boolean;
   /** Opens something in place: whether it is open now, said as aria-expanded. */
   expanded?: boolean;
@@ -40,6 +45,9 @@ export function IconButton({
   label,
   size = "m",
   emphasis = "outline",
+  solid,
+  type = "button",
+  disabled,
   pressed,
   expanded,
   count,
@@ -52,11 +60,12 @@ export function IconButton({
   return (
     <Tooltip label={label} drops={drops}>
       <button
-        type="button"
+        type={type}
+        disabled={disabled}
         aria-label={counted === null ? label : `${label}, ${counted.said}`}
         aria-pressed={pressed}
         aria-expanded={expanded}
-        {...iconLook(emphasis, size, tool)}
+        {...iconLook(solid === true ? "solid" : emphasis, size, tool)}
         onClick={onClick}
       >
         {icon === undefined ? <span aria-hidden="true">{emoji}</span> : <Icon name={icon} size={iconSize(size)} />}

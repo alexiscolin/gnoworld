@@ -4,14 +4,16 @@ import type { ErrorKind } from "./kind.ts";
 import { WORDS, type Way } from "./words.ts";
 import styles from "./ErrorView.module.css";
 
-export interface ErrorViewProps {
+interface Where {
+  here: string;
+  earth: string;
+  galaxy: string;
+}
+
+interface Shared {
   kind: ErrorKind;
   /** The place a route gives: a world, a realm, a universe. */
   noun?: string | undefined;
-  /** The page, inside the shell; the place, inside a plate; inline, a line in a card or a panel. */
-  size?: "page" | "place" | "inline";
-  /** Where the ways lead: the page itself, the Earth, the Galaxy. */
-  where: { here: string; earth: string; galaxy: string };
   /** Inline's own way to ask again, where the card can do it without a reload. */
   onRetry?: (() => void) | undefined;
   /** A reference the visitor can quote, or the message and stack in development. */
@@ -19,13 +21,26 @@ export interface ErrorViewProps {
   detail?: string | undefined;
 }
 
+// The page, inside the shell, or the place, inside a plate, lead on to where the ways go: the page itself, the Earth, the Galaxy. Inline,
+// a line in a card or a panel, leads nowhere, so a place with no route to read (a chunk that failed, drawn at the module's start) needs none.
+export type ErrorViewProps = Shared &
+  (
+    | { size?: "page" | "place"; where: Where; urgent?: never }
+    | {
+        size: "inline";
+        where?: Where | undefined;
+        /** An alert, for a list the reader waits on; a polite status otherwise. */
+        urgent?: boolean | undefined;
+      }
+  );
+
 interface Link {
   label: string;
   href: string;
   reload: boolean;
 }
 
-function ways(kind: ErrorKind, where: ErrorViewProps["where"]): { first: Link; rest: Link[] } {
+function ways(kind: ErrorKind, where: Where): { first: Link; rest: Link[] } {
   // The app may be what failed: a way out of a crash loads the document again, which the router cannot.
   const reload = kind !== "not-found";
   const all: Record<Way, Link> = {
@@ -47,10 +62,13 @@ const reload = () => {
 };
 
 /** What a failure shows, in three sizes: its title, one line, a primary way on and the places to go. */
-export function ErrorView({ kind, noun, size = "page", where, onRetry, note, detail }: ErrorViewProps) {
+export function ErrorView(props: ErrorViewProps) {
+  const { kind, noun, onRetry, note, detail } = props;
   const words = WORDS[kind];
-  if (size === "inline") return <EmptyState look="failed" line={words.short} onRetry={onRetry ?? reload} />;
-  const { first, rest } = ways(kind, where);
+  if (props.size === "inline")
+    return <EmptyState look="failed" line={words.short} urgent={props.urgent === true} onRetry={onRetry ?? reload} />;
+  const size = props.size ?? "page";
+  const { first, rest } = ways(kind, props.where);
   return (
     <div role="alert">
       <div className={styles["view"]} data-size={size} data-kind={kind}>

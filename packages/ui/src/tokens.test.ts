@@ -76,6 +76,12 @@ describe("parseTokens", () => {
     "--pk",
     "--spark-line",
     "--spark-area",
+    "--lit-fill",
+    "--lit-now",
+    "--appear-time",
+    "--appear-grow",
+    "--appear-from",
+    "--dot-gap",
   ];
   const drawn = () => tokens().filter((token) => !LAYOUT_VARIABLES.includes(token.name));
 

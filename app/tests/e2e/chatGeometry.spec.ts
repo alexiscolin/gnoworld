@@ -152,7 +152,8 @@ test.describe("the chat at the video's size", () => {
       const css = getComputedStyle(element);
       return { radius: css.borderTopLeftRadius, wide: element.getBoundingClientRect().width };
     });
-    expect(send.radius).toBe("50%");
+    // Round whatever the radius is written as: the disc's 50 %, or IconButton's pill (D13219).
+    expect(send.radius === "50%" || Number.parseFloat(send.radius) >= send.wide / 2).toBe(true);
     near(send.wide, 32);
     const field = await page.getByRole("textbox", { name: /^Message/ }).evaluate((element) => {
       const css = getComputedStyle(element);

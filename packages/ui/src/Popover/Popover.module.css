@@ -34,8 +34,13 @@
     cursor: pointer;
   }
 
-  .item:is(:hover, :focus-visible) {
-    background: var(--color-fill-hover);
+  .item {
+    --lit-fill: var(--color-fill-hover);
+  }
+
+  /* The keyboard's light, as the pointer's. */
+  .item:focus-visible {
+    background: var(--lit-fill);
   }
 
   /* An act with an icon before its words; an irreversible one coral, its alert icon first. */
@@ -52,14 +57,9 @@
     color: var(--color-danger);
   }
 
-  /* An act yet to come: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
+  /* An act yet to come: ComingSoon's greyed look, its "Soon" at the row's end, no fill under the pointer. */
   .item[aria-disabled="true"] {
-    opacity: var(--opacity-disabled);
-    cursor: not-allowed;
-  }
-
-  .item[aria-disabled="true"]:is(:hover, :focus-visible) {
-    background: none;
+    --lit-fill: transparent;
   }
 
   .soon {

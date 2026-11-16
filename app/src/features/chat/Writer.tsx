@@ -3,7 +3,7 @@
 import { Suspense, type ReactNode } from "react";
 import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
-import { ErrorView, useWhere } from "../errors/index.ts";
+import { ErrorView, errorKind, useWhere } from "../errors/index.ts";
 import { Composer, renewComposer } from "./composerChunk.ts";
 import type { ComposerProps } from "./Composer.tsx";
 import { Failing } from "./Failing.tsx";
@@ -96,7 +96,10 @@ export function Writer(props: WriterProps) {
 export function RoomWriter(props: WriterProps) {
   const where = useWhere();
   return (
-    <Failing fallback={<ErrorView kind="crash" size="inline" where={where} />} renew={renewComposer}>
+    <Failing
+      fallback={(error) => <ErrorView kind={errorKind(error)} size="inline" where={where} />}
+      renew={renewComposer}
+    >
       <Writer {...props} />
     </Failing>
   );

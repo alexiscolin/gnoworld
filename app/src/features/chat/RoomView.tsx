@@ -33,7 +33,7 @@ export const NoRoomYet = () => (
 );
 const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).Typists }), {
   waiting: NOBODY,
-  failed: NOBODY,
+  failed: () => NOBODY,
 });
 function TypistsHere({ typing }: { typing: Typing | undefined }) {
   return Object.keys(typing ?? {}).length === 0 ? NOBODY : <Typists typing={typing} />;
