@@ -4,6 +4,7 @@
 import { Button, Chip, Dialog } from "@gnoworld/ui";
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { useLocation } from "react-router";
+import { Folding } from "./RoomSections.tsx";
 import { countWords } from "./unread.ts";
 import styles from "./RoomsDrawer.module.css";
 
@@ -66,8 +67,13 @@ export function RoomsDrawer({
               Rooms
             </p>
             <div className={styles["body"]} data-drawer-body="" onClick={leave(close)}>
-              {rail}
-              {worlds}
+              {/* Its own box, so the rail's column (fill-column: the height of the body) no longer pushes the worlds to the foot. */}
+              <div>{rail}</div>
+              {worlds === undefined ? null : (
+                <div className={styles["worlds"]}>
+                  <Folding name="Worlds">{worlds}</Folding>
+                </div>
+              )}
             </div>
           </div>
         ) : (

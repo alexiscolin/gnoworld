@@ -155,7 +155,7 @@ export function GuestWriter({ room }: { room: string }) {
             {problem}
           </p>
         )}
-        <Cluster justify="between">
+        <Cluster justify="between" className={styles["way"]}>
           <span className="meta">
             {guest.off
               ? "Guests cannot speak here."

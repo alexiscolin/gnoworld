@@ -15,4 +15,11 @@
     color: var(--color-danger);
     font: var(--font-meta);
   }
+
+  /* A phone's way in: Connect Adena at 44 px (the selector outweighs ui's size rule by its pseudo-class). */
+  @media (width < 900px) {
+    .way button:enabled {
+      --_h: var(--control-m);
+    }
+  }
 }

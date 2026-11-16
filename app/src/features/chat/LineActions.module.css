@@ -47,5 +47,15 @@
     .bar button:disabled {
       --_h: var(--control-m);
     }
+
+    /* Eight 44 px buttons are wider than a phone's row: the bar stays inside it, at its end, and wraps to a second row, so none is off the screen. */
+    .bar {
+      max-inline-size: calc(100% - 2 * var(--space-2xs));
+      /* layout: the buttons that do not fit go to a second row */
+      flex-wrap: wrap;
+      /* layout: the rows keep the bar's end */
+      justify-content: flex-end;
+      white-space: normal;
+    }
   }
 }

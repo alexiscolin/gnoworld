@@ -10,7 +10,7 @@ export function LogInToWrite() {
   return (
     <div className={box["box"]}>
       <div className={styles["inner"]}>
-        <Cluster justify="between">
+        <Cluster justify="between" className={styles["way"]}>
           <Stack space="3xs">
             <strong className={styles["lead"]}>Join the conversation</strong>
             <span className="meta">{LOG_IN_TO_WRITE}</span>

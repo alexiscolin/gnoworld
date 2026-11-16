@@ -49,6 +49,13 @@
   @media (width < 900px) {
     .box {
       text-overflow: ellipsis;
+      /* raw: iOS Safari zooms the page when it focuses a field under 16 px; no token holds a plain 16 px (--font-action is 500 over a line of 1) */
+      font-size: 1rem;
+    }
+
+    .box[data-shape="pill"] {
+      /* raw: the same, for the list's filter */
+      font-size: 1rem;
     }
   }
 

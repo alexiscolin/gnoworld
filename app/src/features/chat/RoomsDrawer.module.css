@@ -26,4 +26,22 @@
     overflow: auto;
     padding: var(--space-s) var(--space-xs) max(var(--space-m), env(safe-area-inset-bottom));
   }
+
+  @media (width < 900px) {
+    /* The rooms' links and the sections' toggles are 44 px, as a finger needs (NavItem's own height is this token). */
+    .body {
+      --chat-item: var(--control-m);
+    }
+
+    /* Over Disclosure's own height for a section's name (its selector's weight: four attributes and classes). */
+    .body[data-drawer-body] h2 button[aria-expanded][aria-controls] {
+      min-block-size: var(--control-m);
+    }
+
+    /* The worlds under the rooms, their section a step below the last. */
+    .worlds {
+      /* layout: a step under the rooms */
+      margin-block-start: var(--space-m);
+    }
+  }
 }

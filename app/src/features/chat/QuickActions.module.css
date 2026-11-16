@@ -63,6 +63,11 @@
 
   /* A phone: the composer clears the home indicator (no inset while the keyboard is up). */
   @media (width < 900px) {
+    /* A pill is a finger's height; the row's step keeps one off the next. */
+    .pinned > * {
+      block-size: var(--control-m);
+    }
+
     .dock {
       padding-block-end: max(calc(var(--space-s) + var(--space-3xs)), env(safe-area-inset-bottom));
     }

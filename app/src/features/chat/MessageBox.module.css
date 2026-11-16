@@ -170,12 +170,64 @@
       --_h: var(--control-m);
     }
 
+    /* The whole composer is budgeted inside the visual viewport (--chat-vh), so Send never leaves the screen: what is left of it after the
+       header, the dock's padding, the foot, the open format bar (two rows, worst case), the words' row when there are some and a few
+       lines of the conversation is the field's cap. Where that is under the field's own minimum, the minimum wins. */
+    .box {
+      --_foot: calc(var(--control-m) + var(--space-3xs) + var(--space-2xs));
+      --_dock: calc(var(--space-s) + max(var(--space-s) + var(--space-3xs), env(safe-area-inset-bottom)));
+      /* raw: no format bar, no words */
+      --_bar: 0px;
+      /* raw: no words */
+      --_say: 0px;
+      --_free: calc(
+        var(--chat-vh) - var(--banner-under) - var(--_dock) - var(--_foot) - var(--_bar) - var(--_say) - 3lh
+      );
+    }
+
+    .box:has(.format[data-open]) {
+      --_bar: calc(2 * var(--control-m) + 3 * var(--space-3xs) + var(--line-width));
+    }
+
+    .box:has(.words > p) {
+      --_say: calc(1lh + var(--space-2xs));
+    }
+
+    /* An error or a count of the draft has a row of its own, which the foot's controls never share (Line 1 is too long by N bytes). */
+    .words {
+      /* layout: under the foot, across the box, from the words' inset */
+      grid-area: 4 / 1 / auto / -1;
+      /* layout: at the start of its row */
+      place-self: center start;
+      /* layout: from the words' inset, a step off the box's end */
+      margin-inline: var(--_in) var(--space-2xs);
+    }
+
+    .words > p {
+      /* layout: a step off the foot, and the box's edge below */
+      margin-block: 0 var(--space-2xs);
+    }
+
+    .box [role="textbox"],
+    .box [role="textbox"] + [aria-hidden="true"],
+    .box .field textarea {
+      /* raw: iOS Safari zooms the page when it focuses a field under 16 px; no token holds a plain 16 px (--font-action is 500 over a line of 1) */
+      font-size: 1rem;
+    }
+
     .box [role="textbox"],
     .box .field textarea {
-      /* layout: a share of the screen, so a long draft scrolls in its field and the foot stays in view */
-      --_share: 0.3;
-      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh) * var(--_share)));
+      max-block-size: min(calc(10lh + var(--space-s)), var(--_free));
       overflow: auto;
+    }
+  }
+
+  /* A phone on its side: height is what is scarce, so the field starts at one line and the conversation gives way to the rest. */
+  @media (width < 900px) and (height < 500px) {
+    .box [role="textbox"],
+    .box [role="textbox"] + [aria-hidden="true"],
+    .box .field textarea {
+      min-block-size: calc(1lh + var(--space-s));
     }
   }
 }

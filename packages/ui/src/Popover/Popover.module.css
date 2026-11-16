@@ -18,6 +18,14 @@
     --_w: var(--popover-wide);
   }
 
+  /* A phone: never taller than the visual viewport either, which the on-screen keyboard shortens (viewport.ts keeps --chat-vh there; the
+     dynamic viewport's height elsewhere). */
+  @media (width < 900px) {
+    .panel {
+      max-block-size: min(calc(100% - 2 * var(--space-2xs)), calc(var(--chat-vh) - 2 * var(--space-2xs)));
+    }
+  }
+
   .panel[data-kind="menu"] {
     --_w: max-content;
 
