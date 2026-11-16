@@ -3,9 +3,9 @@
 // The token renews on use for 30 days and ends 90 days after its login whatever the use.
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { verifyArbitrarySignature } from "@adena-wallet/sdk";
-import { Address, type Challenge, type Proof, type VerifyRequest } from "@gnoworld/schemas";
+import { Address, type Challenge, type VerifyRequest } from "@gnoworld/schemas";
 import { z } from "zod";
+import { verifies, verifyProof, type Verify } from "./verify.ts";
 
 export const LOGIN_TABLES = `
 CREATE TABLE nonces (nonce TEXT PRIMARY KEY, chain TEXT NOT NULL, text TEXT NOT NULL, expires_at INTEGER NOT NULL) STRICT;
@@ -42,30 +42,6 @@ ALTER TABLE nonces ADD COLUMN subject TEXT;
 CREATE INDEX nonces_by_owner ON nonces (owner) WHERE kind IS NOT NULL;
 `;
 
-export interface Expected {
-  signer: Address;
-  chainId: string;
-  data: string;
-}
-export type Verify = (proof: Proof, expected: Expected) => Promise<boolean>;
-
-// The SDK's verifier says yes when told nothing to check (ADR-0002 §4): here all three are required.
-export const verifyProof: Verify = async (proof, { signer, chainId, data }) =>
-  verifyArbitrarySignature(proof, { signer, chainId, data });
-
-// The verifier's answer, a refusal when it throws: the SDK's never does, but a proof must not depend on it.
-export async function verifies<P = Proof>(
-  verify: (proof: P, expected: Expected) => Promise<boolean>,
-  proof: P,
-  expected: Expected,
-): Promise<boolean> {
-  try {
-    return await verify(proof, expected);
-  } catch {
-    return false;
-  }
-}
-
 /** A text signed once: a nonce kept with the whole text the wallet signs, and with the action it stands for when it is
  * an admin's change, then the proof that spends it. */
 export interface Signed {
@@ -93,6 +69,8 @@ export interface Login {
   // When a live session's token was signed, in ms; undefined for none, an ended one or an unknown.
   signedAt: (token: string | undefined) => number | undefined;
   logout: (token: string | undefined) => void;
+  // Ends every other token of a live session's address, this one kept; an unknown, ended or absent token ends nothing.
+  logoutOthers: (token: string | undefined) => void;
 }
 
 const Spent = z.object({ chain: z.string(), text: z.string() });
@@ -192,6 +170,10 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
     live: db.prepare("SELECT address, signed_at, expires_at FROM tokens WHERE hash = ? AND expires_at > ?"),
     renew: db.prepare("UPDATE tokens SET expires_at = ? WHERE hash = ?"),
     end: db.prepare("DELETE FROM tokens WHERE hash = ?"),
+    // One statement: every other token of the live token's address, the token's own hash kept.
+    endOthers: db.prepare(
+      "DELETE FROM tokens WHERE hash != ?1 AND address = (SELECT address FROM tokens WHERE hash = ?1 AND expires_at > ?2 AND signed_at + ?3 > ?2)",
+    ),
     // An account keeps its newest tokens only: logins nobody uses would otherwise fill the disk.
     dropOldTokens: db.prepare(
       `DELETE FROM tokens WHERE address = ? AND rowid NOT IN
@@ -200,7 +182,10 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
   };
 
   return {
-    challenge: (chainId, domain) => signed.issue(chainId, domain, { head: ["Sign in to gnoworld (login, version 1)"] }),
+    challenge: (chainId, domain) =>
+      signed.issue(chainId, domain, {
+        head: ["Sign in to gnoworld (login, version 2)", `Sign only if your browser's address bar shows ${domain}.`],
+      }),
 
     async verify(request, mayCreate, host) {
       const proved = await signed.prove(request, host);
@@ -240,6 +225,10 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
 
     logout(token) {
       if (token !== undefined) sql.end.run(sha256(token));
+    },
+
+    logoutOthers(token) {
+      if (token !== undefined) sql.endOthers.run(sha256(token), now(), cap);
     },
   };
 }

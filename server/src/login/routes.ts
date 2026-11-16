@@ -11,6 +11,7 @@ import { guard, json, SESSION_COOKIE, tokenOf, type Guarded } from "../guard.ts"
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
 import { visitorOf as readVisitor } from "../visitor.ts";
+import { FRESH_MS } from "./links.ts";
 import { makeLogin, type Login } from "./login.ts";
 import { makeTickets, type Tickets } from "./ticket.ts";
 
@@ -98,6 +99,18 @@ export function loginRoutes(
   app.post("/logout", (c) => {
     login.logout(tokenOf(c));
     setCookie(c, SESSION_COOKIE, "", { ...cookie, maxAge: 0 });
+    return c.body(null, 204);
+  });
+
+  // Every other session of the caller's address ends, this cookie staying good: ADR-0002 §4's "revocable in the settings".
+  // A login of the last ten minutes only, like a link: a relayed session must not keep the power to end the person's own logins.
+  app.post("/logout-others", (c) => {
+    if (!calls.take(visitorOf(c), now())) return refuse(c, "limit");
+    const token = tokenOf(c);
+    const signed = login.signedAt(token);
+    if (login.session(token) === undefined || signed === undefined || now() - signed > FRESH_MS)
+      return answer(c, "unauthenticated", 401);
+    login.logoutOthers(token);
     return c.body(null, 204);
   });
 
