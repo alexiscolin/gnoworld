@@ -1174,6 +1174,8 @@ def mutants():
         ("for x in wanted[key] if x not in lst]", "for x in wanted[key]]", "a twin added once to a profile"),
         ("    except AttributeError:\n        lists = None", "    except ZeroDivisionError:\n        lists = None", "a profile's settings of the wrong shape left as they are"),
         (' + sorted(glob.glob(os.path.join(glob.escape(home), ".claude-*")))', "", "every profile, ~/.claude-* too"),
+        ("        if os.path.islink(profile):", "        if False:", "no profile through a folder that is a link"),
+        ("    except OSError:\n        return", "    except ZeroDivisionError:\n        return", "a profile's settings that cannot be opened left as they are"),
     ):
         yield from each(mr, find, replace, "hooks", f"machine_rules.py writes {why}")
     yield from each(ih, 'main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)', "main=$(git rev-parse --show-toplevel)", "hooks",

@@ -54,6 +54,8 @@ def write(profile, wanted):
     try:
         with open(path) as f:
             s = json.load(f)
+    except OSError:
+        return "unreadable, left as it is"
     except ValueError:
         return "not JSON, left as it is"
     try:
@@ -79,5 +81,7 @@ if __name__ == "__main__":
     home = os.path.expanduser("~")
     wanted = rules(json.loads(sys.argv[1]), sys.argv[2], home, os.getuid())
     for profile in [os.path.join(home, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(home), ".claude-*"))):
-        if os.path.lexists(os.path.join(profile, "settings.json")):
+        if os.path.islink(profile):  # its settings are another folder's, wherever the link leads
+            print(f"install_hooks: {profile}: a link, left as it is")
+        elif os.path.lexists(os.path.join(profile, "settings.json")):
             print(f"install_hooks: {profile}: {write(profile, wanted)}")
