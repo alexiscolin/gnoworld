@@ -48,9 +48,9 @@ func init(cur realm) {
 
 // A rental, decoded from its string; never stored as a struct.
 type rental struct {
-	payer                address
+	payer              address
 	start, days, price int
-	text                 string
+	text               string
 }
 
 // encode is a rental as stored; the text, which may hold spaces, comes last.
