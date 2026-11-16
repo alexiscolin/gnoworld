@@ -20,7 +20,7 @@ export function LoadedRoom({
   return (
     <>
       {problem === undefined ? null : <p role="status">{problem}</p>}
-      {room ?? (problem === undefined ? (failed ?? <NoRoomYet />) : null)}
+      {room ?? (problem === undefined ? <NoRoomYet failed={failed} /> : null)}
     </>
   );
 }

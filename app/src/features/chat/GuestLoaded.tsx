@@ -96,7 +96,7 @@ function GuestRoom({
       {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
       {shown === undefined ? (
         asksDm ? null : (
-          (failed ?? <NoRoomYet />)
+          <NoRoomYet failed={failed} />
         )
       ) : (
         <RoomView

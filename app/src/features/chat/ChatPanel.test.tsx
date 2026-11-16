@@ -169,5 +169,40 @@ describe("the dock when the server does not answer", () => {
       (each) => each.children.length === 0 && each.textContent === "The server is not answering.",
     );
     expect(words?.closest("[data-chat-layout]")).not.toBeNull();
+    // At the lead's inset, as the dock's own empty state sits (RoomView.module.css .lead).
+    expect(words?.closest("div[class*='lead']")).not.toBeNull();
+  });
+
+  // The page this test drew is the last box in the body (a drawer's host); an earlier test's may still be there.
+  const mine = () => document.body.lastElementChild;
+  const said = () => (mine()?.textContent.match(/The server is not answering\./g) ?? []).length;
+  const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+
+  it("says it once, in the conversation's place, for an account with no direct message open", async () => {
+    vi.stubGlobal("fetch", roomsAnswer(400));
+    drawer()(page);
+    act(() => {
+      state().loginActions.signedIn(ME);
+    });
+    await settled(() => said() > 0);
+    expect(said()).toBe(1);
+  });
+
+  it("says it in the rooms' rail and not the conversation, beside a direct message that is open", async () => {
+    vi.stubGlobal("fetch", roomsAnswer(400));
+    drawer()(
+      <MemoryRouter initialEntries={[`/?dm=${OTHER}`]}>
+        <StoreProvider>
+          <Grab />
+          <ChatPanel world="bubble" place={place} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    act(() => {
+      state().loginActions.signedIn(ME);
+    });
+    await settled(() => said() > 0);
+    // The rail and the rooms' menu both say it (two surfaces); the conversation does not.
+    expect(mine()?.querySelector("div[class*='lead']")).toBeNull();
   });
 });
