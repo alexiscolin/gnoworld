@@ -361,6 +361,13 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     const other = budget.reserve("translate", DOLLAR);
     if (!other.ok) throw new Error("the budget refused");
     expect(await read()).toMatchObject({ spent: { ask: 0.37, translate: 0 }, reserved: { ask: 0, translate: 1 } });
+    budget.settle(other.hold, 0.25 * DOLLAR);
+    expect(await read()).toEqual({
+      ask: 45,
+      translate: 5,
+      spent: { ask: 0.37, translate: 0.25 },
+      reserved: { ask: 0, translate: 0 },
+    });
   });
 
   it("changes a budget at once, logs the change, and answers both", async () => {
