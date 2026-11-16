@@ -1,0 +1,89 @@
+{
+  "ignoreFiles": ["docs/**", ".claude/workflows/**"],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "app": {
+      "entry": [
+        "src/sw/sw.ts!",
+        "src/sw/precache.ts!",
+        "src/csp.ts!",
+        "src/cspOrigins.ts!",
+        "src/dataFiles.ts!",
+        "src/dataPlaces.ts!",
+        "src/prerender.ts!",
+        "src/sitemap.ts!",
+        "src/glsl.ts!"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}!",
+        "!src/**/*.test.{ts,tsx}!",
+        "!src/**/testing/**!",
+        "!src/*Fixture.ts!",
+        "!src/**/*.stories.tsx!",
+        "!src/space/planet/creditFiles.ts!"
+      ],
+      "react-router": {
+        "config": ["react-router.config.ts"]
+      },
+      "ignoreBinaries": ["react-router"]
+    },
+    "server": {
+      "entry": ["src/main.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!", "!src/testing/**!", "!src/**/*.bench.ts!"]
+    },
+    "jarvis": {
+      "entry": ["src/main.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!", "!src/testing/**!", "!src/**/*.bench.ts!"]
+    },
+    "link-reader": {
+      "entry": ["src/main.ts!"],
+      "project": [
+        "src/**/*.ts!",
+        "!src/**/*.test.ts!",
+        "!src/testImages.ts!",
+        "!src/tlsFixtures.ts!",
+        "!src/memory.ts!"
+      ]
+    },
+    "packages/core": {
+      "entry": ["src/index.ts!", "src/bubbles/index.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!", "!src/testing.ts!", "!src/store/fixture.ts!"],
+      "includeEntryExports": true
+    },
+    "packages/schemas": {
+      "entry": ["src/index.ts!", "src/chainEvents.ts!", "src/functions.ts!", "src/indexer.ts!", "src/proposal.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!"],
+      "includeEntryExports": true
+    },
+    "packages/chain": {
+      "entry": ["src/*.ts!", "!src/*.test.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!", "!src/testing/**!"],
+      "ignore": ["src/testing/**"]
+    },
+    "packages/service": {
+      "entry": ["src/*.ts!", "!src/*.test.ts!"],
+      "project": ["src/**/*.ts!", "!src/**/*.test.ts!", "!src/testing/**!"],
+      "ignore": ["src/testing/**"]
+    },
+    "packages/ui": {
+      "entry": [
+        "src/index.ts!",
+        "src/fonts.ts!",
+        "src/Overview/Overview.tsx!",
+        "src/TokensPage/TokensPage.tsx!",
+        "src/Overview/samples.ts!"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}!",
+        "!src/**/*.test.{ts,tsx}!",
+        "!src/**/*.stories.tsx!",
+        "!src/testing.tsx!",
+        "!src/testSetup.ts!"
+      ]
+    }
+  }
+}
