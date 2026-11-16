@@ -26,7 +26,6 @@ export function sceneOffer(device: {
   readonly phone: boolean;
   readonly savesData: boolean;
 }): SceneOffer {
-  // A phone is the full chat alone until its 3D pass (D13711).
-  if (device.weak || device.phone) return "none";
-  return device.savesData ? "ask" : "auto";
+  if (device.weak) return "none";
+  return device.phone || device.savesData ? "ask" : "auto";
 }
