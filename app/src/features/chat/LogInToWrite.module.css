@@ -16,10 +16,11 @@
     font: var(--font-meta);
   }
 
-  /* A phone's way in: Connect Adena at 44 px (the selector outweighs ui's size rule by its pseudo-class). */
+  /* A phone's way in: one line, Connect Adena small at its end; its 44 px target is the hit box small buttons take (utilities.css). */
   @media (width < 900px) {
-    .way button:enabled {
-      --_h: var(--control-m);
+    .way {
+      /* layout: the note gives way, the control keeps its width */
+      min-inline-size: 0;
     }
   }
 }

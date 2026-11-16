@@ -78,12 +78,14 @@ describe("a guest's composer", () => {
       expect(box.parentElement?.querySelector(`label[for="${box.id}"]`)?.textContent).toBe("Message #games");
     });
 
-    it("with Adena (a computer's narrow window), keeps Connect Adena", () => {
+    it("with Adena (a computer's narrow window), keeps Connect Adena on one short line", () => {
       phone();
       vi.stubGlobal("adena", { AddEstablish: () => undefined });
       const view = mount(<GuestWriter room="#games" />);
       expect(connect(view)).toBeDefined();
       expect(view.textContent).not.toContain("use a computer");
+      expect(view.textContent).toContain("Guest · Connect for a name, links and reactions");
+      expect(view.textContent).not.toContain("a gno.land name of your own");
     });
   });
 });

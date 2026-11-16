@@ -43,6 +43,7 @@ const problemOf = (said: Refused): string => (said.cause === undefined ? reasonO
 
 // What an account has that a guest has not, said beside Connect Adena.
 const ADENA_GIVES = "With Adena, a gno.land name of your own, links, replies and reactions.";
+const PHONE_GUEST = "Guest · Connect for a name, links and reactions";
 
 // No guest name to be had: the server answers 404 where guests do not speak at all (GUEST_CHAT=off, or no moderation to judge them).
 const OFF = "Guests cannot speak on this server. Connect Adena to speak.";
@@ -171,13 +172,14 @@ export function GuestWriter({ room }: { room: string }) {
 /** The line under a guest's box: who speaks and what Adena gives, with Connect Adena. A phone without Adena draws none: its placeholder
  * says it speaks as a guest, the menu how to log in. */
 function GuestLine({ off, name, computer }: { off: boolean; name: string | undefined; computer: boolean }) {
+  // A phone's line is one short line, the way in a small control at its end (Alexis: "plus petit… sur une ligne").
+  const phone = useMedia(PHONE_QUERY);
   if (computer && !off) return null;
+  const said = name === undefined ? "You speak as a guest." : `You speak as ${name}.`;
   return (
-    <Cluster justify="between" className={styles["way"]}>
-      <span className="meta">
-        {off
-          ? "Guests cannot speak here."
-          : `${name === undefined ? "You speak as a guest." : `You speak as ${name}.`} ${ADENA_GIVES}`}
+    <Cluster justify="between" wrap={phone ? "no" : "yes"} className={styles["way"]}>
+      <span className={phone ? "meta truncate" : "meta"}>
+        {off ? "Guests cannot speak here." : phone ? PHONE_GUEST : `${said} ${ADENA_GIVES}`}
       </span>
       {computer ? null : (
         <Button
