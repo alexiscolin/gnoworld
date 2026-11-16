@@ -123,7 +123,7 @@ Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`:
 | `core` (`packages/core`) | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
 | `lib` | `core`, Zod, the chain client libraries | React, `space`, `features`, `ui` |
 | `store` | `core`, `lib` types | React, `space`, `features` |
-| `space` | `core`, `store` (read and subscribe), `lib`, three, GSAP, `ui`'s React-free helpers (`typedIn`, `holdsEscape`, `iconNode`) | React, `features`, `ui`'s components |
+| `space` | `core`, `store` (read and subscribe), `lib`'s `saveData`, three, GSAP, `ui`'s React-free helpers (`typedIn`, `holdsEscape`, `iconNode`) | React, `features`, `ui`'s components, the rest of `lib`, by import or at run time |
 | `ui` | `ui` | `features`, `space`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
 | `sw` | `sw` | Anything else: the worker runs alone, before the page |

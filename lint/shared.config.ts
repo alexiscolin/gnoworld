@@ -56,7 +56,7 @@ export const MODULE_STATE = {
 // What runs on a frame makes nothing (ADR-0002 §9): a collector's pause is a dropped frame. By name, the loop's and what
 // it calls, in the scene and in core; a function a frame reaches joins this list as it is written. Three's own render is not held here.
 const FRAME_NAMES =
-  "tick|pose|glideAt|wake|cancel|draw|advance|follow|visit|light|unit|field|side|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|dived|wayAt";
+  "tick|pose|glideAt|wake|cancel|draw|advance|follow|visit|light|unit|field|side|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|wayAt";
 const NAME = `/^(${FRAME_NAMES})$/`;
 const MEMBER = `:matches(MethodDefinition, PropertyDefinition, Property)[key.name=${NAME}]`;
 const MADE_HERE =

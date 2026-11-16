@@ -37,7 +37,7 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
+FRAME_NAMES = ["tick", "pose", "glideAt", "wayAt", "wake", "cancel", "draw", "advance", "follow", "visit", "light", "unit", "field", "side", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
     ("frame_arrow.ts", "export const unitOf = (): number[] => {\n  return [1];\n};\n", FRAME),
@@ -563,7 +563,9 @@ try:
             ("space/__probe__/scene_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
             ("space/__probe__/scene_zustand_react.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
             ("space/__probe__/scene_zustand.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
+            # lib's saveData alone: the scene reads the data saver; the rest of lib stays out of it.
             ("space/__probe__/scene_lib.ts", uses(name="savesData", path="../../lib/saveData.ts"), None),
+            ("space/__probe__/scene_lib_other.ts", uses(name="NEW_TAB", path="../../lib/newTab.ts"), "import-x/no-restricted-paths"),
             ("space/__probe__/scene_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
             ("space/__probe__/scene_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
             ("space/__probe__/scene_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
@@ -571,6 +573,12 @@ try:
             # The design system's helpers that touch no React are the scene's one door to ui, by name or by path.
             ("space/__probe__/scene_ui_helper.ts", uses(name="typedIn", path="@gnoworld/ui"), None),
             ("space/__probe__/scene_ui_helper_path.ts", uses(name="iconNode", path="../../../../packages/ui/src/index.ts"), None),
+            ("space/__probe__/scene_ui_helper_escape.ts", uses(name="holdsEscape", path="@gnoworld/ui"), None),
+            # Nor at run time: an import() of React, the design system, zustand or lib is refused; the scene's own chunks load.
+            ("space/__probe__/scene_dynamic_react.ts", 'export async function load(): Promise<unknown> {\n  return import("react");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_ui.ts", 'export async function load(): Promise<unknown> {\n  return import("@gnoworld/ui");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_lib.ts", 'export async function load(): Promise<unknown> {\n  return import("../../lib/newTab.ts");\n}\n', "no-restricted-syntax: The scene loads"),
+            ("space/__probe__/scene_dynamic_own.ts", 'export async function load(): Promise<unknown> {\n  return import("./globe.ts");\n}\n', None),
             ("space/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
             ("space/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
             # What runs on a frame makes nothing: a method, a private one, a field's arrow; each way of making, each alone.

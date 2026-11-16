@@ -33,7 +33,13 @@ const LIB =
 const STORE =
   "The store holds the state: core, lib, zustand/vanilla; never React, the design system, a feature, the scene or a route.";
 const SCENE =
-  "The scene is three, core, lib and the store: never React, the design system's components, a feature or a route.";
+  "The scene is three, core, the store and lib's saveData: never React, the design system's components, a feature, a route or the rest of lib.";
+// Nor at run time: an import() of React, the design system, zustand or lib (the scene's own chunks load).
+const SCENE_LOADS = {
+  selector:
+    "ImportExpression[source.value=/^(react|react-dom|react-router|zustand|@gnoworld\\/ui)(\\/|$)|^(\\.\\.\\/)+lib\\//]",
+  message: `The scene loads no React, design system, zustand or lib at run time either. ${SCENE}`,
+};
 // The design system's helpers that touch no React (typedIn, holdsEscape, iconNode: built for the scene's DOM, ui/src/escape.ts): the one door the scene has to ui.
 const SCENE_UI = ["typedIn", "holdsEscape", "iconNode"];
 // The packages that bring React or the design system, by their names: a zone sees only paths inside the repository.
@@ -101,6 +107,12 @@ export default defineConfig(
               from: [`${SRC}/features`, `${SRC}/routes`],
               message: SCENE,
             },
+            {
+              target: `${SRC}/space`,
+              from: `${SRC}/lib`,
+              except: ["./saveData.ts"],
+              message: SCENE,
+            },
           ],
         },
       ],
@@ -165,7 +177,7 @@ export default defineConfig(
           ],
         },
       ],
-      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, ON_A_FRAME],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, ON_A_FRAME, SCENE_LOADS],
       // An index walks an array with no iterator, where a frame runs.
       "@typescript-eslint/prefer-for-of": "off",
     },
@@ -175,7 +187,7 @@ export default defineConfig(
     // adopted by the next Near (adopt.ts); making it free of iterators needs a parallel array kept in both, a change of its own.
     files: [`${SRC}/space/parts/near.ts`],
     ignores: TESTS,
-    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END] },
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SCENE_LOADS] },
   },
   { files: [`${SRC}/**/*.{ts,tsx}`], ignores: [`${SRC}/lib/**`, `${SRC}/sw/**`, ...TESTS], rules: reaching(REACHES) },
 );
