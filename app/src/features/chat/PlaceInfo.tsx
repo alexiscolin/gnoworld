@@ -19,6 +19,8 @@ export interface PlaceInfoProps {
   links?: ReactNode;
   /** The place's page, as a control opening it (a phone's sheet, PlaceSheet.tsx); none on a computer, whose page is beside the chat. */
   page?: ReactNode;
+  /** In a sheet (`bare`): who talks and who is here, in one line of words in place of the figures. */
+  live?: string;
   /** Without the kicker and the name: the sheet this is in has them in its title. */
   bare?: boolean;
   /** Who is here, drawn under Here now. */
@@ -36,10 +38,13 @@ export function PlaceInfo({
   countries,
   links,
   page,
+  live,
   bare = false,
   here,
   panelRef,
 }: PlaceInfoProps) {
+  // A sheet's order: what is live, its page, who is here, then the links out.
+  const sheet = bare && live !== undefined;
   return (
     <aside ref={panelRef} tabIndex={-1} aria-label={name} className={styles["panel"]}>
       <Stack space="xs">
@@ -51,7 +56,13 @@ export function PlaceInfo({
           </>
         )}
         <p className={styles["about"]}>{description}</p>
-        {talking === undefined ? null : (
+        {sheet ? (
+          <>
+            {live === "" ? null : <p className={styles["live"]}>{live}</p>}
+            {page}
+          </>
+        ) : null}
+        {sheet || talking === undefined ? null : (
           <div className={styles["stats"]}>
             <Cluster space="2xl">
               <Figure value={talking} caption="Talking now" />
@@ -59,14 +70,19 @@ export function PlaceInfo({
             </Cluster>
           </div>
         )}
-        {links}
-        {page}
+        {sheet ? null : (
+          <>
+            {links}
+            {page}
+          </>
+        )}
         <section className={styles["here"]}>
           <Stack space="2xs">
             <h3 className="label">Here now</h3>
             {here}
           </Stack>
         </section>
+        {sheet ? links : null}
       </Stack>
     </aside>
   );

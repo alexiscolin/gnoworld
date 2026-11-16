@@ -1,8 +1,23 @@
 /* The phone's info sheet: ui's whole-screen dialog (wide="screen") holds it; the info panel's own inset is the column's, the dialog's
    padding is the sheet's. */
 @layer components {
+  /* The sheet is as wide as the dialog's padding box and no wider: every rule and row keeps the same inset at both ends. */
+  .sheet {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow: clip visible;
+  }
+
+  /* The page's plate lifts its ground, where the muted grey measures 6.28:1, under the 6.3:1 floor: the sheet's muted words take the soft grey. */
+  @media (width < 900px) {
+    .sheet {
+      --color-text-muted: var(--color-text-soft);
+    }
+  }
+
   .sheet > aside {
     padding: 0;
+    inline-size: 100%;
   }
 
   /* The arrow of Send points up and Back's points against the text: the icon's own points along it (PhoneHeader.module.css). */
@@ -13,10 +28,19 @@
   /* The textures' credit at the sheet's foot: a plain muted link-look button, a 44 px row. */
   .credits {
     min-block-size: var(--control-m);
+    /* layout: a step of air between the links and the credits */
+    margin-block-start: var(--space-xs);
     color: var(--color-text-muted);
   }
 
+  /* "Its page", the sheet's one primary, as wide as the sheet. */
   .page {
-    padding-block-start: var(--space-xs);
+    padding-block-start: var(--space-2xs);
+  }
+
+  .page > button {
+    inline-size: 100%;
+    /* layout: the icon and the words centred in the full-width button */
+    justify-content: center;
   }
 }

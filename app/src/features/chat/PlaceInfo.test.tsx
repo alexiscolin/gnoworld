@@ -48,4 +48,25 @@ describe("the info panel", () => {
     const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" here={null} />);
     expect(one(box, "aside").getAttribute("tabindex")).toBe("-1");
   });
+
+  it("in a sheet reads the live line, then the page, Here now, and the links last, with no lone figure", () => {
+    const box = mount(
+      <PlaceInfo
+        bare
+        kicker="k"
+        name="Earth"
+        description="d"
+        talking={0}
+        live="Nobody talking now · 1 here"
+        page={<button type="button">Its page</button>}
+        links={<ul data-slot="links" />}
+        here={<ul data-slot="people" />}
+      />,
+    );
+    const order = all(box, "p, button, h3, [data-slot]").map(
+      (each) => each.textContent || each.getAttribute("data-slot"),
+    );
+    expect(order).toEqual(["d", "Nobody talking now · 1 here", "Its page", "Here now", "people", "links"]);
+    expect(box.textContent).not.toContain("Talking now");
+  });
 });

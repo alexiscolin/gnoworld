@@ -131,7 +131,7 @@
     inset: 0;
   }
 
-  .button[data-stretch]:hover {
+  .button[data-stretch]:not([data-emphasis="solid"]):hover {
     --_fill: var(--color-fill-hover);
   }
 

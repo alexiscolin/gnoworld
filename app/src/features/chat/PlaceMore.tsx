@@ -8,8 +8,11 @@ import { countriesHere } from "./Country.tsx";
 import { Figure } from "./Figure.tsx";
 import styles from "./PlaceInfo.module.css";
 
+export const countriesCount = (lines: readonly Line[], members: readonly string[]) =>
+  new Set(countriesHere(lines, members).values()).size;
+
 export function CountriesFigure({ lines, members }: { lines: readonly Line[]; members: readonly string[] }) {
-  const count = new Set(countriesHere(lines, members).values()).size;
+  const count = countriesCount(lines, members);
   return count === 0 ? null : <Figure value={count} caption={count === 1 ? "Country" : "Countries"} />;
 }
 

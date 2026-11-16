@@ -7,7 +7,8 @@ import { realmPath } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { PlaceInfo } from "./PlaceInfo.tsx";
 import { PlaceView } from "./PlaceView.tsx";
-import { CountriesFigure, Links } from "./PlaceMore.tsx";
+import { liveLine } from "./liveLine.ts";
+import { countriesCount, CountriesFigure, Links } from "./PlaceMore.tsx";
 
 // The place on its universe's gnoweb: its realm's page, else gnoweb itself (the Earth, a world with no realm).
 const gnowebOf = ({ universe: { gnoweb }, realms, realm: own }: ChatPlace): string | undefined => {
@@ -51,6 +52,15 @@ export function Info({
       countries={room === undefined ? undefined : <CountriesFigure lines={room.lines} members={room.members} />}
       links={<Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />}
       page={page}
+      {...(bare
+        ? {
+            live: liveLine({
+              talking,
+              here: room?.members.length,
+              countries: room === undefined ? undefined : countriesCount(room.lines, room.members),
+            }),
+          }
+        : {})}
       here={people}
       panelRef={panelRef}
     />

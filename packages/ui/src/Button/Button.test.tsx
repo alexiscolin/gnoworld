@@ -233,7 +233,8 @@ describe("Button", () => {
     );
     expect(screen.getByRole("link", { name: "Open chat" }).hasAttribute("data-stretch")).toBe(true);
     expect(rule(".button[data-stretch]::after")).toBe('content: ""; position: absolute; inset: 0;');
-    expect(rule(".button[data-stretch]:hover")).toBe("--_fill: var(--color-fill-hover);");
+    // A solid (cream) fill keeps itself: the veil would make dark ink sit on a dark fill, and on a phone a tap leaves the hover on.
+    expect(rule('.button[data-stretch]:not([data-emphasis="solid"]):hover')).toBe("--_fill: var(--color-fill-hover);");
   });
 
   // The composer's format bar draws its tools' ink and their narrow height from outside, reaching its link tool's button too.

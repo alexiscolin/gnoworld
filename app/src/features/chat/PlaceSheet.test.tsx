@@ -32,6 +32,13 @@ describe("a place's page on a phone", () => {
     expect(all(at(undefined, <PageButton onOpen={() => undefined} />), "button")).toEqual([]);
   });
 
+  it("is the sheet's solid primary, with no floating tip and no press over the whole sheet (stretch's hover paints the fill dark)", () => {
+    const button = one(at(<Plate />, <PageButton primary onOpen={() => undefined} />), "button");
+    expect(button.getAttribute("data-emphasis")).toBe("solid");
+    expect(button.hasAttribute("data-stretch")).toBe(false);
+    expect(button.hasAttribute("title")).toBe(false);
+  });
+
   it("draws the plate in the plate's own frame: its panel, its container, its scroller", async () => {
     const box = at(<Plate />, <PlacePage place={place} />);
     await settled(() => all(box, "[data-plate]").length === 1);

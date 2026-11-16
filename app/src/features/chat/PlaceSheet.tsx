@@ -18,9 +18,8 @@ export function PageButton({ onOpen, primary = false }: { onOpen: () => void; pr
   return (
     <Button
       emphasis={primary ? "solid" : "outline"}
-      {...(primary ? { size: "l" as const, stretch: true } : {})}
+      {...(primary ? { size: "l" as const } : {})}
       icon="news"
-      description="Opens the place's page"
       onClick={onOpen}
     >
       Its page
