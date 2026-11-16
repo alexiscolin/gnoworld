@@ -117,8 +117,30 @@ describe("the network control", () => {
     settle(found);
     await settled(() => true);
     expect(at()).toBe("/w/bubble");
+    expect(document.querySelector("[aria-busy='true']")).toBeNull();
     expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
     expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
+  });
+
+  it("lets a second choice end the first: the first read changes nothing and the work stays shown until the second settles", async () => {
+    const pending: ((value: typeof found) => void)[] = [];
+    chain.readPage.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const box = await draw("/r/gov/dao");
+    await choose("gno.land");
+    act(() => {
+      trigger(box).click();
+    });
+    await settled(() => radios().length > 0);
+    await choose("gno.land");
+    expect(chain.readPage).toHaveBeenCalledTimes(2);
+    pending[0]?.(found);
+    await settled(() => true);
+    expect(at()).toBe("/r/gov/dao");
+    expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
+    expect(trigger(box).getAttribute("aria-busy")).toBe("true");
+    pending[1]?.(found);
+    await settled(() => at() === "/net/gnoland/r/gov/dao");
+    expect(trigger(box).getAttribute("aria-busy")).not.toBe("true");
   });
 
   it("keeps a realm the other chain holds but draws no page for (no Render): the chain says it exists", async () => {
