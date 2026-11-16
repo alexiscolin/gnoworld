@@ -3439,6 +3439,11 @@ mkdir -p "$t/oldnode" && printf '#!/bin/sh\necho v1.0.0\n' >"$t/oldnode/node" &&
 out=$(cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh 2>&1) &&
 	fail "check.sh ran on another Node than .node-version's"
 printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "check.sh did not refuse another Node, saying so: $out"
+# The pinned Node first on PATH, as any version manager puts it there, is taken with no nvm at all (D13416): check.sh goes past its
+# start, failing later on this stand-in, which answers its version and nothing more.
+mkdir -p "$t/pathnode" && printf '#!/bin/sh\necho v%s\n' "$(cat "$here/../.node-version")" >"$t/pathnode/node" && chmod +x "$t/pathnode/node"
+out=$(cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/pathnode:$PATH" sh scripts/check.sh 2>&1) || :
+! printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" != "check.sh: FAILED at main:start" ] || fail "check.sh refused the pinned Node first on PATH: $out"
 # The trap stops the lanes started, by an eval of their names: a caller's own `lanes`, on a run that stops before any lane, runs nothing.
 (cd "$g" && env -u SANDBOX_RUNTIME pid_a=999999 lanes='a}";touch${IFS}pwned;:"${pid_a' GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh) >/dev/null 2>&1 || :
 [ ! -e "$g/pwned" ] || fail "a caller's lanes ran as code in check.sh's trap"

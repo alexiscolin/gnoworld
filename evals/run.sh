@@ -8,7 +8,9 @@
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(dirname "$here")
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"
+want="v$(cat "$repo/.node-version")" # the Node it pins, first on PATH or in nvm's default folder, as check.sh takes it (D13416)
+export PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin:$PATH"
+[ "$(node -v 2>/dev/null)" = "$want" ] || { echo "evals/run.sh: Node $want is needed (.node-version)" >&2; exit 2; }
 missing() {
 	echo "evals/run.sh: $1" >&2
 	exit 2
