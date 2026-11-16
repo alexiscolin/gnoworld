@@ -1013,7 +1013,7 @@ describe("the chat, as the server starts it", () => {
     it("counts the stream's visitors by the proxy's X-Real-IP when TRUSTED_PROXY is the peer", async () => {
       const { app } = setup({ worlds: worlds("bubble"), moderation: OFF, ergo: undefined, trustedProxy: "10.0.0.2" });
       for (const realIp of ["192.0.2.1", "192.0.2.2"]) {
-        for (let n = 0; n < 4; n += 1) {
+        for (let n = 0; n < 32; n += 1) {
           expect((await follow(app, { peer: "10.0.0.2", realIp })).response.status).toBe(200);
         }
       }

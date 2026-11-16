@@ -7,6 +7,9 @@ import type { IncomingMessage, Server, ServerOptions } from "node:http";
 // Headers within 5 s, a whole request within 10 s, an idle kept-alive connection closed after 5 s.
 export const TIMEOUTS = { headers: 5_000, request: 10_000, keepAlive: 5_000, check: 1_000 };
 
+/** Whether a Content-Type is JSON: `application/json`, in any case, with any parameter, and nothing longer (`application/jsonx` is not). */
+export const isJsonType = (type: string | undefined): boolean => /^application\/json\s*(;|$)/i.test(type ?? "");
+
 /** Node's HTTP server options for these timeouts. */
 export function serverOptions(timeouts = TIMEOUTS): ServerOptions {
   return {

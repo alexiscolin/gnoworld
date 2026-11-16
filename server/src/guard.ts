@@ -6,6 +6,7 @@ import type { ApiError } from "@gnoworld/schemas";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { routePath } from "hono/route";
+import { isJsonType } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
 
 // The host of the request's Origin, which the guard checked.
@@ -23,7 +24,7 @@ export function guard(
     if (c.req.method !== "GET" && c.req.method !== "HEAD") {
       const host = hosts.get(c.req.header("origin") ?? "");
       if (host === undefined) return refuse(c, "origin");
-      if (!/^application\/json\s*(;|$)/i.test(c.req.header("content-type") ?? "")) return refuse(c, "type");
+      if (!isJsonType(c.req.header("content-type"))) return refuse(c, "type");
       c.set("host", host);
     }
     await next();

@@ -3,7 +3,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { ReaderCard } from "@gnoworld/schemas";
-import { readBody, serverOptions } from "@gnoworld/service/http";
+import { isJsonType, readBody, serverOptions } from "@gnoworld/service/http";
 import { z } from "zod";
 import { Refused } from "./fetch.ts";
 import type { Kind } from "./fetch.ts";
@@ -77,7 +77,7 @@ function readerHandler(deps: ServerDeps): (request: IncomingMessage, response: S
     if (path === "/health" && request.method === "GET") return void send(response, 200, '{"ok":true}');
     if (path !== "/card") return void send(response, 404);
     if (request.method !== "POST") return void send(response, 405);
-    if (!(request.headers["content-type"] ?? "").startsWith("application/json")) return void send(response, 415);
+    if (!isJsonType(request.headers["content-type"])) return void send(response, 415);
     if (active >= deps.max) {
       deps.log({ kind: "busy" });
       return void send(response, 503);
