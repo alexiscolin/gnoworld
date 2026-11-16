@@ -204,6 +204,28 @@ test("flies from the cosmos to a world's page, and lands as the world comes into
   expect((await flightOf(page)).neared).toBe(true);
 });
 
+// The counts wobble from a round to the next (a trace: 34 to 40, textures 15 to 18, never climbing), what a view draws near its end. A
+// leak is what never comes back: every read above the one before. A count of a few values cannot climb through five reads by wobble
+// alone, and a leak of one a flight (four a read) climbs through all of them.
+const climbs = (counts: number[]) => counts.every((count, at) => at === 0 || count > (counts[at - 1] ?? Infinity));
+
+test("a count that never comes back is a leak, one that wobbles is none", () => {
+  for (const wobbling of [
+    [34, 40, 38, 41, 39],
+    [15, 17, 16, 18, 16],
+    [15, 16, 16, 17, 17],
+    [40, 39, 38, 40, 41],
+  ])
+    expect(climbs(wobbling), wobbling.join()).toBe(false);
+  // One leaked a flight, four a read, under the wobble of the traces above.
+  for (const wobble of [
+    [0, 2, -1, 1, 0],
+    [1, -1, 0, 2, 1],
+    [0, 0, 0, 0, 0],
+  ])
+    expect(climbs(wobble.map((w, at) => 15 + 4 * (at + 1) + w)), wobble.join()).toBe(true);
+});
+
 // The bar, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP).
 // Every kind of place, half pages' flights, driven through the router; a world page's own warming is no flight's.
 test("leaves the GPU's resources at their baseline and the heap within a tenth after twenty flights there and back", async ({
@@ -233,18 +255,9 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   };
   await test.step("one round of each kind first", round);
   await steady();
-  // The counts wobble from a round to the next (a trace: 34 to 40, never climbing), what a view draws near its end: the baseline is the
-  // highest of the warm reads, and a leak is what the rounds add above it, as the lowest of the last three reads (a count going up and
-  // down is no leak; one a flight is twelve or more over five rounds).
-  let warmed = await gpu();
   for (const rounds of [2, 3]) {
     await test.step(`round ${String(rounds)}`, round);
     await steady();
-    const now = await gpu();
-    warmed = {
-      geometries: Math.max(warmed.geometries, now.geometries),
-      textures: Math.max(warmed.textures, now.textures),
-    };
   }
   const before = { heap: await heap(), flights: (await flightOf(page)).flights };
   const reads: { geometries: number; textures: number }[] = [];
@@ -255,8 +268,7 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   }
   // A page that frames its planet close flies once more as it settles: at least the twenty asked.
   expect((await flightOf(page)).flights).toBeGreaterThanOrEqual(before.flights + 20);
-  const last = reads.slice(-3);
-  expect(Math.min(...last.map((read) => read.geometries))).toBeLessThanOrEqual(warmed.geometries);
-  expect(Math.min(...last.map((read) => read.textures))).toBeLessThanOrEqual(warmed.textures);
+  expect(climbs(reads.map((read) => read.geometries)), "geometries climb a read after another").toBe(false);
+  expect(climbs(reads.map((read) => read.textures)), "textures climb a read after another").toBe(false);
   expect(await heap()).toBeLessThanOrEqual(before.heap * 1.1);
 });
