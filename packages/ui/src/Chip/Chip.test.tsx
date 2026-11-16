@@ -86,7 +86,7 @@ describe("Chip", () => {
     ).flat();
     expect(shown.some((c) => c.control && c.pressed === "true")).toBe(true);
     expect(shown.some((c) => c.control && c.counted)).toBe(true);
-    for (const tone of ["neutral", "mine", "warm", "signal", "danger"])
+    for (const tone of ["neutral", "mine", "warm", "signal", "danger", "new"])
       expect(shown.some((c) => !c.control && c.tone === tone)).toBe(true);
   });
 });

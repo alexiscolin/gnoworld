@@ -49,11 +49,11 @@ function AccountPill({
 }
 
 // The trigger as the menu draws it before its code comes: the device's menu, or the account's pill.
-function Trigger({ pill, onClick }: { pill: ReactNode; onClick: () => void }) {
+function Trigger({ pill, onClick, phone }: { pill: ReactNode; onClick: () => void; phone: boolean | undefined }) {
   return pill === null ? (
-    <IconButton icon="menu" label="Menu" onClick={onClick} />
+    <IconButton icon="menu" label="Menu" emphasis={phone === true ? "plain" : "outline"} onClick={onClick} />
   ) : (
-    <Button onClick={onClick}>
+    <Button emphasis={phone === true ? "quiet" : "outline"} onClick={onClick}>
       {pill}
       <span className="visually-hidden">Your account</span>
     </Button>
@@ -169,7 +169,7 @@ export function AccountMenu({
       <AccountPill address={address} universe={universe} again={again} onPickable={setPickable} />
     );
   // The trigger as the menu draws it, until the menu's code takes its place, open.
-  const trigger = <Trigger pill={pill} onClick={ask} />;
+  const trigger = <Trigger pill={pill} onClick={ask} phone={phone} />;
   const door = asked ? (
     <Suspense fallback={trigger}>
       <Opened

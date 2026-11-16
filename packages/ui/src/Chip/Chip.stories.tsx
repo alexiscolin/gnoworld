@@ -17,6 +17,7 @@ export const Marks: Story = {
       <Chip tone="warm">Live</Chip>
       <Chip tone="signal">Assistant</Chip>
       <Chip tone="danger">Refused</Chip>
+      <Chip tone="new">3</Chip>
     </Cluster>
   ),
 };

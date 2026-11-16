@@ -89,6 +89,13 @@
     --_ink: var(--color-danger);
   }
 
+  /* What is unseen: the solid coral of the world column's pill (UnreadPill) and the bell's count. */
+  .chip[data-tone="new"] {
+    --_fill: var(--color-new);
+    --_line: var(--color-new);
+    --_ink: var(--color-ink);
+  }
+
   /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"); a link in view says so by aria-current. */
   .chip:is([aria-pressed="true"], [aria-current="true"]) {
     --_fill: var(--color-primary);

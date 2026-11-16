@@ -1,6 +1,7 @@
 // The account's menu itself, asked at its trigger's first press and drawn in its place, open (AccountMenu.tsx).
 import { Menu, type IconName, type MenuItem } from "@gnoworld/ui";
 import type { ReactNode } from "react";
+import { useCredits } from "../credits/index.ts";
 import { useDeviceView, type DeviceView } from "../../deviceViews.ts";
 import { useNetworkItems } from "./NetworkMenu.tsx";
 
@@ -52,6 +53,7 @@ export function Opened({
 }) {
   const [, open] = useDeviceView();
   const network = useNetworkItems();
+  const credits = useCredits();
   // A row that opens one of the device's views.
   const to = (label: string, icon: IconName, view: DeviceView): MenuItem => ({
     label,
@@ -67,30 +69,39 @@ export function Opened({
     to("Passport", "passport", "passport"),
     ...(address === undefined ? [] : [to("Saved", "bookmark", "saved")]),
     to("Settings", "sliders", "settings"),
+    // A phone draws no fixed Credits corner (CC BY 4.0 allows a link): the menu holds it.
+    ...(phone ? [{ label: "Credits", onSelect: credits.show }] : []),
     ...(phone ? network.items.map(named) : []),
     // A key's holder frees it with no login: the way is in the menu a visitor sees.
     ...(address === undefined ? [to("Release a key", "key", "release")] : []),
     ...ownRows(address !== undefined, onPickName, onLogOut),
   ];
-  return address === undefined ? (
-    <Menu
-      trigger="Menu"
-      label="Your device"
-      icon="menu"
-      items={items}
-      openAtOnce
-      note={guestNote}
-      busy={network.busy}
-    />
-  ) : (
-    <Menu
-      trigger="Your account"
-      label="Your account"
-      lead={lead}
-      wordsHidden
-      items={items}
-      openAtOnce
-      busy={network.busy}
-    />
+  const menu =
+    address === undefined ? (
+      <Menu
+        trigger="Menu"
+        label="Your device"
+        icon="menu"
+        items={items}
+        openAtOnce
+        note={guestNote}
+        busy={network.busy}
+      />
+    ) : (
+      <Menu
+        trigger="Your account"
+        label="Your account"
+        lead={lead}
+        wordsHidden
+        items={items}
+        openAtOnce
+        busy={network.busy}
+      />
+    );
+  return (
+    <>
+      {menu}
+      {credits.dialog}
+    </>
   );
 }

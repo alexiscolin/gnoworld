@@ -3,7 +3,7 @@ import { Pressable } from "../Pressable.tsx";
 import { sightRef } from "../offscreen.ts";
 import styles from "./Chip.module.css";
 
-type Tone = "neutral" | "mine" | "warm" | "signal" | "danger";
+type Tone = "neutral" | "mine" | "warm" | "signal" | "danger" | "new";
 
 interface Mark {
   children: string;

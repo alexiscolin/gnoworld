@@ -3,7 +3,7 @@
 // the bell and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
 // the page written at /, which must hydrate as the path's own. The bars stay over the full chat, which they open and close.
 import { PHONE_QUERY } from "@gnoworld/core";
-import { Cluster, Logo } from "@gnoworld/ui";
+import { Chip, Cluster, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { useWoken } from "./features/home/clock.ts";
@@ -29,7 +29,7 @@ function Account({ universe }: { universe: UniverseView }) {
   return (
     <Cluster space="2xs" wrap={phone ? "no" : "yes"}>
       <SearchButton className="" emphasis={phone ? "plain" : "outline"} />
-      <BellSlot />
+      <BellSlot phone={phone} />
       <AccountMenu
         universe={universe.id}
         phone={phone}
@@ -38,6 +38,21 @@ function Account({ universe }: { universe: UniverseView }) {
       />
     </Cluster>
   );
+}
+
+// A testnet's warning stays in a phone's header, the network's name and switch being in the menu (DESIGN-SYSTEM.md, Trust): a warm chip,
+// a dot with the word for screen readers where the row has no room for the chip (shellHeader.module.css).
+function PhoneTestnet({ testnet }: { testnet: boolean }) {
+  const phone = useMedia(PHONE_QUERY);
+  return phone && testnet ? (
+    <span className={styles["testnet"]} data-testnet="">
+      <Chip tone="warm">Testnet</Chip>
+      <span className={styles["testnetDot"]} data-dot="">
+        <span className="dot" data-tone="warm" aria-hidden="true" />
+        <span className="visually-hidden">Testnet</span>
+      </span>
+    </span>
+  ) : null;
 }
 
 // A level: its mark, colourless (stars, a sun, a planet), its word and the name of the place it leads to, in a pill of its own;
@@ -97,9 +112,12 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
   useSeenPlaces(universe, pathname);
   return (
     <header className={styles["header"]}>
-      <Link to="/" className={styles["logo"]} aria-label="gnoworld">
-        <Logo wordmark />
-      </Link>
+      <div className={styles["brand"]}>
+        <Link to="/" className={styles["logo"]} aria-label="gnoworld">
+          <Logo wordmark />
+        </Link>
+        <PhoneTestnet testnet={universe.testnet} />
+      </div>
       <div className={styles["bars"]}>
         <nav aria-label="Views" className={`${styles["views"] ?? ""} control-bar`} ref={barRef}>
           <span className={styles["fill"]} aria-hidden="true" />

@@ -57,6 +57,32 @@ describe("the account's menu", () => {
     expect(rows.findIndex((row) => row.startsWith("Network:"))).toBeGreaterThan(rows.indexOf("Settings"));
   });
 
+  it("on a phone has a Credits row after Settings, which opens the credits dialog; a computer's menu has none", async () => {
+    Object.assign(HTMLDialogElement.prototype, {
+      showModal(this: HTMLDialogElement) {
+        this.open = true;
+      },
+      close(this: HTMLDialogElement) {
+        this.open = false;
+      },
+    });
+    const computer = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(items(computer)).not.toContain("Credits");
+    const box = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} phone />);
+    const rows = items(box);
+    expect(rows.indexOf("Credits")).toBe(rows.indexOf("Settings") + 1);
+    expect(box.querySelector("dialog")).toBeNull();
+    const row = [...box.querySelectorAll<HTMLButtonElement>("[role='menuitem']")].find(
+      (item) => item.textContent === "Credits",
+    );
+    act(() => {
+      row?.click();
+    });
+    await vi.waitFor(() => {
+      expect(box.querySelector("dialog[open]")?.textContent).toContain("Credits");
+    });
+  });
+
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);

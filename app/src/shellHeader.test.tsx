@@ -321,6 +321,35 @@ describe("the header's menu on a phone", () => {
     expect(radios.filter((each) => each.getAttribute("aria-checked") === "true")).toHaveLength(1);
   });
 
+  const headerOf = async (path: string) => {
+    api.me.mockResolvedValue({ ok: true, value: { address: null } });
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <ShellHeader universe={site.universeAt(path)} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    await settled(() => box.querySelector("button[aria-label='Menu']") !== null);
+    return box;
+  };
+
+  test("a phone on a testnet keeps Testnet in the header, after the logo: a warm chip, and a dot with the word for under 360 px", async () => {
+    screenOf({ width: 390 });
+    const box = await headerOf("/");
+    const pill = box.querySelector("header [data-testnet]");
+    expect(pill?.previousElementSibling?.getAttribute("aria-label")).toBe("gnoworld");
+    expect(pill?.querySelector("[data-tone='warm']")?.textContent).toBe("Testnet");
+    expect(pill?.querySelector("[data-dot] .visually-hidden")?.textContent).toBe("Testnet");
+  });
+
+  test("a phone on mainnet, and a computer on a testnet, draw no such pill in the logo's place", async () => {
+    screenOf({ width: 390 });
+    expect((await headerOf("/net/gnoland")).querySelector("[data-testnet]")).toBeNull();
+    screenOf({ width: 1280 });
+    expect((await headerOf("/")).querySelector("[data-testnet]")).toBeNull();
+  });
+
   test("a computer's menu has neither the words, the way in nor the network", async () => {
     screenOf({ width: 1280 });
     withAdena();

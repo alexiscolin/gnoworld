@@ -27,7 +27,8 @@ function useSettled(): boolean {
   return settled;
 }
 
-export function Bell() {
+/** `phone`: a phone header's icons are plain, as its search's. */
+export function Bell({ phone }: { phone: boolean }) {
   const [count, setCount] = useState(0);
   // The bell counts what is the reader's own: a visitor's bell holds the news, uncounted.
   const signedIn = useApp(({ login }) => login.session.kind === "in");
@@ -40,6 +41,7 @@ export function Bell() {
       <IconButton
         icon="bell"
         label="Notifications"
+        emphasis={phone ? "plain" : "outline"}
         count={signedIn ? count : 0}
         countTone="new"
         pressed={open}

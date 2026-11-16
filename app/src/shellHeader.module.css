@@ -19,6 +19,24 @@
     padding: var(--space-s);
   }
 
+  .brand {
+    /* layout: a computer's grid sees the logo alone: the box takes no part in it */
+    display: contents;
+  }
+
+  .testnet {
+    /* layout: a phone's warning, drawn only there (shellHeader.tsx) */
+    display: flex;
+    /* layout: the chip or the dot on the logo's line */
+    align-items: center;
+    min-inline-size: 0;
+  }
+
+  .testnetDot {
+    /* layout: the chip shows from 360 px; the dot's place is under it */
+    display: none;
+  }
+
   .logo {
     /* layout: the link is a box of its logo's height, so no line's leading moves the mark off the row's middle */
     display: flex;
@@ -386,6 +404,28 @@
       padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) calc(var(--space-s) + env(safe-area-inset-right));
       /* layout: the logo and the controls on one line, at every width from 320 px: the network and the way in are rows of the account's menu */
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .brand {
+      /* layout: the logo and the testnet's warning on one line, a step apart, giving way before the controls */
+      display: flex;
+      /* layout: they share a middle */
+      align-items: center;
+      /* layout: a step between the logo and the warning */
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+
+    /* Under 360 px the chip's words would crowd the three 44 px controls at 320: a warm dot, its word kept for screen readers. */
+    @media (width < 360px) {
+      .testnet > :first-child {
+        display: none;
+      }
+
+      .testnetDot {
+        /* layout: the dot and its hidden word in the chip's place */
+        display: inline-flex;
+      }
     }
 
     .logo {

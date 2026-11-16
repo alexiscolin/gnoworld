@@ -33,6 +33,8 @@ export interface TabsProps {
   fill?: boolean;
   /** Counts as plain figures after the words in the data type, not in a badge. */
   plainCount?: boolean;
+  /** The counts' tone: coral when they are what is unseen (the bell's kinds), mint otherwise. */
+  countTone?: "mine" | "new";
   /** The id base of the tabs and their panels (a TabPanel with the same base), so each panel is named by its tab. */
   id?: string;
 }
@@ -48,8 +50,10 @@ export function Tabs({
   size = "m",
   fill = false,
   plainCount = false,
+  countTone = "mine",
   id,
 }: TabsProps) {
+  const tone = countTone === "new" ? "new" : undefined;
   const reached = Math.max(
     0,
     tabs.findIndex((tab) => tab.id === selected),
@@ -93,6 +97,7 @@ export function Tabs({
               <>
                 {" "}
                 <span
+                  data-tone={tone}
                   className={plainCount ? styles["figure"] : `${String(badge["badge"])} ${String(styles["count"])}`}
                 >
                   {tab.count}
