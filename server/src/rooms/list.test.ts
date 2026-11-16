@@ -536,7 +536,7 @@ describe("GET /api/rooms?world=earth at 5,000 rooms", () => {
 
   it("runs the room query once for two guests within 5 s, and again once the 5 s are past", async () => {
     const t = crowded(5000);
-    const rooms = (): number => t.ran.filter((sql) => sql.includes("FROM rooms WHERE world")).length;
+    const rooms = (): number => t.ran.filter((sql) => sql.includes("FROM rooms r LEFT JOIN earth_rooms")).length;
     const first = await t.ask("?world=earth", {}, true);
     const second = await t.ask("?world=earth", {}, true);
     expect(second.text).toBe(first.text);

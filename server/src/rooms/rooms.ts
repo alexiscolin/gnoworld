@@ -50,10 +50,11 @@ UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world = 'earth' A
 UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world < 'earth'
 UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world > 'earth'`;
 
-/** One world's rooms listed (parameters: the world twice and the window's start, or any lower bound for a world but the Earth). */
+/** One world's rooms listed with the date an account made them, null for a room none made (parameters: the world twice and the
+ * window's start, or any lower bound for a world but the Earth). */
 export const WORLD_LISTED_SQL = `
-SELECT name, archived FROM rooms WHERE world = ? AND archived = 0
-UNION ALL SELECT name, archived FROM rooms WHERE world = ? AND archived = 1 AND created_at > ?`;
+SELECT r.name, r.archived, e.created_at AS made FROM rooms r LEFT JOIN earth_rooms e ON e.name = r.name WHERE r.world = ? AND r.archived = 0
+UNION ALL SELECT r.name, r.archived, e.created_at FROM rooms r LEFT JOIN earth_rooms e ON e.name = r.name WHERE r.world = ? AND r.archived = 1 AND r.created_at > ?`;
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -64,17 +65,19 @@ export function listRooms(db: DatabaseSync, now?: number): Room[] {
   return Rooms.parse(db.prepare(LISTED_SQL).all(earthWindowStart(now))).toSorted((a, b) => compare(a.name, b.name));
 }
 
-/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE), in one query, those past the window left out. */
-export function worldRoomStates(db: DatabaseSync, world: string, now: number): { name: string; archived: boolean }[] {
-  const Rows = z.array(z.object({ name: z.string(), archived: z.number() }));
+/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE) and the date an account made them (earth_rooms),
+ * in one query, those past the window left out. */
+export function worldRoomStates(
+  db: DatabaseSync,
+  world: string,
+  now: number,
+): { name: string; archived: boolean; madeAt: number | undefined }[] {
+  const Rows = z.array(z.object({ name: z.string(), archived: z.number(), made: z.number().nullable() }));
   // Only the Earth has rooms past the window: any other world's archived rooms all stay.
   const from = world === "earth" ? earthWindowStart(now) : Number.MIN_SAFE_INTEGER;
   return Rows.parse(db.prepare(WORLD_LISTED_SQL).all(world, world, from))
     .toSorted((a, b) => compare(a.name, b.name))
-    .map(({ name, archived }) => ({
-      name,
-      archived: archived === 1,
-    }));
+    .map(({ name, archived, made }) => ({ name, archived: archived === 1, madeAt: made ?? undefined }));
 }
 
 export const worldRooms = (db: DatabaseSync, world: string, now: number): string[] =>

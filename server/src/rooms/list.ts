@@ -76,13 +76,13 @@ function sectionsOf(
 
 // The Earth's rooms in the order of use: the rooms no account made (the main room, the moderators' and the file's) first as
 // they were, then the public rooms by people here, lines in 24 hours, the newest, then name.
-function byUse(db: DatabaseSync, seen: readonly string[], counts: Counts): string[] {
-  const Made = z.array(z.object({ name: z.string(), created_at: z.number() }));
-  const made = new Map(
-    Made.parse(db.prepare("SELECT name, created_at FROM earth_rooms").all()).map((row) => [row.name, row.created_at]),
-  );
+function byUse(seen: readonly { name: string; madeAt: number | undefined }[], counts: Counts): string[] {
+  const made = new Map(seen.flatMap(({ name, madeAt }) => (madeAt === undefined ? [] : [[name, madeAt] as const])));
   const use = (room: string) => [counts.here(room) ?? 0, counts.messages.get(room) ?? 0, made.get(room) ?? 0] as const;
-  const [first, rest] = [seen.filter((room) => !made.has(room)), seen.filter((room) => made.has(room))];
+  const [first, rest] = [
+    seen.filter(({ name }) => !made.has(name)).map(({ name }) => name),
+    seen.filter(({ name }) => made.has(name)).map(({ name }) => name),
+  ];
   return [
     ...first,
     ...rest.toSorted((a, b) => {
@@ -138,10 +138,8 @@ export function listRoutes({
     const kept = who === undefined ? guests.get(world) : undefined;
     if (kept !== undefined) return c.json(kept);
     const counts = { here, messages: lines() };
-    const listed = worldRoomStates(db, world, now())
-      .filter(({ name, archived }) => visible(name, who, archived))
-      .map(({ name }) => name);
-    const seen = world === "earth" ? byUse(db, listed, counts) : listed;
+    const listed = worldRoomStates(db, world, now()).filter(({ name, archived }) => visible(name, who, archived));
+    const seen = world === "earth" ? byUse(listed, counts) : listed.map(({ name }) => name);
     const body = {
       world,
       sections: sectionsOf(roles, world, { seen, counts, realms: realmPaths(db, world) }),

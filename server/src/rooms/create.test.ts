@@ -464,6 +464,8 @@ describe("a room anyone makes on the Earth", () => {
       ...plan(WORLD_LISTED_SQL, "earth", "earth", 0),
     ];
     expect(used.join("\n")).toMatch(/earth_rooms_by_date/);
+    // The list's dates come from the primary key of earth_rooms, for the listed rooms alone.
+    expect(plan(WORLD_LISTED_SQL, "earth", "earth", 0).join("\n")).toMatch(/earth_rooms.*name=\?/);
     expect(used.join("\n")).toMatch(/rooms_live/);
     expect(used.join("\n")).toMatch(/rooms_archived_by_date/);
     expect(used.filter((detail) => /^SCAN (rooms|earth_rooms|e|r)\b(?! USING)/.test(detail))).toEqual([]);
