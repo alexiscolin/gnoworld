@@ -91,7 +91,13 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    Terminal would not show as itself, lists the subjects, each
    harness file with its lines added and removed, the declaration lines, any workflow file, how the branch on GitHub changes and 16 hex
    of the tip, and on his y pushes that tip with his gh login and opens the pull request (`scripts/land.py`, which reuses
-   `scripts/agent_pr.py`'s reading and scans). The change exists only on GitHub until he merges it. `pre-merge-commit` gives a merge commit the same checks, and a merge always makes one
+   `scripts/agent_pr.py`'s reading and scans). What a session writes: a branch named `[a-z0-9][a-z0-9-]{0,62}`, never
+   main, holding GitHub's main as it is now (merged in if main moved), each harness file it touches declared on a `Harness-changed:` line
+   (`scripts/ci_changes.sh` run on the range first); in the drop folder, nothing but `<branch>.bundle` (`git bundle create` of
+   `<main>..<branch>`, one head, 512 MiB at most) and `<branch>.md` (UTF-8, 64 KiB at most: the title on its first line, 256 characters
+   at most and no control character, a blank line, the body); and the tip's 16 hex, given to the owner. He types `land`, compares the 16
+   hex in its listing, answers `y`; the two files are removed once the pull request is opened or found, so the folder holds one branch
+   at a time. The change exists only on GitHub until he merges it. `pre-merge-commit` gives a merge commit the same checks, and a merge always makes one
    (the install's `merge.ff false`). pre-commit reaches `git commit` and `git merge` alone: cherry-pick, revert, rebase, am and git's
    plumbing (`stash create` then `update-ref`, as `commit-tree`) commit with no hook, which guard.py refuses when typed, not when a
    script file runs them; such a commit meets its wall on GitHub, whose changes job refuses a harness file no commit declares on a line
