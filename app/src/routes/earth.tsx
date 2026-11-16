@@ -50,7 +50,6 @@ export default function Earth() {
         plate={<EarthPlate universe={universe} />}
         page={(dock) => <EarthPage universe={universe} chat={dock} />}
       />
-      <WorldSigns />
       <Arrival universe={universe.id} world={EARTH_ID} name="Earth" path={universe.earth.path} />
     </>
   );
@@ -86,6 +85,7 @@ function EarthPage({ universe, chat }: { universe: UniverseView; chat: ReactNode
         </DockChat>
       </Panel.Layout>
       <SpaceFoot />
+      <WorldSigns />
     </>
   );
 }

@@ -104,7 +104,7 @@
 
   /* A phone's full chat (under 900 px): from under the shell header to the visual viewport's foot, which viewport.ts keeps in --chat-vh (the dynamic viewport's where
      unset), so the on-screen keyboard never covers the composer; a header of 44 px rows (PhoneHeader.module.css, which also says where the
-     arrival's pill stands under it); and the room for that pill kept free over the lines only while it shows, never an empty band. */
+     arrival's pill stands under it); and no room kept over the lines for a pill, which a phone's full chat never draws. */
   @media (width < 900px) {
     .screen[data-full] {
       /* the layer starts under the shell header's row, which stays visible and pressable (shellHeader.module.css); past it, where the
@@ -124,9 +124,23 @@
       --chat-head: 0px;
     }
 
+    /* No pill over a phone's full chat (the page's banners are not drawn there), so no room kept for one. */
     .screen[data-full][data-compact] [data-region="conversation"] {
-      /* the arrival's pill's room, only while it shows (ui's Flash sets --banner-held) */
-      padding-block-start: var(--banner-held);
+      padding-block-start: 0;
+    }
+
+    /* The phone header's place while its code comes (ChatTop.tsx): its two rows and the step between them, so the conversation does not
+       move down as it arrives (PhoneHeader.module.css: one row on a short window). */
+    .topWaiting {
+      /* layout: reserved room, nothing drawn */
+      display: block;
+      block-size: calc(var(--control-m) * 2 + var(--space-3xs));
+    }
+
+    @media (height < 500px) {
+      .topWaiting {
+        block-size: var(--control-m);
+      }
     }
   }
 

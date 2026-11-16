@@ -103,6 +103,16 @@ describe("the sheets in the address", () => {
     expect(now(box)).toBe("/|none");
   });
 
+  it("closes from the page straight to none over the whole run, so the next Back leaves the place", () => {
+    const box = draw("/", "/r/a?chat=full");
+    press(box, "info");
+    press(box, "page");
+    press(box, "close");
+    expect(now(box)).toBe("/r/a?chat=full|none");
+    press(box, "Back");
+    expect(now(box)).toBe("/|none");
+  });
+
   it("opens from an address that holds it (a reload, a link) and closes it by a replace, keeping the entry before", () => {
     const box = draw("/", "/r/a?chat=full&sheet=page");
     expect(now(box)).toBe("/r/a?chat=full&sheet=page|page");

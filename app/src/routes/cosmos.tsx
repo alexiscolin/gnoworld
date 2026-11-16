@@ -1,18 +1,18 @@
 // The cosmos's other views, `/universe` and `/s/<namespace>`: the home's page, with no page written ahead (the static host's fallback
 // serves it, as it serves a realm's view), so no server loader: the browser's reads the home's data. The address says the view
 // (useCosmosAddress).
-import { PHONE_QUERY } from "@gnoworld/core";
-import { data, redirect, useLocation } from "react-router";
+import { data, useLocation } from "react-router";
 import { RouteError } from "../features/errors/index.ts";
 import { cosmosAt, homeOf, isHome } from "../cosmosAt.ts";
 import { worldsFile } from "../worldsFile.ts";
 import { site } from "../places.ts";
+import { phoneAway } from "./phoneAway.ts";
 
 // A system is a namespace with a world in the worlds' file; one the file does not hold is no system. A file that did not come proves nothing.
 export async function clientLoader({ request }: { request: Request }) {
   const universe = site.universe(homeOf(request), "cosmos");
-  // A phone has no space to show a cosmos view in: the universe's home list, before anything is read.
-  if (typeof matchMedia === "function" && matchMedia(PHONE_QUERY).matches) return redirect(universe.home.path);
+  const away = phoneAway(universe.home.path);
+  if (away !== undefined) return away;
   const at = cosmosAt(new URL(request.url).pathname);
   if (at?.view !== "system" || isHome(at.system) || !universe.isDefault) return universe;
   const file = await worldsFile();

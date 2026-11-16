@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { phoneGoes } from "./features/chat/phoneGo.ts";
-import { fullChatHref, markFullEarly } from "./fullChat.ts";
+import { fullChatHref, fullOnPhone, markFullEarly } from "./fullChat.ts";
 
 const at = (path: string) => {
   const [rest = "", hash] = path.split("#", 2);
   const [pathname = "", search = ""] = rest.split("?", 2);
   return { pathname, search: search === "" ? "" : `?${search}`, hash: hash === undefined ? "" : `#${hash}` };
 };
-const go = (path: string, phone = true, home = "/") => phoneGoes(phone, at(path), home);
+const go = (path: string, phone = true) => (phone ? fullOnPhone(at(path)) : undefined);
 
 describe("where a phone goes from an address", () => {
   it("opens a place in its full chat, in any universe", () => {
@@ -33,17 +32,9 @@ describe("where a phone goes from an address", () => {
     expect(go("/w/govdao?room=dev&chat=full")).toBeUndefined();
   });
 
-  it("sends the cosmos's addresses and an ecosystem's to the universe's home", () => {
-    expect(go("/universe")).toBe("/");
-    expect(go("/s/gnoland")).toBe("/");
-    expect(go("/s/gnoland/")).toBe("/");
-    expect(go("/e/gnoswap")).toBe("/");
-    expect(go("/net/onyx/e/gnoswap", true, "/net/onyx")).toBe("/net/onyx");
-  });
-
   it("leaves the home, the list and any other address where they are", () => {
     expect(go("/")).toBeUndefined();
-    expect(go("/net/onyx", true, "/net/onyx")).toBeUndefined();
+    expect(go("/net/onyx")).toBeUndefined();
     expect(go("/list")).toBeUndefined();
     expect(go("/nowhere")).toBeUndefined();
     expect(go("/worlds/x")).toBeUndefined();

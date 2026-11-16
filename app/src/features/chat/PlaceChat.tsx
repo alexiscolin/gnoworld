@@ -5,7 +5,7 @@ import type { ChatProps } from "./Chat.tsx";
 import { DockCover } from "./DockCover.tsx";
 import { useChatAlone } from "./full.ts";
 import { chatHeld, heard, hold, Pending, putSeat, seatOf } from "./fullHost.tsx";
-import { PhoneGate } from "./PhoneGate.tsx";
+import { usePhoneGo } from "./phoneGo.ts";
 import { restoreScrolls, scrollsOf } from "./stillScreen.ts";
 
 // The pages that hold a chat now, docked or full: the one leaving and the one coming are told in the same commit.
@@ -83,16 +83,6 @@ function DockSlot({ chat }: { chat: ChatProps | undefined }) {
   );
 }
 
-/** A place's page and its chat: the page with its chat docked in it, or, asked full in the address, the shell's one chat alone (no space,
- * no plate). `chat` is none while it cannot be drawn yet. */
-export function PlaceChat(props: PlaceChatProps) {
-  return (
-    <PhoneGate>
-      <Place {...props} />
-    </PhoneGate>
-  );
-}
-
 interface PlaceChatProps {
   chat: ChatProps | undefined;
   page: (dock: ReactNode) => ReactNode;
@@ -102,9 +92,13 @@ interface PlaceChatProps {
   failed?: ReactNode;
 }
 
-function Place({ chat, page, plate, failed }: PlaceChatProps) {
+/** A place's page and its chat: the page with its chat docked in it, or, asked full in the address, the shell's one chat alone (no space,
+ * no plate). `chat` is none while it cannot be drawn yet. */
+export function PlaceChat({ chat, page, plate, failed }: PlaceChatProps) {
   useHolding();
   const alone = useChatAlone();
+  // A phone's place goes to its full chat by a replace; it draws nothing while it goes, and stays the same element, so it mounts once.
+  if (usePhoneGo()) return null;
   if (!alone) return page(<DockSlot chat={chat} />);
   return (
     <>

@@ -22,13 +22,32 @@ export function PageButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-// The section the address names (#page: the realm's page, where its proposals are), scrolled to once the plate is drawn: a sibling of the
-// plate in its Suspense mounts as the plate does. Only a section of the plate's own panel, never one of the chat behind the sheet.
+// The section the address names (#page: the realm's page, where its proposals are), scrolled to once the plate has drawn it: the routes'
+// plates are chunks of their own, so the section may come after the sheet. Only a section of the plate's own panel, never one of the
+// chat behind the sheet. Watches the page for a bounded time and stops as it is found.
+const WAIT_FOR_SECTION = 5000;
 function ScrollToSection() {
   useEffect(() => {
     const id = sectionId(window.location.hash);
-    const target = id === undefined ? null : document.getElementById(id);
-    if (target?.closest("[data-look='plate']")) target.scrollIntoView({ block: "start" });
+    if (id === undefined) return;
+    const look = () => {
+      const target = document.getElementById(id);
+      if (!target?.closest("[data-look='plate']")) return false;
+      target.scrollIntoView({ block: "start" });
+      return true;
+    };
+    if (look()) return;
+    const watch = new MutationObserver(() => {
+      if (look()) watch.disconnect();
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    const stop = setTimeout(() => {
+      watch.disconnect();
+    }, WAIT_FOR_SECTION);
+    return () => {
+      clearTimeout(stop);
+      watch.disconnect();
+    };
   }, []);
   return null;
 }

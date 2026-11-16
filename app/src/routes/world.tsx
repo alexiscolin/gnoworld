@@ -83,9 +83,6 @@ export default function World() {
         plate={plate}
         page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />}
       />
-      {/* The arrival banners: nothing unless the server's signal says this account earned one. */}
-      <Banners world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
-      <WorldSigns world={hubWorldOf(world)} />
       <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
   );
@@ -103,19 +100,24 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
   return (
-    <PlaceFrame
-      ring={ring}
-      label={world.name}
-      plate={
-        <>
-          <Kicker planet>{kickerOf(world)}</Kicker>
-          <Panel.Title>{world.name}</Panel.Title>
-          {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
-        </>
-      }
-      chat={chat}
-      chatDue={chatDue}
-    />
+    <>
+      <PlaceFrame
+        ring={ring}
+        label={world.name}
+        plate={
+          <>
+            <Kicker planet>{kickerOf(world)}</Kicker>
+            {/* The arrival banners: nothing unless the server's signal says this account earned one. */}
+            <Banners world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
+            <Panel.Title>{world.name}</Panel.Title>
+            {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
+          </>
+        }
+        chat={chat}
+        chatDue={chatDue}
+      />
+      <WorldSigns world={hubWorldOf(world)} />
+    </>
   );
 }
 

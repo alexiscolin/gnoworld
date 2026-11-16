@@ -4,9 +4,10 @@ import type { ComponentProps, RefObject } from "react";
 import { ErrorView, errorKind } from "../errors/index.ts";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
+import styles from "./ChatScreen.module.css";
 
 const PhoneTop = chunked(async () => ({ default: (await import("./phoneChat.tsx")).PhoneTop }), {
-  waiting: null,
+  waiting: <span className={styles["topWaiting"]} />,
   failed: (error) => <ErrorView kind={errorKind(error)} size="inline" urgent />,
 });
 

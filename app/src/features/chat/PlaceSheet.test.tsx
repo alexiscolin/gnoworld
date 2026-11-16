@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, mount, one, settled } from "../../../tests/mount.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
+import { chunked } from "./Failing.tsx";
 import { PlacePageProvider } from "./placePage.ts";
 import { PageButton, PlacePage } from "./PlaceSheet.tsx";
 
@@ -73,5 +74,59 @@ describe("a place's page on a phone", () => {
     await settled(() => all(box, "[data-plate]").length === 1);
     expect(scrolled).not.toHaveBeenCalled();
     history.replaceState(null, "", "/");
+  });
+
+  describe("a plate in a chunk of its own, as the routes make it", () => {
+    const later = () => {
+      let arrive: () => void = () => undefined;
+      const Late = chunked(
+        () =>
+          new Promise<{ default: () => ReactNode }>((done) => {
+            arrive = () => {
+              done({
+                default: () => (
+                  <section id="section">
+                    <p data-plate="x">the page</p>
+                  </section>
+                ),
+              });
+            };
+          }),
+        { waiting: null, failed: () => null },
+      );
+      return {
+        Late,
+        arrive: () => {
+          arrive();
+        },
+      };
+    };
+
+    it("says it loads while the chunk comes, and draws a computer's waiting as nothing", async () => {
+      const { Late, arrive } = later();
+      const later2 = later();
+      const box = at(<Late />, <PlacePage place={place} />);
+      expect(one(box, "[role='status']").textContent).toBe("Loading the page…");
+      expect(mount(<later2.Late />).textContent, "a computer's plate waiting draws nothing").toBe("");
+      arrive();
+      await settled(() => all(box, "[data-plate]").length === 1);
+      expect(all(box, "[role='status']")).toEqual([]);
+    });
+
+    it("scrolls to the section once the chunk has drawn it, though the sheet was drawn before", async () => {
+      const scrolled = vi.fn();
+      Element.prototype.scrollIntoView = function (this: Element) {
+        scrolled(this.id);
+      };
+      history.replaceState(null, "", "/r/gov/dao?sheet=page#section");
+      const { Late, arrive } = later();
+      const box = at(<Late />, <PlacePage place={place} />);
+      expect(scrolled).not.toHaveBeenCalled();
+      arrive();
+      await settled(() => all(box, "[data-plate]").length === 1);
+      await settled(() => scrolled.mock.calls.length === 1);
+      expect(scrolled).toHaveBeenCalledWith("section");
+      history.replaceState(null, "", "/");
+    });
   });
 });

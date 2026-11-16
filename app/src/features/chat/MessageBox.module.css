@@ -195,6 +195,12 @@
       --_below: calc(var(--space-2xs) + var(--control-m));
     }
 
+    /* An account without a name has the nudge under its box (NameNudge.tsx): the text, which wraps at 320 px, and its button at 44 px, a row
+       or two. */
+    .box:has(+ [data-nudge]) {
+      --_below: calc(var(--space-2xs) * 2 + 2lh + var(--control-m));
+    }
+
     .box:has(.format[data-open]) {
       --_bar: calc(2 * var(--control-m) + 3 * var(--space-3xs) + var(--line-width));
     }
