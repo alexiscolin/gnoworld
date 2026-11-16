@@ -42,12 +42,15 @@ export const tags = (sent: readonly string[]) => sent.filter((line) => line.incl
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 // The places the page set: a MARKREAD with its time, not its ask of Ergo's place.
 export const marks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
+// How long the barrier's TAGMSG may take to reach the socket: a loaded runner hears it late (the nightly of 2026-11-16 got 1
+// of 2 in the default 5 s), and the wait still ends on the word itself, never on a time.
+export const BARRIER = { timeout: 90_000 };
 // What the page sent before a word of its own written now: that word's TAGMSG goes out behind all of it, on the same
 // socket, so what is missing before it was never sent.
 export async function sentBefore(page: Page, sent: readonly string[]): Promise<readonly string[]> {
   const told = tags(sent).length;
   await field(page).fill(`barrier ${String(told)}`);
-  await expect.poll(() => tags(sent).length).toBeGreaterThan(told);
+  await expect.poll(() => tags(sent).length, BARRIER).toBeGreaterThan(told);
   return sent.slice(
     0,
     sent.findLastIndex((line) => line.includes(" TAGMSG ")),

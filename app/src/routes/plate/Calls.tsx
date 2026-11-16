@@ -150,16 +150,7 @@ function Segments({
   );
 }
 
-export function Calls({
-  rollup,
-  worlds,
-  beside,
-}: {
-  rollup: RealmRollup;
-  worlds: Worlds["worlds"] | undefined;
-  /** Who calls it stands beside it, so it takes eight columns, all twelve once open. */
-  beside: boolean;
-}) {
+export function Calls({ rollup, worlds }: { rollup: RealmRollup; worlds: Worlds["worlds"] | undefined }) {
   const [scale, setScale] = useState<"log" | "linear">("log");
   const [range, setRange] = useState<"all" | "14">("all");
   const expand = useAlone("calls");
@@ -168,7 +159,7 @@ export function Calls({
   if (every.length === 0 && rollup.last.length === 0) return null;
   const failed = rollup.last.filter((call) => !call.success).length;
   return (
-    <Cell span={open || !beside ? 12 : 8}>
+    <Cell span={12}>
       <Card look="hub" fixed rises open={open}>
         <Card.Header
           icon="chart"

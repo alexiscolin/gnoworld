@@ -19,7 +19,7 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
   const shown = open ? top : top.slice(0, OPENS_WITH);
   const most = top[0]?.calls ?? 1;
   return (
-    <Cell span={open ? 12 : 4}>
+    <Cell span={12}>
       <Card look="hub" fixed rises open={open}>
         <Card.Header icon="people" title="Who calls it" level={2} hint="per day" expand={expand} />
         <Card.Body>
