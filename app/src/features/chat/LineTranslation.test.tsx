@@ -117,9 +117,9 @@ describe("a translated line", () => {
     wantTranslation({ room: ROOM, id: asking.id, language: "fr" }, () => new Promise((resolve) => (answer = resolve)));
     await act(() => vi.advanceTimersByTimeAsync(3000));
     for (const box of boxes) expect(all(box, "[data-translation]")).toHaveLength(0);
-    answer({ ok: false, reason: "unavailable" });
+    answer({ ok: false, reason: "malformed" });
     await act(() => vi.advanceTimersByTimeAsync(3000));
-    await translate(failed, { ok: false, reason: "unavailable" });
+    await translate(failed, { ok: false, reason: "malformed" });
     for (const box of boxes) expect(all(box, "[data-translation]")).toHaveLength(0);
   });
 
