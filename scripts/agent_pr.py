@@ -75,12 +75,14 @@ def branch_ok(branch):
     return (2 <= len(parts) <= 9 and parts[0] == "agent" and ".." not in branch and all(PART.fullmatch(p) for p in parts[1:]))
 
 
+TMP = os.path.realpath("/tmp")  # macOS's /tmp is a link to /private/tmp, Linux's is none: the one link resolved, root's own
+
+
 def take(path, limit, dest):
     """Copies a file of the caller's space to dest, walking each folder of its path without following a link."""
-    if path.startswith("/tmp/"):
-        path = "/private" + path  # macOS's /tmp is a link to /private/tmp; nothing else is resolved
+    path, space = (TMP + p[4:] if p.startswith("/tmp/") else p for p in (path, SPACE))  # both sides read /tmp the same way
     parts = path.split("/")
-    if not path.startswith(SPACE) or "" in parts[1:] or "." in parts or ".." in parts:
+    if not path.startswith(space) or "" in parts[1:] or "." in parts or ".." in parts:
         raise Refused(f"a file outside {SPACE}, or not written plainly: {path!r}")
     flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)

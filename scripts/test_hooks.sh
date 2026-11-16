@@ -7483,6 +7483,21 @@ for line in "land: feat, 1 commit(s) on main" "  $(lg -C "$ld/s" rev-parse --sho
 $out"
 done
 printf '%s\n' "$out" | grep -q "nothing pushed" && [ -z "$(remote feat)" ] && [ -e "$ld/space/feat.bundle" ] || fail "land pushed, or took the drop, on an N: $out"
+# The drop folder named through /tmp, a link to /private/tmp on macOS and none on Linux: both sides of the inside check read it the
+# same way (PR #17's red on GitHub: agent_pr.take turned /tmp/ into /private/tmp/ on the file's side alone, and Linux has no
+# /private). Its copy is made under /tmp itself, whatever TMPDIR is (a Mac's is under /var/folders). Any other link on the way is
+# refused still.
+lt=$(mkdir -p "/tmp/claude-$(id -u)" && mktemp -d "/tmp/claude-$(id -u)/land.XXXXXX") && mkdir "$lt/space" && cp "$ld/space/feat.bundle" "$ld/space/feat.md" "$lt/space/"
+case $lt in /tmp/*) ;; *) fail "mktemp did not name the drop folder through /tmp: $lt" ;; esac
+sed "s|^SPACE = .*|SPACE = \"$lt/space/\"|" "$ld/land.py" >"$ld/land_tmp.py"
+out=$(printf 'n\n' | python3 -I "$ld/land_tmp.py" 2>&1) && code=0 || code=$?
+rm -r "${lt:?}" # before any verdict: a failure leaves nothing outside the test's folder
+[ "$code" = 0 ] || fail "land failed on an N, its drop folder named through /tmp: $out"
+printf '%s\n' "$out" | grep -qxF "tip: $(printf '%.16s' "$tip")" || fail "land did not list a drop folder named through /tmp: $out"
+ln -s "$ld" "$ld/via" && sed "s|^SPACE = .*|SPACE = \"$ld/via/space/\"|" "$ld/land.py" >"$ld/land_via.py"
+out=$(printf 'n\n' | python3 -I "$ld/land_via.py" 2>&1) && fail "land read a drop folder reached through a link: $out"
+printf '%s\n' "$out" | grep -qF "a folder of its path is missing or a link" || fail "land did not refuse a drop folder reached through a link: $out"
+rm "$ld/via" "$ld/land_tmp.py" "$ld/land_via.py"
 out=$(landed y) || fail "land failed on a y: $out"
 [ "$(remote feat)" = "$tip" ] || fail "land did not push the bundle's tip: $out"
 [ "$(cat "$ld/body")" = "The body." ] || fail "land did not open the pull request with its body alone: [$(cat "$ld/body")]"

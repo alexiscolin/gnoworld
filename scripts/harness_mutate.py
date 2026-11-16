@@ -1040,6 +1040,9 @@ def mutants():
         yield from each(ld, find, replace, "hooks", label)
     yield from each(ih, 'if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then', "if false; then", "hooks", "install_hooks installs land from a commit that holds it")
     yield from each("scripts/agent_pr.py", "    if not title or len(title) > 256 or", "    if False or len(title) > 256 or", "hooks", "a pull request's text needs a title")
+    # PR #17's red: the drop folder's /tmp read as the system resolves it. What that is differs by system, so the case runs on both
+    # (the Mac's sandbox, GitHub's Linux); the mutant, killed on both, keeps the rewritten path plain for the checks after it.
+    yield from each("scripts/agent_pr.py", "TMP + p[4:]", 'TMP + "/" + p[4:]', "hooks", "land rewrites /tmp's prefix alone, its path still plain")
     yield from each("scripts/agent_pr.py", "len(title) > 256", "len(title) > 257", "hooks", "a pull request's title is 256 characters at most")
     yield from each("scripts/agent_pr.py", "body.removeprefix(", "body.removesuffix(", "hooks", "a pull request's body starts after its blank line")
     yield from each("scripts/worktree.sh", 'base=$(git rev-parse --verify "$base^{commit}")\n', "", "hooks", "worktree.sh reads its base once, as its commit")
