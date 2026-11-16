@@ -1,7 +1,7 @@
 // Above the cards: the style chips on a phone, the filters and the sort. Filters that need what the file does not give yet (the first block) are
 // not offered.
 import { STYLES, type FilterId, type SortId } from "@gnoworld/core";
-import { Chip, Cluster, Select, Stack } from "@gnoworld/ui";
+import { Chip, Select, Stack } from "@gnoworld/ui";
 import { FilterRow, ToggleChips } from "../ToggleChips.tsx";
 import styles from "./Discover.module.css";
 import type { Discovery } from "./useDiscover.ts";
@@ -31,7 +31,8 @@ export function Controls({ discovery }: { discovery: Discovery }) {
       <Stack space="2xs">
         {/* The styles' chips are a phone's way to the styles' shelves, which the column at the left offers on a computer. */}
         <div className={styles["styleChips"]}>
-          <Cluster space="2xs">
+          {/* One row that scrolls across, its cut edge fading (the scroll-row utility, as the lenses): never two or three rows at 320 px. */}
+          <div className="scroll-row">
             {STYLES.filter(({ id }) => id !== "lab").map(({ id, label }) => (
               <span key={id}>
                 <Chip
@@ -44,7 +45,7 @@ export function Controls({ discovery }: { discovery: Discovery }) {
                 </Chip>
               </span>
             ))}
-          </Cluster>
+          </div>
         </div>
         <FilterRow
           chips={

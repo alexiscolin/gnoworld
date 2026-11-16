@@ -44,7 +44,9 @@
   /* A phone's finger: the link-look button is a 44 px row, its words centred on it. */
   @media (width < 900px) {
     .markAll {
+      /* layout: the words centred on the 44 px row */
       display: inline-flex;
+      /* layout: the words centred on that row */
       align-items: center;
       min-block-size: var(--control-m);
     }

@@ -235,7 +235,9 @@
     }
 
     .worlds a {
+      /* layout: the link's words centred on its 44 px height */
       display: flex;
+      /* layout: the words centred on that height */
       align-items: center;
       min-block-size: var(--control-m);
     }

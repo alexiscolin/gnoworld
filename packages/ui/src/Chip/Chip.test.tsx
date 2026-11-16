@@ -133,3 +133,20 @@ describe("the dot's pulse", () => {
     expect(view.container.querySelector("i")).not.toBe(dot);
   });
 });
+
+describe("Chip's phone box", () => {
+  it("a pressing chip wears the 44 px hit box, its mark and its dock pill do not", () => {
+    render(
+      <>
+        <Chip onClick={vi.fn()}>A</Chip>
+        <Chip onClick={vi.fn()} size="chip">
+          B
+        </Chip>
+        <Chip>C</Chip>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "A" }).classList.contains("hit")).toBe(true);
+    expect(screen.getByRole("button", { name: "B" }).classList.contains("hit")).toBe(false);
+    expect(screen.getByText("C").classList.contains("hit")).toBe(false);
+  });
+});

@@ -40,6 +40,7 @@
 
     /* A row that wraps stretches the place: the list fills it, so its arrow stays at its own end. */
     .wrap > .select {
+      /* layout: the list fills the wrapped row's place */
       flex: 1;
     }
   }

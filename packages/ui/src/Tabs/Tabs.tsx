@@ -79,7 +79,7 @@ export function Tabs({
             type="button"
             role="tab"
             {...tied(id, tab.id)}
-            className={pill(styles["tab"])}
+            className={pill(styles["tab"], "hit")}
             aria-selected={tab.id === selected}
             aria-label={iconOnly ? name : undefined}
             tabIndex={at === reached ? 0 : -1}

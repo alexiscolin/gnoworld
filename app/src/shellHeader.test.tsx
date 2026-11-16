@@ -172,6 +172,7 @@ describe("the header", () => {
     const html = await header("/earth");
     const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
     expect(pill.indexOf("Earth")).toBeGreaterThan(0);
+    expect(pill.indexOf(">Chat<")).toBeGreaterThan(pill.indexOf("Earth"));
     expect(pill).not.toContain('aria-label="Search"');
     expect(html.match(/aria-label="Search"/g)).toHaveLength(1);
   });

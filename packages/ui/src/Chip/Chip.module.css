@@ -47,10 +47,10 @@
     cursor: pointer;
   }
 
-  /* A phone's finger: a chip that presses is a control high (overflow cuts a hit box, so its height grows). */
+  /* A phone's finger (utilities.css, .hit): the box reaches past the pill's height, so only its width is cut. */
   @media (width < 900px) {
-    :is(button, a).chip:is([data-size="s"], [data-size="xs"]) {
-      --_h: var(--control-m);
+    :is(button, a).chip {
+      overflow: clip visible;
     }
   }
 

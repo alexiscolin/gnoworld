@@ -31,6 +31,7 @@
       inset-inline: 0;
       inset-block-end: 0;
       inline-size: auto;
+      /* raw: the sheet leaves the top 30% of the screen visible; no token holds a share of the screen */
       max-block-size: 70dvb;
       overflow: auto;
       padding-block-end: env(safe-area-inset-bottom);

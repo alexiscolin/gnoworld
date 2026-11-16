@@ -129,7 +129,7 @@ export function Chip({
     <Pressable
       href={href}
       onClick={onClick}
-      className={pill(styles["chip"])}
+      className={pill(styles["chip"], size === "chip" ? undefined : "hit")}
       data-tone={tone}
       data-size={size ?? "s"}
       aria-pressed={href === undefined ? selected : undefined}

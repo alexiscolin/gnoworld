@@ -72,7 +72,9 @@
   /* A phone's finger: an option is a control high, its word centred. */
   @media (width < 900px) {
     .option {
+      /* layout: the word in the middle of the control-high option */
       display: grid;
+      /* layout: the word in the middle */
       place-items: center;
       min-block-size: var(--control-m);
     }

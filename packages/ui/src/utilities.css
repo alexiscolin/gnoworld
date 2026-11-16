@@ -176,6 +176,23 @@
     flex: none;
   }
 
+  /* A phone's finger (WCAG 2.5.5): a control under 44 px keeps its look and gains an invisible box to 44 px high, never wider than the
+     control, so side-by-side controls never cover each other; rows that wrap keep a gap of the difference. Where a control clips its
+     own overflow, the box is cut. A stretched button (its card's box) and a link-look one (a run of words) take none. Added by Button, IconButton, Chip,
+     Tabs and Switch. */
+  @media (width < 900px) {
+    .hit:not([data-stretch], [data-emphasis="link"]) {
+      position: relative;
+    }
+
+    .hit:not([data-stretch], [data-emphasis="link"])::after {
+      content: "";
+      position: absolute;
+      inset-block: calc((100% - var(--control-m)) / 2);
+      inset-inline: 0;
+    }
+  }
+
   /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit. */
   .nowrap {
     white-space: nowrap;

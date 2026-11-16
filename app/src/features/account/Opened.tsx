@@ -11,6 +11,7 @@ export function Opened({
   onPickName,
   onJarvis,
   jarvisWhy,
+  guestNote,
 }: {
   address: string | undefined;
   lead: ReactNode;
@@ -21,6 +22,8 @@ export function Opened({
   onJarvis?: () => void;
   /** Why the item is greyed when Jarvis is on but cannot be asked here; none, it is coming soon (Jarvis is off). */
   jarvisWhy?: string;
+  /** A muted line atop a guest's menu: how a touch phone logs in, where its header has no room to say it. */
+  guestNote?: string | undefined;
 }) {
   const [, open] = useDeviceView();
   const items: MenuItem[] = [
@@ -70,7 +73,7 @@ export function Opened({
     ...(address === undefined ? [] : [{ label: "Log out", onSelect: onLogOut }]),
   ];
   return address === undefined ? (
-    <Menu trigger="Menu" label="Your device" icon="menu" items={items} openAtOnce />
+    <Menu trigger="Menu" label="Your device" icon="menu" items={items} openAtOnce note={guestNote} />
   ) : (
     <Menu trigger="Your account" label="Your account" lead={lead} wordsHidden items={items} openAtOnce />
   );

@@ -1,8 +1,8 @@
 /* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
    and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, one row:
-   the logo, the network and the account, with no views (the full chat only). The one breakpoint of both is here. */
+   the logo, the network and the controls, with no views (the full chat only). The one breakpoint of both is here. */
 @layer components {
-  /* The views' bar's height, one source for the bars and the room the page leaves under them on a phone; the two are no parent and child. */
+  /* The views' bar's height, one source for the bars and the room the page leaves under them; the two are no parent and child. */
   .bars {
     --_bar: var(--size-bar);
   }
@@ -41,17 +41,12 @@
     margin-block: 0;
   }
 
-  /* Where one is and how one looks, side by side, a bar over the page's foot on a phone. */
+  /* Where one is and how one looks, side by side (a computer's; a phone draws none). */
   .bars {
     /* layout: the two pills side by side */
     display: flex;
     /* layout: a step between the pills */
     gap: var(--space-2xs);
-    position: fixed;
-    inset-inline: var(--space-s);
-    inset-block-end: var(--space-s);
-    /* raw: above the page's content and the welcome card (1) until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
-    z-index: 2;
   }
 
   /* The views: a pill with its levels and the chat; the ways: Space and Map. */
@@ -362,12 +357,11 @@
     }
   }
 
-  /* The ways where the bar cannot hold them: a pill of their own at the scene's top right, under the header; a phone's bar at the
-     foot keeps its one row, a computer's levels the room. */
+  /* The ways where the bar cannot hold them: a pill of their own at the scene's top right, under the header. */
   @media (width < 1140px) {
     .ways {
       position: fixed;
-      /* raw: under the header, 96 px high (a phone's: 16 px, a 40 px row, 4 px, a 20 px line, 16 px), a step below it */
+      /* raw: under the header, 96 px high a step below it */
       inset-block-start: calc(96px + var(--space-2xs));
       inset-inline-end: var(--page-edge, var(--space-s));
     }
@@ -381,12 +375,14 @@
     }
 
     .header {
+      /* layout: the logo, the network between, the controls: one row */
       grid-template-columns: auto minmax(0, 1fr) auto;
     }
 
     .logo {
       /* layout: the link is a 44 px target round its mark */
       align-items: center;
+      /* layout: the mark in the middle of the target */
       justify-content: center;
       min-inline-size: var(--control-m);
       min-block-size: var(--control-m);
@@ -395,29 +391,20 @@
     .network {
       /* layout: the network shares the logo's row, between it and the controls */
       grid-column: 2;
+      /* layout: the logo's row */
       grid-row: 1;
       order: 0;
       min-inline-size: 0;
     }
 
-    .network button {
-      min-block-size: var(--control-m);
-    }
-
     /* raw: under 360 px the row cannot hold the name, its Testnet chip and three controls: the network drops under the logo */
-    @media (width < 22.5rem) {
+    @media (width < 360px) {
       .network {
+        /* layout: the network across the row under the logo */
         grid-column: 1 / -1;
+        /* layout: the row under the logo */
         grid-row: 2;
       }
-    }
-
-    .chevron {
-      /* raw: a phone's levels a step closer, so the lean is less */
-      --_lean: 6px;
-
-      /* layout: the links' own padding around the chevron, no more: a 320 px bar keeps its names */
-      margin-inline: 0;
     }
   }
 

@@ -138,8 +138,21 @@ export interface MenuProps {
   busy?: boolean;
   /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
   openAtOnce?: boolean;
+  /** A short muted line above the items, read as the menu's description (not an item). */
+  note?: string | undefined;
   /** Open now at this point of the screen, as a right-click's menu does: each new object asks once. */
   at?: { x: number; y: number } | undefined;
+}
+
+const noteId = (panel: string, note: string | undefined) => (note === undefined ? undefined : `${panel}-note`);
+
+// The menu's note: a muted line over the rows, outside its items (role presentation), the menu's description.
+function Note({ id, note }: { id: string | undefined; note: string | undefined }) {
+  return note === undefined ? null : (
+    <p id={id} role="presentation" className={["meta", styles["note"]].join(" ")}>
+      {note}
+    </p>
+  );
 }
 
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
@@ -155,6 +168,7 @@ export function Menu({
   wordsHidden = false,
   openAtOnce = false,
   busy,
+  note,
   at,
 }: MenuProps) {
   // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
@@ -200,7 +214,14 @@ export function Menu({
           </>
         ),
       })}
-      <div {...panel} aria-label={label} onClickCapture={close} onKeyDown={move}>
+      <div
+        {...panel}
+        aria-label={label}
+        aria-describedby={noteId(panel.id, note)}
+        onClickCapture={close}
+        onKeyDown={move}
+      >
+        <Note id={noteId(panel.id, note)} note={note} />
         {items.map((item, at) => (
           <Fragment key={item.label}>
             {at === apart ? <div role="separator" className={styles["separator"]} /> : null}

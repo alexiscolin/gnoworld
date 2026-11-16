@@ -17,6 +17,9 @@ export function pill(...own: (string | undefined)[]) {
   return [shared["pill"], ...own].join(" ");
 }
 
+/** The phone's 44 px box (utilities.css, `.hit`, which leaves out a link-look button and a stretched one) for a control under it. */
+const hit = (size: IconControlSize) => (size === "xs" || size === "s" ? "hit" : undefined);
+
 /** A tool of a bar inside a box (the composer's format bar): the bar's faint ink, the smallest height where the box is narrow. */
 export const toolMark = (tool: boolean | undefined) => ({ "data-tool": tool === true ? "" : undefined });
 
@@ -26,13 +29,18 @@ export function buttonLook(
   tone: "neutral" | "danger" | "signal",
   size: ControlSize,
 ) {
-  return { className: pill(styles["button"]), "data-emphasis": emphasis, "data-tone": tone, "data-size": size };
+  return {
+    className: pill(styles["button"], hit(size)),
+    "data-emphasis": emphasis,
+    "data-tone": tone,
+    "data-size": size,
+  };
 }
 
 /** An icon-only control's look, square, as the attributes its module reads: what IconButton and an icon trigger wear. */
 export function iconLook(emphasis: "solid" | "outline" | "plain", size: IconControlSize, tool?: boolean) {
   return {
-    className: pill(styles["button"], styles["square"]),
+    className: pill(styles["button"], styles["square"], hit(size)),
     "data-emphasis": emphasis,
     "data-tone": "neutral",
     "data-size": size,

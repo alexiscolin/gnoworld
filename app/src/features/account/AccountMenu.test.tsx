@@ -50,6 +50,18 @@ describe("the account's menu", () => {
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
   });
 
+  it("draws the note it is given atop a guest's menu, read as its description, and none otherwise", () => {
+    const guest = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />,
+    );
+    const menu = guest.querySelector("[role='menu']");
+    expect(menu?.firstElementChild?.textContent).toBe("Use a computer.");
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    expect(items(guest)).not.toContain("Use a computer.");
+    const none = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(none.querySelector("[role='menu']")?.getAttribute("aria-describedby")).toBeNull();
+  });
+
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {
     const box = mount(<Opened address={ADDRESS} lead={<span data-face="" />} onLogOut={() => undefined} />);
     const trigger = box.querySelector("button:not([role='menuitem'])");

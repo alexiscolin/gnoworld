@@ -99,7 +99,15 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
 }
 
 /** The account's menu; `network`, the network's name LoginControl draws beside the way in, or beside the pill once logged in. */
-export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
+export function AccountMenu({
+  universe,
+  network = null,
+  guestNote,
+}: {
+  universe: string;
+  network?: ReactNode;
+  guestNote?: string | undefined;
+}) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
   useEffect(() => {
@@ -128,6 +136,7 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
       <Opened
         address={address}
         lead={pill}
+        guestNote={guestNote}
         onLogOut={logOut}
         {...(pickable
           ? {

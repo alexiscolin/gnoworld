@@ -25,6 +25,13 @@
     display: none;
   }
 
+  /* A phone's finger: the name's trigger is a 44 px target. */
+  @media (width < 900px) {
+    .network button {
+      min-block-size: var(--control-m);
+    }
+  }
+
   @media (width >= 900px) {
     .inPill {
       /* layout: the name, the icon and the chip on a line */

@@ -69,6 +69,11 @@
     padding-inline-start: var(--space-s);
   }
 
+  /* The menu's note: a muted line over the rows, in their inset. */
+  .note {
+    padding: var(--space-2xs) var(--space-xs);
+  }
+
   .separator {
     block-size: var(--line-width);
     /* layout: the rule apart from the rows on either side */

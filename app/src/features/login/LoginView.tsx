@@ -17,6 +17,11 @@ export interface LoginViewProps {
   network?: ReactNode;
 }
 
+/** What a phone is told, in the header where there is room and in a guest's menu where there is none. */
+export const USE_A_COMPUTER = "To log in, use a computer; once logged in you can write from here.";
+/** A touch phone: no wallet, and no room for the words in the header. */
+export const PHONE_NO_WALLET = "(pointer: coarse) and (width < 900px)";
+
 const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…", verifying: "Checking your signature…" };
 
 // The button's words: the step a login is at, or, once it stopped, the short why.
@@ -48,7 +53,7 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
         </span>
       </span>
       <span className={styles["phone"]}>
-        <span className={styles["words"]}>Log in on a computer; then write from here.</span>
+        <span className={styles["words"]}>{USE_A_COMPUTER}</span>
         {network}
       </span>
       {status}

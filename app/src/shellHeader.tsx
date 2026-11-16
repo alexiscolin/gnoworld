@@ -10,6 +10,8 @@ import { useDrawnPath } from "./drawnPath.ts";
 import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
+import { useMedia } from "./features/chat/useMedia.ts";
+import { PHONE_NO_WALLET, USE_A_COMPUTER } from "./features/login/index.ts";
 import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
@@ -20,12 +22,15 @@ import styles from "./shellHeader.module.css";
 
 // The search, the bell and the account's menu.
 function Account({ universe }: { universe: UniverseView }) {
+  // A touch phone has no wallet and no room in the header for the words: a guest reads them atop the account's menu.
+  const noWallet = useMedia(PHONE_NO_WALLET);
   return (
     <Cluster space="2xs">
       <SearchButton className="" emphasis="outline" />
       <BellSlot />
       <AccountMenu
         universe={universe.id}
+        guestNote={noWallet ? USE_A_COMPUTER : undefined}
         network={<Network name={universe.name} testnet={universe.testnet} inPill />}
       />
     </Cluster>
