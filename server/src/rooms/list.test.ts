@@ -460,6 +460,18 @@ describe("GET /api/rooms?world=earth, the public square", () => {
     ]);
   });
 
+  // F13676: an archived room made before the 30-day window keeps its row, and leaves the list.
+  it("lists no archived room made before the window, and every live room however old", async () => {
+    const t = square();
+    t.make("past", T0 - 31 * DAY);
+    t.make("recent", T0 - 29 * DAY);
+    t.make("ancient", T0 - 90 * DAY);
+    t.db.prepare("UPDATE rooms SET archived = 1 WHERE name IN ('#earth/past', '#earth/recent')").run();
+    const listed = await names(t);
+    expect(listed).toEqual(expect.arrayContaining(["#earth/recent", "#earth/ancient"]));
+    expect(listed).not.toContain("#earth/past");
+  });
+
   it("counts a room's messages of the last 24 hours and the people here, and leaves a zero out", async () => {
     const t = square({ "#earth/crowd": 5 });
     t.make("crowd", T0 - DAY, { lines: 2 });

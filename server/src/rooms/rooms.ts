@@ -62,11 +62,14 @@ export function worldRooms(db: DatabaseSync, world: string): string[] {
   );
 }
 
-/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE), in one query. */
-export function worldRoomStates(db: DatabaseSync, world: string): { name: string; archived: boolean }[] {
+/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE), in one query, those past the window left out. */
+export function worldRoomStates(db: DatabaseSync, world: string, now: number): { name: string; archived: boolean }[] {
   const Rows = z.array(z.object({ name: z.string(), archived: z.number() }));
-  const sql = "SELECT name, archived FROM rooms WHERE world = ? ORDER BY name";
-  return Rows.parse(db.prepare(sql).all(world)).map(({ name, archived }) => ({ name, archived: archived === 1 }));
+  const sql = `SELECT name, archived FROM rooms WHERE world = ? AND ${NOT_PAST} ORDER BY name`;
+  return Rows.parse(db.prepare(sql).all(world, earthWindowStart(now))).map(({ name, archived }) => ({
+    name,
+    archived: archived === 1,
+  }));
 }
 
 /** The realm path of each of `world`'s realm rooms that has one (create.ts's REALM_PATH). */

@@ -138,7 +138,7 @@ export function listRoutes({
     const kept = who === undefined ? guests.get(world) : undefined;
     if (kept !== undefined) return c.json(kept);
     const counts = { here, messages: lines() };
-    const listed = worldRoomStates(db, world)
+    const listed = worldRoomStates(db, world, now())
       .filter(({ name, archived }) => visible(name, who, archived))
       .map(({ name }) => name);
     const seen = world === "earth" ? byUse(db, listed, counts) : listed;
