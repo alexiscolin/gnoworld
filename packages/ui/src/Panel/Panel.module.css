@@ -167,10 +167,10 @@
       inline-size: var(--plate-w);
     }
 
-    /* The free area beside a placed plate, from its edge to the dock's: the arrival banner (Flash) centres in it. */
+    /* The free area beside a placed plate, a step in from its edge and the dock's: the arrival banner (Flash) centres in it. */
     :root:has(.place) {
-      --banner-start: calc(var(--page-edge) + var(--plate-w));
-      --banner-end: calc(var(--space-m) + var(--chat-dock-now));
+      --banner-start: calc(var(--page-edge) + var(--plate-w) + var(--space-s));
+      --banner-end: calc(var(--space-m) + var(--chat-dock-now) + var(--space-s));
     }
 
     /* The one outline around plate, scene and dock, the same colour all round: the plates inside it draw none. */
