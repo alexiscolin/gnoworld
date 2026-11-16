@@ -12,15 +12,19 @@ fail() { echo "FAIL: $*" >&2; fails=$((fails + 1)); }
 TOKEN=ghp_$(printf '%036d' 7) # made here: a token's shape written out is a finding for the secret scan
 newsecret() { python3 -I -c 'import secrets, string; print("ghp_" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(36)))'; }
 SECRET=$(newsecret)
-GIT=$(command -v git)
+GIT=$(command -v git) PY=$(command -v python3) GH=$(command -v gh) GL=$(command -v gitleaks)
 g() { "$GIT" -c user.name=t -c user.email=t@t -c init.defaultBranch=main -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 
 # The shipped helper: GitHub itself, a fixed PATH, its state from the password database (never HOME), the caller's space by uid.
 grep -qx 'GITHUB = "https://github.com"' "$helper" || fail "the shipped helper does not push to https://github.com"
-grep -qx 'TOOLS = "/opt/homebrew/bin:/usr/bin:/bin"' "$helper" || fail "the shipped helper's PATH is not the fixed one"
+grep -qx 'TOOLS = "@TOOLS@"' "$helper" || fail "the shipped helper's PATH is not left to its installer (D13412)"
 grep -qx 'STATE = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".local/share/agent-github")' "$helper" || fail "the shipped helper's state does not come from the password database"
 grep -qx 'SPACE = f"/private/tmp/claude-{os.getuid()}/agent-pr/"' "$helper" || fail "the shipped helper's space is not the caller's drop folder"
-head -1 "$helper" | grep -qx '#!/usr/bin/env -S -i LC_ALL=C /opt/homebrew/bin/python3 -I' || fail "the shipped helper does not start from an empty environment"
+head -1 "$helper" | grep -qx '#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I' || fail "the shipped helper does not start from an empty environment"
+grep -nE '/opt/homebrew|/usr/local/' "$helper" "$here/install.sh" "$here/agent_pr_guard.py" && fail "the helper, its guard or its installer names a folder of one machine (D13411)"
+cp "$helper" "$t/shipped" && chmod +x "$t/shipped"
+out=$("$t/shipped" push alexis/proj x 2>&1) && fail "the shipped helper ran, no python3 written in: $out"
+case $out in *@PYTHON3@*) ;; *) fail "the shipped helper failed otherwise than on its placeholder: $out" ;; esac
 grep -nE 'os\.environ|getenv|expanduser|expandvars|\$HOME' "$helper" && fail "the helper reads its caller's environment"
 
 # GitHub's stand-in: alexis/proj with main, and decoys a name check must keep it from: ../proj, proj.git.git, -alexis.
@@ -59,14 +63,14 @@ for tool in git gitleaks gh python3 env stat cat mktemp grep sh; do
 	printf '#!/bin/sh\ntouch %s/ran\nexit 0\n' "$t" >"$t/evilbin/$tool" && chmod +x "$t/evilbin/$tool"
 done
 make() { # make <copy> <TOOLS>: the helper pointed at the stand-ins
-	sed -e "s|^GITHUB = .*|GITHUB = \"file://$t/github\"|" -e "s|^TOOLS = .*|TOOLS = \"$2\"|" \
+	sed -e "1s|@PYTHON3@|$PY|" -e "s|^GITHUB = .*|GITHUB = \"file://$t/github\"|" -e "s|^TOOLS = .*|TOOLS = \"$2\"|" \
 		-e "s|^STATE = .*|STATE = \"$t/state\"|" -e "s|^SPACE = .*|SPACE = \"$t/space/\"|" "$helper" >"$1"
 	chmod +x "$1"
 }
-make "$t/agent-pr" "$t/bin:/opt/homebrew/bin:/usr/bin:/bin"
+make "$t/agent-pr" "$t/bin:${GL%/*}:/usr/bin:/bin"
 make "$t/agent-pr-nogl" "$t/nogl"
-make "$t/agent-pr-glbad" "$t/glbad:$t/bin:/opt/homebrew/bin:/usr/bin:/bin"
-make "$t/agent-pr-glzero" "$t/glzero:$t/bin:/opt/homebrew/bin:/usr/bin:/bin"
+make "$t/agent-pr-glbad" "$t/glbad:$t/bin:${GL%/*}:/usr/bin:/bin"
+make "$t/agent-pr-glzero" "$t/glzero:$t/bin:${GL%/*}:/usr/bin:/bin"
 grep -q "^GITHUB = \"file://" "$t/agent-pr" && grep -q "^STATE = \"$t/state\"" "$t/agent-pr" || fail "the helper's constants could not be pointed at the stand-ins"
 alltext=""
 # Every call runs from inside the session's clone, as a session would call it, with the session's PATH and variables planted.
@@ -377,8 +381,8 @@ case $got in *"$TOKEN"*) fail "the credential helper gave the token to another h
 
 # 13. Two pushes at once (a slow gitleaks widens the window): each pushes the commit it scanned; a secret never rides on the
 # other's scan.
-mkdir -p "$t/glslow" && printf '#!/bin/sh\n/opt/homebrew/bin/gitleaks "$@"; rc=$?; sleep 3; exit $rc\n' >"$t/glslow/gitleaks" && chmod +x "$t/glslow/gitleaks"
-make "$t/agent-pr-slow" "$t/glslow:$t/bin:/opt/homebrew/bin:/usr/bin:/bin"
+mkdir -p "$t/glslow" && printf '#!/bin/sh\n%s "$@"; rc=$?; sleep 3; exit $rc\n' "$GL" >"$t/glslow/gitleaks" && chmod +x "$t/glslow/gitleaks"
+make "$t/agent-pr-slow" "$t/glslow:$t/bin:${GL%/*}:/usr/bin:/bin"
 g -C "$t/s" checkout -q -b race-clean origin/main && echo clean >"$t/s/r.txt" && g -C "$t/s" add r.txt && g -C "$t/s" commit -qm clean
 g -C "$t/s" branch -q -f agent/race race-clean && g -C "$t/s" bundle create -q "$t/space/raceA.bundle" agent/race
 g -C "$t/s" checkout -q -b race-leak origin/main && printf 'key = "%s"\n' "$SECRET" >"$t/s/r.txt" && g -C "$t/s" add r.txt && g -C "$t/s" commit -qm leak
@@ -434,13 +438,49 @@ mkdir -p "$t/api/repos/a/b/compare" && echo '{"status": "behind"}' >"$t/api/repo
 echo '{"status": "identical"}' >"$t/api/repos/a/b/compare/main...0123456"
 inst() { HOME="$fh" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
+# What the installer must have found on the PATH it ran with (D13412): the helper holds that python3, then the folders of that
+# git, gh and gitleaks and the system's own PATH; each profile denies exactly the folder above each one's folder outside the
+# system's, as found and as real, the outermost alone, and runs the guard hook with that python3.
+protected() { # protected <home> <the PATH the installer ran with>
+	python3 -I - "$1" "$2" <<'PY'
+import json, os, shutil, sys
+home, path = sys.argv[1:]
+system = os.confstr("CS_PATH").split(":")
+found = {n: os.path.join(os.path.realpath(os.path.dirname(w)), os.path.basename(w)) for n, w in ((n, shutil.which(n, path=path)) for n in ("python3", "git", "gh", "gitleaks"))}
+up = lambda d: os.path.dirname(d) if os.path.dirname(d) != "/" else d
+pre = {up(d) for p in found.values() for d in (os.path.dirname(p), os.path.dirname(os.path.realpath(p))) if d not in system}
+pre = {a for a in pre if not any(a.startswith(b + "/") for b in pre)}
+lines = open(f"{home}/.local/bin/agent-pr").read().split("\n")
+assert lines[0] == f"#!/usr/bin/env -S -i LC_ALL=C {found['python3']} -I", lines[0]
+tools = ":".join(list(dict.fromkeys(os.path.dirname(found[n]) for n in ("git", "gh", "gitleaks"))) + system)
+assert f'TOOLS = "{tools}"' in lines, [l for l in lines if l.startswith("TOOLS")]
+for profile in (".claude", ".claude-work"):
+    s = json.load(open(f"{home}/{profile}/settings.json"))
+    assert {r for r in s["permissions"]["deny"] if r.startswith("Edit(//")} == {f"Edit(/{a}/**)" for a in pre}, (profile, pre)
+    assert f"{found['python3']} -I {home}/.claude/hooks/agent_pr_guard.py {home}/.local/bin/agent-pr" in [h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]], profile
+PY
+}
+protected "$fh" "$PATH" || fail "the installer did not write in the tools found on its PATH, or deny their folders"
+# A PATH folder that is a link in a folder a session writes, to the tools' own: the real folder is written in, never the link,
+# which the session could point at its own programs once the install is done.
+fh4="$t/fh4" && mkdir -p "$fh4/.claude" "$fh4/.claude-work" && echo '{}' >"$fh4/.claude/settings.json" && echo '{}' >"$fh4/.claude-work/settings.json" && ln -s "${GH%/*}" "$t/hb"
+(HOME="$fh4" PATH="$t/hb:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with a linked folder first: $(cat "$t/inst.out")"
+protected "$fh4" "$t/hb:$PATH" && ! grep -qF "$t/hb" "$fh4/.local/bin/agent-pr" "$fh4/.claude/settings.json" || fail "the installer wrote in a linked folder, not the one it leads to"
+# --stamp, which install_hooks.sh runs for land, writes the tools in once every profile denies their folders, and refuses before.
+cp "$helper" "$t/stamped" && HOME="$fh" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1 && head -1 "$t/stamped" | grep -qxF "#!/usr/bin/env -S -i LC_ALL=C $PY -I" ||
+	fail "--stamp did not write in the tools with every profile denying their folders: $(cat "$t/inst.out")"
+if [ -x /usr/bin/python3 ] && [ "$PY" != /usr/bin/python3 ]; then # another python3 and git, the system's own
+	fh3="$t/fh3" && mkdir -p "$fh3/.claude" "$fh3/.claude-work" && echo '{}' >"$fh3/.claude/settings.json" && echo '{}' >"$fh3/.claude-work/settings.json"
+	(HOME="$fh3" PATH="/usr/bin:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with the system's python3 first: $(cat "$t/inst.out")"
+	protected "$fh3" "/usr/bin:$PATH" || fail "the installer did not write in the system's python3 and git it found first, or denied the wrong folders"
+fi
 python3 -I - "$fh" <<'PY' || fail "the installer left a profile without its protections"
 import json, sys
 home = sys.argv[1]
 for profile in (".claude", ".claude-work"):
     s = json.load(open(f"{home}/{profile}/settings.json"))
     deny, sb = s["permissions"]["deny"], s["sandbox"]
-    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(//opt/homebrew/**)", "Edit(~/.claude/settings.json)",
+    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/settings.json)",
                  "Edit(~/.claude-work/settings.json)", "Edit(~/.claude-work/skills/**)", "Edit(~/.claude/hooks/**)"):
         assert rule in deny, (profile, rule)
     assert sb["enabled"] is True and sb["allowUnsandboxedCommands"] is False, profile
@@ -449,7 +489,9 @@ for profile in (".claude", ".claude-work"):
 assert "Edit(~/.zshrc)" in json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"]
 PY
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/proj\nalexis/other agent')" ] || fail "the allow list is not the repositories given"
-cmp -s "$fh/.local/bin/agent-pr" "$helper" || fail "the helper installed is not the commit's"
+# Line 1 and TOOLS aside, the helper installed is the commit's.
+sed -e 1d -e '/^TOOLS = /d' "$helper" >"$t/shipped.rest" && sed -e 1d -e '/^TOOLS = /d' "$fh/.local/bin/agent-pr" >"$t/installed.rest"
+cmp -s "$t/shipped.rest" "$t/installed.rest" || fail "the helper installed is not the commit's"
 grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
 [ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
@@ -466,11 +508,51 @@ echo '{"disableAllHooks": true}' >"$fh/.claude-work/settings.json"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile with hooks off"
 echo '{"permissions": {"allow": ["Read(~/.local/share/agent-github/**)"]}}' >"$fh/.claude-work/settings.json"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting the state folder"
+case :$(command -p getconf PATH): in *":${GH%/*}:"*) ;; *)
+	g=${GH%/*} && printf '{"permissions": {"allow": ["Edit(/%s/x)"]}}\n' "${g%/*}" >"$fh/.claude-work/settings.json"
+	inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting gh's folder"
+	grep -qF "grants Edit(/${g%/*}/x)" "$t/inst.out" || fail "the installer did not name the grant of gh's folder: $(cat "$t/inst.out")"
+	;;
+esac
 echo '{}' >"$fh/.claude-work/settings.json"
 mkdir -p "$t/raw/a/b/0123456" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts" "$t/raw/a/b/0123456/"
 inst a/b main 0123456 alexis/proj && fail "the installer took a short commit id"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 ../x && fail "the installer took a malformed repository"
 inst a/b main ffffffffffffffffffffffffffffffffffffffff alexis/proj && fail "the installer installed from a commit that holds nothing"
+# A tool found first where a session can write is refused, and nothing installed: a git under the home folder, a gh in the
+# temporary folder, a python3 whose path a copy could not carry as written (D13412).
+fh2="$t/fh2" && mkdir -p "$fh2/.claude" "$fh2/bin" "$t/early" && echo '{}' >"$fh2/.claude/settings.json"
+ln -s "$GIT" "$fh2/bin/git" && ln -s "$GH" "$t/early/gh"
+refused() { # refused <HOME> <PATH> <what the refusal says> [<TMPDIR> [<folder it runs from>]]: and nothing written in that home
+	(cd "${5:-.}" && HOME="$1" PATH="$2" TMPDIR="${4:-${TMPDIR:-}}" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) && fail "the installer took PATH=$2"
+	grep -qF -- "$3" "$t/inst.out" || fail "the installer did not refuse with '$3' (PATH=$2): $(cat "$t/inst.out")"
+	case $1 in '' | /) ;; *) [ ! -e "$1/.local" ] && [ "$(ls -A "$1/.claude")" = settings.json ] && [ "$(cat "$1/.claude/settings.json")" = '{}' ] ||
+		fail "a refused install wrote in $1: $(ls -A "$1" "$1/.claude")" ;; esac
+}
+refused "$fh2" "$fh2/bin:$PATH" "git: $fh2/bin/git is under $fh2,"
+refused "$fh2" "$t/early:$PATH" "gh: $t/early/gh is under $(command -p realpath "${TMPDIR:-/tmp}"),"
+lt=$(mkdir -p "/tmp/claude-$(id -u)" && mktemp -d "/tmp/claude-$(id -u)/agent-pr-tmp.XXXXXX") && ln -s "$GH" "$lt/gh"
+refused "$fh2" "$lt:$PATH" "gh: $lt/gh is under $(command -p realpath /tmp)," "$fh2"
+rm -r "${lt:?}"
+for tool in python3 git gh gitleaks; do
+	mkdir -p "$t/odd dir" && rm -f "$t/odd dir/"* && ln -s "$(command -v "$tool")" "$t/odd dir/$tool"
+	refused "$fh2" "$t/odd dir:$PATH" "$tool: $t/odd dir/$tool holds"
+done
+refused "$fh2" "$t/early/../early:$PATH" "gh: $t/early/../early/gh is under "
+refused "$fh2" ".:$PATH" "./gh is under " "" "$t/early"
+case :$(command -p getconf PATH): in *":${GL%/*}:"*) ;; *)
+	cp "$helper" "$t/stamped" && (HOME="$fh2" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1) && fail "--stamp wrote in tools no profile keeps from its sessions"
+	grep -qF "run agent-github's installer first" "$t/inst.out" && head -1 "$t/stamped" | grep -q "@PYTHON3@" || fail "--stamp did not refuse tools no profile keeps from its sessions: $(cat "$t/inst.out")"
+	;;
+esac
+refused "$fh2" /usr/bin:/bin "no gh on your PATH"
+refused "" "$PATH" "no home folder"
+refused / "$PATH" "is under /,"
+# A commit whose helper names python3 instead of its placeholder is refused, before anything is written.
+s2=1111111111111111111111111111111111111111 && mkdir -p "$t/raw/a/b/$s2/scripts" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools" "$t/raw/a/b/$s2/"
+sed '1s|@PYTHON3@|python3|' "$helper" >"$t/raw/a/b/$s2/scripts/agent_pr.py" && echo '{"status": "behind"}' >"$t/api/repos/a/b/compare/main...$s2"
+(HOME="$fh2" sh "$t/install.sh" a/b main "$s2" alexis/proj </dev/null >"$t/inst.out" 2>&1) && fail "the installer took a helper naming python3"
+grep -q "no placeholder took" "$t/inst.out" && [ ! -e "$fh2/.local" ] || fail "the installer did not refuse a helper with no placeholder, before writing: $(cat "$t/inst.out")"
 
 # 12. Its usage, and the token never in anything it printed.
 run && fail "no arguments passed"
