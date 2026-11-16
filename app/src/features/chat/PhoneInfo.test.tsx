@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createRef, useEffect } from "react";
+import { act, createRef, useEffect } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, modals, mount, one, settled } from "../../../tests/mount.tsx";
@@ -34,27 +34,14 @@ const dialogOf = (box: HTMLElement): HTMLDialogElement => {
   if (!(found instanceof HTMLDialogElement)) throw new Error("not a dialog");
   return found;
 };
-const sheet = (open: boolean, onClose: () => void) =>
-  mount(
-    <MemoryRouter>
-      <PhoneInfo
-        open={open}
-        onClose={onClose}
-        place={place}
-        talking={undefined}
-        room={undefined}
-        people={null}
-        panelRef={createRef()}
-      />
-    </MemoryRouter>,
-  );
-
-const sheetWithPage = (onClose: () => void) =>
+const draw = (open: boolean, onClose: () => void, page: { paged?: boolean; onPage?: (paged: boolean) => void } = {}) =>
   mount(
     <MemoryRouter>
       <PlacePageProvider value={<p data-plate="x">the page</p>}>
         <PhoneInfo
-          open
+          open={open}
+          paged={page.paged ?? false}
+          onPage={page.onPage ?? (() => undefined)}
           onClose={onClose}
           place={place}
           talking={undefined}
@@ -65,6 +52,7 @@ const sheetWithPage = (onClose: () => void) =>
       </PlacePageProvider>
     </MemoryRouter>,
   );
+const sheet = (open: boolean, onClose: () => void) => draw(open, onClose);
 
 describe("the info sheet of a phone", () => {
   it("holds the full chat's info when open, under the place's name", () => {
@@ -85,17 +73,32 @@ describe("the info sheet of a phone", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("closes when a link inside it leaves for another page, never for one opening in a new tab", () => {
+  it("leaves a link that goes to another page to the router, whose address drops the sheet, and never closes for a new tab", () => {
     const onClose = vi.fn();
     const box = sheet(true, onClose);
-    const [out] = all(box, "a[target='_blank']");
-    click(out);
-    expect(onClose).not.toHaveBeenCalled();
+    click(all(box, "a[target='_blank']")[0]);
     const inside = document.createElement("a");
     inside.href = "/w/x";
+    inside.addEventListener("click", (event) => {
+      event.preventDefault();
+    });
     one(box, "aside").append(inside);
     click(inside);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes the sheet for a link to a place that is not in it (#chat is the chat behind it), and stops the jump", () => {
+    const onClose = vi.fn();
+    const box = sheet(true, onClose);
+    const jump = document.createElement("a");
+    jump.setAttribute("href", "#chat");
+    one(box, "aside").append(jump);
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      jump.dispatchEvent(event);
+    });
     expect(onClose).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it("keeps a link to a place on its own page open, scrolling to it with no history entry", () => {
@@ -115,18 +118,49 @@ describe("the info sheet of a phone", () => {
     expect(location.hash).toBe(before);
   });
 
-  it("opens the place's page in the sheet itself, with a way back to the info", async () => {
+  it("asks for the page from its button, and draws the page under the place's name, with a way back to the info", async () => {
+    const onPage = vi.fn();
+    click(
+      button(
+        draw(true, () => undefined, { onPage }),
+        "Its page",
+      ),
+    );
+    expect(onPage).toHaveBeenCalledWith(true);
     const onClose = vi.fn();
-    const box = sheetWithPage(onClose);
-    click(button(box, "Its page"));
+    const box = draw(true, onClose, { paged: true, onPage });
     await settled(() => all(box, "[data-plate]").length === 1);
-    expect(all(box, "dialog")).toHaveLength(1);
     expect(all(box, "aside")).toEqual([]);
-    expect(one(box, "h2").textContent).toBe("Its page");
+    expect(one(box, "h2").textContent).toBe("golf");
     click(button(box, "Back to Info"));
-    expect(all(box, "[data-plate]")).toEqual([]);
-    expect(one(box, "aside").getAttribute("aria-label")).toBe("golf");
+    expect(onPage).toHaveBeenLastCalledWith(false);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the info, not out of the sheet, on Close or Escape while the page shows", () => {
+    const onPage = vi.fn();
+    const onClose = vi.fn();
+    click(
+      all(draw(true, onClose, { paged: true, onPage }), "button").find(
+        (each) => each.getAttribute("aria-label") === "Close",
+      ),
+    );
+    expect(onPage).toHaveBeenCalledWith(false);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows the kicker and the title once each: the info's own, then the page's under the name", () => {
+    const words = (box: HTMLElement, text: string) =>
+      all(box, "*").filter((each) => each.children.length === 0 && each.textContent === text).length;
+    const info = sheet(true, () => undefined);
+    expect(words(info, "k")).toBe(1);
+    expect(words(info, "Info")).toBe(1);
+    expect(
+      words(
+        draw(true, () => undefined, { paged: true }),
+        "k",
+      ),
+    ).toBe(1);
   });
 
   it("mounts the planet's view only once open", async () => {

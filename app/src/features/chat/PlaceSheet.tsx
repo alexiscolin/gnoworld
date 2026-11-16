@@ -7,7 +7,7 @@ import { Suspense } from "react";
 import { ErrorView, errorKind } from "../errors/index.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { Failing } from "./Failing.tsx";
-import { usePlacePage } from "./placePage.ts";
+import { InPageSheet, usePlacePage } from "./placePage.ts";
 import { PlateFrame } from "./PlateFrame.tsx";
 
 /** The control that opens the place's page; nothing for a place with no page. */
@@ -28,7 +28,9 @@ export function PlacePage({ place }: { place: ChatPlace }) {
   return (
     <PlateFrame label={place.name}>
       <Failing fallback={(error) => <ErrorView kind={errorKind(error)} size="inline" urgent />} renew={() => undefined}>
-        <Suspense fallback={<p role="status">Loading the page…</p>}>{plate}</Suspense>
+        <Suspense fallback={<p role="status">Loading the page…</p>}>
+          <InPageSheet value>{plate}</InPageSheet>
+        </Suspense>
       </Failing>
     </PlateFrame>
   );

@@ -5,6 +5,11 @@
     padding: 0;
   }
 
+  /* The arrow of Send points up and Back's points against the text: the icon's own points along it (PhoneHeader.module.css). */
+  .back svg {
+    rotate: 180deg;
+  }
+
   .page {
     padding-block-start: var(--space-xs);
   }

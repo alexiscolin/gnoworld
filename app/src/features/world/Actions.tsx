@@ -3,7 +3,8 @@
 import { Button, Cluster, type IconName } from "@gnoworld/ui";
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
-import { composerBox } from "../chat/index.ts";
+import { fullChatHref } from "../../fullChat.ts";
+import { composerBox, sheetHref, useInPageSheet } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
 
@@ -22,6 +23,9 @@ const toComposer = (event: MouseEvent) => {
 // a backslash, a space, a control character, a dot segment, a query or a fragment is no link (the browser reads `/\\host` and
 // `/<tab>/host` as another host).
 const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+$/.test(path);
+
+// In a phone's page sheet the proposals are the realm's page, which opens in its own sheet; elsewhere the realm's view.
+const proposalsHref = (path: string, sheet: boolean): string => (sheet ? fullChatHref(sheetHref(path, "page")) : path);
 
 export interface ActionsProps {
   /** The place, as a share names and links it. */
@@ -59,10 +63,11 @@ function Leads({
   second,
 }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
   const first = useNobodySpoke(room);
+  const sheet = useInPageSheet();
   if (proposals !== undefined && isSitePath(proposals)) {
     return (
       <>
-        <Button href={proposals} pad="wide" emphasis="solid" icon="arrow">
+        <Button href={proposalsHref(proposals, sheet)} pad="wide" emphasis="solid" icon="arrow">
           Read the proposals
         </Button>
         {room === undefined ? null : (

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
+import { InPageSheet } from "../chat/index.ts";
 import { Actions } from "./Actions.tsx";
 
 // Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share
@@ -19,18 +20,20 @@ afterEach(() => {
   host = undefined;
   vi.unstubAllGlobals();
 });
-function draw(proposals?: string) {
+function draw(proposals?: string, inSheet = false) {
   host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
   act(() => {
     root.render(
       <StoreProvider>
-        {proposals === undefined ? (
-          <Actions place={PLACE} follow={FOLLOW} />
-        ) : (
-          <Actions place={PLACE} follow={FOLLOW} proposals={proposals} />
-        )}
+        <InPageSheet value={inSheet}>
+          {proposals === undefined ? (
+            <Actions place={PLACE} follow={FOLLOW} />
+          ) : (
+            <Actions place={PLACE} follow={FOLLOW} proposals={proposals} />
+          )}
+        </InPageSheet>
       </StoreProvider>,
     );
   });
@@ -94,6 +97,12 @@ describe("a world's actions, with proposals", () => {
     expect(first?.textContent).toBe("Read the proposals");
     expect(first?.getAttribute("href")).toBe(PROPOSALS);
     expect(first?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+  });
+
+  // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts).
+  it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", () => {
+    expect(draw(PROPOSALS, true).querySelector("a")?.getAttribute("href")).toBe(`${PROPOSALS}?sheet=page&chat=full`);
+    expect(draw(PROPOSALS).querySelector("a")?.getAttribute("href")).toBe(PROPOSALS);
   });
 
   it("draws Read the proposals, Follow and Share, the three of frame 31", () => {
