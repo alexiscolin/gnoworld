@@ -40,6 +40,11 @@ if [ -d "$src/.git" ]; then
 else
 	gitdir=$(sed -n 's/^gitdir: //p' "$src/.git")
 	GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)
+	# And it sits in that checkout's "-wt" folder, its .git naming the checkout's own: a .git rewritten to a repository the session
+	# planted in its tree would give this run that config, and a root in the session's folder (the security review of D13415).
+	holder=$(dirname "$src")
+	[ "${holder%-wt}-wt" = "$holder" ] && [ "$GIT_COMMON_DIR" = "${holder%-wt}/.git" ] ||
+		{ echo "worktree.sh: $src is no worktree of the main checkout's -wt folder whose .git names that checkout's" >&2; exit 1; }
 fi
 export GIT_COMMON_DIR
 root=$(dirname "$GIT_COMMON_DIR")-wt

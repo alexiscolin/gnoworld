@@ -6196,7 +6196,7 @@ ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
 # checkout is not in, it refuses, naming the root, and makes nothing; the other cases give it a home holding the checkout ($home).
 # The base is no commit, so a fence switched off (a harness mutant) stops there, never making a tree, and still fails on the message.
 wsr=$(cd "$ws" && pwd -P)
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree with a root outside its home: $out"
+out=$(cd "$ws/src" && HOME="$wsr/nothome" sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree with a root outside its home: $out"
 printf '%s\n' "$out" | grep -qF "$wsr/src-wt, the main checkout's worktrees' folder, is not in your home" || fail "worktree.sh did not name the root it requires: $out"
 [ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
 home="$wsr" wr="$wsr/src-wt"
@@ -6324,16 +6324,24 @@ wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
 # Run from a linked worktree, it makes and removes trees of this repository; and when that worktree's
 # own commondir leads elsewhere, it still reads this repository's config: the common folder comes from the tree's .git, which the
 # settings deny every session, never from the commondir git would read. So from a worktree made with relative paths.
-git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
-git -C "$ws/src" worktree add -q -b fromrel "$ws/fromrel" HEAD && mkdir "$ws/fromrel/node_modules" && echo "gitdir: ../src/.git/worktrees/fromrel" >"$ws/fromrel/.git"
-admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
+git -C "$ws/src" worktree add -q -b fromwt "$wr/srcwt" HEAD && mkdir "$wr/srcwt/node_modules"
+git -C "$ws/src" worktree add -q -b fromrel "$wr/srcrel" HEAD && mkdir "$wr/srcrel/node_modules" && echo "gitdir: ../../src/.git/worktrees/srcrel" >"$wr/srcrel/.git"
+admin=$(sed 's/^gitdir: //' "$wr/srcwt/.git")
 cp -R "$ws/src/.git" "$ws/evilgit2" && git --git-dir="$ws/evilgit2" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit2" >"$admin/commondir"
-out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
 [ ! -e "$ws/pwned" ] || fail "worktree.sh, run from a worktree, took its config from the commondir: its fsmonitor ran (F5097): $out"
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/fromwt" || fail "worktree.sh, run from a worktree, made no tree of this repository"
-out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
 echo ../.. >"$admin/commondir"
-out=$(cd "$ws/fromrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+out=$(cd "$wr/srcrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+# A worktree whose .git a session rewrote to a repository planted in its own folder, with a filter and an fsmonitor that would run
+# outside the sandbox and a "-wt" folder beside it: refused before git runs, nothing made (the security review of D13415).
+saved=$(cat "$wr/srcwt/.git") && git init -q "$wr/srcwt/evil" && mkdir -p "$wr/srcwt/evil/.git/worktrees/x" "$wr/srcwt/evil-wt" &&
+	git --git-dir="$wr/srcwt/evil/.git" config core.fsmonitor "$ws/fsmonitor" && echo "gitdir: $wr/srcwt/evil/.git/worktrees/x" >"$wr/srcwt/.git"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" planted planted HEAD 2>&1) && fail "worktree.sh ran from a worktree whose .git names a planted repository: $out"
+printf '%s\n' "$out" | grep -qF "is no worktree of the main checkout's -wt folder" && [ ! -e "$ws/pwned" ] && [ -z "$(ls -A "$wr/srcwt/evil-wt")" ] ||
+	fail "worktree.sh did not refuse a .git rewritten to a planted repository, or ran its config: $out"
+printf '%s\n' "$saved" >"$wr/srcwt/.git"
 # So from the main checkout, whose .git folder holds no commondir unless one was planted there.
 echo "$ws/evilgit2" >"$ws/src/.git/commondir"
 out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
