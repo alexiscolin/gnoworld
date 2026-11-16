@@ -41,6 +41,8 @@
 
   .item[data-soon] .main {
     opacity: 1;
+    /* layout: the button stands in its tooltip's anchor, not in the item's grid: as tall as the pill all the same */
+    min-block-size: var(--chat-item);
   }
 
   .item[data-unread] .main {
