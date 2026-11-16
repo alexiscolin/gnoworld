@@ -50,7 +50,6 @@ export class Moons {
   #wanted: readonly MoonRoom[] = [];
   #dirty = false;
   #of: Planet | undefined;
-  #seconds = 0;
   // This frame's, kept for the slots' calls.
   #clock: { seconds: number; delta: number; still: boolean } = { seconds: 0, delta: 0, still: false };
   #view: { turn: Quaternion; eye: Vector3 } = { turn: this.#turn, eye: this.#eye };
@@ -83,7 +82,6 @@ export class Moons {
     clock: { seconds: number; delta: number; still: boolean },
     view: { turn: Quaternion; eye: Vector3 },
   ): void {
-    this.#seconds = clock.seconds;
     this.#clock = clock;
     this.#view = view;
     const gone = planet === undefined;
@@ -121,7 +119,7 @@ export class Moons {
   // The planet changed: the foreground moon starts on the ring's near side, a little to one side, as the eye sees it.
   #arrive(planet: Planet, { turn, eye }: { turn: Quaternion; eye: Vector3 }): void {
     this.#of = planet;
-    placeOf(planet, this.#seconds, this.#at);
+    placeOf(planet, this.#clock.seconds, this.#at);
     const local = this.#to
       .set(eye.x - this.#at.x, eye.y - this.#at.y, eye.z - this.#at.z)
       .applyQuaternion(this.#turn.copy(turn).invert());
