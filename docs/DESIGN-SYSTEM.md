@@ -131,8 +131,10 @@ text on the hover fill; a trend is text with its caret, coral when it falls.
 **Trust, shown in words.** A conversation's header and its row show one of: not encrypted,
 encrypted, key changed, checked by you; each an icon (lock, shield, key) and a word, never on the
 avatar. "Never a verified badge" means no badge granted by the platform; a check the person made
-is theirs. The network is always named, and a testnet always says "Testnet". "Sponsored" is for
-paid placement only; a fee someone else pays reads "Fee paid by gnoworld".
+is theirs. The network is always named, and a testnet always says "Testnet". Pressed, the name
+opens the networks to choose from (D13501): the place stays when the other network holds it, and
+otherwise its home opens with a line saying so. "Sponsored" is for paid placement only; a fee
+someone else pays reads "Fee paid by gnoworld".
 
 **Contrast,** every pair at least 6.3:1. These are measured with an sRGB mix: the
 oklab mix differs by little, and axe in the gate measures the real pixels.
