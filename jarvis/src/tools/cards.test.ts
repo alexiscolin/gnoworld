@@ -820,6 +820,22 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
     }
   });
 
+  it("refuses an action's button of a shared answer before reading anything, and keeps its flights", async () => {
+    const { tools, read, node } = setup();
+    const { asked, cards } = askedOf();
+    const shared = { ...asked, shared: true };
+    const act: AnswerButton = { type: "action", label: "Vote", action: vote(), chainId: "onyx-1" };
+    expect(await tools.run(button(act), shared)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: a shared answer carries flights alone.",
+    });
+    expect(read).not.toHaveBeenCalled();
+    expect(node).not.toHaveBeenCalled();
+    expect(cards.cards()).toEqual(none());
+    expect(await tools.run(button(fly("/w/bubble"), null), shared)).toMatchObject({ ok: true, isError: false });
+  });
+
   it("refuses an action's button with no chain profile, or on a realm gnomcp cannot render, saying which", async () => {
     const { tools } = setup();
     const { asked, cards } = askedOf();

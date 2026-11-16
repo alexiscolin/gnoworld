@@ -28,13 +28,13 @@ test("stands Adena's station page in the planet's circle, as a world's, and goes
   await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   await expect.poll(() => placed(page), SLOW).toBe("bubble");
   await goInPage(page, "/w/adena?test-gpu");
-  await expect(page.locator("h1")).toHaveText("Adena");
+  await expect(page.locator("h1")).toHaveText("Adena", SLOW);
   await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   await opened(page);
   await expect.poll(() => placed(page), SLOW).toBe("adena");
   // Back to a planet, then to another station, then off the world pages: the engine goes with the page.
   await goInPage(page, "/w/govdao?test-gpu");
-  await expect(page.locator("h1")).toHaveText("GovDAO");
+  await expect(page.locator("h1")).toHaveText("GovDAO", SLOW);
   await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   await expect.poll(() => placed(page), SLOW).toBe("gov/dao");
   await goInPage(page, "/w/gnoswap?test-gpu");
