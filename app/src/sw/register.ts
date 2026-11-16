@@ -107,10 +107,9 @@ export async function startServiceWorker(start: Start): Promise<void> {
       { signal },
     );
   };
-  // The browser looks for a new worker when a page loads; one kept open for days moves in place, so it asks each time it
-  // is shown again, when the network comes back (a laptop that slept) and every hour (a tab always in view). The notice
-  // closes on its click: a page whose click took nothing over (the message lost) is offered the update again, for its
-  // next click to send it again.
+  // The browser looks for a new worker when a page loads; one kept open for days asks again when shown, when the network
+  // comes back (a laptop that slept) and every hour (a tab always in view). A click that took nothing over (its message
+  // lost) is offered the update again, for the next click to send it again.
   const check = () => {
     if (clicked && registration.waiting !== null) offer();
     registration.update().catch(async (error: unknown) => {
