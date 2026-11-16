@@ -1272,6 +1272,45 @@ describe("the chat, as the server starts it", () => {
       expect(again.lines.indexOf("SAMODE #bubble/old +s")).toBeLessThan(again.lines.indexOf("MODE #bubble"));
     });
 
+    // F13676: an archived Earth room made before the 30-day window keeps its row; the link no longer joins it.
+    it("joins no archived Earth room made before the window when it connects again, and raises no alert for its channel", async () => {
+      const clock = { now: T0 };
+      const { peer, ergo, chat } = await linked(
+        { worlds: worlds("earth", "bubble"), moderation: OFF },
+        { now: () => clock.now },
+      );
+      chat.rooms.earth("g1a", "old");
+      chat.rooms.archive("earth", "old");
+      clock.now += 31 * 24 * 60 * 60_000;
+      chat.rooms.earth("g1a", "new");
+      peer.socket.destroy();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      await expect.poll(() => again.lines.some((l) => l.startsWith("JOIN #"))).toBe(true);
+      const joins = again.lines.find((l) => l.startsWith("JOIN #")) ?? "";
+      expect(joins).toContain("#earth/new");
+      expect(joins).not.toContain("#earth/old");
+      again.say(":ergo.test 322 gnoworld #earth/old 1 :");
+      again.say(":ergo.test 323 gnoworld :End of /LIST");
+      again.say("PING :settled");
+      await again.next(/^PONG settled$/);
+      expect(logged.filter((l) => l.includes('"unknown_room"'))).toEqual([]);
+    });
+
+    // The mute sends one SAMODE a room of the world: the rooms the bot has left (past the window) are not among them.
+    it("mutes in the live and window rooms of the Earth, none in an archived room past the window", async () => {
+      const clock = { now: T0 };
+      const { peer, chat } = await linked({ worlds: worlds("earth"), moderation: OFF }, { now: () => clock.now });
+      chat.rooms.earth("g1a", "old");
+      chat.rooms.archive("earth", "old");
+      clock.now += 31 * 24 * 60 * 60_000;
+      chat.rooms.earth("g1a", "new");
+      expect(chat.roomsOf("earth")).toEqual(["#earth", "#earth/new"]);
+      expect(chat.muteKeeping("g1b", "earth")).toBe("muted");
+      await expect.poll(() => peer.lines.filter((l) => MUTE_LINE.test(l)).length).toBe(2);
+      expect(peer.lines.filter((l) => l.includes("#earth/old") && MUTE_LINE.test(l))).toEqual([]);
+    });
+
     it("raises the alert for a channel in Ergo it did not make, and for no room it made, archived or open", async () => {
       const { peer, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
       chat.rooms.create("bubble", "garden");

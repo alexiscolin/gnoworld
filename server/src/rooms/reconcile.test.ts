@@ -155,6 +155,27 @@ describe("the reconciler's pass", () => {
     ]);
   });
 
+  // F13676: a room that crosses the 30-day window while the link runs leaves the list; the bot leaves its channel at the next pass.
+  it("leaves a room that dropped out of the list since the last pass, once, and no room it never walked", async () => {
+    let listed = ["#a", "#b"];
+    const sent: string[] = [];
+    const reconciler = makeReconciler({
+      rooms: () => listed,
+      desired: () => OPEN,
+      state: () => Promise.resolve(state({ flags: "Mnt" })),
+      send: (command, params) => sent.push([command, ...params].join(" ")) > 0,
+      log: quiet,
+    });
+    await reconciler.pass();
+    expect(sent).toEqual([]);
+    listed = ["#a"];
+    await reconciler.pass();
+    await reconciler.pass();
+    expect(sent).toEqual(["PART #b"]);
+    await reconciler.pass("#b");
+    expect(sent).toEqual(["PART #b"]);
+  });
+
   it("raises the alert when it opens a room that was closed: the roles file made it open", async () => {
     const lines: string[] = [];
     const reconciler = makeReconciler({
