@@ -70,19 +70,15 @@
       "ignore": ["src/testing/**"]
     },
     "packages/ui": {
-      "entry": [
-        "src/index.ts!",
-        "src/fonts.ts!",
-        "src/Overview/Overview.tsx!",
-        "src/TokensPage/TokensPage.tsx!",
-        "src/Overview/samples.ts!"
-      ],
+      "entry": ["src/index.ts!", "src/fonts.ts!"],
       "project": [
         "src/**/*.{ts,tsx}!",
         "!src/**/*.test.{ts,tsx}!",
         "!src/**/*.stories.tsx!",
         "!src/testing.tsx!",
-        "!src/testSetup.ts!"
+        "!src/testSetup.ts!",
+        "!src/Overview/**!",
+        "!src/TokensPage/**!"
       ]
     }
   }
