@@ -7014,6 +7014,25 @@ closes_case "body=12${nl}headers=12${nl}idle=15"
 	fail "deploy/test.sh's headers' or body's check passed a close at 12 s, past its one second of margin: $out"
 closes_case "still open after 40 s"
 [ "$(printf '%s\n' "$out" | grep -c '^FAIL ')" = 3 ] || fail "deploy/test.sh's closes passed a probe that never closed: $out"
+# F13163's DNS checks: dns_answers counts the addresses but loopback's a lookup got, and says when nslookup or docker gave no answer at all
+# (no Server: line), never reading it as a name that does not resolve; indexer_read tries the live read three times at most.
+dj="$here/../deploy/test-jarvis.sh"
+{ sed -n '/^dns_answers() {/,/^}$/p' "$dj"; sed -n '/^indexer_read() {/,/^}$/p' "$dj"
+	printf '%s\n' 'docker() { case $FAKE in' \
+		'none) echo "docker: Error response from daemon: No such container" >&2; return 125 ;;' \
+		'nx) printf "Server:\t\t127.0.0.11\nAddress:\t127.0.0.11:53\n\n** server can'"'"'t find x.: NXDOMAIN\n"; return 1 ;;' \
+		'two) printf "Server:\t\t127.0.0.11\nAddress:\t127.0.0.11:53\n\nName:\tguard\nAddress: 172.18.0.3\nAddress: 172.18.0.4\nAddress: 127.0.0.1\n" ;;' \
+		'esac; }' 'sleep() { :; }' \
+		'gnomcp_read() { n=$(($(cat "$CALLS") + 1)) && echo "$n" >"$CALLS" && if [ "$n" -ge "$OK_AT" ]; then echo read; else echo "failed: timeout $n"; fi; }' \
+		'case $1 in dns) dns_answers r guard. ;; *) echo 0 >"$CALLS" && echo "$(indexer_read) $(cat "$CALLS")" ;; esac'; } >"$dc/f13163.sh"
+for case in "none:no answer: docker: Error response from daemon: No such container" "nx:0" "two:2"; do
+	got=$(FAKE=${case%%:*} sh "$dc/f13163.sh" dns 2>&1)
+	[ "$got" = "${case#*:}" ] || fail "deploy/test-jarvis.sh's dns_answers read the ${case%%:*} lookup as [$got], not [${case#*:}]"
+done
+for case in "1:read 1" "2:read 2" "3:read 3" "4:failed: timeout 3 3"; do
+	got=$(CALLS="$dc/calls" OK_AT=${case%%:*} sh "$dc/f13163.sh" reads 2>&1)
+	[ "$got" = "${case#*:}" ] || fail "deploy/test-jarvis.sh's indexer_read, the read answering at try ${case%%:*}, gave [$got], not [${case#*:}]"
+done
 fi
 
 if part workshop; then

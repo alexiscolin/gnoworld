@@ -88,7 +88,7 @@ if [ "${1:-}" = --mutants ]; then
 	# its way out would still refuse (both lists given Anthropic's API), a container joined to the reader's network, the door's
 	# key not asked.
 	mutant "the reader listening on all its addresses" "the reader's way out's network reaches no listener of the reader's" compose 'services: { jarvis_reader: { environment: { READER_LISTEN: "0.0.0.0:8083" } } }'
-	mutant "a host dropped from the relay's list" "gnomcp's reads succeed through the reader" compose 'services: { jarvis_reader: { environment: { READER_HOSTS: "rpc.onyx.testnets.gno.land,indexer.onyx.testnets.gno.land,indexer.gno.land" } } }'
+	mutant "a host dropped from the relay's list" "gnomcp reads gno.land's node through the reader" compose 'services: { jarvis_reader: { environment: { READER_HOSTS: "rpc.onyx.testnets.gno.land,indexer.onyx.testnets.gno.land,indexer.gno.land" } } }'
 	mutant "the relay and the reader's way out both open to Anthropic's API" "the relay refuses a name off its list" sni_open
 	mutant "a container joined to the reader's network" "the reader's network holds jarvis and the reader alone" compose 'services: { server: { networks: { reader: {} } } }'
 	mutant "jarvis asking no door key" "jarvis answers 401 to a request with no key" compose 'services: { jarvis: { environment: { JARVIS_DOOR_KEY_FILE: !reset null }, healthcheck: !override { test: [CMD, /nodejs/bin/node, -e, "process.exit(0)"] } } }'
@@ -353,7 +353,8 @@ socket.on('data', (chunk) => {
       send({ method: 'notifications/initialized' });
       send({ id: 2, method: 'tools/call', params: { name: process.env.TOOL, arguments: JSON.parse(process.env.ARGS) } });
     } else if (message.id === 2) {
-      console.log(message.result && message.result.isError !== true ? 'read' : 'failed');
+      const failed = message.error || (!message.result ? 'no result' : message.result.isError === true ? message.result.content : null);
+      console.log(failed ? 'failed: ' + JSON.stringify(failed).slice(0, 300) : 'read');
       process.exit(0);
     }
   }
@@ -364,9 +365,17 @@ send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', cap
 JS
 )
 gnomcp_read() { docker exec -e TOOL="$1" -e ARGS="$2" "$jarvis" /nodejs/bin/node -e "$read_js" 2>&1 || true; }
-expect "gnomcp's reads succeed through the reader: Onyx's node, gno.land's node, gno.land's indexer" \
-	"$(gnomcp_read gno_status '{"profile":"onyx"}') $(gnomcp_read gno_status '{"profile":"gnoland"}') $(gnomcp_read gno_history '{"profile":"gnoland","realm":"gno.land/r/gnoland/home"}')" \
-	"read read read"
+expect "gnomcp reads Onyx's node through the reader" "$(gnomcp_read gno_status '{"profile":"onyx"}')" read
+expect "gnomcp reads gno.land's node through the reader" "$(gnomcp_read gno_status '{"profile":"gnoland"}')" read
+# gno.land's indexer, live, times out now and then (F13163): three tries, the last one's answer judged.
+indexer_read() {
+	tries=0
+	until got=$(gnomcp_read gno_history '{"profile":"gnoland","realm":"gno.land/r/gnoland/home"}') && [ "$got" = read ] || [ "$tries" -ge 2 ]; do
+		tries=$((tries + 1)) && sleep 5
+	done
+	echo "$got"
+}
+expect "gnomcp reads gno.land's indexer through the reader (three tries at most)" "$(indexer_read)" read
 # gnomcp's audit reaches the reader's log as tool, result and duration alone: a planted argument of a read never does.
 planted=zzplantedargumentzz
 gnomcp_read gno_render "{\"profile\":\"gnoland\",\"realm\":\"gno.land/r/$planted/home\"}" >/dev/null
@@ -374,10 +383,20 @@ reader_log=$(docker logs "$reader" 2>&1)
 expect "the reader's log shows gnomcp's tool and never a planted argument" \
 	"$(printf '%s\n' "$reader_log" | grep -c '"tool":"gno_render"' | sed 's/^[1-9][0-9]*$/some/') $(printf '%s\n' "$reader_log" | grep -c "$planted" || true)" "some 0"
 # Docker's own DNS answers no outside name on these networks: neither the reader nor jarvis can send data out in a lookup. Each
-# has its control, a name of its own network, which resolves.
-dns_outside() { docker run --rm --network "container:$1" --entrypoint nslookup "$CURL" "$2" 2>/dev/null | sed -n 's/^Address: //p' | grep -vc '^127\.' || true; }
-expect "neither the reader nor jarvis resolves an outside name" "$(dns_outside "$reader" example.com) $(dns_outside "$jarvis" example.com)" "0 0"
-case $(dns_outside "$reader" guard)$(dns_outside "$jarvis" server) in [1-9]*) pass "and each resolves a name of its own network (the control)" ;; *) fail "the DNS check is blind: no name of their own network resolves" ;; esac
+# has its control, a name of its own network, which resolves. Every name ends with its dot: busybox's nslookup asks a name with no dot
+# only joined to resolv.conf's search domains (networking/nslookup.c, add_query_with_search), which GitHub's runners have (F13163).
+# dns_answers prints how many addresses but loopback's the lookup got, or "no answer" when nslookup or docker gave none at all (no
+# Server: line), which is never read as a name that does not resolve.
+dns_answers() {
+	out=$(docker run --rm --network "container:$1" --entrypoint nslookup "$CURL" "$2" 2>&1) || :
+	case $out in
+	*Server:*) printf '%s\n' "$out" | sed -n 's/^Address: //p' | grep -vc '^127\.' || : ;;
+	*) echo "no answer: $(printf '%s' "$out" | head -n 1)" ;;
+	esac
+}
+expect "neither the reader nor jarvis resolves an outside name" "$(dns_answers "$reader" example.com.) $(dns_answers "$jarvis" example.com.)" "0 0"
+expect "the reader resolves a name of its own network (the control)" "$(dns_answers "$reader" guard. | sed 's/^[1-9][0-9]*$/some/')" some
+expect "jarvis resolves a name of its own network (the control)" "$(dns_answers "$jarvis" server. | sed 's/^[1-9][0-9]*$/some/')" some
 
 # What it holds: nothing of jarvis's or the server's, no volume, no file of the host; a user nobody else runs as.
 expect "the reader mounts no volume and no file" "$(docker inspect --format '{{range .Mounts}}{{if ne .Type "tmpfs"}}{{.Destination}} {{end}}{{end}}' "$reader")" ""
