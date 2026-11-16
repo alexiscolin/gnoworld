@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
-import { Anchor } from "../link.tsx";
+import { Pressable } from "../Pressable.tsx";
 import { Soon } from "../ComingSoon/ComingSoon.tsx";
 import styles from "./NavItem.module.css";
 
@@ -52,6 +52,8 @@ function End({ meta, badge }: Pick<Shared, "meta" | "badge">) {
   );
 }
 
+const nothing = () => undefined;
+
 // The item's control: a link, a button that acts, or one to come, inert.
 function Main({
   face,
@@ -75,14 +77,11 @@ function Main({
         {face}
       </Soon>
     );
-  return href === undefined ? (
-    <button type="button" {...look} onClick={onClick}>
+  // With no address and no act it is the item in view: a button that does nothing.
+  return (
+    <Pressable href={href} onClick={onClick ?? nothing} {...look}>
       {face}
-    </button>
-  ) : (
-    <Anchor href={href} {...look}>
-      {face}
-    </Anchor>
+    </Pressable>
   );
 }
 

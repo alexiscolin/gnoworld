@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Sidebar, Stack } from "../compositions/index.ts";
-import { Anchor } from "../link.tsx";
+import { Pressable } from "../Pressable.tsx";
 import styles from "./Row.module.css";
 
 export interface RowProps {
@@ -63,24 +63,16 @@ function Body({
   external: boolean | undefined;
   onClick: (() => void) | undefined;
 }) {
-  const now = current ? "true" : undefined;
-  if (onClick !== undefined) {
-    return (
-      <button type="button" className={["full-start", styles["link"]].join(" ")} aria-current={now} onClick={onClick}>
-        {led}
-      </button>
-    );
-  }
-  if (href === undefined) return led;
   return (
-    <Anchor
+    <Pressable
       href={href}
+      onClick={onClick}
+      external={external}
       className={["full-start", styles["link"]].join(" ")}
-      aria-current={now}
-      {...(external === true ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      aria-current={current ? "true" : undefined}
     >
       {led}
-    </Anchor>
+    </Pressable>
   );
 }
 

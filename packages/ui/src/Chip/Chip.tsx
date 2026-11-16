@@ -1,5 +1,5 @@
 import { pill } from "../Button/control.ts";
-import { Anchor } from "../link.tsx";
+import { Pressable } from "../Pressable.tsx";
 import { sightRef } from "../offscreen.ts";
 import styles from "./Chip.module.css";
 
@@ -77,6 +77,33 @@ function Words({ children, count }: { children: string; count: number | string |
   );
 }
 
+// A chip that does nothing: a static mark at the smallest size, its dot before the words.
+function Static({
+  children,
+  tone,
+  dot,
+  strong,
+}: {
+  children: string;
+  tone: Tone;
+  dot: boolean | undefined;
+  strong: boolean | undefined;
+}) {
+  return (
+    <span
+      className={pill(styles["chip"])}
+      data-tone={tone}
+      data-size="xs"
+      data-strong={strong === true ? "" : undefined}
+    >
+      {dot === true ? (
+        <i key={children} ref={sightRef} className={["disc ring", styles["dot"]].join(" ")} aria-hidden="true" />
+      ) : null}
+      {children}
+    </span>
+  );
+}
+
 /** A short word: a button at the small control's size, or a static mark at the smallest, in a tone. */
 export function Chip({
   children,
@@ -92,55 +119,26 @@ export function Chip({
   dot,
   strong,
 }: ChipProps) {
-  if (href !== undefined) {
+  if (href === undefined && onClick === undefined)
     return (
-      <Anchor
-        href={href}
-        className={pill(styles["chip"])}
-        data-tone={tone}
-        data-size={size ?? "s"}
-        aria-current={selected === true ? "true" : undefined}
-        aria-label={label}
-      >
-        <Words count={count}>{children}</Words>
-      </Anchor>
-    );
-  }
-  if (onClick === undefined) {
-    return (
-      <span
-        className={pill(styles["chip"])}
-        data-tone={tone}
-        data-size="xs"
-        data-strong={strong === true ? "" : undefined}
-      >
-        {dot === true ? (
-          <i
-            key={typeof children === "string" ? children : undefined}
-            ref={sightRef}
-            className={["disc ring", styles["dot"]].join(" ")}
-            aria-hidden="true"
-          />
-        ) : null}
+      <Static dot={dot} strong={strong} tone={tone}>
         {children}
-      </span>
+      </Static>
     );
-  }
   return (
-    <button
-      type="button"
+    <Pressable
+      href={href}
+      onClick={onClick}
       className={pill(styles["chip"])}
       data-tone={tone}
       data-size={size ?? "s"}
-      aria-pressed={selected}
+      aria-pressed={href === undefined ? selected : undefined}
+      aria-current={href !== undefined && selected === true ? "true" : undefined}
       aria-label={label}
       aria-haspopup={popup}
       tabIndex={tabIndex}
-      onClick={() => {
-        onClick();
-      }}
     >
       <Words count={count}>{children}</Words>
-    </button>
+    </Pressable>
   );
 }
