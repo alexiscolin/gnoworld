@@ -74,19 +74,21 @@ export function Around({ around }: { around: AroundData }) {
       <Card.Body>
         <Grid cols={12} space="l">
           <Cell span={6}>
-            <Network
-              label={`${around.title}: places linked to ${around.centre.label}`}
-              centre={around.centre}
-              left={left}
-              right={right}
-              selected={picked}
-              pickedHint={find(picked ?? "")?.path === undefined ? "no page of its own" : "click again to open it"}
-              onSelect={(id) => {
-                const node = find(id);
-                if (node !== undefined && picked === id) go(node);
-                setPicked(id);
-              }}
-            />
+            <div className={styles["graph"]}>
+              <Network
+                label={`${around.title}: places linked to ${around.centre.label}`}
+                centre={around.centre}
+                left={left}
+                right={right}
+                selected={picked}
+                pickedHint={find(picked ?? "")?.path === undefined ? "no page of its own" : "click again to open it"}
+                onSelect={(id) => {
+                  const node = find(id);
+                  if (node !== undefined && picked === id) go(node);
+                  setPicked(id);
+                }}
+              />
+            </div>
           </Cell>
           <Cell span={6}>
             {/* A rule between the graph and its list, so the two halves read apart. */}

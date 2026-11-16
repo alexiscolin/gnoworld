@@ -112,6 +112,9 @@
     /* A chip's words in the plate's pills. */
     --font-chip: 500 0.75rem/1 var(--family-sans);
 
+    /* How far a phone's 44 px hit box (utilities.css) stands out of its control each side: a Switch's track sets it. */
+    --hit-inline: 0;
+
     --space-3xs: 4px;
     --space-2xs: 8px;
     --space-xs: 12px;
@@ -211,6 +214,8 @@
        it; the arrival's pill a step under it; and the room a page keeps free above its first line so the pill covers none of it
        and nothing moves when it comes: one row of the pill and a step. */
     --banner-under: 96px;
+    /* The shell header's height a phone's full chat starts below (shellHeader.module.css sets it under 900 px); none from 900 px. */
+    --shell-head: 0px;
     --banner-top: calc(var(--banner-under) + var(--space-s));
     /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it (frames 4, 20, 26). */
     --dock-top: 98px;
@@ -316,6 +321,13 @@
   /* The phone layout's breakpoint (DESIGN-SYSTEM.md, Breakpoints), where the pill's actions wrap under its words: two rows. */
   @media (width < 900px) {
     :root {
+      /* Nothing under the reading size (13 px) but the label style: the 12 px and 10.5 px roles take it, the frames' 10 and 9 px mono the label's 11. */
+      --font-meta: 400 0.8125rem/1.4 var(--family-sans);
+      --font-data: 400 0.8125rem/1.4 var(--family-mono);
+      --font-hint: 400 0.8125rem/1.4 var(--family-sans);
+      --font-chip: 500 0.8125rem/1 var(--family-sans);
+      --text-2xs: 0.6875rem;
+      --text-3xs: 0.6875rem;
       --banner-room: calc(var(--control-s) * 2 + var(--space-m) + var(--space-2xs) * 2 + var(--space-s));
     }
   }

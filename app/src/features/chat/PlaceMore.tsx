@@ -25,7 +25,7 @@ export function Links({ gnoweb, chainId }: { gnoweb: string | undefined; chainId
     <Cluster as="ul" space="xs">
       {links.map(({ label, href }) => (
         <li key={label}>
-          <a href={href} {...NEW_TAB} className="label">
+          <a href={href} {...NEW_TAB} className="label hit">
             <span className={styles["link"]}>
               {label}
               <Icon name="arrow-up-right" />

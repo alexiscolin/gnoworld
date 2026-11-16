@@ -212,4 +212,12 @@
       display: none;
     }
   }
+
+  /* A touch phone has no keys: the chords' hints, and the one on the hand-off row, are not drawn. */
+  @media (width < 900px) and (pointer: coarse) {
+    .hints,
+    .handOff kbd {
+      display: none;
+    }
+  }
 }

@@ -179,7 +179,8 @@ the brightest planet behind the header's pills.
   `caps` utility, the capitals alone. Units and domains inside a label keep their case, and both
   utilities reset the case and the tracking under `:lang()` for scripts that caps break (Arabic,
   Hebrew, Persian…).
-- 11 px is the floor; nothing is smaller.
+- 11 px is the floor; nothing is smaller. Under 900 px the reading size (13 px) is: `--font-meta`, `--font-data`, `--font-hint` and
+  `--font-chip` take it, and the frames' 10 and 9 px mono (`--text-2xs`, `--text-3xs`) the label's 11 px, the one smaller size.
 - Two families, Geist and Geist Mono, self-hosted with `font-display: swap` and preloaded for the
   first screen; beyond the scripts Geist covers, a system fallback per script. The first paint is
   measured for layout shift.

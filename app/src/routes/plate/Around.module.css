@@ -3,4 +3,10 @@
   .note {
     white-space: nowrap;
   }
+
+  /* The graph draws from this box's own width: a phone's narrow card gives it the card's, never the column's minimum. */
+  .graph {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
 }

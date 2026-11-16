@@ -12,4 +12,11 @@
   a.out:hover {
     text-decoration-color: currentcolor;
   }
+
+  /* A phone's finger (utilities.css, .hit): the link is a box of its own, so the 44 px box has its height to stand on. */
+  @media (width < 900px) {
+    a.out {
+      display: block;
+    }
+  }
 }
