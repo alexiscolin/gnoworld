@@ -24,7 +24,6 @@ export type Args =
   | { ok: true; args: string[] }
   | { ok: false; why: "read" | "gnoweb" }
   | { ok: false; why: "fields"; problems: (Problem | undefined)[] };
-type ReadFields = { ok: true; fields: CallField[] } | { ok: false; why: "write" | "gnoweb" };
 type ReadArgs =
   | { ok: true; literals: string[] }
   | { ok: false; why: "write" | "gnoweb" }
@@ -71,14 +70,6 @@ function bytesShape(type: string): Shape | undefined {
   if (match === null) return undefined;
   const length = Number(match[1]);
   return Number.isSafeInteger(length) ? { kind: "bytes", length } : undefined;
-}
-
-/**
- * Whether a call carries a parameter of this `vm/qfuncs` type as text.
- * @internal
- */
-export function isCarried(type: string): boolean {
-  return shapeOf(type) !== undefined;
 }
 
 function integerProblem(text: string, bits: number, signed: boolean): Problem | undefined {
@@ -196,15 +187,6 @@ function resolveRead(params: Params): ReadResolved {
   if (params?.[0]?.Type === realmType()) return { ok: false, why: "write" };
   const fields = fieldsOf(params ?? [], ({ kind }) => kind === "string" || kind === "bool" || kind === "integer");
   return fields === undefined ? { ok: false, why: "gnoweb" } : { ok: true, fields };
-}
-
-/**
- * The fields a read draws, every parameter a string, a bool or an integer; none for a write or another type.
- * @internal
- */
-export function readFields(params: Params): ReadFields {
-  const done = resolveRead(params);
-  return done.ok ? { ok: true, fields: done.fields.map(({ field }) => field) } : done;
 }
 
 // A Go interpreted string literal: a backslash, a quote, a newline and a tab escaped, the four textProblem lets through that Go's string

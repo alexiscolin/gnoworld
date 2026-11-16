@@ -1,17 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import * as core from "../index.ts";
-import {
-  callArgs,
-  callFields,
-  HIDDEN,
-  isCarried,
-  READ_STRING_MAX_BYTES,
-  readArgs,
-  readFields,
-  realmType,
-  textProblem,
-} from "./args.ts";
+import { callArgs, callFields, HIDDEN, READ_STRING_MAX_BYTES, readArgs, realmType, textProblem } from "./args.ts";
 
 // A call's arguments follow its parameters' types (ADR-0002 §4). The rules are gno's own `convert.go`
 // (gnolang/gno 07e44776c261, tag v1.5.1, the version onyx-1 and gnoland-1 run), read as `vm/qfuncs` writes the types
@@ -20,6 +10,8 @@ import {
 const cur = () => ({ Name: "cur", Type: realmType() });
 const param = (type: string, name = "x") => ({ Name: name, Type: type });
 // A last `[]uint8` may be `...byte`: each kind is judged before a last bool.
+// Whether a call carries a parameter of this type: callFields draws a field for it (a last `[]uint8` may be `...byte`, so a bool ends).
+const isCarried = (type: string) => callFields([cur(), param(type), param("bool")]).ok;
 const call = (type: string, text: string) => {
   const done = callArgs([cur(), param(type), param("bool", "end")], [text, "true"]);
   return done.ok ? { ok: true as const, args: done.args.slice(0, -1) } : done;
@@ -717,11 +709,10 @@ describe("textProblem: what a CallRequest refuses of any text", () => {
 });
 
 describe("the index", () => {
-  it("exports callFields, callArgs, realmType and isCarried for the app and jarvis", () => {
+  it("exports callFields, callArgs and realmType for the app and jarvis", () => {
     expect(core.callFields).toBe(callFields);
     expect(core.callArgs).toBe(callArgs);
     expect(core.realmType).toBe(realmType);
-    expect(core.isCarried).toBe(isCarried);
     expect(core.textProblem).toBe(textProblem);
     expect(core.HIDDEN).toBe(HIDDEN);
   });
@@ -761,22 +752,9 @@ function utf8(text: string): number {
   return bytes;
 }
 
-describe("readFields: what a read asks for", () => {
-  it.each([null, undefined, []])("takes a function with no parameter (%j), and draws no field", (params) => {
-    expect(readFields(params)).toEqual({ ok: true, fields: [] });
-  });
-
-  it("draws a field for each string, bool and integer parameter, in order", () => {
-    const params = [param("string", "who"), param("bool", "all"), param("int", "page"), param("uint8", "small")];
-    expect(readFields(params)).toEqual({
-      ok: true,
-      fields: [
-        { name: "who", type: "string", kind: "string", freeText: true },
-        { name: "all", type: "bool", kind: "bool", freeText: false },
-        { name: "page", type: "int", kind: "integer", freeText: false },
-        { name: "small", type: "uint8", kind: "integer", freeText: false },
-      ],
-    });
+describe("readArgs: what a read asks for", () => {
+  it.each([null, undefined, []])("takes a function with no parameter (%j), and writes no literal", (params) => {
+    expect(readArgs(params, [])).toEqual({ ok: true, literals: [] });
   });
 
   it.each([
@@ -784,7 +762,6 @@ describe("readFields: what a read asks for", () => {
     ["before a string", () => [cur(), param("string")]],
     ["before a bool and an int", () => [cur(), param("bool"), param("int")]],
   ])("refuses a function whose first parameter is the realm (%s): a write, which qeval would fake", (_name, params) => {
-    expect(readFields(params())).toEqual({ ok: false, why: "write" });
     expect(
       readArgs(
         params(),
@@ -798,24 +775,22 @@ describe("readFields: what a read asks for", () => {
   it.each(["float32", "float64", "[]uint8", "[32]uint8", "[]string", "address", "map[string]string", "*string", ""])(
     "refuses a read with a %j parameter: only string, bool and integers are written here",
     (type) => {
-      expect(readFields([param("string"), param(type)])).toEqual({ ok: false, why: "gnoweb" });
       expect(readArgs([param("string"), param(type)], ["a", "1"])).toEqual({ ok: false, why: "gnoweb" });
     },
   );
 
   it("refuses the realm type after the first parameter as a type it does not carry, not as a write", () => {
-    expect(readFields([param("string"), cur()])).toEqual({ ok: false, why: "gnoweb" });
+    expect(readArgs([param("string"), cur()], ["a", "1"])).toEqual({ ok: false, why: "gnoweb" });
   });
 
   it("calls a first realm parameter a write before it looks at the others", () => {
-    expect(readFields([cur(), param("float64")])).toEqual({ ok: false, why: "write" });
-    expect(readFields([param("float64"), cur()])).toEqual({ ok: false, why: "gnoweb" });
+    expect(readArgs([cur(), param("float64")], ["1"])).toEqual({ ok: false, why: "write" });
+    expect(readArgs([param("float64"), cur()], ["1", "1"])).toEqual({ ok: false, why: "gnoweb" });
   });
 
   it.each(["realm", ".uverse.realm", "address", ".uverse.address", realmType().toUpperCase(), `${realmType()} `])(
     "refuses a first parameter of type %j: nothing it does not carry is ever written",
     (type) => {
-      expect(readFields([param(type)]).ok).toBe(false);
       expect(readArgs([param(type)], ["a"]).ok).toBe(false);
     },
   );
@@ -984,8 +959,7 @@ describe("readArgs: a whole call", () => {
 });
 
 describe("the index, for a read", () => {
-  it("exports readFields, readArgs and the string cap for the app", () => {
-    expect(core.readFields).toBe(readFields);
+  it("exports readArgs and the string cap for the app", () => {
     expect(core.readArgs).toBe(readArgs);
     expect(core.READ_STRING_MAX_BYTES).toBe(READ_STRING_MAX_BYTES);
   });

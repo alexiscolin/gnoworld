@@ -20,15 +20,6 @@ const deviceChoice = (account: Address, storage: () => DraftStorage): string | u
     check: (raw) => (typeof raw === "string" && (raw === HIDDEN || isCountryCode(raw)) ? raw : undefined),
   });
 
-/**
- * The country `account` chose on this device; none until it chooses, once it hid it, or when the device cannot be read.
- * @internal
- */
-export function keptCountry(account: Address, storage: () => DraftStorage = pageStorage): string | undefined {
-  const kept = deviceChoice(account, storage);
-  return kept === HIDDEN || kept === NONE ? undefined : kept;
-}
-
 /** Keeps `code` as what `account` shows, or that it shows none; whether the device did. */
 export function keepCountry(
   account: Address,

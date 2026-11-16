@@ -12,19 +12,11 @@ import {
 } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { evalCall } from "./evalCall.ts";
-import { makeQueryClient, Unread } from "../query/client.ts";
+import { QueryClient } from "@tanstack/react-query";
+import { isUnread, makeQueryClient, Unread } from "../query/client.ts";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";
-import {
-  readCallable,
-  readEval,
-  readFunctions,
-  readPage,
-  readUser,
-  realmFunctions,
-  toCallable,
-  toFunctions,
-} from "./rpc.ts";
+import { readEval, readPage, readUser, realmFunctions, toCallable, toFunctions } from "./rpc.ts";
 
 // The four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
 // which answers are RECORDED through gnomcp and which are READ from gno's source at v1.5.0; a title says "recorded" or "read".
@@ -51,6 +43,21 @@ const options = (fetcher: ChainFetch, extra: ReadOptions = {}): ReadOptions => (
   now: () => NOW,
   ...extra,
 });
+// The functions of a realm as the views ask them: the query's one read, shaped by what each view selects. One try, no timer kept.
+type Listed = Parameters<typeof toFunctions>[0];
+const listedThrough =
+  <T>(shape: (read: Listed) => ChainRead<T>) =>
+  async (rpc: string, realm: string, o: ReadOptions): Promise<ChainRead<T>> => {
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, retry: false } } });
+    try {
+      return shape(await client.query(realmFunctions(rpc, realm, o)));
+    } catch (error) {
+      if (isUnread<Listed>(error)) return shape(error.read);
+      throw error;
+    }
+  };
+const readFunctions = listedThrough(toFunctions);
+const readCallable = listedThrough(toCallable);
 const askedOf = (fetcher: ReturnType<typeof answering>): string[] => fetcher.mock.calls.map(([url]) => url);
 
 function failureOf(result: ChainRead<unknown>): Failure {
