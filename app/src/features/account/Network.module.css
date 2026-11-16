@@ -13,11 +13,8 @@
   /* On a phone the header's row names the network: the pill keeps the name alone. */
   .inPill {
     display: none;
-    /* layout: a line off the account's name, as the views' pill's divider */
+    /* layout: a gap off the account's pill, which it stands beside, never inside: no divider on the scene */
     margin-inline-start: var(--space-2xs);
-    padding-inline-start: var(--space-xs);
-    /* raw: a hairline, the views' pill's 1 px divider */
-    border-inline-start: 1px solid var(--color-line-strong);
   }
 
   @media (width >= 900px) {
