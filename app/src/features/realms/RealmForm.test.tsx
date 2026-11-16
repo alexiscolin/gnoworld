@@ -54,6 +54,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(source)}
+          page={REALM}
           call={{ realm: REALM, chain: CHAIN, options: { fetch: under } }}
         />
       </div>
@@ -62,6 +63,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("SetProfile", input("name")))}
+          page={REALM}
           call={{ realm: REALM, chain: SIBLING_CHAIN, options: { fetch: sibling } }}
         />
       </div>
@@ -286,6 +288,7 @@ describe("a GovDAO page's vote form", () => {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("MustVoteOnProposalSimple", input("pid"), input("option")))}
+          page="gno.land/r/gov/dao"
           call={{
             realm: "gno.land/r/gov/dao",
             chain: CHAIN,
