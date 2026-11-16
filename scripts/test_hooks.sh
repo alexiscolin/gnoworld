@@ -651,8 +651,17 @@ else:
 # They are main's, which install_hooks.sh installs, not this branch's: a branch's new rule is judged once it is main's.
 temporary = {"/private/tmp", "/tmp", os.path.realpath(tempfile.gettempdir())}
 here_main = os.path.realpath(real_main)
-main_settings = subprocess.run(["git", f"--git-dir={sys.argv[3]}", "show", "main:.claude/settings.json"], capture_output=True, text=True)
-profiles = [q for q in [os.path.join(HOME, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(HOME), ".claude-*"))) if os.path.isfile(os.path.join(q, "settings.json"))]
+# The object itself, whatever a replace ref shows, as install_hooks.sh reads it; the branch, never a tag or a file named main.
+main_settings = subprocess.run(["git", "--no-replace-objects", f"--git-dir={sys.argv[3]}", "show", "refs/heads/main:.claude/settings.json"], capture_output=True, text=True)
+# The profiles machine_rules.py writes: a folder that is a link is none of them; one whose settings are no file holds no twin, said.
+profiles = []
+for q in [os.path.join(HOME, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(HOME), ".claude-*"))):
+    if os.path.islink(q) or not os.path.lexists(os.path.join(q, "settings.json")):
+        continue
+    if os.path.isfile(os.path.join(q, "settings.json")):
+        profiles.append(q)
+    else:
+        print(f"siblings: {q}'s settings are no file: its twins are not judged")
 if profiles and main_settings.returncode == 0 and not any(here_main == r or here_main.startswith(r + "/") for r in temporary):
     twins_here = mr["rules"](json.loads(main_settings.stdout), here_main, HOME, os.getuid())
     for q in profiles:
