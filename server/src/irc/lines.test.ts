@@ -17,7 +17,7 @@ describe("the link's own lines (3j's green pass)", () => {
   it("writes any command it allows as one line of its form, or nothing", () => {
     fc.assert(
       fc.property(
-        fc.constantFrom("REDACT", "NOTICE", "SAMODE", "JOIN", "PRIVMSG", "KICK", "QUIT"),
+        fc.constantFrom("REDACT", "NOTICE", "SAMODE", "JOIN", "PART", "PRIVMSG", "KICK", "QUIT"),
         fc.array(word, { maxLength: 4 }),
         (command, params) => {
           if (!allowed(command, params)) return;
@@ -36,6 +36,7 @@ describe("the link's own lines (3j's green pass)", () => {
             REDACT: /^REDACT #[^\s,]+[ \r]/,
             NOTICE: /^NOTICE [^#,\s:][^\s,]*[ \r]/,
             JOIN: /^JOIN #[^\s,]+\r\n$/,
+            PART: /^PART #[^\s,]+\r\n$/,
             KICK: /^KICK #[^\s,]+ [^\s,*?!@#:][^\s,*?!@]* :?\S.*\r\n$/,
           };
           const form = forms[command];
@@ -45,6 +46,13 @@ describe("the link's own lines (3j's green pass)", () => {
       ),
       { numRuns: 2000 },
     );
+  });
+
+  it("leaves one room by PART, and refuses a list, a direct target and a reason (F13676)", () => {
+    expect(allowed("PART", ["#earth/old"])).toBe(true);
+    expect(["alice", "#a,#b", "#a b", ""].map((room) => allowed("PART", [room]))).toEqual([false, false, false, false]);
+    expect(allowed("PART", ["#earth/old", "bye"])).toBe(false);
+    expect(line("PART", ["#earth/old"])).toBe("PART #earth/old\r\n");
   });
 
   it("sends a NOTICE to an account's shape alone, never a server mask nor a room's prefix (F655)", () => {

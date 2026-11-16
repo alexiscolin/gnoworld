@@ -40,7 +40,7 @@ export function presentFor(db: DatabaseSync, file: string | undefined, { visible
     log,
     ...watchersOf(stream),
     file,
-    rooms: () => listRooms(db),
+    rooms: () => listRooms(db, now()),
   });
 }
 

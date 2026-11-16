@@ -4,6 +4,7 @@
 import { isIP } from "node:net";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
+import type { Limiter } from "./limit.ts";
 
 // The address a limit counts: the proxy's header from the proxy itself, else the peer, an IPv4-mapped one as IPv4.
 function addressOf(peer: string, header: string | undefined, proxy: string | undefined): string {
@@ -56,3 +57,15 @@ export function visitor48(peer: string, header: string | undefined, proxy: strin
 
 export const visitor48Of = (c: Context, proxy: string | undefined): string =>
   visitor48(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
+
+/** How many visitors a /48 is worth: one customer at most providers, sixty /64s of it take no more than this many visitors' share. */
+export const VISITORS_PER_BLOCK = 4;
+
+/** Allowances asked together, each a limiter and the key it counts: a try is refused when any is full, and spends them all only once taken. */
+export type Allowances = readonly (readonly [Limiter, string])[];
+
+export const anyFull = (asked: Allowances, at: number): boolean => asked.some(([each, key]) => each.full(key, at));
+
+export function takeAll(asked: Allowances, at: number): void {
+  for (const [each, key] of asked) each.take(key, at);
+}

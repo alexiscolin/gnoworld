@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "@gnoworld/service/db";
 import { z } from "zod";
 import type { Command } from "../irc/lines.ts";
-import { mainRoom, worldOf } from "./rooms.ts";
+import { earthWindowStart, mainRoom, worldOf } from "./rooms.ts";
 
 export const ROOM_STATE = `
 ALTER TABLE rooms ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
@@ -29,9 +29,26 @@ CREATE TABLE earth_rooms (name TEXT PRIMARY KEY, maker TEXT NOT NULL, created_at
 CREATE INDEX earth_rooms_by_maker ON earth_rooms (maker, created_at);
 `;
 
+// The window's count (earthWindowStart) and the rooms past it read a range of dates, not every row.
+export const EARTH_WINDOW_INDEX = `
+CREATE INDEX earth_rooms_by_date ON earth_rooms (created_at);
+`;
+
+// The lists, the channels and the live count read the live rooms, and the archived ones by date, never every row (rooms.ts's LISTED_SQL).
+export const ROOM_LISTING_INDEXES = `
+CREATE INDEX rooms_live ON rooms (world, name) WHERE archived = 0;
+CREATE INDEX rooms_archived_by_date ON rooms (world, created_at) WHERE archived = 1;
+`;
+
+/** The public rooms made after a window start (one parameter). */
+export const ROWS_IN_WINDOW_SQL = "SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?";
+/** The public rooms live now, read from the live rooms' index. */
+export const LIVE_EARTH_SQL =
+  "SELECT count(*) AS n FROM rooms r CROSS JOIN earth_rooms e ON e.name = r.name WHERE r.world = 'earth' AND r.archived = 0";
+
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
-/** The public rooms ever made, archived ones too: an archived room stays a row, a channel and a list entry, so making and archiving frees none. */
+/** The public rooms made in the window (earthWindowStart), archived ones too: archiving frees no place, only time does (C12, D13675). */
 export const EARTH_ROWS_MAX = 5_000;
 /** The public rooms an account makes in a day, archived ones counted. */
 export const EARTH_PER_DAY = 3;
@@ -75,15 +92,14 @@ interface Options {
   realmMax?: number;
   // The Earth's public rooms at most, EARTH_ROOMS_MAX unless a test says less.
   earthMax?: number;
-  // The public rooms ever made, EARTH_ROWS_MAX unless a test says less.
+  // The public rooms made in the window, EARTH_ROWS_MAX unless a test says less.
   earthRowsMax?: number;
 }
 
-// The Earth's public rooms' statements: how many there are (all, and live), an account's in a day, one made, a room's maker.
+// The Earth's public rooms' statements: how many there are (live, and made in the window), an account's in a day, one made, a room's maker.
 const earthSql = (db: DatabaseSync) => ({
-  earth: db.prepare(
-    "SELECT count(*) AS rows, coalesce(sum(r.archived = 0), 0) AS live FROM earth_rooms e JOIN rooms r ON r.name = e.name",
-  ),
+  rows: db.prepare(ROWS_IN_WINDOW_SQL),
+  live: db.prepare(LIVE_EARTH_SQL),
   today: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE maker = ? AND created_at > ?"),
   made: db.prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, ?, ?)"),
   maker: db.prepare("SELECT maker FROM earth_rooms WHERE name = ?"),
@@ -132,15 +148,14 @@ export function makeRooms({
     send("SAMODE", [room, "-i"]);
     return { made: room };
   };
-  const Held = z.object({ rows: z.number(), live: z.number() });
   const Maker = z.object({ maker: z.string() }).optional();
   const mayEarth: Rooms["mayEarth"] = (maker, name) => {
     const room = `${mainRoom("earth")}/${name}`;
     if (room.length > CHANNEL_MAX) return "too_long";
     if (stateOf(room) !== undefined) return "exists";
     if (Count.parse(sql.today.get(maker, now() - DAY_MS)).n >= EARTH_PER_DAY) return "day";
-    const { rows, live } = Held.parse(sql.earth.get());
-    return live >= earthMax || rows >= earthRowsMax ? "full" : "ok";
+    const rows = Count.parse(sql.rows.get(earthWindowStart(now()))).n;
+    return Count.parse(sql.live.get()).n >= earthMax || rows >= earthRowsMax ? "full" : "ok";
   };
   const mayRealm: Rooms["mayRealm"] = (room, reserve = 0) => {
     if (stateOf(room) !== undefined) return "exists";
