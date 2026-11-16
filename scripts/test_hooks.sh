@@ -2593,7 +2593,7 @@ mv "$t/scan_secrets.away" "$hk/scan_secrets.sh"
 fresh
 # A staged harness file is committed in a person's Terminal alone, never in the sandbox: every file of .githooks/records.sh's list,
 # by name and as it is on disk, its name in any case, with a space or an accent; a path that only looks like one is not.
-harnessed() { said "is committed in Alexis's Terminal alone"; }
+harnessed() { said "never reaches a commit from Claude Code's sandbox"; }
 for f in 'scripts/my file.sh' .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
 	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts CLAUDE.md; do
@@ -2608,7 +2608,7 @@ fresh
 for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
 	for f in packages/core/package.json app/vite.config.ts; do
 		mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
-		(cd "$c2" && env "$v=1" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+		(cd "$c2" && env "$v=1" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 			fail "pre-commit let a staged $f through in the sandbox with $v=1 (D241)"
 		git -C "$c2" reset -q && rm "$c2/$f"
 	done
@@ -2627,7 +2627,7 @@ done
 # reads): the list alone refuses it, on a disk that keeps case or not.
 ic="$t/icase" && git init -q "$ic" && git -C "$ic" update-index --add --cacheinfo "100644,$(echo planted | git -C "$ic" hash-object -w --stdin),Scripts/tool.sh"
 out=$(cd "$ic" && sh "$hk/pre-commit" 2>&1 >/dev/null) && fail "pre-commit let Scripts/tool.sh through in the sandbox: $out"
-printf '%s\n' "$out" | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit did not read Scripts/tool.sh as the harness file scripts/ holds, case-blind (F151, D241): $out"
+printf '%s\n' "$out" | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit did not read Scripts/tool.sh as the harness file scripts/ holds, case-blind (F151, D241): $out"
 for f in app/src/scripts/a.ts scriptsx/a.ts app/src/config.ts docs/stryker.config.json.md packages/core/src/args/args.ts; do
 	mkdir -p "$c2/$(dirname "$f")" && echo x >"$c2/$f" && git -C "$c2" add "$f"
 	precommit || fail "pre-commit refused $f, which only looks like a harness file"
@@ -2664,7 +2664,7 @@ harnessed || fail "pre-commit let the deletion of a harness file through in the 
 git -C "$c2" reset -q && git -C "$c2" mv scripts/moved.sh moved.sh
 harnessed || fail "pre-commit let a harness file moved out of the harness through in the sandbox (D241)"
 fresh && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
-(cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-merge-commit let a merge bring a harness file in the sandbox (D241)"
 fresh
 # SANDBOX_RUNTIME unset is no way out: the sandbox cannot open the hook for writing, whatever its environment says, and
@@ -2672,14 +2672,14 @@ fresh
 echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
 outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$hk/pre-commit" 2>&1 >/dev/null); }
 chmod a-w "$hk/pre-commit"
-outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
+outside_ | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
 # Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence.
 command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
-(cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
 chmod u+w "$hk/pre-commit"
 outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal"
-outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
+outside_ SANDBOX_RUNTIME=1 | grep -qF "never reaches a commit from Claude Code's sandbox" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
 fresh
 # Through git itself, which hands its hooks GIT_INDEX_FILE for `commit -a` and `commit -- <path>`: the same
 # checks, on what that commit holds; an empty commit checks nothing and passes.
@@ -2696,7 +2696,7 @@ gc -m "fix: a path alone" -- a.ts || fail "git commit -- <path>, through the hoo
 echo unformatted >>"$c2/a.ts"
 gc -m "fix: an unformatted path" -- a.ts && fail "git commit -- <path>, through the hooks, let its unformatted path through"
 fresh && echo '# x' >>"$c2/scripts/check_docs.py"
-(cd "$c2" && git -c core.hooksPath="$hk" commit -qam "fix: a harness file" 2>&1) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && git -c core.hooksPath="$hk" commit -qam "fix: a harness file" 2>&1) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "git commit -a, through the hooks, took a harness file in the sandbox, or refused it for another reason than D241"
 fresh
 gc --allow-empty -m "chore: nothing" || fail "an empty commit, through the hooks, was refused"
@@ -2723,7 +2723,7 @@ fake=$(git -C "$c3" commit-tree -m planted "$staged_tree")
 [ -n "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref's case staged nothing"
 git -C "$c3" replace "$head" "$fake"
 [ -z "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref planted hides nothing: the case proves nothing"
-(cd "$c3" && sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c3" && sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "never reaches a commit from Claude Code's sandbox" ||
 	fail "pre-commit read HEAD through a replace ref, which hid a staged harness file (F132)"
 git -C "$c3" replace -d "$head" >/dev/null
 fi
@@ -2921,6 +2921,23 @@ in_i env PATH="$t/moving:$PATH" sh scripts/install_hooks.sh tweak >/dev/null 2>&
 [ -e "$t/moved" ] && [ "$(git -C "$i" rev-parse tweak)" = "$(git -C "$i" rev-parse planted)" ] || fail "the moving git moved nothing: the case proves nothing"
 installed "$tweaked" || fail "install_hooks.sh installed from a branch moved while it ran, not the commit it was given (L3)"
 ran "install_hooks.sh, its branch moved"
+# land (D13211): a commit holding it installs it in ~/.local/bin, agent-pr's code it reuses beside it, and the repository origin names,
+# which must be GitHub's; the installed command finds its code through its link. A commit without it installs no land.
+[ ! -e "$HOME/.local/share/land/repo" ] || [ "$(cat "$HOME/.local/share/land/repo")" != o/r ] || fail "install_hooks.sh installed land from a commit without it"
+git -C "$i" checkout -q -b landed main && cp "$here/land.py" "$here/agent_pr.py" "$i/scripts/"
+git -C "$i" add -A && in_i git commit -qm "feat: land" && git -C "$i" checkout -q main && git -C "$i" remote add origin git@github.com:o/r.git
+lh="$i/home/.local"
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) || fail "install_hooks.sh failed with land in its commit"
+[ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && [ -x "$lh/share/land/land.py" ] && cmp -s "$lh/share/land/agent_pr.py" "$here/agent_pr.py" &&
+	[ "$(cat "$lh/share/land/repo")" = o/r ] || fail "install_hooks.sh did not install land, its code and its repository"
+out=$(python3 -I "$lh/bin/land" x 2>&1) && fail "the installed land took an argument: $out"
+printf '%s\n' "$out" | grep -q "^usage: land" || fail "the installed land did not run through its link: $out"
+git -C "$i" remote set-url origin https://example.com/o/r.git
+git -C "$i" config --unset merge.ff
+(cd "$i" && HOME="$i/home2" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) && fail "install_hooks.sh installed land for an origin that is not GitHub's"
+[ "$(git -C "$i" config merge.ff)" = false ] || fail "install_hooks.sh refused land's origin before setting git's merges, a half install"
+[ ! -e "$i/home2/.local" ] || fail "install_hooks.sh wrote land's folder before refusing its origin"
+git -C "$i" remote remove origin
 git -C "$i" branch -f tweak "$tweaked"
 reinstall
 # A replace ref makes git show other bytes for an object: the install and a person's command read the objects themselves.
@@ -7427,6 +7444,136 @@ grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "
 # Every call of the tailnet-preview script, up and down, from /: its python3 -c imports first from the folder it runs from.
 [ -s "$w/log.preview-cwd" ] && [ -z "$(grep -vx / "$w/log.preview-cwd")" ] ||
 	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
+fi
+
+if part land; then
+# land: the owner's one command for a pull request (D13211, D13213), against local stand-ins for GitHub, gh and gitleaks. After his y it
+# pushes the one branch a bundle holds, from GitHub's main, and opens the pull request; before, it lists what he approves: the subjects,
+# each harness file with its lines added and removed, the declaration lines, any workflow file, how the branch on GitHub changes, 16 hex
+# of the tip. It refuses what is not one branch named as its files, a file that is a link, a drop folder of more, a secret, a branch
+# not from main; an N pushes nothing.
+ld="$t/land" && mkdir -p "$ld/github/o" "$ld/space" "$ld/state" "$ld/bin"
+ld=$(cd "$ld" && pwd -P)
+lg() { git -c user.name=t -c user.email=t@t -c init.defaultBranch=main -c core.hooksPath=/dev/null "$@"; }
+lg init -q "$ld/s" && mkdir -p "$ld/s/.githooks" "$ld/s/scripts" && cp "$hooks/records.sh" "$hooks/commit-msg" "$ld/s/.githooks/" && secrets_into "$ld/s/scripts/"
+echo a >"$ld/s/scripts/x.sh" && echo r >"$ld/s/README.md"
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm base && lg init -q --bare "$ld/github/o/r.git" && lg -C "$ld/s" push -q "$ld/github/o/r.git" main
+printf 'o/r\n' >"$ld/state/repo"
+lg -C "$ld/s" checkout -qb feat && echo b >>"$ld/s/scripts/x.sh" && mkdir -p "$ld/s/.github/workflows" && echo 'on: push' >"$ld/s/.github/workflows/w.yml"
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "feat: a change" -m "Harness-changed: scripts/x.sh - a test
+Removed-test: a > b - merged" && tip=$(lg -C "$ld/s" rev-parse HEAD)
+offer() { lg -C "$ld/s" bundle create -q "$ld/space/$1.bundle" "${2:-$1}" && printf 'feat: a change\n\nThe body.\n' >"$ld/space/$1.md"; }
+offer feat
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s/git.log"\ncase " $* " in *" push "*) [ ! -e "%s/race" ] || "%s" -C "%s/github/o/r.git" update-ref refs/heads/feat "$(cat "%s/race")" ;; esac\nexec "%s" "$@"\n' \
+	"$ld" "$ld" "$(command -v git)" "$ld" "$ld" "$(command -v git)" >"$ld/bin/git" && chmod +x "$ld/bin/git"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s/gh.log"\ncase $2 in list) [ ! -e "%s/pr" ] || echo https://github.com/o/r/pull/1; case " $* " in *" --state=open "*) ;; *) [ ! -e "%s/prclosed" ] || echo https://github.com/o/r/pull/0 ;; esac ;; create) : >"%s/pr"; for a; do case $a in --body-file=*) cat "${a#--body-file=}" >"%s/body" ;; esac; done; echo https://github.com/o/r/pull/1 ;; esac\n' "$ld" "$ld" "$ld" "$ld" "$ld" >"$ld/bin/gh"
+printf '#!/bin/sh\nfor a; do case $a in --log-opts=*) for w in ${a#--log-opts=}; do case $w in *..*) r=$w ;; esac; done ;; esac; last=$a; done\ncase $1 in\ndir) ! grep -rq PLANTEDTOKEN "$last" ;;\nstdin) ! grep -q PLANTEDTOKEN ;;\ngit) echo "INF $(git -C "$last" rev-list --count "$r") commits scanned."; ! git -C "$last" log -p --format= "$r" | grep PLANTEDTOKEN ;;\nesac\n' >"$ld/bin/gitleaks"
+chmod +x "$ld/bin/gh" "$ld/bin/gitleaks"
+sed -e "s|^GITHUB = .*|GITHUB = \"file://$ld/github\"|" -e "s|^TOOLS = .*|TOOLS = \"$ld/bin:/usr/bin:/bin\"|" -e "s|^STATE = .*|STATE = \"$ld/state\"|" \
+	-e "s|^SPACE = .*|SPACE = \"$ld/space/\"|" "$here/land.py" >"$ld/land.py" && cp "$here/agent_pr.py" "$ld/agent_pr.py"
+grep -q "^GITHUB = \"file://" "$ld/land.py" && grep -q "^SPACE = \"$ld/space/\"" "$ld/land.py" || fail "land's constants could not be pointed at the stand-ins"
+grep -qx 'SPACE = f"/private/tmp/claude-{os.getuid()}/land/"' "$here/land.py" && grep -qx 'GITHUB = "https://github.com"' "$here/land.py" || fail "the shipped land reads another drop folder or pushes elsewhere than GitHub"
+landed() { printf '%s\n' "$1" | python3 -I "$ld/land.py" 2>&1; }
+remote() { lg -C "$ld/github/o/r.git" rev-parse -q --verify "refs/heads/$1" || :; }
+out=$(landed n) || fail "land failed on an N: $out"
+for line in "land: feat, 1 commit(s) on main" "  $(lg -C "$ld/s" rev-parse --short HEAD) feat: a change" "harness files touched (2):" "  scripts/x.sh  +1 -0" \
+	"  .github/workflows/w.yml  +1 -0" "declaration lines (2):" "  Harness-changed: scripts/x.sh - a test" "  Removed-test: a > b - merged" "pull request: feat: a change" \
+	"WORKFLOW FILES, which run on GitHub once pushed: .github/workflows/w.yml" "on GitHub: a new branch feat" "tip: $(printf '%.16s' "$tip")"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "land did not list: $line
+$out"
+done
+printf '%s\n' "$out" | grep -q "nothing pushed" && [ -z "$(remote feat)" ] && [ -e "$ld/space/feat.bundle" ] || fail "land pushed, or took the drop, on an N: $out"
+out=$(landed y) || fail "land failed on a y: $out"
+[ "$(remote feat)" = "$tip" ] || fail "land did not push the bundle's tip: $out"
+[ "$(cat "$ld/body")" = "The body." ] || fail "land did not open the pull request with its body alone: [$(cat "$ld/body")]"
+grep -q -- "-c credential.helper= -c credential.helper=!gh auth git-credential push -q --force-with-lease=refs/heads/feat: file://$ld/github/o/r.git $tip:refs/heads/feat" "$ld/git.log" ||
+	fail "land did not push the tip with gh's login alone and a lease: $(grep ' push ' "$ld/git.log")"
+grep -qxF "pr create --repo=o/r --base=main --head=feat --title=feat: a change --body-file=$ld/state/tmp/$(ls "$ld/state/tmp" 2>/dev/null)/body.md" "$ld/gh.log" ||
+	grep -q "^pr create --repo=o/r --base=main --head=feat --title=feat: a change --body-file=" "$ld/gh.log" || fail "land did not open the pull request: $(cat "$ld/gh.log")"
+[ ! -e "$ld/space/feat.bundle" ] && [ ! -e "$ld/space/feat.md" ] && [ -z "$(ls -A "$ld/state/tmp")" ] || fail "land left the drop or its private copy"
+printf '%s\n' "$out" | grep -qxF "land: pushed $(printf '%.16s' "$tip"); https://github.com/o/r/pull/1" || fail "land did not say what it pushed: $out"
+# A fix on top moves the branch on; a branch rebuilt replaces it, said before the y; the pull request already open is said.
+echo c >>"$ld/s/README.md" && lg -C "$ld/s" commit -qam "fix: on top" && offer feat
+out=$(landed y) && printf '%s\n' "$out" | grep -qxF "on GitHub: feat moves on from $(printf '%.12s' "$tip")" && printf '%s\n' "$out" | grep -q "the pull request was there" ||
+	fail "land did not move the branch on, or opened a second pull request: $out"
+tip2=$(lg -C "$ld/s" rev-parse HEAD) && lg -C "$ld/s" commit -q --amend -m "fix: rebuilt" && offer feat
+out=$(landed y) && printf '%s\n' "$out" | grep -qxF "on GitHub: feat at $(printf '%.12s' "$tip2") is REPLACED" && [ "$(remote feat)" = "$(lg -C "$ld/s" rev-parse HEAD)" ] ||
+	fail "land did not say the branch is replaced, or did not push it: $out"
+# Each refusal pushes nothing and leaves the drop for the session to fix.
+before=$(remote feat)
+refused() { out=$(landed y) && fail "land took $1: $out"; [ "$(remote feat)" = "$before" ] || fail "land pushed $1"; rm -f "$ld/space"/*; }
+lg -C "$ld/s" branch -q other main && lg -C "$ld/s" bundle create -q "$ld/space/feat.bundle" feat other && printf 't\n\nb\n' >"$ld/space/feat.md" && refused "a bundle of two branches"
+lg -C "$ld/s" tag v1 && offer feat v1 && refused "a bundle of a tag"
+offer feat other && refused "a bundle whose branch is not its files' name"
+offer feat && mv "$ld/space/feat.md" "$ld/feat.md" && ln -s "$ld/feat.md" "$ld/space/feat.md" && refused "a drop file that is a link"
+offer feat && offer other && refused "a drop folder of two pull requests"
+# Each scan reads its part: a file's content (the history), the pull request's title and body, a commit's author (the commits whole).
+lg -C "$ld/s" checkout -q -B feat main && echo PLANTEDTOKEN >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a file" && offer feat
+refused "a branch with a secret in a file"
+lg -C "$ld/s" checkout -q -B feat main && echo s >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: clean" && offer feat && printf 'feat: PLANTEDTOKEN\n\nb\n' >"$ld/space/feat.md"
+refused "a pull request with a secret in its title"
+offer feat && printf 'feat: t\n\nthe body PLANTEDTOKEN\n' >"$ld/space/feat.md" && refused "a pull request with a secret in its body"
+lg -C "$ld/s" checkout -q -B feat main && echo a >"$ld/s/README.md" && (GIT_AUTHOR_NAME=PLANTEDTOKEN && export GIT_AUTHOR_NAME && lg -C "$ld/s" commit -qam "feat: an author") && offer feat
+refused "a commit whose author holds a secret"
+# A message whose scissors line commit-msg would cut, holding what it refuses below; a file name holding a newline, which would add a
+# line to the listing; a refusal quoting a flagged line shown escaped, never as the Terminal would read it.
+lg -C "$ld/s" checkout -q -B feat main && echo k >"$ld/s/README.md" && printf 'feat: fine\n\n# ------------------------ >8 ------------------------\nCo-Authored-By: a bot <b@b>\n' >"$ld/msg"
+lg -C "$ld/s" commit -q --cleanup=verbatim -a -F "$ld/msg" && offer feat && refused "a message holding a scissors line"
+lg -C "$ld/s" checkout -q -B feat main && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')" 2>/dev/null ||
+	{ mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"; }
+lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "ci: a name" && offer feat && refused "a file name holding a newline"
+lg -C "$ld/s" checkout -q -B feat main && printf 'PLANTEDTOKEN\033[8m\n' >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a flagged line" && offer feat
+out=$(landed y) && fail "land took a branch with a secret: $out"
+! printf '%s' "$out" | grep -q "$(printf '\033')" && printf '%s\n' "$out" | grep -qF '\x1b[8m' || fail "land printed a refusal's escape as the Terminal reads it: $out"
+rm -f "$ld/space"/*
+# git's object checks: a commit whose tree holds a .git entry, which fsck refuses, is fetched by none of land's copies.
+lg -C "$ld/s" checkout -q -B feat main && blob=$(echo x | lg -C "$ld/s" hash-object -w --stdin)
+tree=$(printf '100644 blob %s\t.git\n' "$blob" | lg -C "$ld/s" mktree) && lg -C "$ld/s" checkout -q main && lg -C "$ld/s" branch -q -f feat "$(lg -C "$ld/s" commit-tree "$tree" -p main -m "feat: a dot git")"
+offer feat && refused "a commit fsck refuses"
+# Only y answers yes: Enter alone, a Y, a yes or no answer at all pushes nothing.
+lg -C "$ld/s" checkout -q -B feat main && echo n >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: an answer" && offer feat
+for answer in "" Y yes; do out=$(landed "$answer") && printf '%s\n' "$out" | grep -q "nothing pushed" && [ "$(remote feat)" = "$before" ] || fail "land pushed on the answer [$answer]: $out"; done
+out=$(python3 -I "$ld/land.py" </dev/null 2>&1) && printf '%s\n' "$out" | grep -q "nothing pushed" && [ "$(remote feat)" = "$before" ] || fail "land pushed with no answer: $out"
+rm -f "$ld/space"/*
+# The harness list comes from GitHub's main: a branch that rewrites records.sh changes neither the listing nor runs in the Terminal.
+lg -C "$ld/s" checkout -q -B feat main && echo z >>"$ld/s/scripts/x.sh" && printf ': >"%s/planted"\nharness() ( true )\n' "$ld" >"$ld/s/.githooks/records.sh"
+lg -C "$ld/s" commit -qam "feat: the list rewritten" -m "Harness-changed: scripts/x.sh - t" -m "Harness-changed: .githooks/records.sh - t" && offer feat
+out=$(landed n) && printf '%s\n' "$out" | grep -qxF "  scripts/x.sh  +1 -0" && printf '%s\n' "$out" | grep -q "^  .githooks/records.sh  +2 " && [ ! -e "$ld/planted" ] ||
+	fail "land listed, or ran, the branch's own harness list: $out"
+rm -f "$ld/space"/*
+offer feat && : >"$ld/space/notes.txt" && refused "a drop folder holding another file"
+lg -C "$ld/s" checkout -q --orphan alone && lg -C "$ld/s" commit -qm alone && lg -C "$ld/s" branch -q -f feat alone && offer feat && refused "a branch not from main"
+# What the owner reads is what is: a character the Terminal would not show as itself (an escape that hides or redraws the listing, a
+# bidi control) refuses the land; a file name git would quote (a workflow named outside ASCII) is listed as it is.
+lg -C "$ld/s" checkout -q -B feat main && echo e >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "$(printf 'feat: hidden\033[8m')" && offer feat
+refused "a subject holding a terminal escape"
+lg -C "$ld/s" checkout -q -B feat main && mkdir -p "$ld/s/.github/workflows" && echo 'on: push' >"$ld/s/.github/workflows/é.yml" && lg -C "$ld/s" add -A &&
+	lg -C "$ld/s" commit -qm "ci: a workflow" -m "Harness-changed: .github/workflows/é.yml - a test" && offer feat
+out=$(landed n) && printf '%s\n' "$out" | grep -qxF "WORKFLOW FILES, which run on GitHub once pushed: .github/workflows/é.yml" ||
+	fail "land did not list a workflow file whose name git quotes: $out"
+rm -f "$ld/space"/*
+# What pre-push and commit-msg held for a push: never main; the base's commit-msg on each message (an attribution line refused).
+lg -C "$ld/s" checkout -q -B feat main && echo m >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: to main"
+cp -R "$ld/s" "$ld/m" && lg -C "$ld/m" checkout -q -B main feat && lg -C "$ld/m" bundle create -q "$ld/space/main.bundle" main && printf 't\n\nb\n' >"$ld/space/main.md"
+out=$(landed y) && fail "land took a branch named main: $out"
+[ "$(lg -C "$ld/github/o/r.git" rev-parse main)" != "$(lg -C "$ld/m" rev-parse main)" ] || fail "land pushed main"
+rm -rf "$ld/m" "$ld/space"/*
+lg -C "$ld/s" checkout -q -B feat main && echo c >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a change" -m "Co-Authored-By: a bot <b@b>" && offer feat
+refused "a commit with an attribution line"
+# A pull request's file: a title of 1 to 256 characters on its first line; the files named as a branch, a v2 bundle.
+lg -C "$ld/s" checkout -q -B feat main && echo t >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a title" && offer feat && printf '\n\nno title\n' >"$ld/space/feat.md"
+refused "a pull request with no title"
+lg -C "$ld/s" branch -q -f Feat_x feat && offer Feat_x && refused "a branch named outside a-z, 0-9 and -"
+printf 'not a bundle\n' >"$ld/space/feat.bundle" && printf 't\n\nb\n' >"$ld/space/feat.md" && refused "a file that is no v2 bundle"
+offer feat && printf '%0257d\n\nb\n' 0 >"$ld/space/feat.md" && refused "a title of 257 characters"
+# The lease: the branch moved on GitHub between the listing and the push is not overwritten.
+offer feat && lg -C "$ld/github/o/r.git" rev-parse main >"$ld/race"
+out=$(landed y) && fail "land overwrote a branch that moved on GitHub after its listing: $out"
+[ "$(remote feat)" = "$(cat "$ld/race")" ] || fail "land's push replaced the branch that moved: $(remote feat)"
+rm -f "$ld/race" "$ld/space"/*
+# A pull request closed or merged under that branch's name is no open one: a new one is opened.
+offer feat && rm -f "$ld/pr" && : >"$ld/prclosed" && : >"$ld/gh.log" && out=$(landed y) && grep -q "^pr create " "$ld/gh.log" || fail "land opened no pull request where none is open, a closed one there: $out"
+out=$(python3 -I "$ld/land.py" feat 2>&1) && fail "land took an argument: $out"
 fi
 
 if part ci; then

@@ -59,7 +59,7 @@ SECTIONS = {
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
-    "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
+    "scripts/install_hooks.sh": "installed,outside", "scripts/land.py": "land", "scripts/agent_pr.py": "land", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/related.py": "gate_lanes", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/failures.json": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
@@ -1009,6 +1009,41 @@ def mutants():
         yield from each(".claude/settings.json", f'      "Edit(~/Server/gnoworld/scripts/{name})",\n', "", "hooks", f"settings keep the main checkout's scripts/{name} out of the file tools")
     # The hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
+    # land (D13211, D13213): the owner's one command for a pull request, and its installation from main.
+    ld = "scripts/land.py"
+    for find, replace, label in (
+        ('        if answer.strip() != "y":\n', "        if False:\n", "land pushes nothing without the owner's y"),
+        ("        base_checks(work, cache, base, tip)\n", "", "land runs GitHub's main's checks before its listing"),
+        ('        ap.scan_text(work, f"{branch}', '        (lambda *a: None)(work, f"{branch}', "land runs gitleaks over the commits' text and the pull request's"),
+        ('        if git("merge-base", "--is-ancestor", base, tip, ok=(0, 1)).returncode:\n', "        if False:\n", "land refuses a branch not from GitHub's main"),
+        (' or set(names) != {f"{stems[0]}.bundle", f"{stems[0]}.md"}', "", "land refuses a drop folder holding more than one pull request's files"),
+        ('    if len(git("bundle", "list-heads", bundle).stdout.splitlines()) != 1:\n', "    if False:\n", "land refuses a bundle of more than one branch"),
+        ('    rows = [line.split("\\t") for line in numstat.splitlines() if line]', "    rows = []", "land lists each harness file touched"),
+        ("is REPLACED", "moves on", "land says a branch it rewrites on GitHub"),
+        ('    if bad:\n        raise ap.Refused(f"the pull request holds a character', '    if False:\n        raise ap.Refused(f"the pull request holds a character', "land prints no character the Terminal would not show as itself"),
+        ('    if stems[0] == "main":\n', "    if False:\n", "land refuses a branch named main"),
+        ("    if scanned.returncode:\n", "    if False:\n", "land runs GitHub's main's secret scan over the range"),
+        ("        if said.returncode:\n", "        if False:\n", "land runs GitHub's main's commit-msg on each message"),
+        ('"--force-with-lease=refs/heads/{branch}:{remote}"', '"--force"', "land pushes with a lease on what it listed"),
+        ('"-c", "credential.helper=!gh auth git-credential",', "", "land pushes with gh's login alone"),
+        ('"--state=open", ', "", "land opens a pull request where none is open"),
+        (" or not STEM.fullmatch(stems[0])", "", "land takes a branch named in a-z, 0-9 and - alone"),
+        ('g("show", f"{base}:.githooks/records.sh")', 'g("show", f"{tip}:.githooks/records.sh")', "land lists harness files by GitHub's main's list, never the branch's"),
+        ('        if answer.strip() != "y":', '        if answer.strip() == "n":', "land pushes on y alone"),
+        ("{whole}", "", "land scans the commits whole, their authors included"),
+        ('        git("-c", "fetch.fsckObjects=true", "fetch", "-q", "--no-tags", bundle,', '        git("fetch", "-q", "--no-tags", bundle,', "land fetches the bundle with git's object checks"),
+        ('DECLARED = re.compile(r"^(?:Harness-changed|Removed-test|', 'DECLARED = re.compile(r"^(?:Harness-changed|', "land lists every kind of declaration line"),
+        ('        if re.search(r"^# -* >8 -*$", text, re.M):', "        if False:", "land refuses a message whose scissors line hides what commit-msg reads"),
+        ("in n for n in names):", "in n for n in []):", "land refuses a file name holding a newline"),
+        ('        print(f"land: refused: {escaped(str(e))}", file=sys.stderr)', '        print(f"land: refused: {e}", file=sys.stderr)', "land prints a refusal's quoted text escaped"),
+    ):
+        yield from each(ld, find, replace, "hooks", label)
+    yield from each(ih, 'if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then', "if false; then", "hooks", "install_hooks installs land from a commit that holds it")
+    yield from each("scripts/agent_pr.py", "    if not title or len(title) > 256 or", "    if False or len(title) > 256 or", "hooks", "a pull request's text needs a title")
+    yield from each("scripts/agent_pr.py", "len(title) > 256", "len(title) > 257", "hooks", "a pull request's title is 256 characters at most")
+    yield from each("scripts/agent_pr.py", "body.removeprefix(", "body.removesuffix(", "hooks", "a pull request's body starts after its blank line")
+    yield from each("scripts/worktree.sh", 'base=$(git rev-parse --verify "$base^{commit}")\n', "", "hooks", "worktree.sh reads its base once, as its commit")
+    yield from each(ih, "	case $repo in */*/* | /* | */ | '') echo", "	case $repo in x) echo", "hooks", "install_hooks refuses an origin that is not GitHub's for land")
     yield from each(ih, 'git cat-file -e "$ref:.githooks/$hook" 2>/dev/null ||', "true ||", "hooks", "install_hooks refuses a commit missing a hook")
     yield from each(ih, "git ls-tree --full-tree ", "git ls-tree ", "hooks", "install_hooks reads the commit from any folder")
     yield from each(ih, '[ -z "$twice" ] ||', "true ||", "hooks", "install_hooks refuses two files under one name")
@@ -1261,11 +1296,10 @@ def mutants():
     yield from each("scripts/repo_files.py", "            f.write(str(os.getpid()))", "            f.write(\"x\")", "hooks", "a copy names its run's pid")
     yield from each("scripts/repo_files.py", "        return False\n    except OSError:", "        return True\n    except OSError:", "hooks", "a gone pid is a dead run")
     yield from each("scripts/repo_files.py", 'os.path.join(where, "tree-" + os.path.basename(where))', 'os.path.join(where, "tree")', "hooks", "a copy never takes the name tree, one per run")
-    yield from each("scripts/worktree.sh", 'case $arg in -*)', 'case $arg in -zzz)', "hooks", "worktree.sh refuses an argument that starts with a dash (CR6)")
-    yield from each("scripts/worktree.sh", 'base=$(git rev-parse --verify "$base^{commit}")\n', "", "hooks", "worktree.sh reads its base once, as its commit")
     yield from each("scripts/worktree.sh", '[ "$(git rev-parse --verify "$base^{commit}")" = "$served" ]', "true", "hooks", "worktree.sh lets a harness differ only for main as GitHub serves it")
     yield from each("scripts/worktree.sh", "(^|/)(package\\.json|", "(^|/)(packagex\\.json|", "hooks", "worktree.sh still compares the served main's package files")
     yield from each("scripts/worktree.sh", "	case $url in git@github.com:*) url=https://github.com/${url#git@github.com:} ;; esac\n", "", "hooks", "worktree.sh reads GitHub's ssh address over https")
+    yield from each("scripts/worktree.sh", 'case $arg in -*)', 'case $arg in -zzz)', "hooks", "worktree.sh refuses an argument that starts with a dash (CR6)")
     for find, replace, label in (('for arg in "$dir" ', "for arg in ", "the folder"), ('"$dir" "$branch" "$base"; do', '"$dir" "$base"; do', "the branch"),
                                  ('"$dir" "$branch" "$base"; do', '"$dir" "$branch"; do', "the base")):
         yield from each("scripts/worktree.sh", find, replace, "hooks", f"worktree.sh refuses {label} that starts with a dash (CR6)")

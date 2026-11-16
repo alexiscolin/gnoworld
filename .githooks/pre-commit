@@ -29,7 +29,7 @@ fi
 if $sandboxed; then
 	held=$(harness --cached --name-only) || { echo "pre-commit: git could not list the staged harness files; nothing is committed unchecked" >&2; exit 1; }
 	if [ -n "$held" ]; then
-		echo "pre-commit: a harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): $held" >&2
+		echo "pre-commit: a harness file never reaches a commit from Claude Code's sandbox: build it in a copy, for Alexis's land (D241, D13213): $held" >&2
 		exit 1
 	fi
 fi

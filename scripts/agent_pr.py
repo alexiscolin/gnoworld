@@ -173,6 +173,30 @@ def gitleaks_config(work):
     return config
 
 
+def pr_text(data):
+    """A pull request's file, its title on the first line, a blank line, its body: (title, body), or refused."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise Refused("the pull request's file is not UTF-8 text") from None
+    title, _, body = text.partition("\n")
+    if not title or len(title) > 256 or re.search(r"[\x00-\x1f\x7f]", title):
+        raise Refused("the file's first line, the title, is 1 to 256 characters")
+    return title, body.removeprefix("\n")
+
+
+def touched(work, token, cache, base, tip):
+    """Every name the commits from base to tip touch, merges included, as git holds it: NUL-separated, never quoted (a name outside
+    ASCII, with a quote or a backslash, is written whole)."""
+    out = git(work, token, "-C", cache, "log", "-m", "-z", "--format=", "--name-only", f"{base}..{tip}").stdout
+    return [n[1:] if n.startswith("\n") else n for n in out.split("\0") if n and n != "\n"]
+
+
+def runs(names):
+    """What of names runs on GitHub once pushed; a link at .github itself is its bare name, so the folder's own name counts too."""
+    return sorted({n for n in names if n == ".github" or any(("/" + n + "/").startswith(r) for r in RUNS)})
+
+
 def scan(work, cache, base, tip, token):
     """gitleaks over every commit from base to tip, merges included, by gitleaks's own rules alone; the commits it read
     must be the commits pushed."""
@@ -235,11 +259,9 @@ def push(repo_arg, bundle_arg, work):
             f"+refs/heads/{branch}:{scratch}")
         tip = git(work, token, "-C", cache, "rev-parse", "--verify", f"{scratch}^{{commit}}").stdout.strip()
         base = git(work, token, "-C", cache, "rev-parse", "--verify", f"refs/remotes/origin/{default}^{{commit}}").stdout.strip()
-        names = git(work, token, "-C", cache, "log", "-m", "--format=", "--name-only", f"{base}..{tip}").stdout.splitlines()
-        # A link at .github/workflows itself is its bare name: the folder's own name counts too.
-        runs = sorted({n for n in names if n == ".github" or any(("/" + n + "/").startswith(r) for r in RUNS)})
-        if runs:
-            raise Refused(f"what runs on GitHub is a person's to push, not the agent's: {', '.join(runs)}")
+        names = touched(work, token, cache, base, tip)
+        if runs(names):
+            raise Refused(f"what runs on GitHub is a person's to push, not the agent's: {', '.join(runs(names))}")
         scan(work, cache, base, tip, token)
         # Every commit whole, as git holds it (its headers, a signature or one of its own included), and every name it touches.
         commits = git(work, token, "-C", cache, "rev-list", f"{base}..{tip}").stdout
@@ -256,15 +278,7 @@ def open_pr(repo_arg, branch, pr_arg, work):
     owner, name, which = repository(repo_arg)
     if not branch_ok(branch):
         raise Refused(f"a pull request comes from one agent/<name> branch: {branch!r}")
-    data = take(pr_arg, PR_MAX, os.path.join(work, "pr.md"))
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
-        raise Refused("the pull request's file is not UTF-8 text") from None
-    title, _, body = text.partition("\n")
-    if not title or len(title) > 256 or re.search(r"[\x00-\x1f\x7f]", title):
-        raise Refused("the file's first line, the title, is 1 to 256 characters")
-    body = body.removeprefix("\n")
+    title, body = pr_text(take(pr_arg, PR_MAX, os.path.join(work, "pr.md")))
     token = read_token(which)
     scan_text(work, f"{branch}\n{title}\n{body}", "the title or the body")
     body_file = os.path.join(work, "body.md")
