@@ -9,6 +9,7 @@ import type { ChatPlace } from "./ChatScreen.tsx";
 import { Failing } from "./Failing.tsx";
 import { InPageSheet, usePlacePage } from "./placePage.ts";
 import { PlateFrame } from "./PlateFrame.tsx";
+import { sectionId } from "./sectionId.ts";
 
 /** The control that opens the place's page; nothing for a place with no page. */
 export function PageButton({ onOpen }: { onOpen: () => void }) {
@@ -25,8 +26,8 @@ export function PageButton({ onOpen }: { onOpen: () => void }) {
 // plate in its Suspense mounts as the plate does. Only a section of the plate's own panel, never one of the chat behind the sheet.
 function ScrollToSection() {
   useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
-    const target = id === "" ? null : document.getElementById(id);
+    const id = sectionId(window.location.hash);
+    const target = id === undefined ? null : document.getElementById(id);
     if (target?.closest("[data-look='plate']")) target.scrollIntoView({ block: "start" });
   }, []);
   return null;

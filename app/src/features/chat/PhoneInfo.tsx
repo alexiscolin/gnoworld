@@ -8,6 +8,7 @@ import { Button, Dialog } from "@gnoworld/ui";
 import { Info } from "./Info.tsx";
 import styles from "./PhoneInfo.module.css";
 import { PageButton, PlacePage } from "./PlaceSheet.tsx";
+import { sectionId } from "./sectionId.ts";
 
 type InfoProps = ComponentProps<typeof Info>;
 
@@ -19,7 +20,8 @@ function follow(event: MouseEvent<HTMLElement>, onClose: () => void) {
   const href = link.getAttribute("href");
   if (href?.startsWith("#") !== true) return;
   event.preventDefault();
-  const target = event.currentTarget.ownerDocument.getElementById(decodeURIComponent(href.slice(1)));
+  const id = sectionId(href);
+  const target = id === undefined ? null : event.currentTarget.ownerDocument.getElementById(id);
   if (target !== null && event.currentTarget.contains(target)) target.scrollIntoView({ block: "start" });
   else onClose();
 }
