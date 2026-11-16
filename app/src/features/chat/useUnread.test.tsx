@@ -72,13 +72,19 @@ async function askedThenClosed(): Promise<ReturnType<typeof setup>> {
   return t;
 }
 
+// The hook drawn with a count of 3, after its first ask.
+async function opened() {
+  const t = setup(ok({ bubble: 3 }));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(t.counts).toHaveBeenCalledTimes(1);
+  return t;
+}
+
 describe("useUnread", () => {
   it("asks once on opening and holds the answer", async () => {
-    const t = setup(ok({ bubble: 3 }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(t.counts).toHaveBeenCalledTimes(1);
+    const t = await opened();
     expect(t.last()).toEqual({ bubble: 3 });
   });
 
@@ -149,11 +155,7 @@ describe("useUnread", () => {
 
   // A tab in the background asks nobody for a count no one reads (the other timers skip a hidden document too).
   it("asks nothing on its 30 s tick while the page is hidden, and asks again once shown", async () => {
-    const t = setup(ok({ bubble: 3 }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(t.counts).toHaveBeenCalledTimes(1);
+    const t = await opened();
     const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
     try {
       await act(async () => {

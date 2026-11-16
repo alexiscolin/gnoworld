@@ -368,22 +368,23 @@ describe("a page's two forms of one function, across a remount of the page", () 
   const callers = (host: HTMLElement) =>
     all(host, "button").filter((each) => /^Call\s+SetProfile/.test(each.textContent));
 
+  // Both forms' Call pressed once they are drawn: two cards, one each.
+  const openBoth = async (host: HTMLElement) => {
+    await vi.waitFor(() => {
+      expect(callers(host)).toHaveLength(2);
+    });
+    for (const each of callers(host)) click(each);
+    expect(Object.keys(callsIn(state())?.calls ?? {})).toHaveLength(2);
+  };
+
   it("opens a card for each, and finds each one's card again when the page mounts again", async () => {
     const draw = drawer();
     draw(show(true));
     const host = document.body.lastElementChild as HTMLElement;
-    await vi.waitFor(() => {
-      expect(callers(host)).toHaveLength(2);
-    });
-    for (const each of callers(host)) click(each);
-    expect(Object.keys(callsIn(state())?.calls ?? {})).toHaveLength(2);
+    await openBoth(host);
     expect(all(host, "article > article, figure + article")).toHaveLength(2);
     draw(show(false));
     draw(show(true));
-    await vi.waitFor(() => {
-      expect(callers(host)).toHaveLength(2);
-    });
-    for (const each of callers(host)) click(each);
-    expect(Object.keys(callsIn(state())?.calls ?? {})).toHaveLength(2);
+    await openBoth(host);
   });
 });
