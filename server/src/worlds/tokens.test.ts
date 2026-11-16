@@ -160,7 +160,7 @@ describe("readTokens", () => {
     expect(store.height()).toBe(3);
   });
 
-  // F13505: the other reads here refuse an answer carrying `errors` (txsOf's schema does), heightAfter's did not: errors beside a
+  // F13515: the other reads here refuse an answer carrying `errors` (txsOf's schema does), heightAfter's did not: errors beside a
   // height were read as the height, and the walk stepped past a transaction that was never found too large.
   it("refuses a height read that answers errors, never stepping past a transaction on it", async () => {
     const db = new DatabaseSync(":memory:");

@@ -426,7 +426,7 @@ describe("GET /api/rooms?world=earth, the public square", () => {
       t.db
         .prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, 'g1x', ?)")
         .run(`#earth/${name}`, madeAt);
-      // Lines are counted in room_said as they pass (F13500).
+      // Lines are counted in room_said as they pass (F13510).
       for (let n = 0; n < lines; n += 1) guestSaid(t.db)(`#earth/${name}`, at);
     };
     return { ...t, make };

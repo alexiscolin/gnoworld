@@ -406,9 +406,9 @@ describe("the realm rooms' reserve and who owns a room", () => {
   });
 });
 
-// F13501: a room is two writes (`rooms` and its `earth_rooms` or `realm_rooms` row): a stop between them left an orphan row,
+// F13511: a room is two writes (`rooms` and its `earth_rooms` or `realm_rooms` row): a stop between them left an orphan row,
 // and that realm answered 500 for ever. Both in one transaction, then JOIN and SAMODE.
-describe("a room made in two writes (F13501): the second one failing leaves nothing", () => {
+describe("a room made in two writes (F13511): the second one failing leaves nothing", () => {
   const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const rows = (db: DatabaseSync) => ({
     rooms: z.array(z.object({ name: z.string() })).parse(db.prepare("SELECT name FROM rooms ORDER BY name").all()),

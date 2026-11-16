@@ -204,9 +204,9 @@ describe("a room only guests speak in (D430): its relayed lines leave no verdict
   });
 });
 
-// F13500: the verdicts are capped (retention's maxVerdicts), so a room's lines must not be read from them: every line that
+// F13510: the verdicts are capped (retention's maxVerdicts), so a room's lines must not be read from them: every line that
 // passes is counted in room_said, whose retention keeps 25 hours and each room's latest hour.
-describe("a room older than 14 days, active, with the verdicts capped (F13500)", () => {
+describe("a room older than 14 days, active, with the verdicts capped (F13510)", () => {
   it("is never archived when the cap has dropped its line from the verdicts: its line was counted in room_said as it passed", async () => {
     const { clock, rooms, db } = setup();
     rooms.earth(A, "active");

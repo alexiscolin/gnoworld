@@ -119,7 +119,7 @@ export function makeRooms({
   const RealmRow = z.object({ yes: z.number() }).optional();
   const sql = roomSql(db);
   const stateOf = (room: string) => State.parse(sql.state.get(room));
-  // The rows go in one transaction (F13501: a stop between them left an orphan row and a realm answering 500 for ever); the
+  // The rows go in one transaction (F13511: a stop between them left an orphan row and a realm answering 500 for ever); the
   // JOIN and the SAMODEs follow once it committed.
   const open = (room: string, world: string, rows: () => void = () => undefined) => {
     transaction(db, () => {

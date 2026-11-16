@@ -130,7 +130,7 @@ describe("the moderation client", () => {
     [`${category}'s score below 0`, changed("category_scores", category, -0.1)],
   ]);
 
-  // D13505 (F13504): a 14th category from OpenAI is ignored with one alert naming it, the 13 known judged as before; a
+  // D13505 (F13514): a 14th category from OpenAI is ignored with one alert naming it, the 13 known judged as before; a
   // missing known one (SHAPES above) still refuses the answer. This replaces the two rows that pinned the strict refusal.
   it.each([
     ["scores", changed("category_scores", "new/kind", 0.1)],

@@ -834,9 +834,9 @@ describe("the stream's card events", () => {
   });
 });
 
-// F13502: 4 streams an address turned a shared Wi-Fi's fifth person away; nginx's own limit is 32 an address
+// F13512: 4 streams an address turned a shared Wi-Fi's fifth person away; nginx's own limit is 32 an address
 // (deploy/web/nginx.conf, `limit_conn open 32`), and the total was half the 2,000 online of the load test.
-describe("the stream's admission (F13502)", () => {
+describe("the stream's admission (F13512)", () => {
   it("admits the 32nd stream of one address, as nginx does, and refuses the 33rd with 429", async () => {
     const { rooms } = setup({ total: 100 });
     for (let n = 0; n < 32; n += 1) expect((await rooms("#bubble")).response.status).toBe(200);

@@ -66,7 +66,7 @@ const setup = (provider: (text: string) => Promise<Answer | "unchecked">, thresh
   return { db, clock, check, asked, rows, lines };
 };
 
-describe("a line counted in room_said (F13500): the Earth's idleness and daily counts read it alone", () => {
+describe("a line counted in room_said (F13510): the Earth's idleness and daily counts read it alone", () => {
   const said_ = (db: DatabaseSync) => db.prepare("SELECT room, n FROM room_said ORDER BY room, hour").all();
 
   it("counts a line that passes, once, in its room's hour", async () => {
