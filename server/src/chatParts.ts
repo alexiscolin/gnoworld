@@ -60,6 +60,7 @@ interface LinkParts {
   db: DatabaseSync;
   ergo: Config["ergo"];
   redactRetryMs: number | undefined;
+  now: () => number;
   progress: ReturnType<typeof makeProgress>;
   queue: { idle: () => Promise<void> };
   reconciler: ReturnType<typeof reconcilerFor>;
@@ -77,6 +78,7 @@ export function linkFor({
   db,
   ergo,
   redactRetryMs,
+  now,
   progress,
   queue,
   reconciler,
@@ -91,7 +93,7 @@ export function linkFor({
   if (ergo === undefined) return undefined;
   return ircLink({
     ...ergo,
-    rooms: () => listRooms(db).map(({ name }) => name),
+    rooms: () => listRooms(db, now()).map(({ name }) => name),
     lastChecked: progress.last,
     hold: progress.hold,
     drained: () => queue.idle(),
@@ -119,13 +121,21 @@ export function linkFor({
 /** What an owner's hide and mute do: the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
 export const ownerActs = (
   db: DatabaseSync,
-  { send, link }: { send: (command: Command, params: readonly string[]) => boolean; link: () => Link | undefined },
+  {
+    send,
+    link,
+    now,
+  }: {
+    send: (command: Command, params: readonly string[]) => boolean;
+    link: () => Link | undefined;
+    now: () => number;
+  },
   { muteKeeping }: Pick<Mutes, "muteKeeping">,
 ) => ({
   line: lineOf(link),
   hide: (room: string, msgid: string): boolean => send("REDACT", [room, msgid, "hidden by a moderator of this world"]),
   muteKeeping,
-  roomsOf: (world: string): readonly string[] => worldRooms(db, world),
+  roomsOf: (world: string): readonly string[] => worldRooms(db, world, now()),
 });
 
 /** The chat's stop: its timers cleared, nothing more started, the link and the queue let go, the stream closed. A line left waiting is caught up at the next start. */

@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
-import { ensureRooms, ROOM_TABLES } from "../rooms/rooms.ts";
+import { EARTH_TABLES, ROOM_STATE } from "../rooms/create.ts";
+import { ensureNamed, ensureRooms, ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeActivity } from "./activity.ts";
 import { activityRoutes } from "./routes.ts";
 
@@ -16,7 +17,7 @@ afterEach(() => {
 });
 
 const setup = () => {
-  const db = openDatabase(":memory:", [ROOM_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, EARTH_TABLES]);
   opened.push(db);
   ensureRooms(db, ["earth", "bubble"], T0);
   const activity = makeActivity();
@@ -40,6 +41,26 @@ describe("GET /api/activity", () => {
     expect(ActivityRooms.parse(JSON.parse(String(body)))).toEqual({
       rooms: [{ world: "bubble", room: "#bubble", perMinute: 0.2 }],
     });
+  });
+
+  // F13686: the activity reads the bounded set of rooms, never an archived Earth room past the window.
+  it("answers no archived Earth room made more than 30 days ago, and the window's archived one", async () => {
+    const { db, ask } = setup();
+    ensureNamed(
+      db,
+      [
+        { name: "#earth/old", world: "earth" },
+        { name: "#earth/kept", world: "earth" },
+      ],
+      T0 - 31 * 24 * 60 * 60_000,
+    );
+    db.prepare("UPDATE rooms SET archived = 1, created_at = ? WHERE name = '#earth/kept'").run(T0 - 24 * 60 * 60_000);
+    db.prepare("UPDATE rooms SET archived = 1 WHERE name = '#earth/old'").run();
+    const [, body] = await ask("?worlds=earth");
+    expect(ActivityRooms.parse(JSON.parse(String(body))).rooms.map(({ room }) => room)).toEqual([
+      "#earth",
+      "#earth/kept",
+    ]);
   });
 
   it("answers each asked world's rooms with their messages a minute, public and kept 5 seconds", async () => {
@@ -122,7 +143,7 @@ describe("GET /api/activity, rooms by role (3m)", () => {
   const visible = (room: string, who: string | undefined) =>
     room === "#bubble/crew" ? who === "member" || who === "mod" : room === "#bubble/attic" ? who === "mod" : true;
   const roleSetup = () => {
-    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, EARTH_TABLES]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     for (const name of ["#bubble/crew", "#bubble/attic"]) {
@@ -145,7 +166,7 @@ describe("GET /api/activity, rooms by role (3m)", () => {
   };
 
   it("says its answer varies with the cookie, so no cache hands a guest's answer to an account (F585)", async () => {
-    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, EARTH_TABLES]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     const app = makeApp(

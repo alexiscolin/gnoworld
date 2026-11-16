@@ -19,7 +19,7 @@ export interface Said {
   few?: true;
 }
 
-export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK" | "RELAYMSG";
+export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "PART" | "KICK" | "RELAYMSG";
 
 export const NICK = "gnoworld";
 
@@ -59,7 +59,7 @@ function relayForm([room = "", nick = "", text = "", ...more]: readonly string[]
 }
 
 // A REDACT in one room; a NOTICE to one account, by Ergo's shape of a name (letters, digits, - and _); a
-// room's mode (roomMode); a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason.
+// room's mode (roomMode); a JOIN or a PART of one room; a KICK of one person, never the bot, from one room, with its reason.
 // Another command has no form.
 const FORMS = new Map<string, (params: readonly string[]) => boolean>(
   Object.entries({
@@ -68,6 +68,7 @@ const FORMS = new Map<string, (params: readonly string[]) => boolean>(
     SAMODE: roomMode,
     RELAYMSG: relayForm,
     JOIN: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
+    PART: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
     KICK: ([room = "", who = "", reason = "", ...more]: readonly string[]) =>
       ROOM.test(room) && person(who) && reason !== "" && more.length === 0,
   }),

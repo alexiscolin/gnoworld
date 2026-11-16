@@ -34,24 +34,54 @@ export function ensureNamed(db: DatabaseSync, rooms: readonly Room[], now: numbe
 /** A room's world, from its name: #<world> or #<world>/<name>, as the server and the roles file make them. */
 export const worldOf = (room: string): string => room.slice(1).split("/")[0] ?? "";
 
-export function listRooms(db: DatabaseSync): Room[] {
+/** The window the Earth's rows cap counts over: a month, the longest an archived room is worth holding a place and a channel for. */
+const EARTH_WINDOW_MS = 30 * 24 * 60 * 60_000;
+
+/** Where the window starts at `now`: a public room made after it counts (create.ts), one made at or before it is past. */
+export const earthWindowStart = (now: number): number => now - EARTH_WINDOW_MS;
+
+// The rooms kept in the lists and the bot's channels (D13676): every room but an archived room of the Earth made at or before the
+// window's start, whose row and name stay. Each branch reads an index (create.ts's ROOM_LISTING_INDEXES), so the cost follows the
+// live rooms and the window's, never every row ever made.
+/** The rooms listed as of a window start (one parameter), in no order: an ORDER BY made the planner scan every row by name. */
+export const LISTED_SQL = `
+SELECT name, world FROM rooms WHERE archived = 0
+UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world = 'earth' AND created_at > ?
+UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world < 'earth'
+UNION ALL SELECT name, world FROM rooms WHERE archived = 1 AND world > 'earth'`;
+
+/** One world's rooms listed with the date an account made them, null for a room none made (parameters: the world twice and the
+ * window's start, or any lower bound for a world but the Earth). */
+export const WORLD_LISTED_SQL = `
+SELECT r.name, r.archived, e.created_at AS made FROM rooms r LEFT JOIN earth_rooms e ON e.name = r.name WHERE r.world = ? AND r.archived = 0
+UNION ALL SELECT r.name, r.archived, e.created_at FROM rooms r LEFT JOIN earth_rooms e ON e.name = r.name WHERE r.world = ? AND r.archived = 1 AND r.created_at > ?`;
+
+const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** The rooms, with `now`: those the lists and the bot's channels hold; without it, every row ever made (the name check, the unknown-channel alert). */
+export function listRooms(db: DatabaseSync, now?: number): Room[] {
   const Rooms = z.array(z.object({ name: z.string(), world: z.string() }));
-  return Rooms.parse(db.prepare("SELECT name, world FROM rooms ORDER BY name").all());
+  if (now === undefined) return Rooms.parse(db.prepare("SELECT name, world FROM rooms ORDER BY name").all());
+  return Rooms.parse(db.prepare(LISTED_SQL).all(earthWindowStart(now))).toSorted((a, b) => compare(a.name, b.name));
 }
 
-export function worldRooms(db: DatabaseSync, world: string): string[] {
-  const Names = z.array(z.object({ name: z.string() }));
-  return Names.parse(db.prepare("SELECT name FROM rooms WHERE world = ? ORDER BY name").all(world)).map(
-    ({ name }) => name,
-  );
+/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE) and the date an account made them (earth_rooms),
+ * in one query, those past the window left out. */
+export function worldRoomStates(
+  db: DatabaseSync,
+  world: string,
+  now: number,
+): { name: string; archived: boolean; madeAt: number | undefined }[] {
+  const Rows = z.array(z.object({ name: z.string(), archived: z.number(), made: z.number().nullable() }));
+  // Only the Earth has rooms past the window: any other world's archived rooms all stay.
+  const from = world === "earth" ? earthWindowStart(now) : Number.MIN_SAFE_INTEGER;
+  return Rows.parse(db.prepare(WORLD_LISTED_SQL).all(world, world, from))
+    .toSorted((a, b) => compare(a.name, b.name))
+    .map(({ name, archived, made }) => ({ name, archived: archived === 1, madeAt: made ?? undefined }));
 }
 
-/** A world's rooms with their archived flag (rooms.archived, create.ts's ROOM_STATE), in one query. */
-export function worldRoomStates(db: DatabaseSync, world: string): { name: string; archived: boolean }[] {
-  const Rows = z.array(z.object({ name: z.string(), archived: z.number() }));
-  const sql = "SELECT name, archived FROM rooms WHERE world = ? ORDER BY name";
-  return Rows.parse(db.prepare(sql).all(world)).map(({ name, archived }) => ({ name, archived: archived === 1 }));
-}
+export const worldRooms = (db: DatabaseSync, world: string, now: number): string[] =>
+  worldRoomStates(db, world, now).map(({ name }) => name);
 
 /** The realm path of each of `world`'s realm rooms that has one (create.ts's REALM_PATH). */
 export function realmPaths(db: DatabaseSync, world: string): Map<string, string> {

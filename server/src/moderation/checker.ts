@@ -91,7 +91,7 @@ export function strikesFor(db: DatabaseSync, { moderation: { mute }, spared }: C
   const mutes = makeMutes({
     db,
     send,
-    roomsOf: (world) => worldRooms(db, world),
+    roomsOf: (world) => worldRooms(db, world, now()),
     now,
     forMs: mute.minutes * 60_000,
     max: mute.max,
