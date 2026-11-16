@@ -245,7 +245,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   address share one count, so a burst of them refuses all such lines for a minute (logged as `limit`).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person
   and send the signature itself, so the cookie lands with it. The server cannot tell; only a
-  wallet that shows the requesting site and refuses another domain's text can; that Adena does so is not checked here. The 90-day cap and logout bound it.
+  wallet that shows the requesting site and refuses another domain's text can; that Adena does so is not checked here. The signed text asks the person to check the address bar (D13600). The 90-day cap, logout and "Log out my other sessions" bound it.
 
 ### The content security policy
 
