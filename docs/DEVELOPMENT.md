@@ -15,7 +15,7 @@ git --no-replace-objects show main:scripts/install_hooks.sh | sh
 
 It installs `land` too (D13213) when python3, git, gh and gitleaks are on your PATH outside your home and temporary folders and
 every Claude profile already keeps their folders from its sessions, which `tools/agent-github/install.sh` writes (D13412);
-otherwise it says why and installs the hooks alone.
+otherwise it says why, installs the hooks alone, and keeps the land already installed.
 
 A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` takes no push, and pre-push refuses one. A session's
 branch reaches GitHub through `land`, the owner's one command (D13211, D13213; `docs/HARNESS.md`, "A change, from plan to merge"). The install
