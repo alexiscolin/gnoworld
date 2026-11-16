@@ -37,7 +37,7 @@ export function Soon({ name, icon, words, size = "m", children, className }: Com
   // An icon alone wears an IconButton's own look, so it stands at the same size beside them (the chat's header).
   const look =
     children !== undefined
-      ? { className: "bare" }
+      ? { className: className ?? "bare" }
       : words === undefined
         ? iconLook("outline", size)
         : buttonLook("outline", "neutral", size);
@@ -46,7 +46,7 @@ export function Soon({ name, icon, words, size = "m", children, className }: Com
       <button
         type="button"
         {...look}
-        className={[look.className, styles["soon"], className].join(" ")}
+        className={[look.className, styles["soon"], children === undefined ? className : undefined].join(" ")}
         aria-disabled="true"
         aria-label={`${name}, coming soon`}
       >

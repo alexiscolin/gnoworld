@@ -35,6 +35,12 @@
     --lit-fill: transparent;
 
     background: none;
+    /* the whole item greys, its end too; the button inside keeps its own ink */
+    opacity: var(--opacity-disabled);
+  }
+
+  .item[data-soon] .main {
+    opacity: 1;
   }
 
   .item[data-unread] .main {
