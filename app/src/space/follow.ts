@@ -141,10 +141,10 @@ class Follow {
   }
 }
 
-const follow = new Follow();
+const home = new Follow();
 
 /** One frame of the home's first screen's follow of its featured worlds: one first screen at a time. */
 export const followHome = (space: Space, delta: number): void => {
   shapeBoosts(space);
-  follow.update(space, delta);
+  home.update(space, delta);
 };

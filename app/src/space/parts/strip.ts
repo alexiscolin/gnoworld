@@ -109,16 +109,17 @@ export class Strip {
 
   // The corners where the links' planets stand now: those at each end, and the other end for the quad's direction.
   #follow(seconds: number): void {
-    const [at, other, pos] = [this.#at.array, this.#other.array, this.#place];
+    const at = this.#at.array;
+    const other = this.#other.array;
+    const pos = this.#place;
     const count = Math.min(this.#links.length, MOST);
     for (let link = 0; link < count; link += 1) {
       const each = this.#links[link];
       if (each === undefined) continue;
-      for (const [planet, ends, others] of [
-        [each.from, 0, 2],
-        [each.to, 2, 0],
-      ] as const) {
-        placeOf(planet, seconds, pos);
+      for (let end = 0; end < 2; end += 1) {
+        const ends = end * 2;
+        const others = 2 - ends;
+        placeOf(end === 0 ? each.from : each.to, seconds, pos);
         for (let corner = 0; corner < 2; corner += 1) {
           put(at, link * 4 + ends + corner, pos);
           put(other, link * 4 + others + corner, pos);

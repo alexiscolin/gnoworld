@@ -86,7 +86,7 @@ describe("the names of a still scene", () => {
     labels.tick(seen, 0);
     vi.advanceTimersByTime(1000);
     labels.tick(seen, 0);
-    labels.light(new Set(["nothing"]));
+    labels.lightOnly(new Set(["nothing"]));
     labels.tick(seen, 0);
     expect(labels.settled()).toBe(false);
   });

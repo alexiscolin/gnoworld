@@ -67,7 +67,7 @@ const SPREAD = 1.15;
 // A sun at least this many times its largest planet's radius.
 const SUN_OVER = 2;
 /** `v` made a unit, as a new vector. */
-export const unit = (v: Vec): Vec => {
+export const normalized = (v: Vec): Vec => {
   const length = Math.hypot(v.x, v.y, v.z) || 1;
   return { x: v.x / length, y: v.y / length, z: v.z / length };
 };
@@ -81,9 +81,13 @@ export const cross = (a: Vec, b: Vec): Vec => ({
 // A plane tilted by up to 0.45 rad from the disc's, the way the hash of `id` says.
 function planeOf(id: string, home: boolean) {
   const [tilt, turn] = [home ? 0.06 : hashOf(id, 1) * 0.45, hashOf(id, 2) * Math.PI * 2];
-  const normal = unit({ x: Math.cos(turn) * Math.sin(tilt), y: Math.cos(tilt), z: Math.sin(turn) * Math.sin(tilt) });
-  const across = unit(cross(normal, { x: 0.3, y: 0.1, z: 1 }));
-  return { normal, across, along: unit(cross(normal, across)) };
+  const normal = normalized({
+    x: Math.cos(turn) * Math.sin(tilt),
+    y: Math.cos(tilt),
+    z: Math.sin(turn) * Math.sin(tilt),
+  });
+  const across = normalized(cross(normal, { x: 0.3, y: 0.1, z: 1 }));
+  return { normal, across, along: normalized(cross(normal, across)) };
 }
 
 /** The disc's radius for `count` systems: the demo's, wider past what it holds, so each keeps its room however many come. */

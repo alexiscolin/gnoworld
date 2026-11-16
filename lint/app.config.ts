@@ -170,5 +170,12 @@ export default defineConfig(
       "@typescript-eslint/prefer-for-of": "off",
     },
   },
+  {
+    // Left off here (Lowered-floor: ignore): near.ts walks its Map of held planets each frame with forEach and for...of, and the Map is
+    // adopted by the next Near (adopt.ts); making it free of iterators needs a parallel array kept in both, a change of its own.
+    files: [`${SRC}/space/parts/near.ts`],
+    ignores: TESTS,
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END] },
+  },
   { files: [`${SRC}/**/*.{ts,tsx}`], ignores: [`${SRC}/lib/**`, `${SRC}/sw/**`, ...TESTS], rules: reaching(REACHES) },
 );

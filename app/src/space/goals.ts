@@ -6,7 +6,8 @@ import type { Space } from "./scene.ts";
 import type { Goal } from "./rig/flight.ts";
 import { copySpot, type Pose } from "./rig/pose.ts";
 import { compose, featuredPool, latch, lightOf, normalise, quarterOf, rollOf, type Frame, type View } from "./vista.ts";
-import { unit, type Planet, type System, type Vec } from "./layout.ts";
+import type { Eye } from "./vista.ts";
+import { normalized, type Planet, type System, type Vec } from "./layout.ts";
 
 /** The page's circle, in the page's pixels, and the screen. */
 export interface Circle {
@@ -105,20 +106,24 @@ export function systemGoal(
 ): Goal {
   const n = system.normal;
   const level = way.x * n.x + way.y * n.y + way.z * n.z;
-  const flat = unit({ x: way.x - n.x * level, y: way.y - n.y * level, z: way.z - n.z * level });
+  const flat = normalized({ x: way.x - n.x * level, y: way.y - n.y * level, z: way.z - n.z * level });
   // From above its plane, a little tilted (the plan); or low over it, about 12°, near and large, the sun in the middle and the near worlds
   // big in front.
   const [across, above] = plan ? [0.17, 0.985] : [0.978, 0.208];
-  const from = unit({
+  const from = normalized({
     x: flat.x * across + n.x * above,
     y: flat.y * across + n.y * above,
     z: flat.z * across + n.z * above,
   });
+  // Made once, written each frame: a frame makes nothing.
+  const asked: { screen: Screen; page: Circle | undefined } = { screen: NO_CIRCLE, page: undefined };
   return {
     ...said,
     pose: (out) => {
       const page = circle?.();
-      set(out, system.place, from).distance = fitOf(system.reach, above, { screen: screen(), page });
+      asked.screen = screen();
+      asked.page = page;
+      set(out, system.place, from).distance = fitOf(system.reach, above, asked);
       // Upright on its own plane: a drag turns it round its axis.
       copySpot(n, out.up);
       if (page?.free !== undefined) centre(out, page);
@@ -147,7 +152,7 @@ function centre(out: Pose, page: Circle): void {
 function fitOf(
   reach: number,
   above: number,
-  { screen: { width, height }, page }: { screen: Screen; page?: Circle | undefined },
+  { screen: { width, height }, page }: { screen: Screen; page: Circle | undefined },
 ): number {
   // From above the orbits drawn fill it; in 3D the camera stands well inside that, the outer orbits past the window's edges and the near
   // planets large in front.
@@ -193,21 +198,26 @@ export function planetGoal(
   const n = planet.system.normal;
   const frame = { toSun, n, side };
   let sign = 0;
+  // Made once, written each frame: a frame makes nothing.
+  const lit = { at, toSun, side };
+  const turned = { way, toSun };
+  const wayAt = (by: number): Vec => quarterOf(way, frame, by);
+  const eye: { -readonly [K in keyof Eye]: Eye[K] } = { earth: at, toSun, circle: NO_CIRCLE, distance: 0, wayAt };
   return {
     ...said,
     pose: (out) => {
       const told = circle();
       if (told === undefined) return false;
-      lightOf(planet, seconds(), { at, toSun, side });
+      lightOf(planet, seconds(), lit);
       if (told.close === true) {
         out.distance = fitDistance(planet.radius, told);
-        const wayAt = (by: number): Vec => quarterOf(way, frame, by);
         // The first screen frames the view that shows most of the system's other worlds, once; the Earth being still, so is the light.
-        const eye = { earth: at, toSun, circle: told, distance: out.distance, wayAt };
+        eye.circle = told;
+        eye.distance = out.distance;
         if (others !== undefined) compose(others, eye, seconds());
         const view = others === undefined ? NO_TURN : (latch.view ?? NO_TURN);
         set(out, at, wayAt(view.turn));
-        rollOf(out.up, { way, toSun }, view.roll);
+        rollOf(out.up, turned, view.roll);
       } else {
         if (sign === 0) sign = sunOnTheRight(wayOf(way, frame, 1), toSun) ? 1 : -1;
         set(out, at, wayOf(way, frame, sign));
@@ -232,11 +242,12 @@ export function homeGoal(
 }
 
 const NO_TURN: View = { turn: 0, roll: 0 };
+const NO_CIRCLE: Circle = { x: 0, y: 0, radius: 0, width: 0, height: 0 };
 const spot0 = (): Vec => ({ x: 0, y: 0, z: 0 });
 
 // Whether, seen from `way`, the sun (`toSun`) stands on the screen's right: the camera's right is the way crossed with the up, negated.
 function sunOnTheRight(way: Vec, toSun: Vec): boolean {
-  const right = unit({
+  const right = normalized({
     x: -way.y * UP.z + way.z * UP.y,
     y: -way.z * UP.x + way.x * UP.z,
     z: -way.x * UP.y + way.y * UP.x,

@@ -51,6 +51,10 @@ export class Moons {
   #dirty = false;
   #of: Planet | undefined;
   #seconds = 0;
+  // This frame's, kept for the slots' calls.
+  #clock: { seconds: number; delta: number; still: boolean } = { seconds: 0, delta: 0, still: false };
+  #view: { turn: Quaternion; eye: Vector3 } = { turn: this.#turn, eye: this.#eye };
+  #ease = 0;
   #spin = 0;
 
   /** `ring`: the page's orbit line, whose look each other moon's orbit line takes. */
@@ -79,24 +83,39 @@ export class Moons {
     clock: { seconds: number; delta: number; still: boolean },
     view: { turn: Quaternion; eye: Vector3 },
   ): void {
-    const { delta } = clock;
     this.#seconds = clock.seconds;
+    this.#clock = clock;
+    this.#view = view;
     const gone = planet === undefined;
-    if (gone) {
-      // The planet is left (a flight begins): the moons go at once and are made again as one is framed.
-      [this.#of, this.#dirty] = [undefined, true];
-      for (const slot of this.#slots) slot.alpha = 0;
-    } else if (planet !== this.#of) this.#arrive(planet, view);
+    if (gone) this.#leave();
+    else if (planet !== this.#of) this.#arrive(planet, view);
     if (this.#dirty && !gone) this.#sync(planet.id === EARTH ? 1 : MOONS_MOST, clock.still);
-    const ease = clock.still ? 1 : damp(delta, EASE_S);
+    this.#ease = clock.still ? 1 : damp(clock.delta, EASE_S);
     this.group.visible = false;
-    for (const shadow of this.shadows) shadow.w = 0;
+    for (let at = 0; at < this.shadows.length; at += 1) this.shadows[at]?.setComponent(3, 0);
     if (planet !== undefined) placeOf(planet, clock.seconds, this.#at);
-    this.#slots.forEach((slot, at) => {
-      this.#tick(slot, { ease, delta, shown: !gone && !slot.leaving && slot.room !== "" });
-      if (!slot.ready && this.#lines[at] !== undefined) this.#lines[at].visible = false;
-      if (planet !== undefined && slot.ready) this.#place(slot, at, { planet, clock, view });
-    });
+    this.#eachSlot(planet);
+  }
+
+  #eachSlot(planet: Planet | undefined): void {
+    for (let at = 0; at < this.#slots.length; at += 1) {
+      const slot = this.#slots[at];
+      if (slot === undefined) continue;
+      this.#tick(slot, planet !== undefined && !slot.leaving && slot.room !== "");
+      const line = this.#lines[at];
+      if (!slot.ready && line !== undefined) line.visible = false;
+      if (planet !== undefined && slot.ready) this.#place(slot, at, planet);
+    }
+  }
+
+  // The planet is left (a flight begins): the moons go at once and are made again as one is framed.
+  #leave(): void {
+    this.#of = undefined;
+    this.#dirty = true;
+    for (let at = 0; at < this.#slots.length; at += 1) {
+      const slot = this.#slots[at];
+      if (slot !== undefined) slot.alpha = 0;
+    }
   }
 
   // The planet changed: the foreground moon starts on the ring's near side, a little to one side, as the eye sees it.
@@ -125,10 +144,10 @@ export class Moons {
   }
 
   // A slot's moon made when it has a room and the maps came, shown once compiled and uploaded, eased in and out, freed once gone.
-  #tick(slot: Slot, { ease, delta, shown }: { ease: number; delta: number; shown: boolean }): void {
+  #tick(slot: Slot, shown: boolean): void {
     if (slot.drawn === undefined && slot.room !== "" && !slot.leaving) this.#make(slot);
-    slot.alpha += ((shown && slot.ready ? 1 : 0) - slot.alpha) * ease;
-    slot.flare *= Math.exp(-delta / FLARE_S);
+    slot.alpha += ((shown && slot.ready ? 1 : 0) - slot.alpha) * this.#ease;
+    slot.flare *= Math.exp(-this.#clock.delta / FLARE_S);
     if (slot.alpha < 0.01 && !shown && slot.drawn !== undefined && slot.room !== "") this.#free(slot);
   }
 
@@ -161,19 +180,9 @@ export class Moons {
     if (group.visible) this.shadows[at]?.set(group.position.x, group.position.y, group.position.z, group.scale.x);
   }
 
-  #place(
-    slot: Slot,
-    at: number,
-    {
-      planet,
-      clock,
-      view,
-    }: {
-      planet: Planet;
-      clock: { seconds: number; delta: number; still: boolean };
-      view: { turn: Quaternion; eye: Vector3 };
-    },
-  ): void {
+  #place(slot: Slot, at: number, planet: Planet): void {
+    const clock = this.#clock;
+    const view = this.#view;
     const { drawn } = slot;
     if (drawn === undefined) return;
     const angle = angleOf(at, this.#spin, clock);
