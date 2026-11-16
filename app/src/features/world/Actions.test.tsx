@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
-import { InPageSheet } from "../chat/index.ts";
+import { InPageSheet } from "../chat/placePage.ts";
 import { Actions } from "./Actions.tsx";
 
 // Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share
