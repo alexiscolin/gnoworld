@@ -29,6 +29,11 @@ CREATE TABLE earth_rooms (name TEXT PRIMARY KEY, maker TEXT NOT NULL, created_at
 CREATE INDEX earth_rooms_by_maker ON earth_rooms (maker, created_at);
 `;
 
+// The window's count (EARTH_WINDOW_DAYS) and the rooms past it read a range of dates, not every row.
+export const EARTH_WINDOW_INDEX = `
+CREATE INDEX earth_rooms_by_date ON earth_rooms (created_at);
+`;
+
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
 /** The public rooms made in the last EARTH_WINDOW_DAYS, archived ones too: archiving frees no place, only time does (C12, D13675). */
@@ -77,15 +82,14 @@ interface Options {
   realmMax?: number;
   // The Earth's public rooms at most, EARTH_ROOMS_MAX unless a test says less.
   earthMax?: number;
-  // The public rooms ever made, EARTH_ROWS_MAX unless a test says less.
+  // The public rooms made in the window, EARTH_ROWS_MAX unless a test says less.
   earthRowsMax?: number;
 }
 
-// The Earth's public rooms' statements: how many there are (made in the window, and live), an account's in a day, one made, a room's maker.
+// The Earth's public rooms' statements: how many there are (live, and made in the window), an account's in a day, one made, a room's maker.
 const earthSql = (db: DatabaseSync) => ({
-  earth: db.prepare(
-    "SELECT coalesce(sum(e.created_at > ?), 0) AS rows, coalesce(sum(r.archived = 0), 0) AS live FROM earth_rooms e JOIN rooms r ON r.name = e.name",
-  ),
+  rows: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?"),
+  live: db.prepare("SELECT count(*) AS n FROM earth_rooms e JOIN rooms r ON r.name = e.name WHERE r.archived = 0"),
   today: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE maker = ? AND created_at > ?"),
   made: db.prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, ?, ?)"),
   maker: db.prepare("SELECT maker FROM earth_rooms WHERE name = ?"),
@@ -134,15 +138,14 @@ export function makeRooms({
     send("SAMODE", [room, "-i"]);
     return { made: room };
   };
-  const Held = z.object({ rows: z.number(), live: z.number() });
   const Maker = z.object({ maker: z.string() }).optional();
   const mayEarth: Rooms["mayEarth"] = (maker, name) => {
     const room = `${mainRoom("earth")}/${name}`;
     if (room.length > CHANNEL_MAX) return "too_long";
     if (stateOf(room) !== undefined) return "exists";
     if (Count.parse(sql.today.get(maker, now() - DAY_MS)).n >= EARTH_PER_DAY) return "day";
-    const { rows, live } = Held.parse(sql.earth.get(now() - EARTH_WINDOW_DAYS * DAY_MS));
-    return live >= earthMax || rows >= earthRowsMax ? "full" : "ok";
+    const rows = Count.parse(sql.rows.get(now() - EARTH_WINDOW_DAYS * DAY_MS)).n;
+    return Count.parse(sql.live.get()).n >= earthMax || rows >= earthRowsMax ? "full" : "ok";
   };
   const mayRealm: Rooms["mayRealm"] = (room, reserve = 0) => {
     if (stateOf(room) !== undefined) return "exists";

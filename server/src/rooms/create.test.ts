@@ -10,6 +10,7 @@ import {
   EARTH_ROOMS_MAX,
   EARTH_ROWS_MAX,
   EARTH_TABLES,
+  EARTH_WINDOW_INDEX,
   makeRooms,
   REALM_PATH,
   REALM_TABLES,
@@ -28,7 +29,14 @@ const setup = ({
   earthMax,
   earthRowsMax,
 }: { max?: number; earthMax?: number; earthRowsMax?: number } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [
+    ROOM_TABLES,
+    ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    EARTH_WINDOW_INDEX,
+  ]);
   opened.push(db);
   ensureRooms(db, ["bubble", "earth"], T0);
   const link = { up: true };
@@ -375,6 +383,12 @@ describe("a room anyone makes on the Earth", () => {
     clock.now += 2 * 24 * 60 * 60_000;
     expect(rooms.mayEarth(B, "c")).toBe("ok");
     expect(rooms.earth(B, "c")).toEqual({ made: "#earth/c" });
+  });
+
+  it("indexes the rooms by their date, so the window's count is a range read, not a scan", () => {
+    const { db } = setup();
+    const plan = db.prepare("EXPLAIN QUERY PLAN SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?").all(0);
+    expect(JSON.stringify(plan)).toContain("earth_rooms_by_date");
   });
 
   it("keeps a room past the window as it was: its row, its name, its maker, archived, never destroyed", () => {
