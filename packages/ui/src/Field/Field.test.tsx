@@ -266,6 +266,15 @@ describe("Field", () => {
     expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
   });
 
+  it("marks the box invalid with `invalid` alone, drawing no message and no status words", () => {
+    const { container } = render(<Field kind="lines" label="Message" invalid value="" onChange={vi.fn()} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    expect(box.getAttribute("aria-invalid")).toBe("true");
+    expect(box.hasAttribute("aria-describedby")).toBe(false);
+    expect(container.querySelector("p")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
   it("takes the handle off a box of lines that grows on its own, and leaves it on the others", () => {
     const { rerender } = render(<Field kind="lines" label="Message" value="" onChange={vi.fn()} />);
     expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(false);
