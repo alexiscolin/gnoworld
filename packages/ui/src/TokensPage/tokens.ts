@@ -36,6 +36,7 @@ export function groups() {
         "--banner-",
         "--shell-",
         "--hit-",
+        "--phone-",
         "--dock-",
         "--page-",
         "--globe-",
