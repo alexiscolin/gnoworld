@@ -22,8 +22,8 @@ import { JarvisTold } from "./jarvisTold.tsx";
 import { Saved } from "./Saved.tsx";
 import { Media } from "./Media.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
-import { RoomsList } from "./RoomsList.tsx";
-import { badged, unreadOf } from "./unread.ts";
+import { RoomsMenu } from "./RoomsMenu.tsx";
+import { unreadOf } from "./unread.ts";
 import { useOpened, useWhoIsHere } from "./whoIsHere.tsx";
 import { NoRoomYet, RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf } from "./shown.tsx";
@@ -175,16 +175,15 @@ export function Loaded(props: LoadedProps) {
         {...composing.writer}
       />
     );
-  // The room's name opens the place's rooms under a search.
-  const menu = (
-    <RoomsList sections={sections} current={room} failed={failed} badge={(id) => badged(noticing.badges?.[id])} />
-  );
   return (
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
       chips={<RoomChips sections={sections} current={room} badges={noticing.badges} />}
-      menu={{ label: "Rooms", content: menu }}
+      menu={{
+        label: "Rooms",
+        content: <RoomsMenu sections={sections} room={room} failed={failed} noticing={noticing} />,
+      }}
       mark={
         owner ? (
           <>
