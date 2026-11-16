@@ -495,8 +495,8 @@ between worlds. None may saturate the map:
   row 11).
 - **A call is a transaction the user signs in Adena.** It shows as an inline card in the
   room or on the plate, in four steps (ADR-0001 §7):
-  1. the preview: realm, function, arguments, network, fee. The network is the universe's
-     chain, and Adena must be on it;
+  1. the preview: realm, function, arguments, network, fee, the deposit's cap (D13625). The
+     network is the universe's chain, and Adena must be on it;
   2. "sign in Adena": the wallet opens;
   3. "landing in a block": Adena answers once the network accepts the transaction, so
      the card follows its hash until the block and its result;
