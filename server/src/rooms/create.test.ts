@@ -405,3 +405,49 @@ describe("the realm rooms' reserve and who owns a room", () => {
     expect(rooms.realm(room(3))).toBe("full");
   });
 });
+
+// F13511: a room is two writes (`rooms` and its `earth_rooms` or `realm_rooms` row): a stop between them left an orphan row,
+// and that realm answered 500 for ever. Both in one transaction, then JOIN and SAMODE.
+describe("a room made in two writes (F13511): the second one failing leaves nothing", () => {
+  const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const rows = (db: DatabaseSync) => ({
+    rooms: z.array(z.object({ name: z.string() })).parse(db.prepare("SELECT name FROM rooms ORDER BY name").all()),
+    earth: db.prepare("SELECT name FROM earth_rooms").all(),
+    realm: db.prepare("SELECT name FROM realm_rooms").all(),
+  });
+  const failing = (db: DatabaseSync, table: string) => {
+    db.exec(`CREATE TRIGGER stop BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, 'stopped'); END`);
+    return () => {
+      db.exec("DROP TRIGGER stop");
+    };
+  };
+
+  it("an Earth room whose earth_rooms row fails leaves no rooms row and sends no JOIN, and can be made then", () => {
+    const { db, sent, rooms } = setup();
+    const before = rows(db);
+    const mend = failing(db, "earth_rooms");
+    expect(() => rooms.earth(A, "coffee")).toThrow();
+    expect(rows(db)).toEqual(before);
+    expect(sent).toEqual([]);
+    expect(rooms.exists("#earth/coffee")).toBe(false);
+    mend();
+    expect(rooms.earth(A, "coffee")).toEqual({ made: "#earth/coffee" });
+    expect(sent).toEqual(["JOIN #earth/coffee", "SAMODE #earth/coffee +M", "SAMODE #earth/coffee -i"]);
+    expect(rooms.maker("#earth/coffee")).toBe(A);
+  });
+
+  it("a realm's room whose realm_rooms row fails leaves no rooms row and sends no JOIN, and can be made then", () => {
+    const { db, sent, rooms } = setup();
+    const before = rows(db);
+    const mend = failing(db, "realm_rooms");
+    expect(() => rooms.realm("#bubble/golf-0123456789", undefined, "gno.land/r/x/golf")).toThrow();
+    expect(rows(db)).toEqual(before);
+    expect(sent).toEqual([]);
+    mend();
+    expect(rooms.realm("#bubble/golf-0123456789", undefined, "gno.land/r/x/golf")).toEqual({
+      made: "#bubble/golf-0123456789",
+    });
+    expect(rooms.isRealm("#bubble/golf-0123456789")).toBe(true);
+    expect(sent[0]).toBe("JOIN #bubble/golf-0123456789");
+  });
+});

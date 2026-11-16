@@ -6,6 +6,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "../login/login.ts";
 import { makeChecker, VERDICT_TABLES } from "../moderation/check.ts";
+import { ROOM_SAID } from "../rooms/earth.ts";
 import { makeQueue } from "../moderation/queue.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
 import { answer } from "./answers.ts";
@@ -13,7 +14,7 @@ import { answer } from "./answers.ts";
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const log = logger(PEPPER, () => true);
 // The verdicts' index by account as main opens them: a line's rate reads it.
-const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, STRIKE_TABLES]);
+const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES, STRIKE_TABLES, ROOM_SAID]);
 const nothing = answer();
 const check = makeChecker({
   db,

@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { Address, Unread } from "@gnoworld/schemas";
+import { Address, toAddress, Unread } from "@gnoworld/schemas";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,7 +27,7 @@ afterEach(() => {
   for (const db of opened.splice(0)) if (db.isOpen) db.close();
 });
 
-function setup(perSecond = 1000) {
+function setup(perSecond: number | null = 1000, tokens: ReadonlyMap<string, Address> = TOKENS) {
   const roles: Typed = {
     team: new Set(),
     worlds: new Map([["bubble", { rules: RULES, groups: new Map(), rooms: new Map() }]]),
@@ -52,11 +52,11 @@ function setup(perSecond = 1000) {
     "/api/unread",
     unreadRoutes({
       unread,
-      session: (token) => TOKENS.get(token ?? ""),
+      session: (token) => tokens.get(token ?? ""),
       origins: [ORIGIN],
       log,
       now: () => clock.now,
-      perSecond,
+      ...(perSecond === null ? {} : { perSecond }),
     }),
   );
   let serial = 0;
@@ -186,6 +186,42 @@ describe("the places a page forwards", () => {
     expect((await t.post(body, "bob")).status).toBe(429);
     t.clock.now += 1000;
     expect((await t.post(body, "bob")).status).toBe(204);
+  });
+});
+
+describe("the second's limit by default (F13513)", () => {
+  it("keeps the place of each of 200 accounts posting one within a second: 500 a second, not 20", async () => {
+    const accounts = Array.from(
+      { length: 200 },
+      (_, n) => [`t${String(n)}`, Address.parse(toAddress(new Uint8Array(20).fill(n)))] as const,
+    );
+    const t = setup(null, new Map(accounts));
+    const body = { places: [t.place("#bubble", T0)] };
+    const statuses = await Promise.all(accounts.map(async ([token]) => (await t.post(body, token)).status));
+    expect(statuses.filter((status) => status !== 204)).toEqual([]);
+  });
+
+  it("spends no account's allowance on a call the second's limit refused", async () => {
+    const accounts = new Map([
+      ["alice", ALICE],
+      ["bob", BOB],
+    ]);
+    const t = setup(1, accounts);
+    const body = { places: [t.place("#bubble", T0)] };
+    expect((await t.post(body, "alice")).status).toBe(204);
+    for (let n = 0; n < 40; n += 1) expect((await t.post(body, "bob")).status).toBe(429);
+    t.clock.now += 1000;
+    for (let n = 0; n < 30; n += 1) {
+      expect((await t.post(body, "bob")).status).toBe(204);
+      t.clock.now += 1000;
+    }
+  });
+
+  it("spends no site token on a call the account's own limit refused", async () => {
+    const t = setup(500);
+    const body = { places: [t.place("#bubble", T0)] };
+    for (let n = 0; n < 500; n += 1) await t.post(body, "bob");
+    expect((await t.post(body, "alice")).status).toBe(204);
   });
 });
 

@@ -6,6 +6,7 @@ import type { ApiError } from "@gnoworld/schemas";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { routePath } from "hono/route";
+import { isJsonType } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
 
 // The host of the request's Origin, which the guard checked.
@@ -23,7 +24,7 @@ export function guard(
     if (c.req.method !== "GET" && c.req.method !== "HEAD") {
       const host = hosts.get(c.req.header("origin") ?? "");
       if (host === undefined) return refuse(c, "origin");
-      if (!/^application\/json\s*(;|$)/i.test(c.req.header("content-type") ?? "")) return refuse(c, "type");
+      if (!isJsonType(c.req.header("content-type"))) return refuse(c, "type");
       c.set("host", host);
     }
     await next();
@@ -38,8 +39,11 @@ export async function json(c: Context): Promise<unknown> {
   return jsonOf(await c.req.text());
 }
 
-/** The login's session token of a request: its one cookie. */
-export const tokenOf = (c: Context): string | undefined => getCookie(c, "__Host-session");
+/** The login's one cookie, which holds the session token. */
+export const SESSION_COOKIE = "__Host-session";
+
+/** The login's session token of a request. */
+export const tokenOf = (c: Context): string | undefined => getCookie(c, SESSION_COOKIE);
 
 /** What the session `session` knows of a request's cookie (an account, or none). */
 export const sessionOf = <T>(c: Context, session: (token: string | undefined) => T): T => session(tokenOf(c));

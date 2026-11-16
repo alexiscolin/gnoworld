@@ -1080,9 +1080,9 @@ describe("the server's process", { timeout: 30_000 }, () => {
     const follow = (visitor: string) =>
       fetch(`http://127.0.0.1:${String(port)}/api/stream?rooms=%23bubble`, { headers: { "x-real-ip": visitor } });
     const open = [];
-    for (let i = 0; i < 4; i++) open.push(await follow("192.0.2.1"));
+    for (let i = 0; i < 32; i++) open.push(await follow("192.0.2.1"));
     expect(open.map(({ status, headers }) => [status, headers.get("content-type")])).toEqual(
-      Array.from({ length: 4 }, () => [200, "text/event-stream"]),
+      Array.from({ length: 32 }, () => [200, "text/event-stream"]),
     );
     expect((await follow("192.0.2.1")).status).toBe(429);
     const other = await follow("192.0.2.2");
