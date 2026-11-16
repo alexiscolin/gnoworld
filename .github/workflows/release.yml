@@ -1,0 +1,63 @@
+# Main's images on GitHub's packages. Each push to main, or a run by hand from main, builds every image the stack builds
+# (deploy/compose.yaml) for linux/amd64 and pushes it as ghcr.io/<owner>/<repository>/<image>:<the commit's first 12 hex>,
+# once: a tag that exists is never pushed again. Its one job writes packages and nothing else; the run's token is named in
+# the push step alone, never in the build (the pinned checkout keeps it off the disk). No build cache: every image starts
+# from its pinned base images. scripts/test_hooks.sh, section ci, holds this file to its every byte.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # One run of a commit at a time: two cannot both find its tag absent and both push.
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  images:
+    name: image ${{ matrix.image }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Pushes this job's one image to the repository's packages.
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [web, server, ergo, egress, jarvis, jarvis-reader, link-reader]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image, labelled with its source and commit
+        env:
+          IMAGE: ${{ matrix.image }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          docker build --pull --platform linux/amd64 --file "deploy/${IMAGE}/Dockerfile" \
+            --label "org.opencontainers.image.source=https://github.com/${REPO}" \
+            --label "org.opencontainers.image.revision=${SHA}" \
+            --tag "release:${IMAGE}" .
+      - name: Push it under the commit, unless that tag exists
+        env:
+          IMAGE: ${{ matrix.image }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          ref="ghcr.io/${REPO,,}/${IMAGE}:${SHA:0:12}"
+          printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+          if docker manifest inspect "$ref" >/dev/null 2>&1; then
+            echo "$ref exists: left as it is"
+          else
+            docker tag "release:${IMAGE}" "$ref"
+            docker push "$ref"
+          fi
+          docker logout ghcr.io

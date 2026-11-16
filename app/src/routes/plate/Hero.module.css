@@ -27,17 +27,6 @@
     .pill {
       white-space: nowrap;
     }
-
-    /* Follow and Share stand at the kicker's row, to the right, as the pills do wide (the proposal's phone, s3b.js topr). */
-    .row > :nth-last-child(-n + 2) {
-      position: absolute;
-      inset-block-start: 0;
-      inset-inline-end: 0;
-    }
-
-    .row > :nth-last-child(2) {
-      inset-inline-end: calc(var(--control-s) + var(--space-2xs));
-    }
   }
 
   .pill {

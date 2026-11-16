@@ -41,8 +41,8 @@
     .globe,
     .globe + * {
       --_dock: var(--chat-dock-s);
-      /* raw: the plate's words end here */
-      --_start: 578px;
+      /* raw: the plate's content edge, where its end padding stops the words and cards; the planet keeps clear of it */
+      --_start: calc(var(--page-edge) + var(--plate-w) - var(--plate-inset-end));
       /* raw: the dock's left, from the window's width */
       --_end: calc(100vi - var(--space-m) - var(--_dock));
       --_top: var(--dock-top);
@@ -73,9 +73,9 @@
       --_x: 76vi;
       /* raw: the study's centre, down */
       --_middle: 68vb;
-      /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; its air and its glow past it (1.18 radii) a step clear
-         of the words */
-      --_radius: min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-s)) / 1.18);
+      /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; held so that the disc's limb, drawn 1.04 radii out
+         (measured), stands a step (--space-m) right of the plate's content edge: over the plate's fade, never over its content */
+      --_radius: min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-m)) / 1.04);
     }
 
     .globe {
