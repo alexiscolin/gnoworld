@@ -3,9 +3,10 @@
 import { Flash } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
 import { useAfterLoad } from "../../later.ts";
-import { hostAnswers, startServiceWorker } from "../../sw/register.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
+// The worker's code, asked once the page has rested, apart from the first screen's (budgets.spec.ts).
+const worker = () => import("../../sw/register.ts");
 
 // A Flash keeps its status region on the page from the start, empty: a screen reader announces a
 // region's change, and may say nothing of one that arrives already filled. Closed, the update waits.
@@ -33,24 +34,28 @@ export function UpdatePrompt() {
   useEffect(() => {
     if (!loaded) return undefined;
     const leaving = new AbortController();
-    startServiceWorker({
-      container: "serviceWorker" in navigator ? navigator.serviceWorker : undefined,
-      document,
-      online: window,
-      search: location.search,
-      production: PRODUCTION,
-      reachable: hostAnswers,
-      signal: leaving.signal,
-      reload: () => {
-        location.reload();
-      },
-      report: (error) => {
-        reportError(error);
-      },
-      onUpdate: (next) => {
-        setApply(() => next);
-      },
-    }).catch(reportError);
+    worker()
+      .then(({ hostAnswers, startServiceWorker }) =>
+        startServiceWorker({
+          container: "serviceWorker" in navigator ? navigator.serviceWorker : undefined,
+          document,
+          online: window,
+          search: location.search,
+          production: PRODUCTION,
+          reachable: hostAnswers,
+          signal: leaving.signal,
+          reload: () => {
+            location.reload();
+          },
+          report: (error) => {
+            reportError(error);
+          },
+          onUpdate: (next) => {
+            setApply(() => next);
+          },
+        }),
+      )
+      .catch(reportError);
     return () => {
       leaving.abort();
     };
