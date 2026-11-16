@@ -29,7 +29,7 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    for a realm, the `design-reviewer` when space's look changes. Each finding reproduced before it is fixed, high and medium fixed,
    low listed; each into `docs/review/findings.md` in the given range, one row a pull request in `docs/review-log.md`; a second round
    only as `docs/REVIEW.md`'s step 5 allows.
-7. **Hand over.** For each branch, in `/private/tmp/claude-501/land/`: `<branch>.bundle` (`git bundle create` of that one branch,
+7. **Hand over.** For each branch, in `/private/tmp/claude-<uid>/land/`: `<branch>.bundle` (`git bundle create` of that one branch,
    from GitHub's main) and `<branch>.md`, the pull request's title, a blank line and its body (what it lands, what was run, what was
    not). Give Alexis, in his language (`CLAUDE.local.md`), the review card and the tip's 16 hex; he types `land`, compares them with
    its listing and answers y (D13213). One pull request in the folder at a time.

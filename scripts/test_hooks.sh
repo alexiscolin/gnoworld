@@ -519,10 +519,30 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
+# No instruction, doc or script a session or a contributor reads names a folder of one machine (D13411, D13417): the owner's own
+# go to an untracked CLAUDE.local.md; nvm's default folder may be named, never a version of it.
+machine_paths() {
+	(cd "$1" && git grep -nE '~/Server|/Users/[a-z]|claude-[0-9]+/|\.nvm/versions/node/v[0-9]|~/\.opencode|~/\.orbstack|~/\.claude-[a-z]' -- CLAUDE.md .claude \
+		docs/HARNESS.md docs/DEVELOPMENT.md docs/OPERATIONS.md 'scripts/*.sh' evals/run.sh ':!scripts/test_hooks.sh'; [ $? -le 1 ]) || echo "the scan itself failed in $1"
+}
+mp="$t/machine" && mkdir -p "$mp/docs" "$mp/.claude/commands" "$mp/scripts" "$mp/evals" && git -C "$mp" init -q && echo '~/Server/x' >"$mp/CLAUDE.md" &&
+	echo '/Us''ers/someone/x' >"$mp/.claude/commands/c.md" && echo '/private/tmp/claude-501/land/' >"$mp/docs/HARNESS.md" && echo '~/.opencode/bin' >"$mp/docs/DEVELOPMENT.md" &&
+	echo '~/.claude-work' >"$mp/docs/OPERATIONS.md" && echo '$HOME/.nvm/versions/node/v24.22.0/bin' >"$mp/scripts/a.sh" && echo '~/.orbstack' >"$mp/evals/run.sh" && git -C "$mp" add -A
+[ "$(machine_paths "$mp" | wc -l | tr -d ' ')" = 7 ] || fail "the scan for one machine's folders misses one of seven planted, one a file (D13417): $(machine_paths "$mp")"
+machine=$(machine_paths "$here/..")
+[ -z "$machine" ] || fail "a file names a folder of one machine (D13417): $machine"
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh" && git -C "$nv" init -q
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
 env -u SANDBOX_RUNTIME sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
+# So does evals/run.sh, whose node runs by hand with Anthropic's key; and a pin moved on is the one it takes, no version written in it
+# (D13416): with that Node first on PATH it passes its Node checks and stops at the key, which this run gives none.
+ev="$t/evalsnode" && mkdir -p "$ev/evals" "$ev/bin" && cp "$here/../evals/run.sh" "$ev/evals/" && printf '24.22.0/../../../../evil\n' >"$ev/.node-version"
+out=$(env -u ANTHROPIC_API_KEY_FILE sh "$ev/evals/run.sh" 2>&1) && fail "evals/run.sh ran on a .node-version that is a path: $out"
+printf '%s\n' "$out" | grep -q ".node-version must be a version" || fail "evals/run.sh accepted a .node-version that is a path: $out"
+echo 24.23.0 >"$ev/.node-version" && printf '#!/bin/sh\necho v24.23.0\n' >"$ev/bin/node" && chmod +x "$ev/bin/node"
+out=$(env -u ANTHROPIC_API_KEY_FILE NVM_DIR=/nonexistent PATH="$ev/bin:$PATH" sh "$ev/evals/run.sh" 2>&1) && fail "evals/run.sh ran with no key: $out"
+printf '%s\n' "$out" | grep -q "ANTHROPIC_API_KEY_FILE names no readable file" || fail "evals/run.sh refused the Node .node-version pins, first on PATH: $out"
 # No live file of the harness names a removed part: a relic would run, or be read, as if it were there.
 for f in .githooks/merge.sh scripts/review_pass.py scripts/code_changed.sh scripts/dream_due.sh docs/review-passes.txt; do
 	[ ! -e "$here/../$f" ] || fail "$f is back, which D13173 removed"
@@ -3481,6 +3501,11 @@ mkdir -p "$t/oldnode" && printf '#!/bin/sh\necho v1.0.0\n' >"$t/oldnode/node" &&
 out=$(cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh 2>&1) &&
 	fail "check.sh ran on another Node than .node-version's"
 printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "check.sh did not refuse another Node, saying so: $out"
+# The pinned Node first on PATH, as any version manager puts it there, is taken with no nvm at all (D13416): check.sh goes past its
+# start, failing later on this stand-in, which answers its version and nothing more.
+mkdir -p "$t/pathnode" && printf '#!/bin/sh\necho v%s\n' "$(cat "$here/../.node-version")" >"$t/pathnode/node" && chmod +x "$t/pathnode/node"
+out=$(cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/pathnode:$PATH" sh scripts/check.sh 2>&1) || :
+! printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" != "check.sh: FAILED at main:start" ] || fail "check.sh refused the pinned Node first on PATH: $out"
 # The trap stops the lanes started, by an eval of their names: a caller's own `lanes`, on a run that stops before any lane, runs nothing.
 (cd "$g" && env -u SANDBOX_RUNTIME pid_a=999999 lanes='a}";touch${IFS}pwned;:"${pid_a' GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh) >/dev/null 2>&1 || :
 [ ! -e "$g/pwned" ] || fail "a caller's lanes ran as code in check.sh's trap"
@@ -6177,15 +6202,15 @@ for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
-# It runs outside the sandbox, so it makes and removes the folders of one root alone, $HOME/Server/gnoworld-wt, where no session
-# writes but its own folder. With this user's own home it refuses a folder anywhere else, naming that root,
-# and makes nothing; the other cases give it a home of this run's ($home). The base is no commit, so a fence switched off (a
-# harness mutant) stops there, never making a tree in the real root, and still fails on the message.
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree outside \$HOME/Server/gnoworld-wt: $out"
-printf '%s\n' "$out" | grep -qF "is not $HOME/Server/gnoworld-wt/<name>" || fail "worktree.sh did not name the root it requires: $out"
-[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+# It runs outside the sandbox, so it makes and removes the folders of one root alone, the main checkout's "-wt" folder beside it
+# (D13415), in this user's home, where no session writes but its own folder. With this user's own home, which this run's main
+# checkout is not in, it refuses, naming the root, and makes nothing; the other cases give it a home holding the checkout ($home).
+# The base is no commit, so a fence switched off (a harness mutant) stops there, never making a tree, and still fails on the message.
 wsr=$(cd "$ws" && pwd -P)
-home="$wsr/home" wr="$wsr/home/Server/gnoworld-wt"
+out=$(cd "$ws/src" && HOME="$wsr/nothome" sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree with a root outside its home: $out"
+printf '%s\n' "$out" | grep -qF "$wsr/src-wt, the main checkout's worktrees' folder, is not in your home" || fail "worktree.sh did not name the root it requires: $out"
+[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+home="$wsr" wr="$wsr/src-wt"
 mkdir -p "$wr" "$ws/.githooks" && cp "$hooks/records.sh" "$ws/.githooks/"
 wt() { (cd "$ws/src" && HOME="$home" sh "$here/worktree.sh" "$@"); }
 wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
@@ -6196,7 +6221,7 @@ wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$w
 [ -d "$wr/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
 [ "$(cd "$wr/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wr/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
 [ -z "$(git -C "$wr/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wr/new" status --porcelain)"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree outside \$HOME/Server/gnoworld-wt: $out"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree with a root outside its home: $out"
 [ -d "$wr/new" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/new" || fail "worktree.sh's refused remove of a tree outside its root touched it"
 wt "$wr/new" other HEAD >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
 mkdir "$wr/empty" && wt "$wr/empty" another HEAD >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
@@ -6210,21 +6235,21 @@ done
 # made: another absolute path, another home's root, a .. out of the root or a lone .., a link out of it on the way, a folder in a
 # worktree, a name with a capital, a dot, an underscore, a space, or an accented letter, which sh's [a-z] takes in a UTF-8 locale
 # (bash 3.2, macOS's sh: U and e-acute; dash, Linux's, reads bytes). The locale is set here, whatever the caller's.
-mkdir -p "$ws/elsewhere" "$wsr/home2/Server/gnoworld-wt" && ln -s "$ws/elsewhere" "$wr/away"
+mkdir -p "$ws/elsewhere" "$wsr/other-wt" && ln -s "$ws/elsewhere" "$wr/away"
 n=0
-for d in "$ws/elsewhere/a" "$wsr/home2/Server/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
+for d in "$ws/elsewhere/a" "$wsr/other-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
 	"$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
 	n=$((n + 1))
 	out=$(LC_ALL=en_US.UTF-8 && export LC_ALL && wt "$d" "fence$n" HEAD 2>&1) && fail "worktree.sh made a tree at $d, which is not <root>/<name>: $out"
 	printf '%s\n' "$out" | grep -qF "is not $wr/<name>" || fail "worktree.sh refused $d for another reason than its root: $out"
 	! git -C "$ws/src" rev-parse -q --verify "fence$n" >/dev/null || fail "worktree.sh made the branch of $d, which is not <root>/<name>"
 done
-[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/home2/Server/gnoworld-wt")" ] && [ ! -e "$wsr/home/Server/outside" ] && [ ! -e "$wr/new/inner" ] ||
+[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/other-wt")" ] && [ ! -e "$wsr/outside" ] && [ ! -e "$wr/new/inner" ] ||
 	fail "worktree.sh made a folder out of its root"
 [ "$(ls -A "$wr" | tr '\n' ' ')" = "away empty new " ] || fail "worktree.sh made a folder for a name it refuses: $(ls -A "$wr")"
 # The root is compared as written, never resolved: through a home that is a link, a folder is refused.
 ln -s "$home" "$ws/homelink"
-out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/Server/gnoworld-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
+out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/src-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
 [ ! -e "$wr/via" ] || fail "worktree.sh made a folder through a root that is a link"
 # A link named as the folder is refused, what it leads to untouched: git (2.50) makes the branch, then fails on it. So is it
 # with a trailing slash, which leads through the link.
@@ -6238,12 +6263,12 @@ done
 out=$(cd "$ws/src" && env -u HOME sh "$here/worktree.sh" "$wr/nohome" nohome HEAD 2>&1) && fail "worktree.sh made a tree with no home: $out"
 [ ! -e "$wr/nohome" ] && ! git -C "$ws/src" rev-parse -q --verify nohome >/dev/null || fail "worktree.sh made a folder or a branch with no home"
 # A relative path, or one whose .. stays in the root, is the folder it resolves to.
-wt "../home/Server/gnoworld-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
+wt "../src-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/rel" || fail "worktree.sh did not make the folder a relative path resolves to"
 # remove <dir>: a clean worktree of this repository under the root, from another tree; its files deleted, ignored ones included,
 # never what a link in it leads to; its branch kept; and no other tree's record touched, not even one whose folder is gone, which
 # git worktree prune would take: a session can point another tree's record at nothing.
-wt remove "$wr/../gnoworld-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
+wt remove "$wr/../src-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
 [ ! -e "$wr/rel" ] || fail "worktree.sh left the folder it removed"
 wt "$wr/stale" stale HEAD >/dev/null 2>&1 && rm -r "$wr/stale" || fail "the stale worktree of this case could not be made"
 wt "$wr/clean" clean HEAD >/dev/null 2>&1 || fail "the clean worktree of this case could not be made"
@@ -6310,16 +6335,24 @@ wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
 # Run from a linked worktree, it makes and removes trees of this repository; and when that worktree's
 # own commondir leads elsewhere, it still reads this repository's config: the common folder comes from the tree's .git, which the
 # settings deny every session, never from the commondir git would read. So from a worktree made with relative paths.
-git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
-git -C "$ws/src" worktree add -q -b fromrel "$ws/fromrel" HEAD && mkdir "$ws/fromrel/node_modules" && echo "gitdir: ../src/.git/worktrees/fromrel" >"$ws/fromrel/.git"
-admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
+git -C "$ws/src" worktree add -q -b fromwt "$wr/srcwt" HEAD && mkdir "$wr/srcwt/node_modules"
+git -C "$ws/src" worktree add -q -b fromrel "$wr/srcrel" HEAD && mkdir "$wr/srcrel/node_modules" && echo "gitdir: ../../src/.git/worktrees/srcrel" >"$wr/srcrel/.git"
+admin=$(sed 's/^gitdir: //' "$wr/srcwt/.git")
 cp -R "$ws/src/.git" "$ws/evilgit2" && git --git-dir="$ws/evilgit2" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit2" >"$admin/commondir"
-out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
 [ ! -e "$ws/pwned" ] || fail "worktree.sh, run from a worktree, took its config from the commondir: its fsmonitor ran (F5097): $out"
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/fromwt" || fail "worktree.sh, run from a worktree, made no tree of this repository"
-out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
 echo ../.. >"$admin/commondir"
-out=$(cd "$ws/fromrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+out=$(cd "$wr/srcrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+# A worktree whose .git a session rewrote to a repository planted in its own folder, with a filter and an fsmonitor that would run
+# outside the sandbox and a "-wt" folder beside it: refused before git runs, nothing made (the security review of D13415).
+saved=$(cat "$wr/srcwt/.git") && git init -q "$wr/srcwt/evil" && mkdir -p "$wr/srcwt/evil/.git/worktrees/x" "$wr/srcwt/evil-wt" &&
+	git --git-dir="$wr/srcwt/evil/.git" config core.fsmonitor "$ws/fsmonitor" && echo "gitdir: $wr/srcwt/evil/.git/worktrees/x" >"$wr/srcwt/.git"
+out=$(cd "$wr/srcwt" && HOME="$home" sh "$here/worktree.sh" planted planted HEAD 2>&1) && fail "worktree.sh ran from a worktree whose .git names a planted repository: $out"
+printf '%s\n' "$out" | grep -qF "is no worktree of the main checkout's -wt folder" && [ ! -e "$ws/pwned" ] && [ -z "$(ls -A "$wr/srcwt/evil-wt")" ] ||
+	fail "worktree.sh did not refuse a .git rewritten to a planted repository, or ran its config: $out"
+printf '%s\n' "$saved" >"$wr/srcwt/.git"
 # So from the main checkout, whose .git folder holds no commondir unless one was planted there.
 echo "$ws/evilgit2" >"$ws/src/.git/commondir"
 out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
