@@ -17,6 +17,8 @@
     --appear-from: 0 var(--space-2xs);
 
     visibility: hidden;
+    /* Not a popover: its visibility goes with the fade, the shared rule's other properties as they are. */
+    transition-property: opacity, translate, visibility;
   }
 
   .welcome[data-open] {
