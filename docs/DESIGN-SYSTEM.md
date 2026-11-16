@@ -505,11 +505,14 @@ Breakpoints, written in range syntax in a stylesheet: the phone's `(width < 900p
 `(width >= 900px)`, each other pair the same way (1280, 1340, 1400), so every width, 900 px itself and a
 fraction such as 899.5 included, falls on one side alone. The scripts' queries (`PHONE_QUERY`,
 `(max-width: 899px)`) agree with them at whole widths.
-- Under 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
-  are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
-  plate goes below the planet. The Earth alone keeps its chat a block of the page under the
-  globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
-  Credits.
+- Under 900 px: the phone is the full chat alone (ADR-0002 §8, row 10, amended; D13711). Home is
+  its hero and the worlds list; a place's link (a world, a realm, the Earth) opens its full chat;
+  the chat's header holds Back, Rooms (the rooms, then the worlds), Info and who is here; Info is
+  a sheet with the info column's content and the planet, drawn when it opens, and "Its page"
+  opens the place's own plate in a sheet. No 3D, no cosmos, no "View in space" until the phone's
+  3D pass. Every control is a 44 px target (`--control-m`), set under the phone's range alone.
+- 900 to 1279 px: the place's page with its chat a block, as before; the Earth keeps its chat a
+  block of the page under the globe, up to the dock's 1280 px.
 - 1280 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 
