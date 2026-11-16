@@ -32,6 +32,16 @@
     --_at: calc(var(--_w) - var(--icon-m) - var(--space-3xs));
   }
 
+  /* A phone's finger: the track keeps its look; the label around it reaches 44 px by 44 (a press on it toggles the checkbox). */
+  @media (width < 900px) {
+    .switch::before {
+      content: "";
+      position: absolute;
+      inset-block: calc((var(--control-xs) - var(--control-m)) / 2);
+      inset-inline: calc((var(--_w) - var(--control-m)) / 2);
+    }
+  }
+
   .track {
     display: block;
     inline-size: var(--_w);

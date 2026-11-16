@@ -51,6 +51,20 @@
     --_ink: var(--color-text);
   }
 
+  /* A phone's finger: the tab keeps its look and gains an invisible box to 44 px high. */
+  @media (width < 900px) {
+    .tab {
+      position: relative;
+    }
+
+    .tab::after {
+      content: "";
+      position: absolute;
+      inset-block: calc((var(--_h) - var(--control-m)) / 2);
+      inset-inline: 0;
+    }
+  }
+
   /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
   .tab[aria-selected="true"] {
     --_fill: var(--color-primary);

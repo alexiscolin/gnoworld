@@ -171,6 +171,20 @@
     border-radius: var(--radius-s);
   }
 
+  /* A phone's finger: a control under 44 px keeps its look and gains an invisible box to 44 px (WCAG 2.5.5 target size). A link-look
+     button is a run of words, a stretched one's box is its card's. */
+  @media (width < 900px) {
+    .button:is([data-size="xs"], [data-size="s"]):not([data-stretch], [data-emphasis="link"]) {
+      position: relative;
+    }
+
+    .button:is([data-size="xs"], [data-size="s"]):not([data-stretch], [data-emphasis="link"])::after {
+      content: "";
+      position: absolute;
+      inset: calc((var(--_h) - var(--control-m)) / 2);
+    }
+  }
+
   /* A count's badge: mint, round, its figure centred; the icon button's corner and the tabs' counts wear it. */
   .badge {
     min-inline-size: var(--size-counter);

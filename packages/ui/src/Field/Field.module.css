@@ -45,6 +45,13 @@
     color: var(--color-text-faint);
   }
 
+  /* A phone's field is narrower than a long hint: the hint ends in an ellipsis, never cut mid-word. */
+  @media (width < 900px) {
+    .box {
+      text-overflow: ellipsis;
+    }
+  }
+
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls; a
      browser without field-sizing keeps the two rows of the markup. The handle moves its height alone. */
   textarea.box {

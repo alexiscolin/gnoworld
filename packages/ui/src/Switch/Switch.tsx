@@ -28,7 +28,7 @@ export function Switch({ label, description, checked, onChange }: SwitchProps) {
           </span>
         )}
       </Stack>
-      <span className={styles["switch"]}>
+      <label htmlFor={id} className={styles["switch"]}>
         <input
           id={id}
           type="checkbox"
@@ -41,7 +41,7 @@ export function Switch({ label, description, checked, onChange }: SwitchProps) {
           }}
         />
         <span className={styles["knob"]} aria-hidden="true" />
-      </span>
+      </label>
     </Sidebar>
   );
 }

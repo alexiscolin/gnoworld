@@ -47,6 +47,13 @@
     cursor: pointer;
   }
 
+  /* A phone's finger: a chip that presses is a control high (overflow cuts a hit box, so its height grows). */
+  @media (width < 900px) {
+    :is(button, a).chip:is([data-size="s"], [data-size="xs"]) {
+      --_h: var(--control-m);
+    }
+  }
+
   /* The pointer lightens a neutral chip at rest, never a selected one's cream or a tone's tint. */
   .chip:is(button, a)[data-tone="neutral"]:not([aria-pressed="true"], [aria-current="true"]):hover {
     --_fill: var(--color-fill-hover);
