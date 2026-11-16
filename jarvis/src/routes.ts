@@ -7,6 +7,7 @@ import {
   DOOR_CAPS,
   EXPLAIN_VERSION,
   flightsAlone,
+  isFixedAsk,
   JARVIS_PATHS,
   REALM_EXPLAIN_VERSION,
   JarvisAsk,
@@ -83,7 +84,7 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
               ? catchUp
               : ask;
         if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
-        return replyOf(await asking(question, signal), log, !("question" in asked.data));
+        return replyOf(await asking(question, signal), log, isFixedAsk(asked.data));
       },
     },
     [JARVIS_PATHS.explain]: {
@@ -163,11 +164,11 @@ function replyOf(result: Result, log: Log, shared: boolean): Reply {
       log("jarvis_answer_empty");
       return answered({ status: "failed", cost: result.cost });
     }
-    const buttons = result.cards.buttons.map(({ button }) => (shared ? flightsAlone([button]) : [button])).flat();
+    const buttons = result.cards.buttons.map(({ button }) => button);
     return answered({
       status: "answered",
       markdown,
-      buttons,
+      buttons: shared ? flightsAlone(buttons) : buttons,
       cost: result.cost,
       ...(result.keep === true ? { keep: true, version: EXPLAIN_VERSION } : {}),
     });
@@ -176,8 +177,7 @@ function replyOf(result: Result, log: Log, shared: boolean): Reply {
   if (result.kind === "spent")
     return answered(result.cost === undefined ? { status: "spent" } : { status: "spent", cost: result.cost });
   // Every other end that spent answers failed with its cost, which the door adds to the person's share.
-  if ("cost" in result) return answered({ status: "failed", cost: result.cost });
-  return failureOf(result.kind);
+  return "cost" in result ? answered({ status: "failed", cost: result.cost }) : failureOf(result.kind);
 }
 
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none

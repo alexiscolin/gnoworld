@@ -7,5 +7,5 @@ import type { AnswerButton } from "./jarvis.ts";
 export const isFixedAsk = (ask: object): boolean => "ask" in ask;
 
 /** The buttons of a shared answer: its flights, in order, and no action. */
-export const flightsAlone = (buttons: readonly AnswerButton[]): AnswerButton[] =>
-  buttons.filter((button) => button.type === "fly");
+export const flightsAlone = (buttons: readonly AnswerButton[]) =>
+  buttons.filter((button): button is Extract<AnswerButton, { type: "fly" }> => button.type === "fly");
