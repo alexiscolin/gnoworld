@@ -289,17 +289,23 @@ const quiet = (page: Page) =>
       }),
   );
 
+// The Earth opened with its chat held back, the shifts counted and the motion reduced; returns the release.
+const openEarthHeld = async (page: Page) => {
+  await countShifts(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.routeWebSocket(/\/ws$/, () => undefined);
+  const release = await chatHeld(page);
+  await page.goto("/earth");
+  await hydrated(page);
+  return release;
+};
+
 for (const viewport of [COMPUTER, { width: 1100, height: 800 }]) {
   test.describe(`the chat's wait at ${String(viewport.width)} px`, () => {
     test.use({ viewport, serviceWorkers: "block" });
 
     test("says it is coming, and moves nothing of the page when it comes", async ({ page }) => {
-      await countShifts(page);
-      await page.emulateMedia({ reducedMotion: "reduce" });
-      await page.routeWebSocket(/\/ws$/, () => undefined);
-      const release = await chatHeld(page);
-      await page.goto("/earth");
-      await hydrated(page);
+      const release = await openEarthHeld(page);
       await expect(page.locator("#chat")).toContainText("Loading the chat");
       const [title, slot] = [await box(page, "h1"), await box(page, "#chat")];
       // The page's own moves reach the observer a task late: they must not count as the chat's.
@@ -355,12 +361,7 @@ test.describe("a phone", () => {
   test.use({ viewport: PHONE, serviceWorkers: "block" });
 
   test("says the chat is coming, and moves nothing of the page when it comes", async ({ page }) => {
-    await countShifts(page);
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.routeWebSocket(/\/ws$/, () => undefined);
-    const release = await chatHeld(page);
-    await page.goto("/earth");
-    await hydrated(page);
+    const release = await openEarthHeld(page);
     await expect(page).toHaveURL(/\/earth\?.*chat=full/);
     await expect(page.getByText("Loading the chat").first()).toBeAttached();
     await quiet(page);

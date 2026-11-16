@@ -82,23 +82,28 @@ const handed = async (page: Page, { playwright, launchOptions }: Launcher): Prom
   return address;
 };
 
+const phone = (viewport: { width: number; height: number }, isMobile: boolean) => ({
+  viewport,
+  isMobile,
+  hasTouch: true,
+  deviceScaleFactor: 3,
+  userAgent: AGENT,
+  timezoneId: "UTC",
+  locale: "en-GB",
+});
+
+const welcomed = (page: Page) =>
+  page.addInitScript(() => {
+    localStorage.setItem("gnoworld:welcomed", "1");
+  });
+
 for (const size of SIZES) {
   test.describe(`the phone app at ${String(size.width)}x${String(size.height)}`, () => {
-    test.use({
-      viewport: size,
-      isMobile: true,
-      hasTouch: true,
-      deviceScaleFactor: 3,
-      userAgent: AGENT,
-      timezoneId: "UTC",
-      locale: "en-GB",
-    });
+    test.use(phone(size, true));
 
     // A first visit's welcome sheet would cover the first tap: every journey but the welcome's own is told it was seen.
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        localStorage.setItem("gnoworld:welcomed", "1");
-      });
+      await welcomed(page);
     });
 
     test("a world in the list opens its full chat by a replace, and a shared link lands there too", async ({
@@ -255,20 +260,10 @@ for (const size of SIZES) {
   // viewport applies, so the guarded texture preloads (media="not (max-width: 899px)") are fetched there at any width. A width of
   // 390 px is what the media query judges.
   test.describe(`the phone app at ${String(size.width)}x${String(size.height)}`, () => {
-    test.use({
-      viewport: size,
-      isMobile: false,
-      hasTouch: true,
-      deviceScaleFactor: 3,
-      userAgent: AGENT,
-      timezoneId: "UTC",
-      locale: "en-GB",
-    });
+    test.use(phone(size, false));
 
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        localStorage.setItem("gnoworld:welcomed", "1");
-      });
+      await welcomed(page);
     });
 
     test(
@@ -317,20 +312,10 @@ const LONG: readonly HistoryLine[] = [
 ];
 
 test.describe("the phone app in landscape, 844x390", () => {
-  test.use({
-    viewport: SIDE,
-    isMobile: true,
-    hasTouch: true,
-    deviceScaleFactor: 3,
-    userAgent: AGENT,
-    timezoneId: "UTC",
-    locale: "en-GB",
-  });
+  test.use(phone(SIDE, true));
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
+    await welcomed(page);
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       scriptedErgo(ergo, GUEST, {
         history: LONG,
@@ -400,9 +385,7 @@ test.describe("search on a phone", () => {
   test.use({ viewport: SIZES[1], isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: AGENT });
 
   test("opens from the header, finds a world and opens it in its full chat", async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
+    await welcomed(page);
     await scripted(page, GUEST);
     await page.goto("/");
     await hydrated(page);

@@ -190,14 +190,7 @@ describe("the dock when the server does not answer", () => {
 
   it("says it in the rooms' rail and not the conversation, beside a direct message that is open", async () => {
     vi.stubGlobal("fetch", roomsAnswer(400));
-    drawer()(
-      <MemoryRouter initialEntries={[`/?dm=${OTHER}`]}>
-        <StoreProvider>
-          <Grab />
-          <ChatPanel world="bubble" place={place} />
-        </StoreProvider>
-      </MemoryRouter>,
-    );
+    drawPanel(`/?dm=${OTHER}`);
     act(() => {
       state().loginActions.signedIn(ME);
     });
@@ -206,6 +199,17 @@ describe("the dock when the server does not answer", () => {
     expect(mine()?.querySelector("div[class*='lead']")).toBeNull();
   });
 });
+
+const drawPanel = (entry: string) => {
+  drawer()(
+    <MemoryRouter initialEntries={[entry]}>
+      <StoreProvider>
+        <Grab />
+        <ChatPanel world="bubble" place={place} />
+      </StoreProvider>
+    </MemoryRouter>,
+  );
+};
 
 describe("the screen's header", () => {
   const at = (entry: string, phone: boolean) => {
@@ -222,14 +226,7 @@ describe("the screen's header", () => {
         removeEventListener: () => undefined,
       })),
     );
-    drawer()(
-      <MemoryRouter initialEntries={[entry]}>
-        <StoreProvider>
-          <Grab />
-          <ChatPanel world="bubble" place={place} />
-        </StoreProvider>
-      </MemoryRouter>,
-    );
+    drawPanel(entry);
     act(() => {
       state().loginActions.signedOut();
     });
