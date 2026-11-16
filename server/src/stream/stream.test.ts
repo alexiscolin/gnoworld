@@ -586,7 +586,7 @@ describe("the verdicts' stream when the reader's session cannot be read (F653)",
     };
     app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true, session }));
     const ask = () => app.request("/api/stream?rooms=%23bubble", {}, { incoming: { socket: { remoteAddress: PEER } } });
-    // Past the 4 streams a visitor holds: none of them may stay taken.
+    // Five opens that fail after taking a place: none of them may stay taken.
     for (let i = 0; i < 5; i += 1) expect((await ask()).status).toBe(500);
     expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
     expect(lines.filter((line) => line.includes('"event":"failed"'))).toHaveLength(5);

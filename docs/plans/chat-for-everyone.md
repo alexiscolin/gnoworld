@@ -102,7 +102,7 @@ Bounds, in the order the bot checks (`moderation/check.ts`): too fast, edit not 
 | Tickets (reconnects) | 30 a minute, as `mintsByVisitor` | 10 a minute a name | same shape as the login's (`login/routes.ts`) |
 | Ergo connections | 16 at once, 32 in 10 min (`ip-limits`, already) | Ergo's own | exists |
 | Lines | 6 a minute a name, 12 a visitor | 3 a minute a name in one room | 3.2 |
-| Rooms followed by a stream | 25 a stream, 4 streams a visitor (`stream.ts`, `slots.ts`), already | 1,000 chat slots | exists; guests count there too |
+| Rooms followed by a stream | 25 a stream, 32 streams an address (`stream.ts`, `slots.ts`), already | 2,000 chat slots | exists; guests count there too |
 | Rooms a guest joins in Ergo | 100 (`max-channels-per-client`) | none | the page joins 1 or 2; tightened only if the spike shows a raw client harms |
 
 Every refusal answers `too_many` (429) as the login does; the log records the cause, never the name with the visitor.

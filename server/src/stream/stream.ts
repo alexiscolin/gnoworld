@@ -1,6 +1,6 @@
 // The verdicts' stream (ADR-0002 §6 and §7): server-sent events a page follows, so a
 // link's preview shows only once its message is checked. Public, as guests read, but for the rooms a
-// reader may not read; bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
+// reader may not read; bounded: 25 rooms a stream, 32 streams an address, a total, each room's last
 // events kept for a late client or one coming back.
 import { sessionOf } from "../guard.ts";
 import type {
