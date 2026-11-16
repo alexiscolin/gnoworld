@@ -35,19 +35,11 @@ describe("the textures' credits", () => {
     expect(CREDITS.map(({ source }) => source)).toEqual([
       "https://www.solarsystemscope.com/textures/",
       "https://www.solarsystemscope.com/textures/",
-      "https://esahubble.org/images/heic0707a/",
-      "https://esahubble.org/images/heic1520a/",
-      "https://esawebb.org/images/weic2205a/",
-      "https://www.solarsystemscope.com/textures/",
       "https://svs.gsfc.nasa.gov/4720/",
       "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
     ]);
     expect(CREDITS[0]?.line).toContain("warped and recoloured");
     expect(CREDITS[1]?.line).toContain("scaled to 4096 by 2048");
-    expect(CREDITS[2]?.line).toContain("cropped, stars removed, recoloured and warped");
-    expect(CREDITS[3]?.line).toContain("cropped, stars removed, recoloured and warped");
-    expect(CREDITS[4]?.line).toContain("cropped, stars removed, recoloured and warped");
-    expect(CREDITS[5]?.line).toContain("scaled to 1024 by 512, drawn as they came");
   });
 
   it("names every file in the folder, and no file that is not there", () => {
@@ -92,29 +84,6 @@ describe("the textures' credits", () => {
     expect(earth?.author).toBe("Solar System Scope");
     expect(earth?.line).toContain("Earth");
     expect(earth?.line).toContain("NASA");
-  });
-
-  it("notes the changes made to an ESA/Hubble image after its credit, as its terms ask", () => {
-    const hubble = CREDITS.find((credit) => credit.author.includes("ESA/Hubble"));
-    expect(hubble?.line).toContain(
-      "NASA, ESA, N. Smith (University of California, Berkeley), and The Hubble Heritage Team (STScI/AURA)",
-    );
-    expect(hubble?.line).toContain("stars removed");
-  });
-
-  it("gives the Veil and the Cosmic Cliffs a row each, and notes what was done to them, as ESA/Hubble's and ESA/Webb's terms ask", () => {
-    for (const name of ["veil", "cliffs"]) {
-      const credit = CREDITS.find((row) => row.files.includes(name));
-      expect(credit?.files, name).toEqual([name]);
-      expect(credit?.line, name).toContain("cropped, stars removed, recoloured and warped");
-    }
-    const veil = CREDITS.find((credit) => credit.files.includes("veil"));
-    expect(veil?.author).toBe("ESA/Hubble");
-    expect(veil?.line).toContain("NASA, ESA, Hubble Heritage Team");
-    expect(veil?.source).toBe("https://esahubble.org/images/heic1520a/");
-    const webb = CREDITS.find((credit) => credit.author === "ESA/Webb");
-    expect(webb?.line).toContain("NASA, ESA, CSA, and STScI");
-    expect(webb?.source).toBe("https://esawebb.org/images/weic2205a/");
   });
 });
 

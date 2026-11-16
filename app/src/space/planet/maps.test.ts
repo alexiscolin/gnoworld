@@ -60,7 +60,7 @@ describe("mapUrl", () => {
   });
 
   it("takes the widest when none is wide enough, and a map's only file when it has one", () => {
-    expect(mapUrl("saturn", "/", 4096)).toMatch(/saturn\.1024\./);
+    expect(mapUrl("haze", "/", 4096)).toMatch(/haze\.1024\./);
     expect(mapUrl("ring", "/", 512)).toMatch(/ring\.1024\./);
   });
 });
