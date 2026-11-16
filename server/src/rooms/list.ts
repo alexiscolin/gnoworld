@@ -4,10 +4,10 @@
 // the answer to a session is private, and a section with no room to show is left out, its name with it. Each room carries
 // the people here now and its lines of the last 24 hours when there are any; on the Earth the rooms anyone made
 // follow the moderators' own, by people here, then lines, then the newest.
+import { sessionOf } from "../guard.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { RoomList, type ApiError } from "@gnoworld/schemas";
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { roomCounts } from "./earth.ts";
 import { realmPaths, worldRoomStates } from "./rooms.ts";
@@ -131,7 +131,7 @@ export function listRoutes({
     const parsed = World.safeParse(asked?.length === 1 ? asked[0] : undefined);
     if (!parsed.success) return c.json({ error: "refused" } satisfies ApiError, 400);
     const world = parsed.data;
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     // The answer depends on the session: a shared cache keeps each cookie's apart.
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
     c.header("vary", "cookie");

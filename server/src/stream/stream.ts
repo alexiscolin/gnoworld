@@ -2,6 +2,7 @@
 // link's preview shows only once its message is checked. Public, as guests read, but for the rooms a
 // reader may not read; bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
+import { sessionOf } from "../guard.ts";
 import type {
   ApiError,
   CardEvent,
@@ -13,7 +14,6 @@ import type {
   TranslationEvent,
 } from "@gnoworld/schemas";
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { worldOf } from "../rooms/rooms.ts";
 import { visitorOf } from "../visitor.ts";
@@ -218,7 +218,7 @@ export function makeStream(options: Options = {}): Stream {
         if (!place.free(who)) return c.json({ error: "too_many" } satisfies ApiError, 429);
         // Read before a slot is taken: a session that fails (its renewal writes) is the app's 500, and inside
         // the stream it would end the stream with its slot held for good.
-        const reader = session(getCookie(c, "__Host-session"));
+        const reader = sessionOf(c, session);
         // The rooms a reader may see (live events and replay alike) and those a guest may, its count's, read once here.
         const seen = new Set([...asked.rooms].filter((room) => visible(room, reader)));
         const counted = asked.hidden ? [] : [...asked.rooms].filter((room) => visible(room, undefined));
