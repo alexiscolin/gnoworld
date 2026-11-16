@@ -180,7 +180,8 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 | Link reader | memory | 256 MiB, 48 processes, measured peak 210 MiB | the `link_reader` service's `mem_limit` and `pids_limit` in `compose.yaml` |
 | Link way out | tunnels | 32 (smokescreen's `max_concurrent_connect_tunnels`) | `deploy/egress/config.yaml` |
 | Search | lines kept per room, rows in all, edits per line | 2048, 400000, 50 | `server/src/search/index.ts` lines 15 to 18 |
-| Search | requests a minute per visitor, per account; a second in all | 20, 60, 10 | `server/src/search/routes.ts` lines 19 to 22 |
+| Search | requests a minute per visitor, per account, per address block (a /48); a second in all | 20, 60, 80, 10 | `server/src/search/routes.ts` lines 19 to 25 |
+| Earth rooms | made: a day per account, per visitor, per address block (a /48); live at most; made in the last 30 days at most (D13675) | 3, 6, 24; 1,000; 5,000 | `server/src/rooms/create.ts` lines 32 to 41, `routes.ts` |
 | Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 29 to 32 |
 | Guest | a line's length | 280 characters, 400 bytes | `server/src/guest/rules.ts` |
 | nginx | requests a visitor | 20 a second, burst 640 | `deploy/web/nginx.conf`: `limit_req_zone … zone=visitors`, and `limit_req zone=visitors` in the `server` block |
