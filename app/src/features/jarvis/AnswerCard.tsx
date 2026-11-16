@@ -14,6 +14,8 @@ type Answered = Extract<JarvisAnswer, { status: "answered" }>;
 export type DrawMarkdown = (text: string, link: (href: string, label: ReactNode[]) => ReactNode) => ReactNode[];
 
 export interface AnswerCardProps {
+  /** The answer's own identity (its room and line, or its ask): its call cards are its own, not another answer's holding the same action. */
+  id: string;
   answer: Answered;
   /** Who asked, by short address, when the room is shown another person's answer. */
   asker?: string;
@@ -28,16 +30,17 @@ export interface AnswerCardProps {
 }
 
 function Action({
+  id,
   button,
   chain,
   options,
   onFly,
-}: Pick<AnswerCardProps, "chain" | "options" | "onFly"> & { button: AnswerButton }) {
+}: Pick<AnswerCardProps, "id" | "chain" | "options" | "onFly"> & { button: AnswerButton }) {
   if (button.type === "action")
     return (
       <ActionForm
         exact
-        cardId={`answer action ${JSON.stringify(button.action)}`}
+        cardId={`answer ${id} action ${JSON.stringify(button.action)}`}
         action={button.action}
         label={button.label}
         chain={chain}
@@ -55,7 +58,7 @@ function Action({
   );
 }
 
-export function AnswerCard({ answer, asker, chain, options, gnoweb, own, draw, onFly }: AnswerCardProps) {
+export function AnswerCard({ id, answer, asker, chain, options, gnoweb, own, draw, onFly }: AnswerCardProps) {
   const external = useExternalLinks(gnoweb, own);
   return (
     <>
@@ -73,7 +76,7 @@ export function AnswerCard({ answer, asker, chain, options, gnoweb, own, draw, o
             .map((button) => (
               <Action
                 key={button.type === "fly" ? `fly ${button.place}` : `action ${JSON.stringify(button.action)}`}
-                {...{ button, chain, options, onFly }}
+                {...{ id, button, chain, options, onFly }}
               />
             ))}
         </Stack>

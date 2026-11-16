@@ -44,6 +44,7 @@ function draw(markdown: string, buttons: Answered["buttons"] = [], fetch: ChainF
       <StoreProvider>
         <SignedIn />
         <AnswerCard
+          id="answer-1"
           answer={{ status: "answered", markdown, buttons }}
           chain={CHAIN}
           options={{ fetch }}
@@ -259,6 +260,39 @@ describe("an answer's buttons", () => {
     }
   });
 
+  it("opens a call card of its own for each answer holding the same action", async () => {
+    const answer = (id: string) => (
+      <div data-test={id}>
+        <AnswerCard
+          id={id}
+          answer={{ status: "answered", markdown: id, buttons: [{ type: "action", label: "Vote yes", action: VOTE }] }}
+          chain={CHAIN}
+          options={{ fetch: () => listing(FUNCTIONS) }}
+          gnoweb={CHAIN.gnoweb}
+          own={OWN}
+          draw={drawn}
+          onFly={() => undefined}
+        />
+      </div>
+    );
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <SignedIn />
+          {answer("first")}
+          {answer("second")}
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    const second = one(box, '[data-test="second"]');
+    click(await calling(one(box, '[data-test="first"]'), "Vote yes"));
+    await calling(second, "Vote yes");
+    // The first answer's call card is its own: the second answer shows none until its own button is pressed.
+    expect(all(second, "article")).toHaveLength(1);
+    click(button(second, "Vote yes"));
+    expect(all(box, "article")).toHaveLength(4);
+  });
+
   it("gives a function that takes nothing but the realm a button when its arguments are none: exactly its parameters", async () => {
     const { box } = draw("x", [{ type: "action", label: "Ping", action: { ...VOTE, function: "Ping", args: {} } }]);
     expect(await calling(box, "Ping")).toBeDefined();
@@ -312,6 +346,7 @@ describe("an answer's buttons", () => {
         <StoreProvider>
           <SignedIn />
           <AnswerCard
+            id="answer-1"
             answer={{ status: "answered", markdown: "x", buttons: [{ type: "action", label: "Do it", action }] }}
             chain={CHAIN}
             options={{ fetch: under }}
@@ -322,6 +357,7 @@ describe("an answer's buttons", () => {
           />
           <div data-test="sibling">
             <AnswerCard
+              id="answer-2"
               answer={{ status: "answered", markdown: "y", buttons: [{ type: "action", label: "Ok", action: VOTE }] }}
               chain={{ ...CHAIN, rpc: "https://rpc.sibling.example:443" }}
               options={{ fetch: sibling }}
