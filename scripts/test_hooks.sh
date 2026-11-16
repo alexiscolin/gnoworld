@@ -2993,22 +2993,27 @@ printf '%s\n' "$out" | grep -qF "@PYTHON3@" || fail "the repository's land faile
 # A tool found first in a folder a session can write is refused, and no land installed: a git in the temporary folder.
 ln -s "$(command -v git)" "$t/gitfirst/git"
 (cd "$i" && HOME="$i/home3" PATH="$t/gitfirst:$PATH" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's git from a temporary folder, its hooks with it: $(cat "$t/out")"
-grep -q "git: $t/gitfirst/git is under " "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home3/.local/bin/land" ] || fail "install_hooks.sh took land's git from a temporary folder: $(cat "$t/out")"
+grep -q "git: $t/gitfirst/git is under " "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home3/.local/bin/land" ] || fail "install_hooks.sh took land's git from a temporary folder: $(cat "$t/out")"
 grep -nE '/opt/homebrew|/usr/local/' "$here/land.py" "$here/agent_pr.py" "$here/install_hooks.sh" && fail "land, its code or its installer names a folder of one machine (D13411)"
-git -C "$i" checkout -q -b oldland landed && sed '1s|@PYTHON3@|python3|' "$here/land.py" >"$i/scripts/land.py" && git -C "$i" add -A && in_i git commit -qm "feat: land with python3 by name"
+git -C "$i" checkout -q -b oldland landed && sed '1s|@PYTHON3@|python3|' "$here/land.py" >"$i/scripts/land.py" && git -C "$i" add scripts/land.py && in_i git commit -qm "feat: land with python3 by name"
 git -C "$i" checkout -q -b oldbare oldland && git -C "$i" rm -rq tools && in_i git commit -qm "feat: land with python3 by name, without its installer"
 git -C "$i" checkout -q -b noinstaller landed && git -C "$i" rm -rq tools && in_i git commit -qm "feat: land without its installer" && git -C "$i" checkout -q main
-for b in "oldland|no placeholder took python3" "oldbare|no land installed" "noinstaller|no land installed"; do
+for b in "oldland|no placeholder took python3" "oldbare|no new land installed" "noinstaller|no new land installed"; do
 	(cd "$i" && HOME="$i/home4" alexis sh scripts/install_hooks.sh "${b%%|*}" >"$t/out" 2>&1) || fail "install_hooks.sh failed on ${b%%|*}'s land, its hooks with it: $(cat "$t/out")"
-	grep -qF "${b#*|}" "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home4/.local/bin/land" ] || fail "install_hooks.sh linked a land from ${b%%|*}: $(cat "$t/out")"
+	grep -qF "${b#*|}" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home4/.local/bin/land" ] || fail "install_hooks.sh linked a land from ${b%%|*}: $(cat "$t/out")"
 done
 # A profile whose sessions may write the tools found (agent-github's installer never run there) gets no land.
 case :$(command -p getconf PATH): in *":$(dirname "$(command -v gitleaks)"):"*) ;; *)
 	mkdir -p "$i/home5/.claude" && echo '{}' >"$i/home5/.claude/settings.json"
 	(cd "$i" && HOME="$i/home5" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's profile, its hooks with it: $(cat "$t/out")"
-	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
+	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
 	;;
 esac
+# A reinstall that cannot install the new land keeps the old one, linked and whole (F13464: #33's install removed it first).
+cp "$lh/share/land/land.py" "$t/land_before.py"
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh oldland >"$t/out" 2>&1) || fail "install_hooks.sh failed on a reinstall it refused: $(cat "$t/out")"
+grep -q "no new land installed" "$t/out" && [ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && cmp -s "$lh/share/land/land.py" "$t/land_before.py" &&
+	[ -z "$(ls -A "$lh/share/land" | grep -v -e '^land.py$' -e '^agent_pr.py$' -e '^repo$' -e '^__pycache__$')" ] || fail "a refused reinstall did not keep the old land whole: $(cat "$t/out"); $(ls -A "$lh/share/land")"
 git -C "$i" remote set-url origin https://example.com/o/r.git
 git -C "$i" config --unset merge.ff
 (cd "$i" && HOME="$i/home2" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) && fail "install_hooks.sh installed land for an origin that is not GitHub's"

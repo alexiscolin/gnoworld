@@ -37,7 +37,8 @@ git config pull.ff only
 }
 # land (D13211), the owner's one command for a pull request, and agent-pr's code it reuses, from the same commit, beside the GitHub
 # repository origin names, which it lands to; a commit without it installs none. agent-github's installer, of that commit too,
-# writes into land the python3, git, gh and gitleaks the owner's PATH finds, or refuses (D13412): no land then, the hooks all the same.
+# writes into land the python3, git, gh and gitleaks the owner's PATH finds, or refuses (D13412): the new land is made whole beside
+# the old one, which stays until it is ready (F13464); a commit without that installer gives no new land, the hooks all the same.
 if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	url=$(git config --get remote.origin.url) || url=
 	case $url in git@github.com:*) repo=${url#git@github.com:} ;; https://github.com/*) repo=${url#https://github.com/} ;; *) repo= ;; esac
@@ -46,14 +47,17 @@ if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	share=$HOME/.local/share/land
 	mkdir -p "$HOME/.local/bin" "$share"
 	chmod 700 "$share"
-	rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land" # a link there would take the write elsewhere
-	git show "$ref:scripts/land.py" >"$share/land.py"
-	git show "$ref:scripts/agent_pr.py" >"$share/agent_pr.py"
-	if git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$share/land.py" && head -1 "$share/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C /[^ ]+ -I'; then
-		chmod 755 "$share/land.py"
+	new=$(mktemp -d "$share/new.XXXXXX")
+	git show "$ref:scripts/land.py" >"$new/land.py"
+	git show "$ref:scripts/agent_pr.py" >"$new/agent_pr.py"
+	if git cat-file -e "$ref:tools/agent-github/install.sh" && git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$new/land.py"; then
+		chmod 755 "$new/land.py"
+		rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land" # a link there would take the write elsewhere
+		mv "$new/land.py" "$new/agent_pr.py" "$share/"
 		printf '%s\n' "$repo" >"$share/repo"
 		ln -s "$share/land.py" "$HOME/.local/bin/land"
 	else
-		echo "install_hooks: no land installed, for the reason above; the hooks are" >&2
+		echo "install_hooks: no new land installed, for the reason above; the hooks are, and land stays as it was" >&2
 	fi
+	rm -rf "${new:?}"
 fi
