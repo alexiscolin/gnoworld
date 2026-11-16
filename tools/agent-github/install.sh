@@ -63,8 +63,8 @@ state_of=$(curl -fsSL "$api/repos/$src/compare/$branch...$sha" | /opt/homebrew/b
 case $state_of in identical | behind) ;; *) echo "$sha is not on $src's $branch ($state_of): nothing installed" >&2; exit 1 ;; esac
 fetched=$(mktemp -d "${TMPDIR:-/tmp}/agent-pr-install.XXXXXX")
 trap 'rm -rf "$fetched"' EXIT
-for f in agent-pr agent_pr_guard.py SKILL.md; do
-	curl -fsSL --proto '=https' "$raw/$src/$sha/tools/agent-github/$f" -o "$fetched/$f" || { echo "could not fetch $f at $sha" >&2; exit 1; }
+for f in scripts/agent_pr.py tools/agent-github/agent_pr_guard.py tools/agent-github/SKILL.md; do
+	curl -fsSL --proto '=https' "$raw/$src/$sha/$f" -o "$fetched/${f##*/}" || { echo "could not fetch $f at $sha" >&2; exit 1; }
 done
 
 # Every profile, and a refusal while one holds a setting that would undo this (planted before, by a session of it).
@@ -93,7 +93,7 @@ PY
 
 install -d -m 755 "$HOME/.local/bin" "$HOME/.claude/hooks"
 install -d -m 700 "$state"
-install -m 755 "$fetched/agent-pr" "$helper"
+install -m 755 "$fetched/agent_pr.py" "$helper"
 install -m 644 "$fetched/agent_pr_guard.py" "$hook"
 touch "$state/repos.allow" && chmod 600 "$state/repos.allow"
 for repo in "$@"; do

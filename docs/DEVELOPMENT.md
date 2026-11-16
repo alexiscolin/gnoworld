@@ -13,7 +13,8 @@ from the objects themselves, whatever a replace ref would show instead:
 git --no-replace-objects show main:scripts/install_hooks.sh | sh
 ```
 
-A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` takes no push, and pre-push refuses one. The install
+A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` takes no push, and pre-push refuses one. A session's
+branch reaches GitHub through `land`, the owner's one command (D13211, D13213; `docs/HARNESS.md`, "A change, from plan to merge"). The install
 turns off fast-forward merges in this clone, so a merge always makes a commit, which pre-merge-commit checks (`merge.ff false`; a pull
 stays a fast-forward, `pull.ff only`). A commit runs the secret scan, and from Claude Code's sandbox Prettier on the staged files and
 the docs check, a harness file refused (D241, D13173); `sh scripts/check.sh` is what you run before committing code. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell

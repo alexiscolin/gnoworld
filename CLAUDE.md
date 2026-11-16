@@ -18,8 +18,9 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 - Invent nothing: a claim about a library, an API or a gno package comes from the installed types or source, docs read in this
   session, or a live query of the chain; a review card cites its evidence and names what was not verified.
 - Be critical, never flattering: say what is wrong, weak or missing, with its evidence, even unasked.
-- A harness file (`.githooks/records.sh`'s list), CLAUDE.md and `.claude/` are committed in Alexis's Terminal alone (D241): build
-  the change in a copy and hand him a patch with its sha256.
+- A harness file (`.githooks/records.sh`'s list), CLAUDE.md and `.claude/` reach GitHub through Alexis's `land` alone (D241,
+  D13213): build the change in a copy, drop its branch's bundle and the pull request's text in `/private/tmp/claude-501/land/`, give
+  him the tip's 16 hex.
 - The safety net never shrinks quietly: a test gone or switched off, a floor lowered, a gap or an ignore added is declared on a line
   of its own (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`) or GitHub's regressions job fails; no `.skip`, `.only`,
   `.todo`, `.fails`. Floors rise with the scores.
