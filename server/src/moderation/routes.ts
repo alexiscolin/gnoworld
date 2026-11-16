@@ -38,7 +38,7 @@ export interface ModerationOptions {
 
 // A line's id as a pin names it, and not a word an IRC line would read as its trailing part.
 // The line and each edit folded into it, redacted in one request: no more than the edits the search index keeps of a line
-// (MAX_EDITS), and the limiter counts requests, so this is also the most lookups and REDACTs one request costs.
+// (MAX_EDITS); a second limiter charges each id.
 const Hide = z.strictObject({
   room: PinRequest.shape.room,
   msgids: z
@@ -62,6 +62,8 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
   const { line, hide, mute, roomsOf, mayModerate, judge, identityOf, spared, session, origins, proxy, log, now } =
     options;
   const requests = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
+  // The lookups follow the ids, not the requests: 60 a minute is what 30 requests of 2 ids cost (F13547, F13555).
+  const ids = limiter({ max: 60, windowMs: 60_000, keys: 100_000 });
   const refuse = refuserOf(log, "moderation_refused", refusals);
   // A POST's account, body and right: the guard has run; the session, the body, the right and the limit come in that order.
   async function request<T extends { room: string }>(c: Context, schema: z.ZodType<T>) {
@@ -84,6 +86,7 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
     const asked = await request(c, Hide);
     if (asked instanceof Response) return asked;
     const { who, right, body } = asked;
+    if (!body.msgids.every(() => ids.take(who, now()))) return refuse(c, "limit", { room: body.room });
     // The right is for the room of the body, and the link's REDACT takes a line by its id alone: each id must be a line of
     // that room as Ergo holds it, or an owner of one room would take out the lines of any other.
     const held = await Promise.all(body.msgids.map((msgid) => line(body.room, msgid)));

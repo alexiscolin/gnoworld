@@ -290,6 +290,18 @@ describe("hiding a line", () => {
     expect(t.sent).toEqual(msgids.map((id) => `hide ${REALM} ${id}`));
   });
 
+  // F13547, F13555: the limiter counts requests, so the lookups an account forces a minute follow its ids.
+  it("charges an account per id: a second request of 51 ids in the minute asks Ergo about none", async () => {
+    const t = setup();
+    const ids = (from: number) => Array.from({ length: 51 }, (_, i) => `m${String(from + i)}`);
+    expect((await t.hide({ room: REALM, msgids: ids(1) }, { who: "owner" })).status).toBe(200);
+    const before = t.looked.length;
+    expect((await t.hide({ room: REALM, msgids: ids(100) }, { who: "owner" })).status).toBe(429);
+    expect(t.looked).toHaveLength(before);
+    t.clock.now += 60_000;
+    expect((await t.hide({ room: REALM, msgids: ids(200) }, { who: "owner" })).status).toBe(200);
+  });
+
   it.each([
     ["no id", []],
     ["52 ids, one more than a line and its 50 edits", Array.from({ length: 52 }, (_, i) => `m${String(i + 1)}`)],
