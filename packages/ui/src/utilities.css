@@ -42,7 +42,7 @@
     display: inline-block;
     inline-size: var(--size-dot);
     block-size: var(--size-dot);
-    margin-inline-end: var(--dot-gap, var(--space-2xs));
+    margin-inline-end: var(--dot-gap);
     border-radius: var(--radius-pill);
     background: var(--_dot);
     vertical-align: middle;
@@ -131,11 +131,11 @@
      one in view (aria-current, aria-selected, data-current), as --lit-now says, the stronger step, which wins under the pointer too.
      A row that is greyed or drawn another way sets the two itself (a menu's strong hover, Discover's cream shelf). */
   .lit:hover {
-    background: var(--lit-fill, var(--color-fill));
+    background: var(--lit-fill);
   }
 
   .lit:is([aria-current="true"], [aria-selected="true"], [data-current]) {
-    background: var(--lit-now, var(--color-fill-hover));
+    background: var(--lit-now);
   }
 
   /* The pointer's light on a box that has a fill at rest: the fill brightens, nothing moves (the Select, the chips, Discover's cards). */

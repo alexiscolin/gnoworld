@@ -6,29 +6,29 @@
 @layer components {
   :where(.appears) {
     opacity: 0;
-    scale: var(--appear-grow, none);
-    translate: var(--appear-from, none);
+    scale: var(--appear-grow);
+    translate: var(--appear-from);
     transition:
-      opacity calc(var(--appear-time, var(--motion-fast)) * 0.7 * var(--motion-scale)) var(--ease-in),
-      scale calc(var(--appear-time, var(--motion-fast)) * 0.7 * var(--motion-scale)) var(--ease-in),
-      translate calc(var(--appear-time, var(--motion-fast)) * 0.7 * var(--motion-scale)) var(--ease-in),
-      overlay calc(var(--appear-time, var(--motion-fast)) * 0.7 * var(--motion-scale)) allow-discrete,
-      display calc(var(--appear-time, var(--motion-fast)) * 0.7 * var(--motion-scale)) allow-discrete;
+      opacity calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      scale calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      translate calc(var(--appear-time) * 0.7 * var(--motion-scale)) var(--ease-in),
+      overlay calc(var(--appear-time) * 0.7 * var(--motion-scale)) allow-discrete,
+      display calc(var(--appear-time) * 0.7 * var(--motion-scale)) allow-discrete;
   }
 
   :where(.appears):is(:popover-open, [open], [data-open]) {
     opacity: 1;
     scale: none;
     translate: none;
-    transition-duration: calc(var(--appear-time, var(--motion-fast)) * var(--motion-scale));
+    transition-duration: calc(var(--appear-time) * var(--motion-scale));
     transition-timing-function: var(--ease-standard);
   }
 
   @starting-style {
     :where(.appears):is(:popover-open, [open], [data-open]) {
       opacity: 0;
-      scale: var(--appear-grow, none);
-      translate: var(--appear-from, none);
+      scale: var(--appear-grow);
+      translate: var(--appear-from);
     }
   }
 }

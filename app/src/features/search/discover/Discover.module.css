@@ -71,7 +71,6 @@
   .shelf[aria-selected="true"] {
     --lit-now: var(--color-primary);
 
-    background: var(--color-primary);
     color: var(--color-ink);
     font-weight: 500;
   }

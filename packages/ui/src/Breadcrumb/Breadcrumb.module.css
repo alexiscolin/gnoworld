@@ -37,9 +37,11 @@
   .step {
     /* layout: the arrangement the prototype and the frames draw */
     display: inline-flex;
+    /* layout: the chevron centred on its box, wider than it */
     justify-content: center;
     /* raw: the advance of the "›" it replaced (D13218), measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
     inline-size: 0.4284em;
+    /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-2xs);
     opacity: 0.6;
     rotate: -90deg;
@@ -47,7 +49,9 @@
 
   /* The chevron at three quarters of the label's size, wider than its box and centred on it. */
   .step svg {
+    /* raw: three quarters of the label's size, as tall as its caps */
     inline-size: 0.75em;
+    /* raw: square, as the icon is drawn */
     block-size: 0.75em;
   }
 
