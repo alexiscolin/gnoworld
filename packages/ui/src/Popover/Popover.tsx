@@ -174,6 +174,7 @@ export function Menu({
   // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
   const look = emphasis === "plain" ? "quiet" : "outline";
   const { open, panelRef, trigger, panel } = useAnchored("menu", size === "xs" ? "s" : size, look);
+  const described = noteId(panel.id, note);
   useAtPoint(panelRef, open, at);
   useLayoutEffect(() => {
     if (openAtOnce) panelRef.current?.showPopover();
@@ -214,14 +215,8 @@ export function Menu({
           </>
         ),
       })}
-      <div
-        {...panel}
-        aria-label={label}
-        aria-describedby={noteId(panel.id, note)}
-        onClickCapture={close}
-        onKeyDown={move}
-      >
-        <Note id={noteId(panel.id, note)} note={note} />
+      <div {...panel} aria-label={label} aria-describedby={described} onClickCapture={close} onKeyDown={move}>
+        <Note id={described} note={note} />
         {items.map((item, at) => (
           <Fragment key={item.label}>
             {at === apart ? <div role="separator" className={styles["separator"]} /> : null}

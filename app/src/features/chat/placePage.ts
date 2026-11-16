@@ -17,3 +17,16 @@ const InPageSheetContext = createContext(false);
 export const InPageSheet = InPageSheetContext.Provider;
 
 export const useInPageSheet = (): boolean => use(InPageSheetContext);
+
+/** The search parameter naming the open sheet. */
+export const SHEET = "sheet";
+/** A phone's sheets, the shallower first (phoneSheet.ts keeps their history). */
+export type Sheet = "info" | "page";
+
+/** `href` (a path of this site) opening on `sheet`. Here, not with the sheets' history, so a page's link to a sheet (the proposals') carries
+ * none of it on the first screen. */
+export function sheetHref(href: string, sheet: Sheet): string {
+  const url = new URL(href, "https://site.invalid");
+  url.searchParams.set(SHEET, sheet);
+  return `${url.pathname}${url.search}${url.hash}`;
+}

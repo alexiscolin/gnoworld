@@ -2,22 +2,14 @@
 // the browser's Back closes the page to the info, the info, and only then leaves; a reload or a link that holds it opens the sheet.
 // Never a hash (the plates use them for their own sections) and never in a shared link (share/link.ts drops the query).
 import { useLocation, useNavigate } from "react-router";
+import { SHEET, type Sheet } from "./placePage.ts";
 
-const SHEET = "sheet";
-export type Sheet = "info" | "page";
 const DEPTH = { info: 1, page: 2 } as const;
 
 /** The sheet the search names; none for any other value. */
 export function sheetOf(params: URLSearchParams): Sheet | undefined {
   const asked = params.get(SHEET);
   return asked === "info" || asked === "page" ? asked : undefined;
-}
-
-/** `href` (a path of this site) opening on `sheet`. */
-export function sheetHref(href: string, sheet: Sheet): string {
-  const url = new URL(href, "https://site.invalid");
-  url.searchParams.set(SHEET, sheet);
-  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** The open sheet and the way to another (none closes). Going deeper pushes an entry that says so (its state); going one up pops it when

@@ -54,7 +54,7 @@
   @media (width < 900px) and (height < 500px) {
     .box {
       /* raw: a share of the short window, there being no token for a viewport's fraction */
-      max-block-size: 40svh;
+      max-block-size: 40svb;
     }
   }
 }

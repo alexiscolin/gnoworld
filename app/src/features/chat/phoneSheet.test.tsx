@@ -2,7 +2,8 @@
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { button, click, mount, one } from "../../../tests/mount.tsx";
-import { sheetHref, sheetOf, useSheet } from "./phoneSheet.ts";
+import { sheetOf, useSheet } from "./phoneSheet.ts";
+import { sheetHref } from "./placePage.ts";
 
 // The sheets' own history: the address holds which sheet is open, so Back closes one at a time and a reload or a link opens it.
 function Probe() {
