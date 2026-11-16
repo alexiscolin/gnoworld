@@ -55,7 +55,7 @@ SECTIONS = {
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", ".gitattributes": "check_docs", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
@@ -543,6 +543,8 @@ def mutants():
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more")
     yield from each(hm, "pool.submit(run, *c): c for c in " "controls}", "pool.submit(run, *c): c for c in controls[:1]}", "hooks", "harness_mutate's control runs in every tree")
+    yield from each(hm, "OUTPUT[(tree, test)] = proc.communicate(timeout=" "LIMIT)[0]", 'OUTPUT[(tree, test)] = ""', "hooks", "harness_mutate shows what a failed control said")
+    yield from each(hm, "stderr=subprocess." "STDOUT, text=True, start_new_session=True)", "stderr=subprocess.DEVNULL, text=True, start_new_session=True)", "hooks", "harness_mutate shows a failed control's stderr")
     yield from each(hm, "    if not found" ":  # a harness that lost", "    if False:  # a harness that lost", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge")
     yield from each(hm, "if sys.argv[1:]" ":\n    sys.exit(\"usage", "if False:\n    sys.exit(\"usage", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "if failures" ":\n    sys.exit", "if False:\n    sys.exit", "hooks", "a survivor fails harness_mutate")
@@ -910,11 +912,11 @@ def mutants():
     yield from each(cd, 'for p in sorted(OWN - entries) if named and tier1]', "for p in [] if named and tier1]", "hooks", "check_docs wants the harness's folders in TIER1 (lot 2, S2-9)")
     yield from each(cd, 'speeds.rows(str(root))["1"]', '[p for line in review.read_text().splitlines() if line.startswith("| 1 |") for p in re.findall(r"`([^`]*)`", line)]', "hooks", "check_docs reads the table as speeds.py does (lot 2, S2-10)")
     yield from each(cd, 're.sub(r"/\\*.*?\\*/|//[^\\n]*", "", block, flags=re.S)', "block", "hooks", "check_docs leaves TIER1's comments out (lot 2, S2-12)")
-    yield from each("scripts/check_docs.py", "problems or orphans or", "problems or", "hooks", "check_docs wants each test beside its file")
+    yield from each("scripts/check_docs.py", "decisions or orphans or", "decisions or", "hooks", "check_docs wants each test beside its file")
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or rules or drift or globs:", "hooks", "check_docs wants the runbook's known limits")
     yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or lost or drift or globs:", "hooks", "check_docs fails a lost review rule (G12)")
     yield from each("scripts/check_docs.py", 'limit not in " ".join(said.split())', "limit not in said", "hooks", "check_docs reads a limit wrapped anyhow")
-    yield from each("scripts/check_docs.py", "*lost, sep=", "*LIMITS, sep=", "hooks", "check_docs names the limits lost alone")
+    yield from each("scripts/check_docs.py", 'section 8):", lost)', 'section 8):", LIMITS)', "hooks", "check_docs names the limits lost alone")
     yield from each("scripts/check_docs.py", " for sha in shas if sha not in real]", " for sha in shas if False]", "hooks", "ledger: every commit cited is one")
     yield from each("scripts/check_docs.py", 'if kind == "commit"}', 'if kind != "missing"}', "hooks", "ledger: a cited object is a commit")
     yield from each("scripts/check_docs.py", "        return set(shas)\n", "        return set()\n", "hooks", "ledger: no commit is read outside a repository")
@@ -1826,6 +1828,20 @@ def regressions_name_mutants():
 def design_mutants():
     """The design-reviewer starts for how space looks, and missing frames fail the step (slice-5 harness-c; 2026-11-04)."""
     yield from each("scripts/check_docs.py", 'AGENTS = ("design-reviewer", ', "AGENTS = (", "hooks", "check_docs.py asks for the design-reviewer's brief")
+    # F13435: a refusal of several lines is one annotation on GitHub, its lines kept, twenty at most, escaped.
+    yield from each("scripts/repo_files.py", 'if os.environ.get("GITHUB_ACTIONS") == "true":', "if False:", "hooks", "repo_files.report annotates on GitHub (F13435)")
+    yield from each("scripts/repo_files.py", "items[:most]", "items", "hooks", "repo_files.report keeps twenty lines and says how many more")
+    yield from each("scripts/repo_files.py", '.replace("%", "%25")', "", "hooks", "repo_files.report escapes a % as GitHub's toolkit does")
+    yield from each("scripts/repo_files.py", r'"\\" + i if i.lstrip().startswith("::") else i for i in items', "i for i in items", "hooks", "repo_files.report puts a leading :: behind a backslash")
+    yield from each("scripts/ci_changes.sh", "line in a commit: %s\\n' \\\n", "line in a commit:\\n%s\\n' \\\n", "hooks", "ci_changes.sh names the undeclared files on its one line (F13435)")
+    yield from each("scripts/repo_files.py", r'str(i).replace("\r", "\\r").replace("\n", "\\n")', "str(i)", "hooks", "repo_files.report writes an item's newline as \\n")
+    yield from each("scripts/test_hooks.sh", "unset GITHUB_" "ACTIONS\n", "", "hooks", "test_hooks runs its cases off GitHub's marker (killed where GitHub sets it)")
+    # D13408: both ledgers merge by union, and check_docs refuses a row the union kept twice.
+    yield from each(".gitattributes", "docs/decisions.md merge=union\n", "", "hooks", "the decisions merge by union (D13408)")
+    yield from each(".gitattributes", "docs/review/findings.md merge=union\n", "", "hooks", "the findings merge by union (D13408)")
+    yield from each("scripts/check_docs.py", "if (did, kind) in seen:", "if False:", "hooks", "check_docs refuses a decision written twice")
+    yield from each("scripts/check_docs.py", "seen.add((did, kind))", "seen.add((did, ''))", "hooks", "check_docs reads an amended row apart from the decision")
+    yield from each("scripts/check_docs.py", "problems or decisions or orphans", "problems or orphans", "hooks", "check_docs fails on a decision written twice")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
         ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
@@ -1940,7 +1956,7 @@ def hidden_mutants():
         ('        out += hidden_in(f"the name {ascii(path)}", path)\n', "        pass\n", "reads every name (F5089)"),
         ("{ascii(path)}", "{path}", "writes a name's hidden character as its escape"),
         ('        held = {}\n        out.append(f"git cannot read the index', '        held = {}\n        (f"git cannot read the index', "fails when git cannot read the index"),
-        ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
+        ("if hidden_chars:\n    report(", "if False:\n    report(", "says why it refuses a hidden character"),
         ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
         ('    if not (root / ".git").exists():\n        return []', "    if True:\n        return []", "reads the branch's commit messages (F5079)"),
         ('"refs/remotes/origin/main..HEAD"', '"HEAD"', "reads no message main holds already"),
@@ -1989,6 +2005,14 @@ def stop(proc):
             proc.wait(wait)
 
 
+OUTPUT = {}  # (tree, test) -> the last run's output, which a failed control shows (the night's said nothing of why)
+
+
+def said(tree, test, lines=40):
+    """The last lines a suite printed in tree, indented, for the message that stops the run."""
+    return "\n".join("  " + line for line in OUTPUT.get((tree, test), "").splitlines()[-lines:])
+
+
 def run(tree, test, only=""):
     """A test's exit code in the worktree `tree`; `only` names its sections, empty for all of them, None for a suite past its
     LIMIT, whose group is stopped. A suite cut short by a signal (a Ctrl+C reaches every suite in flight) has no verdict, as a
@@ -1996,16 +2020,16 @@ def run(tree, test, only=""):
     env = {**os.environ, "ONLY": only}
     if STOP.is_set():  # a worker of a pool that is stopping picks up no suite
         raise Cut("the run was stopped")
-    proc = subprocess.Popen(TESTS[test], cwd=tree, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    proc = subprocess.Popen(TESTS[test], cwd=tree, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     LIVE.add(proc)
     try:
         if STOP.is_set():  # stopped between the check above and LIVE: stopped() has not seen this suite, so it ends here
             raise Cut("the run was stopped")
-        proc.communicate(timeout=LIMIT)
+        OUTPUT[(tree, test)] = proc.communicate(timeout=LIMIT)[0]
     except subprocess.TimeoutExpired:
         stop(proc)
         with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.communicate(timeout=GRACE)
+            OUTPUT[(tree, test)] = proc.communicate(timeout=GRACE)[0] or ""
         return None
     except BaseException:
         stop(proc)
@@ -2104,9 +2128,9 @@ with contextlib.ExitStack() as stack:
             for future in concurrent.futures.as_completed(waiting):  # in the order they end: a failure is not kept waiting behind a slow one
                 (tree, test), code = waiting[future], future.result()
                 if code is None:  # a hung control is no pass: it proves nothing about the mutants
-                    sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first")
+                    sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first. It said:\n{said(tree, test)}")
                 if code != 0:
-                    sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
+                    sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first. It said:\n{said(tree, test)}")
         except BaseException as e:  # an interrupt, or a control that failed or hung: the one beside it is stopped, not waited for
             stopped(e, pool)
             raise
