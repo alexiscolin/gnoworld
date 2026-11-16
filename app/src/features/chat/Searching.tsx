@@ -2,10 +2,10 @@
 // a room read around a found message. Only this file is on the first screen; the panel, the field's logic and the band are one late chunk,
 // asked when the search is first opened (a room never searched loads none of it).
 import type { RoomList, SearchHit } from "@gnoworld/schemas";
-import { EmptyState } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useApp, useAppStore } from "../../storeContext.tsx";
+import { ErrorView } from "../errors/index.ts";
 import { chunked } from "./Failing.tsx";
 import type { ChatLink } from "./linkTypes.ts";
 import { roomHref, roomWorld } from "./names.ts";
@@ -15,7 +15,7 @@ import { opensChatSearch } from "./searchKeys.ts";
 
 const Panel = chunked(async () => ({ default: (await import("./search/ChatSearch.tsx")).ChatSearch }), {
   waiting: null,
-  failed: <EmptyState look="failed" line="The search could not load." />,
+  failed: <ErrorView kind="crash" size="inline" />,
 });
 const Banner = chunked(async () => ({ default: (await import("./search/JumpBanner.tsx")).default }), {
   waiting: null,

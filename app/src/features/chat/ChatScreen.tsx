@@ -1,7 +1,7 @@
 // The chat's screen on a world's page, whoever reads it (a visitor's or an account's): docked at the right of the page
 // (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
-import { ChatLayout, EmptyState, Stack } from "@gnoworld/ui";
+import { ChatLayout, Stack } from "@gnoworld/ui";
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -22,6 +22,7 @@ import { useSearching, type SearchInput } from "./Searching.tsx";
 import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
+import { ErrorView } from "../errors/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatWorld } from "./place.ts";
 import { DOCKED, useMedia } from "./useMedia.ts";
@@ -35,7 +36,7 @@ import styles from "./ChatScreen.module.css";
 // notice that the rooms could not load.
 const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
   waiting: null,
-  failed: <EmptyState look="failed" urgent line="The rooms could not load." />,
+  failed: <ErrorView kind="crash" size="inline" urgent />,
 });
 
 /** The place a chat is in: what the page knows of its world and of the worlds beside it. */
