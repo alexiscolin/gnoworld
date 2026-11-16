@@ -10,7 +10,8 @@ const HOME = "/?test-gpu";
 // Small enough for a flight to end soon on the gate's software GPU (a frame advances it 50 ms at most, so a flight of seven seconds takes
 // 135 frames: 38 s at 3.5 frames a second on a 1728 by 1080 page), wide enough for a computer's layout.
 const SMALL = { width: 1000, height: 700 };
-// The page a system is aimed on: at SMALL the click on the nearest sun never starts its flight.
+// The page a system is aimed on: at SMALL the nearest sun stood under the footer (F13577), which takes the click; aimAtASystem says
+// what stands over the sun it aims at.
 const FRAME = { width: 1728, height: 1080 };
 const SLOW = { timeout: 90_000 };
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
@@ -36,7 +37,7 @@ const withWorlds = (page: Page) =>
 async function aimAtASystem(page: Page) {
   const aimed = await page.evaluate(
     () =>
-      new Promise<{ id: string; x: number; y: number } | undefined>((resolve) => {
+      new Promise<{ id: string; x: number; y: number; top: string } | undefined>((resolve) => {
         const ask = globalThis.requestAnimationFrame.bind(globalThis);
         const held: FrameRequestCallback[] = [];
         globalThis.requestAnimationFrame = (run) => {
@@ -59,12 +60,20 @@ async function aimAtASystem(page: Page) {
               : [],
           );
           const found = shown.sort((a, b) => a.off - b.off)[0];
-          resolve(found === undefined ? undefined : { id: found.id, x: found.x, y: found.y });
+          const top = found === undefined ? null : document.elementFromPoint(found.x, found.y);
+          resolve(
+            found === undefined ? undefined : { id: found.id, x: found.x, y: found.y, top: top?.tagName ?? "nothing" },
+          );
         });
       }),
   );
   try {
     if (aimed === undefined) throw new Error("no system on screen to aim at");
+    // A sun under a panel takes no click: say so, rather than wait for a flight that never starts.
+    if (aimed.top !== "CANVAS")
+      throw new Error(
+        `the sun of ${aimed.id} is under a ${aimed.top} at ${String(aimed.x)},${String(aimed.y)}, not the canvas`,
+      );
     await page.mouse.click(aimed.x, aimed.y);
   } finally {
     await page.evaluate(() => {
