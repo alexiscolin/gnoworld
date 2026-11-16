@@ -1,4 +1,5 @@
 """repo_files.py: what the harness's Python scripts share, so each is written once."""
+import sys
 import contextlib
 import os
 import shutil
@@ -77,6 +78,21 @@ def clear_dead():
         if pid.isdigit() and not alive(int(pid)):
             git("worktree", "remove", "--force", tree)
             shutil.rmtree(os.path.dirname(tree), ignore_errors=True)
+
+
+def report(tool, header, items, most=20):
+    """A refusal of several lines: printed as it was, the header then each item, and on GitHub (GITHUB_ACTIONS) also one error
+    annotation of the header and the first `most` items, then how many more, escaped as GitHub's toolkit escapes a message: a
+    problem matcher keeps one line, the header alone (F13435)."""
+    # No item starts a command line, where the runner reads them (stderr included): its newlines written as \n, a leading :: behind
+    # a backslash.
+    items = [str(i).replace("\r", "\\r").replace("\n", "\\n") for i in items]
+    items = ["\\" + i if i.lstrip().startswith("::") else i for i in items]
+    print(header, *items, sep="\n  ", file=sys.stderr)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        lines = [header] + [f"  {i}" for i in items[:most]] + ([f"  +{len(items) - most} more"] if len(items) > most else [])
+        message = "\n".join(lines).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::error title={tool}::{message}", flush=True)
 
 
 @contextlib.contextmanager

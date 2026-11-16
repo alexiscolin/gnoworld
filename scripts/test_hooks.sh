@@ -7,6 +7,9 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 unset GIT_REFLOG_ACTION
 # records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not.
 unset GIT_NO_REPLACE_OBJECTS
+# GitHub sets it in every step: left set, each check_docs and check_regressions a case runs annotates as well (repo_files.report,
+# F13435), and the night's controls failed on it; the cases that want it set it themselves.
+unset GITHUB_ACTIONS
 # The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in a person's
 # shell.
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
@@ -1572,6 +1575,21 @@ good_rules "$d"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
+# On GitHub its refusal is one annotation holding the header and its lines, twenty at most and how many more, escaped as GitHub's
+# toolkit escapes a message (F13435: a problem matcher kept the header alone).
+i=0 && while [ $i -lt 25 ]; do i=$((i + 1)) && printf 'Run `scripts/gone%s%%.sh`.\n' "$i"; done >"$d/.claude/rules/x.md"
+out=$(GITHUB_ACTIONS=true python3 -I "$docs" "$d" 2>/dev/null) && fail "check_docs accepted docs naming 25 missing files"
+printf '%s\n' "$out" | grep -c '^::error title=check_docs::' | grep -qx 1 || fail "check_docs gave its refusal on GitHub as no single annotation: $out"
+python3 -I - "$out" <<'PY' || fail "check_docs's annotation is not its header, twenty lines and how many more, escaped: $out"
+import sys
+line = next(l for l in sys.argv[1].splitlines() if l.startswith("::error title=check_docs::"))
+lines = line.split("::", 2)[2].split("%0A")
+assert lines[0] == "check_docs: these docs name files that do not exist:", lines[0]
+assert len(lines) == 22 and lines[-1] == "  +5 more", lines[-3:]
+assert all(l.startswith("  .claude/rules/x.md: scripts/gone") and l.endswith("%25.sh") for l in lines[1:21]), lines[1:3]
+PY
+out=$(python3 -I "$docs" "$d" 2>/dev/null) || :
+[ -z "$out" ] || fail "check_docs annotated off GitHub: $out"
 rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
@@ -1940,6 +1958,33 @@ done
 printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
 out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
 printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
+# Both ledgers merge by union (.gitattributes, D13408): two branches appending rows to each merge clean, every row kept. A row
+# both sides change is kept twice, and check_docs refuses it in either ledger: union never hides a collision.
+u="$t/union" && mkdir -p "$u/docs/review" && git -C "$u" init -q -b base && cp "$here/../.gitattributes" "$u/.gitattributes" && : >"$u/CLAUDE.md" && good_rules "$u"
+ug() { git -C "$u" -c user.name=t -c user.email=t@t "$@"; }
+row_d() { printf '| 2026-11-16 | %s | why | where |\n' "$1" >>"$u/docs/decisions.md"; }
+row_f() { printf '| %s | 2026-11-16 | r | `x` | %s | %s | %s |\n' "$1" "$2" "$3" "$4" >>"$u/docs/review/findings.md"; }
+printf '| Date | Decision | Why | Where it lives |\n|---|---|---|---|\n' >"$u/docs/decisions.md" && row_d "D9000: the base" && row_d "D9000, amended after the review: kept"
+printf '| Id | Date | By | Where | What | Status | Evidence |\n|---|---|---|---|---|---|---|\n' >"$u/docs/review/findings.md" && row_f F9000 "the base" claimed —
+ug add -A && ug commit -qm base && ug branch -q two && ug branch -q edit1 && ug branch -q edit2
+row_d "D9001: one" && row_f F9001 one claimed — && ug commit -qam one
+ug switch -q two && row_d "D9002: two" && row_f F9002 two claimed — && ug commit -qam two
+out=$(ug merge -q --no-edit base 2>&1) || fail "two branches appending to both ledgers did not merge clean by union: $out"
+[ "$(grep -c '^| 2026-11-16 | D900' "$u/docs/decisions.md")" = 4 ] && [ "$(grep -c '^| F900' "$u/docs/review/findings.md")" = 3 ] ||
+	fail "the union merge of both ledgers lost a row: $(cat "$u/docs/decisions.md" "$u/docs/review/findings.md")"
+out=$(python3 -I "$docs" "$u" 2>&1) || fail "check_docs refused two ledgers merged by union, every row once: $out"
+for side in 1 2; do
+	ug switch -q "edit$side" && sed -i.bak "s/^| F9000 .*/| F9000 | 2026-11-16 | r | \`x\` | the base | rejected | side $side |/; s/^| 2026-11-16 | D9000: the base .*/| 2026-11-16 | D9000: the base, side $side | why | where |/; s/^| 2026-11-16 | D9000, amended after the review: kept .*/| 2026-11-16 | D9000, amended after the review: kept, side $side | why | where |/" "$u/docs/review/findings.md" "$u/docs/decisions.md" &&
+		rm "$u/docs/review/findings.md.bak" "$u/docs/decisions.md.bak" && ug commit -qam "side $side"
+done
+out=$(ug merge -q --no-edit edit1 2>&1) || fail "a row both sides changed did not merge by union: $out"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a union merge that kept a row both sides changed twice: $out"
+printf '%s\n' "$out" | grep -qF "  F9000: the id is used twice" || fail "check_docs did not name the finding a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000: written twice" || fail "check_docs did not name the decision a union merge kept twice: $out"
+printf '%s\n' "$out" | grep -qF "  D9000 amended: written twice" || fail "check_docs did not name the amended row a union merge kept twice: $out"
+[ "$(printf '%s\n' "$out" | grep -c '  D9000')" = 2 ] || fail "check_docs named the decision's rows other than once each: $out"
+grep -v '^| F9000 .* side 1 |$' "$u/docs/review/findings.md" >"$u/f.md" && mv "$u/f.md" "$u/docs/review/findings.md"
+out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a decision a union merge kept twice, the findings clean: $out"
 fi
 
 if part instructions; then
@@ -2060,7 +2105,7 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; : >"$SHARD_ROOT/slept"; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; : >"$SHARD_ROOT/slept"; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ] || { echo "the planted reason of hooks" >&2; exit 1; }; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
@@ -2074,7 +2119,7 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's); ONLY names the blocks to run, none for all.
-printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\n        open(os.environ["SHARD_ROOT"] + "/slept", "a").close()\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\n        open(os.environ["SHARD_ROOT"] + "/slept", "a").close()\nos.path.exists("BROKEN_probe") and print("the planted reason of probe"); sys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
 cp "$here/harness_mutate.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
@@ -2176,6 +2221,7 @@ printf '%s\n' "$out" | grep -q "^FAIL  killed, yet listed in GAPS: planted keep1
 for suite in hooks probe; do
 	out=$(PROBED=1 BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"
 	printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not stop on $suite failing on an untouched tree: $out"
+	printf '%s\n' "$out" | grep -qx "  the planted reason of $suite" || fail "harness_mutate hid why $suite failed on its untouched copy: $out"
 	[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate judged mutants after a failed control: $out"
 	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
 done
@@ -5484,6 +5530,17 @@ python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(in
 fi
 
 if part regressions; then
+# F13435: check_regressions's refusal on GitHub is one annotation of its header and problems, through repo_files.report.
+out=$(cd "$here" && GITHUB_ACTIONS=true python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("check_regressions", "check_regressions: the safety net shrank:", ["a test is gone: a > %s" % n for n in range(3)])' 2>/dev/null) || :
+[ "$out" = "::error title=check_regressions::check_regressions: the safety net shrank:%0A  a test is gone: a > 0%0A  a test is gone: a > 1%0A  a test is gone: a > 2" ] ||
+	fail "repo_files.report gave no single annotation of a refusal's lines: $out"
+grep -q 'report("check_regressions", "check_regressions: the safety net shrank' "$here/check_regressions.py" || fail "check_regressions does not report its problems through repo_files.report"
+err=$(cd "$here" && python3 -I -c 'import sys; sys.path.insert(0, "."); sys.dont_write_bytecode = True
+import repo_files; repo_files.report("t", "h:", ["a\r\n::error title=gate-ok::forged", " ::warning title=forged::ok"])' 2>&1 >/dev/null) || :
+[ "$err" = "h:
+  a\r\n::error title=gate-ok::forged
+  \\ ::warning title=forged::ok" ] || fail "repo_files.report let an item's newline, or its leading ::, start a command line: $err"
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
 # An exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` adds an ignore that
@@ -7534,8 +7591,7 @@ refused "a commit whose author holds a secret"
 # line to the listing; a refusal quoting a flagged line shown escaped, never as the Terminal would read it.
 lg -C "$ld/s" checkout -q -B feat main && echo k >"$ld/s/README.md" && printf 'feat: fine\n\n# ------------------------ >8 ------------------------\nCo-Authored-By: a bot <b@b>\n' >"$ld/msg"
 lg -C "$ld/s" commit -q --cleanup=verbatim -a -F "$ld/msg" && offer feat && refused "a message holding a scissors line"
-lg -C "$ld/s" checkout -q -B feat main && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')" 2>/dev/null ||
-	{ mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"; }
+lg -C "$ld/s" checkout -q -B feat main && mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"
 lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "ci: a name" && offer feat && refused "a file name holding a newline"
 lg -C "$ld/s" checkout -q -B feat main && printf 'PLANTEDTOKEN\033[8m\n' >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a flagged line" && offer feat
 out=$(landed y) && fail "land took a branch with a secret: $out"
@@ -7717,9 +7773,9 @@ def annotated(lines):
                 out.append((m.get("severity", "error"), re.search(pats[0]["regexp"], lines[i]).group(pats[0]["message"])))
     return out
 FAILED = ["FAIL  the reader resolves a name of its own network (the control): wanted [some], got [0]", "test_hooks: stryker_lines.py did not say what it kept",
-          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer", "check_docs: these docs name files that do not exist:",
-          "check_regressions: the safety net shrank, and no commit says why:", "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
-          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit:",
+          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer",
+          "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
+          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit: scripts/a.sh, scripts/b.py",
           "\x1b[31mERROR: Coverage for lines (80%) does not meet global threshold (85%)\x1b[39m",
           "12:00:00 (4242) ERROR MutationTestReportHelper Final mutation score 70.00 under breaking threshold 85, setting exit code to 1 (failure)."]
 for line in FAILED:
@@ -8066,6 +8122,9 @@ grep -q "no commit 0000000000000000000000000000000000000000" "$c/err" || fail "c
 undeclared 'printf "y\n" >scripts/new.py'
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a harness file no commit declares (F089)"
 grep -qF "scripts/new.py" "$c/err" || fail "ci_changes.sh did not name the undeclared harness file: $(cat "$c/err")"
+# On its one line, the one GitHub's matcher keeps (F13435: PR #17's changes job lost the list printed under it).
+grep -qx "ci_changes.sh: harness files changed with no \`Harness-changed: <path> - why\` line in a commit: scripts/new.py" "$c/err" ||
+	fail "ci_changes.sh named the undeclared files elsewhere than on its refusal's line: $(cat "$c/err")"
 changes push "$base" "$c/base" && fail "ci_changes.sh passed on a push a harness file no commit declares (F089)"
 (cd "$c/repo" && git commit -q --allow-empty -m declare -m "Harness-changed: scripts/new.py")
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh took a declaration with no reason"
