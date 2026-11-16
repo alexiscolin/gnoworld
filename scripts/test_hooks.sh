@@ -532,6 +532,14 @@ machine=$(machine_paths "$here/..")
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh" && git -C "$nv" init -q
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
 env -u SANDBOX_RUNTIME sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
+# So does evals/run.sh, whose node runs by hand with Anthropic's key; and a pin moved on is the one it takes, no version written in it
+# (D13416): with that Node first on PATH it passes its Node checks and stops at the key, which this run gives none.
+ev="$t/evalsnode" && mkdir -p "$ev/evals" "$ev/bin" && cp "$here/../evals/run.sh" "$ev/evals/" && printf '24.22.0/../../../../evil\n' >"$ev/.node-version"
+out=$(env -u ANTHROPIC_API_KEY_FILE sh "$ev/evals/run.sh" 2>&1) && fail "evals/run.sh ran on a .node-version that is a path: $out"
+printf '%s\n' "$out" | grep -q ".node-version must be a version" || fail "evals/run.sh accepted a .node-version that is a path: $out"
+echo 24.23.0 >"$ev/.node-version" && printf '#!/bin/sh\necho v24.23.0\n' >"$ev/bin/node" && chmod +x "$ev/bin/node"
+out=$(env -u ANTHROPIC_API_KEY_FILE NVM_DIR=/nonexistent PATH="$ev/bin:$PATH" sh "$ev/evals/run.sh" 2>&1) && fail "evals/run.sh ran with no key: $out"
+printf '%s\n' "$out" | grep -q "ANTHROPIC_API_KEY_FILE names no readable file" || fail "evals/run.sh refused the Node .node-version pins, first on PATH: $out"
 # No live file of the harness names a removed part: a relic would run, or be read, as if it were there.
 for f in .githooks/merge.sh scripts/review_pass.py scripts/code_changed.sh scripts/dream_due.sh docs/review-passes.txt; do
 	[ ! -e "$here/../$f" ] || fail "$f is back, which D13173 removed"

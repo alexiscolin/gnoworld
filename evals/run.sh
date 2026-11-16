@@ -9,13 +9,14 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(dirname "$here")
 want="v$(cat "$repo/.node-version")" # the Node it pins, first on PATH or in nvm's default folder, as check.sh takes it (D13416)
+# A version and nothing else: anything more would put a folder of its choice first on PATH, and its node run by hand with the key.
+printf '%s' "${want#v}" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' || { echo "evals/run.sh: .node-version must be a version such as 24.22.0" >&2; exit 2; }
 export PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin:$PATH"
 [ "$(node -v 2>/dev/null)" = "$want" ] || { echo "evals/run.sh: Node $want is needed (.node-version)" >&2; exit 2; }
 missing() {
 	echo "evals/run.sh: $1" >&2
 	exit 2
 }
-[ "$(node --version)" = v24.22.0 ] || missing "Node 24.22.0 is not first on PATH"
 [ -r "${ANTHROPIC_API_KEY_FILE:-}" ] || missing "ANTHROPIC_API_KEY_FILE names no readable file"
 GNOMCP=${GNOMCP:-$(command -v gnomcp || true)}
 [ -n "$GNOMCP" ] && [ "$("$GNOMCP" version 2>/dev/null)" = 0.11.0 ] || missing "gnomcp 0.11.0 is not found (GNOMCP)"
