@@ -6,9 +6,10 @@ import { CreateRoom, RoomName, type Address, type MadeRoom } from "@gnoworld/sch
 import { Hono, type Context } from "hono";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
+import { visitor48Of, visitorOf } from "../visitor.ts";
 import type { Log } from "@gnoworld/service/log";
 import { mayCreateRoom, type Roles } from "../roles/roles.ts";
-import type { Rooms } from "./create.ts";
+import { EARTH_PER_DAY, type Rooms } from "./create.ts";
 import { reservedOnEarth } from "./earth.ts";
 
 interface Options {
@@ -19,11 +20,13 @@ interface Options {
   // A room's name checked as a message of its world is (moderation/name.ts); none, and no public room is made.
   nameCheck?: ((world: string, name: string) => Promise<"pass" | "hide" | "unchecked">) | undefined;
   origins: readonly string[];
+  proxy?: string | undefined;
   log: Log;
   now: () => number;
 }
 
 const EARTH = "earth";
+const DAY_MS = 24 * 60 * 60_000;
 
 interface Made {
   who: Address;
@@ -42,10 +45,22 @@ const refusals = {
   unchecked: ["not_ready", 503],
 } as const satisfies Refusals;
 
-export function roomsRoutes({ roles, rooms, session, nameCheck, origins, log, now }: Options): Hono<Guarded> {
+export function roomsRoutes({ roles, rooms, session, nameCheck, origins, proxy, log, now }: Options): Hono<Guarded> {
   const made = limiter({ max: 10, windowMs: 60 * 60_000, keys: 100_000 });
   // The tries at a public room, a refused name too: each costs a check, which may be a paid call.
   const tries = limiter({ max: 10, windowMs: 60 * 60_000, keys: 100_000 });
+  // C12: the account's 3 a day (create.ts) alone left throwaway accounts as many rooms as they wished: a visitor (a /64) and
+  // its address block (a /48, four visitors) have a day's allowance too, taken only for a room made.
+  const byVisitor = limiter({ max: 2 * EARTH_PER_DAY, windowMs: DAY_MS, keys: 100_000 });
+  const byBlock = limiter({ max: 8 * EARTH_PER_DAY, windowMs: DAY_MS, keys: 100_000 });
+  const allowances = (c: Context) =>
+    [
+      [byVisitor, visitorOf(c, proxy)],
+      [byBlock, visitor48Of(c, proxy)],
+    ] as const;
+  // Whether the try may go on: no allowance spent, and one of the tries taken.
+  const mayTry = (c: Context, who: Address) =>
+    !allowances(c).some(([each, key]) => each.full(key, now())) && tries.take(who, now());
   const refuse = refuserOf(log, "room_refused", refusals);
   const account = (c: Context): Address | undefined => sessionOf(c, session);
   // Who acts, and whether on that world: a session and the right, before anything else is read.
@@ -58,13 +73,14 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, log, no
   // A public room of the Earth: the cheap refusals first, the name's check once, then the room, which asks again as it makes it.
   const publicRoom = async (c: Context, { who, name, check }: Made) => {
     if (reservedOnEarth(roles, `#${EARTH}/${name}`)) return refuse(c, "exists");
-    if (!tries.take(who, now())) return refuse(c, "limit");
+    if (!mayTry(c, who)) return refuse(c, "limit");
     const may = rooms.mayEarth(who, name);
     if (may !== "ok") return refuse(c, may === "day" ? "limit" : may);
     const verdict = await check(EARTH, name).catch((): "unchecked" => "unchecked");
     if (verdict !== "pass") return refuse(c, verdict === "hide" ? "name" : "unchecked");
     const result = rooms.earth(who, name);
     if (typeof result === "string") return refuse(c, result === "day" ? "limit" : result);
+    for (const [each, key] of allowances(c)) each.take(key, now());
     log("room_made", { room: result.made, account: who });
     return c.json({ room: result.made } satisfies MadeRoom, 201);
   };

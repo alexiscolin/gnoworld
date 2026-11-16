@@ -108,8 +108,13 @@ const setup = ({
     who?: string;
     origin?: string | null;
     type?: string | null;
+    peer?: string;
   }
-  const ask = (method: string, path: string, { body, who, origin = ORIGIN, type = "application/json" }: Ask) =>
+  const ask = (
+    method: string,
+    path: string,
+    { body, who, origin = ORIGIN, type = "application/json", peer = PEER }: Ask,
+  ) =>
     app.request(
       path,
       {
@@ -121,7 +126,7 @@ const setup = ({
         },
         ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
       },
-      { incoming: { socket: { remoteAddress: PEER } } },
+      { incoming: { socket: { remoteAddress: peer } } },
     );
   const create = (body: unknown, more: Ask = {}) => ask("POST", "/api/rooms", { ...more, body });
   const archive = (path: string, more: Ask = {}) => ask("DELETE", `/api/rooms/${path}`, more);
@@ -403,6 +408,25 @@ describe("archiving a realm's room", () => {
   });
 });
 
+// An address the schema takes, made from a number: 32 groups of data and BIP-173's checksum.
+const CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+const polymod = (values: number[]): number => {
+  let check = 1;
+  for (const value of values) {
+    const top = check >> 25;
+    check = ((check & 0x1ffffff) << 5) ^ value;
+    for (const [bit, generator] of GENERATOR.entries()) if ((top >> bit) & 1) check ^= generator;
+  }
+  return check;
+};
+const accountOf = (n: number): Address => {
+  const data = [...Array.from({ length: 30 }, () => 0), n >> 5, n & 31];
+  const mod = polymod([3, 0, 7, ...data, 0, 0, 0, 0, 0, 0]) ^ 1;
+  const check = Array.from({ length: 6 }, (_, i) => (mod >> (5 * (5 - i))) & 31);
+  return Address.parse(`g1${[...data, ...check].map((v) => CHARSET.charAt(v)).join("")}`);
+};
+
 describe("a room anyone makes on the Earth", () => {
   const earth = (name: string) => ({ world: "earth", name });
 
@@ -526,5 +550,46 @@ describe("a room anyone makes on the Earth", () => {
     const { db, create } = setup({ named: "throws" });
     expect((await create(earth("coffee"), { who: "stranger" })).status).toBe(503);
     expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 0 });
+  });
+});
+
+// C12: the account's 3 a day alone left an attacker with many throwaway accounts as many rooms as it wished. Beside it, 6 a day
+// a visitor (a /64) and 24 a day an address block (a /48, four times a visitor, as the guests' names), before any check.
+describe("the Earth's rooms a visitor and an address block make", () => {
+  const earth = (name: string) => ({ world: "earth", name });
+  const withAccounts = (count: number) => {
+    for (let n = 1; n <= count; n += 1) TOKENS.set(`acc${String(n)}`, accountOf(n));
+  };
+  afterEach(() => {
+    for (const token of [...TOKENS.keys()]) if (token.startsWith("acc")) TOKENS.delete(token);
+  });
+
+  it("stops a third account behind one visitor at 6 rooms a day, asks no check, and frees the visitor 24 hours later", async () => {
+    withAccounts(3);
+    const { create, checks, clock } = setup();
+    for (const [who, names] of [
+      ["acc1", ["a", "b", "c"]],
+      ["acc2", ["d", "e", "f"]],
+    ] as const)
+      for (const name of names) expect((await create(earth(name), { who })).status).toBe(201);
+    checks.length = 0;
+    expect(await answer(await create(earth("g"), { who: "acc3" }))).toEqual([429, '{"error":"too_many"}', "no-store"]);
+    expect(checks).toEqual([]);
+    expect((await create(earth("g"), { who: "acc3", peer: "203.0.113.8" })).status).toBe(201);
+    clock.now += 24 * HOUR + 1;
+    expect((await create(earth("h"), { who: "acc3" })).status).toBe(201);
+  });
+
+  it("stops the 25th account of one /48, each from a /64 of its own, and lets another /48 make a room", async () => {
+    withAccounts(60);
+    const { create, checks, db } = setup();
+    const make = (n: number) =>
+      create(earth(`r${String(n)}`), { who: `acc${String(n)}`, peer: `2001:db8:1:${String(n)}::1` });
+    for (let n = 1; n <= 24; n += 1) expect((await make(n)).status).toBe(201);
+    checks.length = 0;
+    for (let n = 25; n <= 60; n += 1) expect((await make(n)).status).toBe(429);
+    expect(checks).toEqual([]);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 24 });
+    expect((await create(earth("far"), { who: "acc25", peer: "2001:db8:2:1::1" })).status).toBe(201);
   });
 });
