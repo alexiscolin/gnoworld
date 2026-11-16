@@ -15,17 +15,9 @@ import {
   type PlanetLook,
 } from "./look.ts";
 import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
+import { CONTINENTS_SEA } from "./continents.ts";
 import { starWarmth } from "../cosmos/warmth.ts";
-import {
-  BARE,
-  CONTINENTS_SEA,
-  ofContinents,
-  plantsOf,
-  planetRecipe,
-  seededRecipe,
-  worldRecipe,
-  type Recipe,
-} from "./recipe.ts";
+import { BARE, ofContinents, plantsOf, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { correlation } from "../testing.ts";

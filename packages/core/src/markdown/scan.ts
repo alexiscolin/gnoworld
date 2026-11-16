@@ -7,8 +7,6 @@ const PUNCTUATION = /[\p{P}\p{S}]/u;
 // A mark opens before a word (no space after it; a space, punctuation or the line's start before it) and closes
 // after one, the other way round: none inside a word, as snake_case and 2*3*4 write.
 const bound = (char: string | undefined) => char === undefined || SPACE.test(char) || PUNCTUATION.test(char);
-/** Whether a character is part of a word, as the reader bounds marks: no space, punctuation or symbol. */
-export const inWord = (char: string | undefined): boolean => !bound(char);
 /** Whether a mark's run between `behind` and `ahead` may open one: before a word, after its bound. */
 export const opens = (behind: string | undefined, ahead: string | undefined): boolean =>
   ahead !== undefined && !SPACE.test(ahead) && bound(behind);

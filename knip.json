@@ -11,7 +11,6 @@
         "config": ["playwright.config.ts", "playwright.stories.config.ts", "playwright.pictures.config.ts"]
       }
     },
-    "server": { "ignoreDependencies": ["@hono/zod-validator"] },
     "link-reader": { "ignoreBinaries": ["openssl"] }
   }
 }

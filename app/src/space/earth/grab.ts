@@ -57,14 +57,16 @@ export class Grab {
   /** `step` seconds on, the view turned as `view`; `still` (reduced motion) has no inertia. */
   advance(seconds: number, view: Quaternion, still: boolean): void {
     const step = Math.min(seconds, LONGEST_S);
-    let [x, y] = [this.#asked.x, this.#asked.y];
+    let x = this.#asked.x;
+    let y = this.#asked.y;
     this.#asked.x = this.#asked.y = 0;
     if (!this.#held) {
       if (still) this.#speed.x = this.#speed.y = 0;
       const decay = Math.exp(-step / TAU);
       // The distance the decaying speed covers over the step, whole: the same at any frame rate.
       const run = TAU * (1 - decay);
-      [x, y] = [x + this.#speed.x * run, y + this.#speed.y * run];
+      x += this.#speed.x * run;
+      y += this.#speed.y * run;
       this.#speed.x *= decay;
       this.#speed.y *= decay;
     }

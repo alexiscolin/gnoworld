@@ -5,8 +5,6 @@
 import { isExportedName, readArgs, type Param } from "@gnoworld/core";
 import { Address, isRealmPath } from "@gnoworld/schemas";
 
-export { evalNameOf, isAddress } from "@gnoworld/core";
-
 /** A read's parameters (vm/qfuncs's) and the texts typed for them, in order; none for a read that takes nothing. */
 export interface Read {
   params?: readonly Param[] | null | undefined;

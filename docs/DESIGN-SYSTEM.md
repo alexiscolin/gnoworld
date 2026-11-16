@@ -312,10 +312,10 @@ stops Vitest counting assertions. The stories' journeys (`app/tests/stories`) bu
 walk every story in Chromium, in GitHub's gate for a change of the design system or the harness.
 - **Lint and types,** `@eslint/css` and typed modules (`tsc`) in the commit gate; `check_css.py` and jscpd in GitHub's.
 - **Pictures:** every story, at three container widths and with reduced motion, screenshotted
-  by Playwright and compared with the approved images (the browser and its platform are pinned). A new baseline is its own commit, which the owner reviews; changing or deleting an
-  approved one fails the push unless the commit says why (`Updated-baseline:`,
-  `scripts/check_regressions.py`). The default runs compare none: the pictures spec stays in the repository and
-  runs by hand; the approved video is the reference, compared by eye, and the design is decided live.
+  by Playwright and compared to the pixel with another run's pictures, never with stored ones (D13500): with
+  `PICTURES_BASE=<a folder outside the repository>`, a run on main with `--update-snapshots=all` takes them and the same
+  run on the branch compares (`app/tests/stories/pictures.spec.ts`; the browser and its platform are pinned). It runs by
+  hand, no gate runs it; the approved video is the reference, compared by eye, and the design is decided live.
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
   - every target is at least 24 px, the default control 44 px;

@@ -34,5 +34,5 @@ GitHub's `unit-browser` job (`.github/workflows/gate.yml`): `CORE_CHROMIUM=1 nod
 ## Rules
 
 - `core` imports only `core`, and uses no globals such as `window`, `document` or `Date.now()`. Lint enforces it. See "Which way dependencies point" in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
-- Lines are 100% covered by tests and branches 95%: [.claude/rules/core.md](../../.claude/rules/core.md).
+- Lines are 99.9% covered by tests and branches 96%: [.claude/rules/core.md](../../.claude/rules/core.md).
 - General TypeScript rules: [.claude/rules/typescript.md](../../.claude/rules/typescript.md).

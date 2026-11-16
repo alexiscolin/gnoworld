@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import data from "../../../../app/data/bubbles.json" with { type: "json" };
 import { centreOf, COUNTRIES } from "./countries.ts";
 import { isFarSide, type LatLon } from "./farSide.ts";
-import { pickBubbles, type BubbleMessage, type Viewer } from "./pickBubbles.ts";
+import { pickBubbles } from "./pickBubbles.ts";
+import type { BubbleMessage, Viewer } from "./types.ts";
 import type { Rules } from "./rules.ts";
 
 // The far side of the globe (ADR-0001 §7: "countries on the far side show only as counts at its edge").

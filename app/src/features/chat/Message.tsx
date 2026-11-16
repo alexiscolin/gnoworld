@@ -4,7 +4,7 @@
 // whole address in its title, its label being anyone's words. A mention shows its account's address shortened,
 // whole in its title; the reader's own apart; an address neither the reader's nor a member's whole. Children go
 // to createElement one by one: a tree that never changes needs no keys.
-import { markdown, type Block, type Inline } from "@gnoworld/core";
+import type { Block, Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import { NEW_TAB } from "../../lib/newTab.ts";
 import { isAccount, shortAddress } from "./names.ts";
@@ -112,9 +112,4 @@ export function Markdown({ blocks, className, me, members, tabbable = true }: Ma
     return createElement("span", { className }, ...drawInlines(first.children, reader));
   }
   return createElement("div", { className }, ...drawBlocks(blocks, reader));
-}
-
-/** A message's text, its Markdown as elements. */
-export function Message({ text, ...shown }: Omit<MarkdownProps, "blocks"> & { text: string }) {
-  return <Markdown blocks={markdown(text)} {...shown} />;
 }

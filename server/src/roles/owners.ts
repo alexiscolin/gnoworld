@@ -89,4 +89,3 @@ export function makeOwnerReaders(options: OwnersOptions) {
 }
 
 /** The holder of a namespace, the action pool: an address namespace holds itself (no read), a name the registry's current address; undefined for nobody and for any read that failed. */
-export const makeOwners = (options: OwnersOptions) => makeOwnerReaders(options).act;

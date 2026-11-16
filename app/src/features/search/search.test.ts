@@ -7,7 +7,7 @@ import { siteOf } from "../../places.ts";
 import { opensPalette } from "./chord.ts";
 import { sortPlaces } from "./ranks.ts";
 import { searchItemsOf, worldsItemsOf } from "./items.ts";
-import { matchOf, parseQuery } from "./match.ts";
+import { matchLower, parseQuery, wordsOf } from "./match.ts";
 import { groupResults } from "./groups.ts";
 import { SHOWN, searchPlaces } from "./search.ts";
 import { buildIndex, FUNCTION_SCORE } from "./searchIndex.ts";
@@ -44,6 +44,13 @@ describe("parseQuery", () => {
     expect(parseQuery("g1short").mode).toBe("name");
   });
 });
+
+// How well `text` answers `query`, as search.ts asks it of an entry: the words as typed, then a few letters off.
+const matchOf = (text: string, query: string) => {
+  const lower = text.toLowerCase();
+  const entry = { lower, words: wordsOf(lower) };
+  return matchLower(entry, query.toLowerCase(), false) ?? matchLower(entry, query.toLowerCase(), true);
+};
 
 describe("matchOf", () => {
   it("ranks the whole name over its start, a word's start, a part and the letters in order", () => {

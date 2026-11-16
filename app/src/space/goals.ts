@@ -5,8 +5,8 @@
 import type { Space } from "./scene.ts";
 import type { Goal } from "./rig/flight.ts";
 import { copySpot, type Pose } from "./rig/pose.ts";
-import { compose, featuredPool, latch, lightOf, normalise, quarterOf, rollOf, type Frame, type View } from "./vista.ts";
-import { unit, type Planet, type System, type Vec } from "./layout.ts";
+import { compose, featuredPool, latch, lightOf, quarterOf, rollOf, type Frame, type View } from "./vista.ts";
+import { normalise, type Planet, type System, type Vec } from "./layout.ts";
 
 /** The page's circle, in the page's pixels, and the screen. */
 export interface Circle {
@@ -105,20 +105,21 @@ export function systemGoal(
 ): Goal {
   const n = system.normal;
   const level = way.x * n.x + way.y * n.y + way.z * n.z;
-  const flat = unit({ x: way.x - n.x * level, y: way.y - n.y * level, z: way.z - n.z * level });
+  const flat = normalise({ x: way.x - n.x * level, y: way.y - n.y * level, z: way.z - n.z * level });
   // From above its plane, a little tilted (the plan); or low over it, about 12°, near and large, the sun in the middle and the near worlds
   // big in front.
   const [across, above] = plan ? [0.17, 0.985] : [0.978, 0.208];
-  const from = unit({
+  const from = normalise({
     x: flat.x * across + n.x * above,
     y: flat.y * across + n.y * above,
     z: flat.z * across + n.z * above,
   });
+  const fit = fitOf(system.reach, above);
   return {
     ...said,
     pose: (out) => {
       const page = circle?.();
-      set(out, system.place, from).distance = fitOf(system.reach, above, { screen: screen(), page });
+      set(out, system.place, from).distance = fit(screen(), page);
       // Upright on its own plane: a drag turns it round its axis.
       copySpot(n, out.up);
       if (page?.free !== undefined) centre(out, page);
@@ -144,21 +145,19 @@ function centre(out: Pose, page: Circle): void {
 // How far a system is seen so its outer orbit, `reach`, fills the room the page leaves it (the header and the crumb above, the rail at the
 // right, kept as wide on the left so it stays in the middle), whatever its size, as wide as the
 // window allows: seen `above` its plane, its disc is a circle from over it and flattens as the view lowers, so it may then reach higher.
-function fitOf(
-  reach: number,
-  above: number,
-  { screen: { width, height }, page }: { screen: Screen; page?: Circle | undefined },
-): number {
-  // From above the orbits drawn fill it; in 3D the camera stands well inside that, the outer orbits past the window's edges and the near
-  // planets large in front.
-  const margin = above > 0.9 ? FIT_MARGIN : FIT_MARGIN_3D;
-  const aspect = width / Math.max(height, 1);
-  // The lens's half height at a distance of 1, as the rig widens it on a tall screen.
-  const tall = Math.tan((FOV * Math.PI) / 360) / Math.min(aspect, 1);
-  const free = Math.max(MIN_ROOM, Math.min(width / 2 - SIDE_ROOM, (height / 2 - TOP_ROOM) / Math.max(above, 0.2)));
-  const room = page === undefined ? free : roomOf(page, height);
-  return (reach * margin * (height / 2)) / (tall * room);
-}
+const fitOf =
+  (reach: number, above: number) =>
+  ({ width, height }: Screen, page: Circle | undefined): number => {
+    // From above the orbits drawn fill it; in 3D the camera stands well inside that, the outer orbits past the window's edges and the near
+    // planets large in front.
+    const margin = above > 0.9 ? FIT_MARGIN : FIT_MARGIN_3D;
+    const aspect = width / Math.max(height, 1);
+    // The lens's half height at a distance of 1, as the rig widens it on a tall screen.
+    const tall = Math.tan((FOV * Math.PI) / 360) / Math.min(aspect, 1);
+    const free = Math.max(MIN_ROOM, Math.min(width / 2 - SIDE_ROOM, (height / 2 - TOP_ROOM) / Math.max(above, 0.2)));
+    const room = page === undefined ? free : roomOf(page, height);
+    return (reach * margin * (height / 2)) / (tall * room);
+  };
 
 // A page's room in pixels, from the middle to the nearest edge: the free room between the plate and the dock, else the circle's.
 const roomOf = ({ free, radius }: Circle, height: number): number =>
@@ -191,26 +190,37 @@ export function planetGoal(
 ): Goal {
   const [at, toSun, side, way] = [spot0(), spot0(), spot0(), spot0()];
   const n = planet.system.normal;
-  const frame = { toSun, n, side };
   let sign = 0;
+  // One object for every call that reads some of these (the light's, the roll's, the way's, the eye's), made once: a frame makes nothing.
+  const held = {
+    at,
+    earth: at,
+    toSun,
+    side,
+    way,
+    n,
+    circle: NO_CIRCLE,
+    distance: 0,
+    wayAt: (by: number): Vec => quarterOf(way, held, by),
+  };
   return {
     ...said,
     pose: (out) => {
       const told = circle();
       if (told === undefined) return false;
-      lightOf(planet, seconds(), { at, toSun, side });
+      lightOf(planet, seconds(), held);
       if (told.close === true) {
         out.distance = fitDistance(planet.radius, told);
-        const wayAt = (by: number): Vec => quarterOf(way, frame, by);
         // The first screen frames the view that shows most of the system's other worlds, once; the Earth being still, so is the light.
-        const eye = { earth: at, toSun, circle: told, distance: out.distance, wayAt };
-        if (others !== undefined) compose(others, eye, seconds());
+        held.circle = told;
+        held.distance = out.distance;
+        if (others !== undefined) compose(others, held, seconds());
         const view = others === undefined ? NO_TURN : (latch.view ?? NO_TURN);
-        set(out, at, wayAt(view.turn));
-        rollOf(out.up, { way, toSun }, view.roll);
+        set(out, at, held.wayAt(view.turn));
+        rollOf(out.up, held, view.roll);
       } else {
-        if (sign === 0) sign = sunOnTheRight(wayOf(way, frame, 1), toSun) ? 1 : -1;
-        set(out, at, wayOf(way, frame, sign));
+        if (sign === 0) sign = sunOnTheRight(wayOf(way, held, 1), toSun) ? 1 : -1;
+        set(out, at, wayOf(way, held, sign));
       }
       out.distance = fitDistance(planet.radius, told);
       return true;
@@ -232,14 +242,14 @@ export function homeGoal(
 }
 
 const NO_TURN: View = { turn: 0, roll: 0 };
+const NO_CIRCLE: Circle = { x: 0, y: 0, radius: 0, width: 0, height: 0 };
 const spot0 = (): Vec => ({ x: 0, y: 0, z: 0 });
 
 // Whether, seen from `way`, the sun (`toSun`) stands on the screen's right: the camera's right is the way crossed with the up, negated.
 function sunOnTheRight(way: Vec, toSun: Vec): boolean {
-  const right = unit({
-    x: -way.y * UP.z + way.z * UP.y,
-    y: -way.z * UP.x + way.x * UP.z,
-    z: -way.x * UP.y + way.y * UP.x,
-  });
-  return right.x * toSun.x + right.y * toSun.y + right.z * toSun.z > 0;
+  const x = -way.y * UP.z + way.z * UP.y;
+  const y = -way.z * UP.x + way.x * UP.z;
+  const z = -way.x * UP.y + way.y * UP.x;
+  // Its length does not change the sign.
+  return x * toSun.x + y * toSun.y + z * toSun.z > 0;
 }

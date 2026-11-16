@@ -18,7 +18,7 @@ const ROSE: Rgb = [1, 0.62, 0.84];
 const TEAL: Rgb = [0.52, 0.9, 0.86];
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 
-const mix = (a: Rgb, b: Rgb, by: number): Rgb => [
+const blend = (a: Rgb, b: Rgb, by: number): Rgb => [
   a[0] + (b[0] - a[0]) * by,
   a[1] + (b[1] - a[1]) * by,
   a[2] + (b[2] - a[2]) * by,
@@ -33,11 +33,11 @@ function streamOf(seed: string) {
 
 /** The galaxy's colour `r` (a share of the disc) from the heart at `turn`, the arms turned by `phase`: smooth everywhere. */
 function tintAt(r: number, turn: number, phase: number): Rgb {
-  const base = mix(mix(GOLD, WHITE, smoothstep(0.05, 0.55, r)), BLUE, smoothstep(0.5, 1, r));
+  const base = blend(blend(GOLD, WHITE, smoothstep(0.05, 0.55, r)), BLUE, smoothstep(0.5, 1, r));
   const arm = Math.sin(2 * (turn - 2.6 * Math.log(r + 0.1)) + phase);
   const patch = Math.sin(3 * turn + 1.7 * Math.log(r + 0.1) + phase * 1.7);
   const rose = 0.3 * smoothstep(0.2, 1, arm) * smoothstep(0.15, 0.4, r);
-  return mix(mix(base, ROSE, rose), TEAL, 0.25 * smoothstep(0.35, 1, patch) * smoothstep(0.3, 0.65, r));
+  return blend(blend(base, ROSE, rose), TEAL, 0.25 * smoothstep(0.35, 1, patch) * smoothstep(0.3, 0.65, r));
 }
 
 // The order the grains are stored in, shuffled by the seed (Fisher-Yates), so any first share of them is spread like the whole.

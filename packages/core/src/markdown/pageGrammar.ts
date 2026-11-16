@@ -22,8 +22,7 @@ export interface FormField {
   flags: string;
 }
 
-export { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, type Align } from "./tables.ts";
-export { MAX_LIST_DEPTH, type Outline, type OutlineItem } from "./outline.ts";
+export type { Outline } from "./outline.ts";
 
 /** What a page holds beyond the chat's blocks. */
 export type PageExtra =

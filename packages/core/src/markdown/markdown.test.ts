@@ -1,17 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { utf8Bytes as bytes } from "../text/utf8.ts";
+import { MAX_QUOTE_DEPTH } from "./blocks.ts";
+import { MAX_INLINE_DEPTH } from "./inline.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
-import {
-  MAX_INLINE_DEPTH,
-  MAX_QUOTE_DEPTH,
-  inWord,
-  markdown,
-  mentions,
-  mentionsRoom,
-  type Block,
-  type Inline,
-} from "./markdown.ts";
+import { markdown, mentions, mentionsRoom, type Block, type Inline } from "./markdown.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -1344,19 +1337,5 @@ describe("markdown: whatever comes", () => {
     };
     expect(linear(pile)).toBe(true);
     expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
-  });
-});
-
-describe("inWord: the characters a mark's run never opens or closes inside", () => {
-  test("holds letters and digits of any script in a word, and no space, punctuation, symbol or line edge", () => {
-    expect(["a", "7", "é", "字"].map((char) => inWord(char))).toEqual([true, true, true, true]);
-    expect([" ", "\n", ".", "-", "$", undefined].map((char) => inWord(char))).toEqual([
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-    ]);
   });
 });

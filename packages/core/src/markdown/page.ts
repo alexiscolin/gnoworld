@@ -8,9 +8,7 @@ import { originOf } from "./address.ts";
 import { pageDialect, type PageBlock, type PageExtra } from "./pageGrammar.ts";
 import { utf8Bytes } from "../text/utf8.ts";
 
-export { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from "./pageGrammar.ts";
-export { MAX_LIST_DEPTH } from "./pageGrammar.ts";
-export type { Align, FormField, Outline, OutlineItem, PageBlock } from "./pageGrammar.ts";
+export type { FormField, Outline, PageBlock } from "./pageGrammar.ts";
 
 /** The most bytes of a page that are read. */
 export const PAGE_MAX_BYTES = 256 * 1024;

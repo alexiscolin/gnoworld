@@ -2,7 +2,12 @@ import fc from "fast-check";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { markdown } from "@gnoworld/core";
-import { ANONYMOUS, block, Message } from "./Message.tsx";
+import { ANONYMOUS, block, Markdown, type MarkdownProps } from "./Message.tsx";
+
+// A message's text, its Markdown as elements.
+const Message = ({ text, ...shown }: Omit<MarkdownProps, "blocks"> & { text: string }) => (
+  <Markdown blocks={markdown(text)} {...shown} />
+);
 
 const html = (text: string) => renderToStaticMarkup(<Message text={text} />);
 // The elements a message may hold, and the attributes each may carry.

@@ -1,6 +1,7 @@
 // The full chat's info panel as the screen fills it: the place, who talks, the countries declared and
 // the links out.
 import type { ReactNode, RefObject } from "react";
+import universes from "../../../data/universes.json" with { type: "json" };
 import type { ChatScreenProps } from "./ChatScreen.tsx";
 import { realmPath } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
@@ -38,7 +39,7 @@ export function Info({
       description={place.description}
       talking={talking}
       countries={room === undefined ? undefined : <CountriesFigure lines={room.lines} members={room.members} />}
-      links={<Links gnoweb={gnowebOf(place)} />}
+      links={<Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />}
       here={people}
       panelRef={panelRef}
     />

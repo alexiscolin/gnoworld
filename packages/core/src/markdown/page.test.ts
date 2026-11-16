@@ -1,22 +1,13 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { MAX_QUOTE_DEPTH, markdown, type Inline } from "./markdown.ts";
+import { MAX_QUOTE_DEPTH } from "./blocks.ts";
+import { markdown, type Inline } from "./markdown.ts";
+import { MAX_LIST_DEPTH, type OutlineItem } from "./outline.ts";
+import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, type Align } from "./tables.ts";
 import { originOf } from "./address.ts";
 import { textProblem } from "../args/args.ts";
 import { withActions } from "./actions.ts";
-import {
-  MAX_TABLE_COLUMNS,
-  MAX_TABLE_ROWS,
-  MAX_LIST_DEPTH,
-  PAGE_MAX_BYTES,
-  page,
-  type Align,
-  type FormField,
-  type Outline,
-  type OutlineItem,
-  type Page,
-  type PageBlock,
-} from "./page.ts";
+import { PAGE_MAX_BYTES, page, type FormField, type Outline, type Page, type PageBlock } from "./page.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };

@@ -509,9 +509,9 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 - **One time for all history.** Ergo keeps rooms' and messages' history the same 90 days
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
   apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until they are a product with a retention of their own. History fills the `ergo` volume, which has no quota.
-- **A thousand rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client
-  (its config.go:1937), and the bot needs 1,000: a guest may join every world's room and receive each one's
-  names. Load, not a hole; k6's crowd measures it.
+- **A hundred rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client, 100
+  (`deploy/ergo/ircd.yaml.tmpl`, decision 2026-10-25 over 1,000): a guest or an account joins 100 rooms at most, as the
+  app's `ROOMS_JOINED` keeps to; the bot, an operator, is exempt (irc/client.go:1667, the config's own comment). A limit, not a hole.
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
 - **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses

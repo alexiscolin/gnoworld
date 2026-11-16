@@ -47,6 +47,8 @@ export class Labels {
   #far: { readonly item: System; readonly rank: number; readonly weight: number; score: number }[] = [];
   readonly #farItems: System[] = [];
   readonly #inside: Item[] = [];
+  // What midOf is told each frame, made once.
+  readonly #mid = { at: this.#at, seconds: 0, out: this.#inside };
   #all: readonly System[] = [];
   // What a lens lights: the worlds by their ids, how many each system holds, and each system's lit planets by use.
   #only: ReadonlySet<string> | undefined;
@@ -107,11 +109,11 @@ export class Labels {
   /** The universe whose names it shows, by `names` (a world's or a namespace's) and who is here. */
   universe(universe: Universe): void {
     this.#all = universe.systems;
-    this.light(this.#only);
+    this.lightOnly(this.#only);
   }
 
   /** Names what a lens lights alone, a system with how many of its worlds it lights, the most first; none, the liveliest of all. */
-  light(only: ReadonlySet<string> | undefined): void {
+  lightOnly(only: ReadonlySet<string> | undefined): void {
     this.#only = only;
     this.#litIn.clear();
     this.#planets.clear();
@@ -148,16 +150,16 @@ export class Labels {
     this.#rest.read(this.#settings());
     const items = this.#items;
     items.length = 0;
-    const candidates =
-      this.arrival && !this.hidden ? midOf(seen, { at: this.#at, seconds, out: this.#inside }) : this.#candidates(seen);
+    this.#mid.seconds = seconds;
+    const candidates = this.arrival && !this.hidden ? midOf(seen, this.#mid) : this.#candidates(seen);
     for (let at = 0; at < candidates.length && items.length < POOL; at += 1) {
       const item = candidates[at];
       if (item !== undefined && this.#free(item, items.length)) items.push(item);
     }
-    this.#assign(items);
+    this.#seat(items);
   }
 
-  #assign(items: readonly Item[]): void {
+  #seat(items: readonly Item[]): void {
     const { held, chosen } = assign({ slots: this.#slots, byItem: this.#held, name: this.#name }, items);
     this.#slots.forEach((slot, at) => {
       const live = held(slot) && (slot.item === undefined || this.ready(slot.item));

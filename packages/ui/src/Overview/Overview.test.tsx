@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { eachStory } from "../testing.tsx";
-import { ICON_NAMES } from "../icons/Icon.tsx";
+import { ICON_NAMES } from "./iconNames.ts";
 import type * as ui from "../index.ts";
 import { Overview } from "./Overview.tsx";
 import * as stories from "./Overview.stories.tsx";

@@ -1,13 +1,15 @@
 import * as bubbles from "@gnoworld/core/bubbles";
 import * as core from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import type { Bubble, BubbleMessage, Count, LatLon, PickArgs, Picked, Rules, Viewer } from "@gnoworld/core/bubbles";
+import type { Bubble, Count, LatLon, Rules } from "@gnoworld/core/bubbles";
+import { isFarSide } from "./farSide.ts";
+import type { BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 import rules from "../../../../app/data/bubbles.json" with { type: "json" };
 
 // The package exposes the bubbles as a subpath, the way schemas exposes `proposal` and `indexer`. The main entry does not
 // carry them: the first screen's bytes.
 describe("@gnoworld/core/bubbles", () => {
-  it("gives the pick, the cut, the turn, the far side and the table's lookup", () => {
+  it("gives the pick, the cut, the turn and the table's lookup", () => {
     expect(Object.keys(bubbles).sort()).toEqual([
       "COUNTRIES",
       "bubbleLines",
@@ -15,11 +17,9 @@ describe("@gnoworld/core/bubbles", () => {
       "countryName",
       "countryTrends",
       "cutText",
-      "isFarSide",
       "isPublicRoom",
       "pickBubbles",
       "regionAt",
-      "regionsOf",
     ]);
   });
 
@@ -44,7 +44,7 @@ describe("@gnoworld/core/bubbles", () => {
     expect(where).toEqual({ lat: 36.1, lon: 138.4 });
     expect(counts).toEqual([]);
     expect(bubbles.cutText("a".repeat(100), rules.maxChars)).toHaveLength(rules.maxChars);
-    expect(bubbles.isFarSide({ lat: 0, lon: 170 }, { lat: 0, lon: -10 })).toBe(true);
+    expect(isFarSide({ lat: 0, lon: 170 }, { lat: 0, lon: -10 })).toBe(true);
   });
 
   it("leaves the main entry as it was: nothing of the bubbles in it", () => {

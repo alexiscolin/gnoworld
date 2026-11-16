@@ -29,6 +29,8 @@ export class Rig {
   readonly free = new Free();
   /** How near and far the hand may bring the eye. */
   reach: Reach = REACH;
+  // What the free look is told each frame, made once.
+  readonly #ride = { pose: this.pose, reach: this.reach, real: 0 };
   /** How fast the stage seems to move: the eye's way over its distance to what it looks at, a second. */
   speed = 0;
   /** The flights' length, the reader's tuning (1, the demo's). */
@@ -123,7 +125,11 @@ export class Rig {
     if (flight?.advance(step, still, this.pose) === true) {
       this.#flight = undefined;
       flight.goal.landed?.();
-    } else if (flight === undefined) this.free.advance(step, still, { pose: this.pose, reach: this.reach, real });
+    } else if (flight === undefined) {
+      this.#ride.reach = this.reach;
+      this.#ride.real = real;
+      this.free.advance(step, still, this.#ride);
+    }
     this.#slide(step);
     eyeOf(this.pose, this.eye);
     const moved = Math.hypot(this.eye.x - this.#was.x, this.eye.y - this.#was.y, this.eye.z - this.#was.z);

@@ -9,7 +9,7 @@ import { advance, CAPS, GUEST_TRIES, guestNick, oneLine, REFUSALS, type Step } f
 import type { Result } from "../api/login.ts";
 import type { Ergo, ErgoOptions, ErgoState, Socket } from "./types.ts";
 
-export { BASIC_CAPS, CAPS, drawGuestNick } from "./handshake.ts";
+export { drawGuestNick } from "./handshake.ts";
 export type { Ergo, ErgoOptions, ErgoState, Socket, Who } from "./types.ts";
 
 export const BACKOFF = { firstMs: 1000, ceilingMs: 60_000 } as const;
