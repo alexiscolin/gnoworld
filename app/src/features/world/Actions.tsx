@@ -108,7 +108,7 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
     };
   }, []);
   return (
-    <Cluster space="2xs" className={className}>
+    <Cluster space="2xs" wrap="scroll" className={className}>
       <Leads {...leads} />
       {/* Follow and Share in words, as frame 30 draws them: icons alone left what each does unclear. */}
       <FollowButton kind="worlds" id={follow} size="m" />
