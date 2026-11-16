@@ -4,48 +4,37 @@ import soon from "../ComingSoon/ComingSoon.module.css";
 import type { MenuItem } from "./Popover.tsx";
 import styles from "./Popover.module.css";
 
-// A row of the menu: an act, a choice (a radio, checked or not) or one yet to come.
-export function Row({ item, onAct }: { item: MenuItem; onAct: (act: () => void) => void }) {
-  const words = (
-    <>
-      {"onSelect" in item && item.tone === "danger" ? <Icon name="alert" /> : null}
-      {item.icon === undefined ? null : <Icon name={item.icon} />}
-      {item.label}
-    </>
-  );
-  const look = ["lit", "tint", "full-start", styles["item"]];
-  if ("soon" in item)
-    return (
-      <button
-        type="button"
-        role="menuitem"
-        tabIndex={-1}
-        className={[...look, soon["soon"]].join(" ")}
-        aria-disabled
-        aria-label={`${item.label}, ${item.why ?? "coming soon"}`}
-      >
-        {words}
-        <span className={styles["soon"]}>
-          <Chip>{item.why ?? "Soon"}</Chip>
-        </span>
-      </button>
-    );
+// What an item does: nothing, said aloud (one to come), or its act, a radio's check and its tone.
+const doing = (item: MenuItem) =>
+  "soon" in item
+    ? { role: "menuitem", "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
+    : {
+        role: item.checked === undefined ? "menuitem" : "menuitemradio",
+        "data-tone": item.tone,
+        "aria-checked": item.checked,
+        onClick: () => {
+          item.onSelect();
+        },
+      };
+
+// A row of the menu: an act, a choice (a radio, checked or not) or one yet to come. A function, not a component: the compiler's memo
+// cache of one more component weighed 450 B gzipped on the home's first screen, and the menu's own already holds this JSX's.
+export function row(item: MenuItem) {
+  const waits = "soon" in item;
+  const word = waits ? (item.why ?? "Soon") : item.note;
   return (
     <button
       type="button"
-      role={item.checked === undefined ? "menuitem" : "menuitemradio"}
       tabIndex={-1}
-      className={look.join(" ")}
-      data-tone={item.tone}
-      aria-checked={item.checked}
-      onClick={() => {
-        onAct(item.onSelect);
-      }}
+      className={["lit", "tint", "full-start", styles["item"], waits ? soon["soon"] : undefined].join(" ")}
+      {...doing(item)}
     >
-      {words}
-      {item.note === undefined ? null : (
+      {!waits && item.tone === "danger" ? <Icon name="alert" /> : null}
+      {item.icon === undefined ? null : <Icon name={item.icon} />}
+      {item.label}
+      {word === undefined ? null : (
         <span className={styles["soon"]}>
-          <Chip tone="warm">{item.note}</Chip>
+          <Chip tone={waits ? "neutral" : "warm"}>{word}</Chip>
         </span>
       )}
     </button>

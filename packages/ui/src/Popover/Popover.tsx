@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   type ToggleEvent,
 } from "react";
@@ -13,7 +14,7 @@ import { type IconName } from "../icons/Icon.tsx";
 import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
-import { Row } from "./MenuRow.tsx";
+import { row } from "./MenuRow.tsx";
 import { Trigger } from "./Trigger.tsx";
 import styles from "./Popover.module.css";
 
@@ -169,6 +170,13 @@ export function Menu({
   useLayoutEffect(() => {
     if (open) panelRef.current?.querySelector<HTMLElement>("[role^='menuitem']")?.focus();
   }, [open, panelRef]);
+  // Before an item's own click, whichever it is: the menu closes and the trigger holds the focus as the item acts, which a browser that
+  // never focused it does not give back on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+  const close = (event: MouseEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element) || event.target.closest("button:not([aria-disabled])") === null) return;
+    event.currentTarget.hidePopover();
+    trigger.ref.current?.focus();
+  };
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Tab") {
       event.currentTarget.hidePopover();
@@ -189,20 +197,11 @@ export function Menu({
         {lead}
         {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
       </Trigger>
-      <div {...panel} aria-label={label} onKeyDown={move}>
+      <div {...panel} aria-label={label} onClickCapture={close} onKeyDown={move}>
         {items.map((item, at) => (
           <Fragment key={item.label}>
             {at === apart ? <div role="separator" className={styles["separator"]} /> : null}
-            <Row
-              item={item}
-              onAct={(act) => {
-                panelRef.current?.hidePopover();
-                // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
-                // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
-                trigger.ref.current?.focus();
-                act();
-              }}
-            />
+            {row(item)}
           </Fragment>
         ))}
       </div>
