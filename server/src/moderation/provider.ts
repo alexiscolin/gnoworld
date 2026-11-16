@@ -50,9 +50,8 @@ export function moderationClient({
   send = netSend,
 }: Options): (input: ModerationInput) => Promise<Answer | "unchecked"> {
   const byCategory = <T extends z.ZodType>(value: (category: Category) => T) =>
-    z.strictObject(
-      Object.fromEntries(CATEGORIES.map((category) => [category, value(category)])) as Record<Category, T>,
-    );
+    // Not strict (D13505): a category OpenAI adds is ignored and alerted (below), never every answer unchecked.
+    z.object(Object.fromEntries(CATEGORIES.map((category) => [category, value(category)])) as Record<Category, T>);
   // The description lets illicit's two flags be null: read as not flagged.
   const nullable = new Set<Category>(["illicit", "illicit/violent"]);
   const Flag = (category: Category) =>
@@ -67,6 +66,24 @@ export function moderationClient({
     category_scores: byCategory(() => z.number().min(0).max(1)),
   });
   const Body = z.object({ results: z.tuple([Result]) });
+  // What the answer holds beyond the 13: named once each in an alert, for a person to add to the list.
+  const Named = z.object({
+    results: z.tuple([
+      z.object({ categories: z.record(z.string(), z.unknown()), category_scores: z.record(z.string(), z.unknown()) }),
+    ]),
+  });
+  const known = new Set<string>(CATEGORIES);
+  const alerted = new Set<string>();
+  const alertUnknown = (json: unknown): void => {
+    const named = Named.safeParse(json);
+    if (!named.success) return;
+    const [{ categories: flags, category_scores: all }] = named.data.results;
+    for (const name of [...Object.keys(flags), ...Object.keys(all)]) {
+      if (known.has(name) || alerted.has(name)) continue;
+      alerted.add(name);
+      log("alert", { error: "moderation_category", reason: name.slice(0, 64) });
+    }
+  };
   return async (text) => {
     let response: Response;
     try {
@@ -103,6 +120,7 @@ export function moderationClient({
       return "unchecked";
     }
     const [{ categories, category_scores: scores }] = body.data.results;
+    alertUnknown(json);
     return { flagged: categories, scores };
   };
 }

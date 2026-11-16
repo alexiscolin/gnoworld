@@ -491,7 +491,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 - **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
   `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
-  call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
+  call), `moderation_shape` (an answer of an unknown shape), `moderation_category` (a category beyond the 13, ignored: its name in the log's reason field, once a process, to add to the list), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
   `card_backlog` and `card_queue_full` (the link cards' queue, as the two above); `irc_nick_taken` (above); `redact_refused`, `unknown_room`

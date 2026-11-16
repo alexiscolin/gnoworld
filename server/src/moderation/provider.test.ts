@@ -130,11 +130,33 @@ describe("the moderation client", () => {
     [`${category}'s score below 0`, changed("category_scores", category, -0.1)],
   ]);
 
+  // D13505 (F13504): a 14th category from OpenAI is ignored with one alert naming it, the 13 known judged as before; a
+  // missing known one (SHAPES above) still refuses the answer. This replaces the two rows that pinned the strict refusal.
+  it.each([
+    ["scores", changed("category_scores", "new/kind", 0.1)],
+    ["flags", changed("categories", "new/kind", false)],
+  ])("judges an answer with a category it does not know in the %s, and raises one alert naming it", async (_, body) => {
+    const { check, events } = client(ok(body));
+    const answer = await check("x");
+    if (answer === "unchecked") throw new Error("unchecked");
+    expect(Object.keys(answer.scores).toSorted()).toEqual(THIRTEEN.toSorted());
+    expect(Object.keys(answer.flagged).toSorted()).toEqual(THIRTEEN.toSorted());
+    expect(answer.flagged.violence).toBe(true);
+    expect(events()).toHaveLength(1);
+    expect(events()[0]).toContain('"event":"alert"');
+    expect(events()[0]).toContain('"error":"moderation_category"');
+    expect(events()[0]).toContain("new/kind");
+  });
+
+  it("raises no alert for an answer of the 13 known categories alone", async () => {
+    const { check, events } = client(ok(OMNI));
+    expect(await check("x")).not.toBe("unchecked");
+    expect(events()).toEqual([]);
+  });
+
   // An answer of a shape it does not know raises the alert: the provider changed under us.
   it.each([
     ["an answer missing categories, the older model's", OLDER],
-    ["a category the client does not know, in the scores", changed("category_scores", "new/kind", 0.1)],
-    ["a category the client does not know, in the flags", changed("categories", "new/kind", false)],
     ["text that is not JSON", "<html>bad gateway</html>"],
     ["a truncated answer", OMNI.slice(0, 300)],
     ["no result", JSON.stringify({ id: "x", model: "omni-moderation-latest", results: [] })],
