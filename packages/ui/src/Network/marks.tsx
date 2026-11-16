@@ -7,6 +7,25 @@ export const CENTRE_R = 24;
 const NAMED = 18;
 const NAME_MAX = 24;
 const IN_DOT = 6;
+// The words' width per character in the mono, and the line's height: an empty side's words break to the lane's room.
+const CHAR = 7;
+const LINE = 12;
+const EDGE = 8;
+
+// The room from the words' anchor to the graph's edge, or the graph's width less its two edges for words centred.
+const roomOf = (anchor: "start" | "middle" | "end", x: number, cx: number): number =>
+  ({ end: x - EDGE, start: 2 * cx - EDGE - x, middle: 2 * cx - 2 * EDGE })[anchor];
+
+/** `text` broken between words into lines of `chars` characters at most; a word longer than that stands alone. */
+export function wrapWords(text: string, chars: number): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(" ")) {
+    const last = lines.at(-1);
+    if (last !== undefined && last.length + 1 + word.length <= chars) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+}
 
 /** A side's word, and what it says with no dot. */
 interface Side {
@@ -64,9 +83,14 @@ export function Nones({
   if (said.length === 0) return null;
   const [x, anchor, y]: [number, "start" | "middle" | "end", number] =
     empty[0] && empty[1] ? [cx, "middle", foot] : empty[0] ? [cx - near, "end", cy + 4] : [cx + near, "start", cy + 4];
+  const lines = wrapWords(said.join(" · "), Math.floor(roomOf(anchor, x, cx) / CHAR));
   return (
-    <text className={styles["none"]} x={x} y={y} textAnchor={anchor}>
-      {said.join(" · ")}
+    <text className={styles["none"]} x={x} y={y - ((lines.length - 1) * LINE) / 2} textAnchor={anchor}>
+      {lines.map((line, at) => (
+        <tspan key={line} x={x} dy={at === 0 ? 0 : LINE}>
+          {line}
+        </tspan>
+      ))}
     </text>
   );
 }
