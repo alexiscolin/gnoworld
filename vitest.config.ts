@@ -21,7 +21,6 @@ const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.
 // (`vitest run --project display --project display_ui`) and at night (nightly.yml), not in the default `test` and `coverage` runs.
 const DISPLAY_UI = [
   "packages/ui/src/{Avatar,Breadcrumb,Button,Card,ChatLayout,Chip,EmptyState,Kicker,Logo,NavItem,Overview,Panel,PlanetThumb,Row,Skeleton,Sparkline,Stat,TokensPage,compositions,icons}/**/*.test.{ts,tsx}",
-  "packages/ui/src/tokens.test.ts",
 ];
 const DISPLAY = [
   "app/src/routes/*.test.tsx",
