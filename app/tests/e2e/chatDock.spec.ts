@@ -154,7 +154,7 @@ test.describe("a chunk of the chat that cannot be fetched", () => {
   test("leaves the Rooms control's place with a word on a phone, the page and its lines standing", async ({ page }) => {
     await page.route(/\/assets\/RoomsDrawer-[\w-]+\.js$/, (route) => route.abort());
     await open(page, { width: 390, as: "guest-chunkxx" });
-    await expect(page.getByText("Something went wrong.")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("A new version is out.")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("This world could not load")).toHaveCount(0);
     await expect(lines(page)).toHaveCount(2);
   });
@@ -162,7 +162,7 @@ test.describe("a chunk of the chat that cannot be fetched", () => {
   test("leaves the people's place with a word for a visitor, the page and its lines standing", async ({ page }) => {
     await page.route(/\/assets\/People-[\w-]+\.js$/, (route) => route.abort());
     await open(page, { width: 1280, as: "guest-chunkyy" });
-    await expect(page.getByText("Something went wrong.")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("A new version is out.")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("This world could not load")).toHaveCount(0);
     await expect(lines(page)).toHaveCount(2);
   });
