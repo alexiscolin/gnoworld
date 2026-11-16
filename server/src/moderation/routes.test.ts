@@ -283,9 +283,16 @@ describe("hiding a line", () => {
     expect(t.asked).toHaveLength(1);
   });
 
+  it("hides a line and its fifty edits in one request: every id REDACTed", async () => {
+    const t = setup();
+    const msgids = Array.from({ length: 51 }, (_, i) => `m${String(i + 1)}`);
+    expect((await t.hide({ room: REALM, msgids }, { who: "owner" })).status).toBe(200);
+    expect(t.sent).toEqual(msgids.map((id) => `hide ${REALM} ${id}`));
+  });
+
   it.each([
     ["no id", []],
-    ["three ids", ["m1", "m2", "m3"]],
+    ["52 ids, one more than a line and its 50 edits", Array.from({ length: 52 }, (_, i) => `m${String(i + 1)}`)],
     ["the same id twice", ["m1", "m1"]],
     ["one bad id among two", ["m1", "m 2"]],
     ["a single id, not a list", "m1"],
@@ -312,6 +319,13 @@ describe("hiding a line", () => {
   it("refuses the pair whole when one of its ids is a line of another room, none sent", async () => {
     const t = setup({ lineRooms: { m1: REALM, m2: "#govdao" } });
     expect((await t.hide({ room: REALM, msgids: ["m1", "m2"] }, { who: "owner" })).status).toBe(404);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("refuses the whole request when one id among 51 is a line of another room, none sent", async () => {
+    const msgids = Array.from({ length: 51 }, (_, i) => `m${String(i + 1)}`);
+    const t = setup({ lineRooms: { ...Object.fromEntries(msgids.map((id) => [id, REALM])), m30: "#govdao" } });
+    expect((await t.hide({ room: REALM, msgids }, { who: "owner" })).status).toBe(404);
     expect(t.sent).toEqual([]);
   });
 

@@ -7,10 +7,13 @@ import { pageFetch } from "../query/policy.ts";
 
 const Done = z.object({ ok: z.literal(true) });
 
-// One or two distinct line ids.
+/** The most ids a hide carries: a line and the 50 edits the search keeps of it (the server's MAX_EDITS + 1). */
+export const HIDE_IDS = 51;
+
+// Distinct line ids, one to HIDE_IDS.
 const sound = (ids: readonly string[]) =>
   ids.length >= 1 &&
-  ids.length <= 2 &&
+  ids.length <= HIDE_IDS &&
   new Set(ids).size === ids.length &&
   ids.every((id) => PinId.safeParse(id).success);
 
@@ -20,7 +23,7 @@ export function moderationApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const send = async (path: string, body: object): Promise<Result<{ ok: true }>> =>
     call({ path: `/api/moderation/${path}`, body, schema: Done });
   return {
-    /** Takes a line out of the room: its id, and its last edit's when it has one; one request. */
+    /** Takes a line out of the room: its id and each edit's, HIDE_IDS at most; one request. */
     hide: async (room: string, msgids: readonly string[]) =>
       RoomId.safeParse(room).success && sound(msgids) ? send("hide", { room, msgids }) : refused,
     /** Mutes an account in the room's world. */

@@ -11,6 +11,7 @@ import { limiter } from "../limit.ts";
 import { asOf, type Right } from "../roles/mayModerate.ts";
 import { isLineOf, type Fetched } from "../irc/fetch.ts";
 import { worldOf } from "../rooms/rooms.ts";
+import { MAX_EDITS } from "../search/index.ts";
 import { visitorOf } from "../visitor.ts";
 
 export interface ModerationOptions {
@@ -36,13 +37,14 @@ export interface ModerationOptions {
 }
 
 // A line's id as a pin names it, and not a word an IRC line would read as its trailing part.
-// One or two of them: the line shown and its last edit, both redacted in one request.
+// The line and each edit folded into it, redacted in one request: no more than the edits the search index keeps of a line
+// (MAX_EDITS), and the limiter counts requests, so this is also the most lookups and REDACTs one request costs.
 const Hide = z.strictObject({
   room: PinRequest.shape.room,
   msgids: z
     .array(PinRequest.shape.msgid.check(z.regex(/^[^:]/)))
     .min(1)
-    .max(2)
+    .max(MAX_EDITS + 1)
     .refine((ids) => new Set(ids).size === ids.length),
 });
 const Mute = z.strictObject({ room: PinRequest.shape.room, account: Address });
@@ -88,7 +90,7 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
     if (held.includes("unanswered")) return refuse(c, "unavailable", { room: body.room });
     if (!held.every((got, i) => isLineOf(got, body.room, body.msgids[i] ?? "")))
       return refuse(c, "not_found", { room: body.room });
-    // Every id is sent, whatever the first said: one answer for the pair.
+    // Every id is sent, whatever the first said: one answer for all.
     const sent = body.msgids.map((msgid) => hide(body.room, msgid));
     if (!sent.every(Boolean)) return refuse(c, "unavailable", { room: body.room });
     log("line_hidden", { room: body.room, msgid: body.msgids.join(","), account: who, ...asOf(right) });

@@ -19,7 +19,16 @@ const server = (answer: { status: number; json?: unknown }) => {
 const bodyOf = (call: { init: RequestInit } | undefined): unknown =>
   typeof call?.init.body === "string" ? JSON.parse(call.init.body) : undefined;
 
+const ids = (n: number) => Array.from({ length: n }, (_, i) => `m${String(i + 1)}`);
+
 describe("an owner's moderation, from the server", () => {
+  // A line and the 50 edits the search keeps of it (server/src/search/index.ts MAX_EDITS): 51 ids, at one request.
+  it("sends a line and its fifty edits in one request", async () => {
+    const { api, sent } = server({ status: 200, json: { ok: true } });
+    expect(await api.hide("#bubble", ids(51))).toEqual({ ok: true, value: { ok: true } });
+    expect(bodyOf(sent[0])).toEqual({ room: "#bubble", msgids: ids(51) });
+  });
+
   it("POSTs the room and the line's ids, in one request, to hide it, the cookie to this site alone", async () => {
     const { api, sent } = server({ status: 200, json: { ok: true } });
     expect(await api.hide("#bubble/games", ["m1", "m2"])).toEqual({ ok: true, value: { ok: true } });
@@ -40,7 +49,7 @@ describe("an owner's moderation, from the server", () => {
     expect(await api.hide("no room", ["m1"])).toEqual({ ok: false, reason: "refused" });
     expect(await api.hide("#bubble", [""])).toEqual({ ok: false, reason: "refused" });
     expect(await api.hide("#bubble", [])).toEqual({ ok: false, reason: "refused" });
-    expect(await api.hide("#bubble", ["m1", "m2", "m3"])).toEqual({ ok: false, reason: "refused" });
+    expect(await api.hide("#bubble", ids(52))).toEqual({ ok: false, reason: "refused" });
     expect(await api.hide("#bubble", ["m1", "m1"])).toEqual({ ok: false, reason: "refused" });
     expect(await api.mute("#bubble", "nobody")).toEqual({ ok: false, reason: "refused" });
     expect(sent).toHaveLength(0);
