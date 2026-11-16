@@ -193,9 +193,9 @@ async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ra
   if (profile === undefined) return refused("an action's button names its realm's chain profile.");
   // The button runs on the chain it carries (D13508), and the check ran on the profile's universe: the two must be one.
   const checkedOn = setup.places.universes.get(profile)?.chainId;
-  if (checkedOn !== undefined && button.chainId !== checkedOn)
+  if (button.chainId !== checkedOn)
     return refused(
-      `its chainId is ${button.chainId}, but its profile ${profile} is ${checkedOn}: name the chain it was checked on.`,
+      `its chainId is ${button.chainId}, but its profile ${profile} is ${String(checkedOn)}: name the chain it was checked on.`,
     );
   const sourced = await readRealm(setup, { profile, realm: button.action.realm, forms: true, signal: asked.signal });
   if (!sourced.ok) return refused(sourced.why);
