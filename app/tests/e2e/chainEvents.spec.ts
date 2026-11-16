@@ -37,11 +37,13 @@ for (const [size, width, height] of SIZES) {
     await page.goto("/w/govdao");
     await hydrated(page);
     // A card of the room's thread in the chat, not a line of the plate (frames 25 and 27).
-    const card = page.locator("#chat [data-chain]");
+    // The chat of a computer is the page's dock (#chat); a phone's is its full chat, the whole page.
+    const chat = width < 900 ? page.locator("body") : page.locator("#chat");
+    const card = chat.locator("[data-chain]");
     await expect(card).toBeVisible();
     await expect(card.getByText(/MustVoteOnProposal/)).toBeVisible();
     await expect(card.getByText(/block 900030/)).toBeVisible();
-    await expect(page.locator("#chat").getByRole("list", { name: "Messages" }).locator("[data-chain]")).toHaveCount(1);
+    await expect(chat.getByRole("list", { name: "Messages" }).locator("[data-chain]")).toHaveCount(1);
     expect(await violations(page)).toEqual([]);
     expect(await sideways(page)).toBeLessThanOrEqual(0);
   });

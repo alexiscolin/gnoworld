@@ -107,7 +107,11 @@ test.describe("on a phone", () => {
     await adena(page);
     await page.goto("/");
     await hydrated(page);
-    await expect(page.getByText("To log in, use a computer; once logged in you can write from here.")).toBeVisible();
+    // A phone's header keeps the account's way in its menu: the words stand there.
+    await page.getByRole("button", { name: "Menu" }).tap();
+    await expect(
+      page.getByRole("menu").getByText("To log in, use a computer; once logged in you can write from here."),
+    ).toBeVisible();
     await expect(connectButton(page)).toBeHidden();
   });
 });

@@ -83,15 +83,16 @@ test.describe("the chat as the video shows it", () => {
     ).toBeVisible();
   });
 
-  test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
+  test("goes back to the universe's home, from the header's left edge, a control that works", async ({ page }) => {
     await logIn(page, "screen-close");
-    // Only a window with no dock has a close to the home (a computer's has its dock to close to): a phone's. /w/bubble is the
-    // default universe's, whose home is the site's root.
+    // Only a window with no dock has a way out of the chat (a computer's has its dock to close to): a phone's, whose header has Back. With no
+    // page of the site before it, Back goes home: /w/bubble is the default universe's, whose home is the site's root.
     await open(page, { width: 390, as: ACCOUNT });
-    const close = page.getByRole("button", { name: "Close the chat" });
-    const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(close)]);
-    expect(bar.x + bar.width - (shut.x + shut.width)).toBeLessThanOrEqual(24);
-    await close.click();
+    const back = page.getByRole("button", { name: "Back" });
+    const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(back)]);
+    expect(shut.x - bar.x).toBeLessThanOrEqual(24);
+    expect(shut.width).toBeGreaterThanOrEqual(44);
+    await back.click();
     await expect.poll(() => new URL(page.url()).pathname).toBe("/");
     await expect(page.locator("[data-chat-layout]")).toHaveCount(0);
   });

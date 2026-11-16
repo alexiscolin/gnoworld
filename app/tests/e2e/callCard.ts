@@ -7,6 +7,7 @@ import { accountPill, connectButton } from "./account.ts";
 import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
+import { isPhone, openPlacePage } from "./realmRoom.ts";
 
 // The call card's journeys' world: Adena's stand-in (adena.ts) given the calls a signature needs, with the answers of
 // ../fakeAdena.ts, and the chain's RPC answering as a browser would get it.
@@ -179,11 +180,10 @@ export async function writeChain(
 
 export { calls, openCall, openRow, writeTab } from "./callRows.ts";
 
-/** Opens the realm's page logged in by cookie (the session of a login made first, the page loaded again). */
+/** Opens the realm's page logged in by cookie (the session of a login made first, the page loaded again); on a phone, in its page sheet. */
 export async function openRealm(page: Page, logIn: () => Promise<void>): Promise<void> {
   await logIn();
-  await page.goto(`/r/${REALM.slice("gno.land/r/".length)}`);
-  await hydrated(page);
+  await openPlacePage(page, `/r/${REALM.slice("gno.land/r/".length)}`, REALM);
   await writeTab(page);
   await expect(calls(page).getByRole("button", { name: /^SetBio\(/ })).toBeVisible();
 }
@@ -233,7 +233,8 @@ export async function phoneOf(
 
 /** What every call journey asks of the page it ends on: no dialog, no accessibility violation, no sideways scroll. */
 export async function sound(page: Page): Promise<void> {
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // A phone has the realm's page in its page sheet, the one dialog there is.
+  await expect(page.getByRole("dialog")).toHaveCount(isPhone(page) ? 1 : 0);
   expect(await violations(page)).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }

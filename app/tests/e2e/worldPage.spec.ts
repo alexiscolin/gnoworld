@@ -1,3 +1,4 @@
+import { openPlacePage } from "./realmRoom.ts";
 import type { Locator } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { violations } from "./axe.ts";
@@ -182,8 +183,8 @@ test.describe("who is here while nobody is counted", () => {
       await page.route("**/api/presence", (route) =>
         route.fulfill({ json: { worlds: [{ world: "bubble", here: 0, perHour: 0, rise: 0 }] } }),
       );
-      await page.goto("/w/bubble");
-      await hydrated(page);
+      // A phone has the plate in its page sheet.
+      await openPlacePage(page, "/w/bubble");
       const band = page.locator("[data-look='plate'] section[aria-label='Figures']");
       await expect(band.getByText("Here now")).toBeVisible();
       await expect(band.locator(".visually-hidden").first()).toHaveText("0");
@@ -223,7 +224,7 @@ test.describe("Share where the browser cannot copy", () => {
 // From 1280 px the chat is a dock at the plate's right, inside one outline; under it the chat is a block under the plate.
 // The plate comes first in the reading and tab order at every width.
 test.describe("the page's order", () => {
-  for (const width of [390, 1279] as const) {
+  for (const width of [1279] as const) {
     test(`at ${String(width)} px the chat is a block under the plate, between the page's gutters`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/w/bubble");
@@ -295,8 +296,8 @@ for (const width of [390, 1280] as const) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto("/w/bubble");
-    await hydrated(page);
+    // A phone has the plate in its page sheet.
+    await openPlacePage(page, "/w/bubble");
     await expect(page.locator("[data-look='plate'] section[aria-label='Figures']")).toBeVisible();
     expect(await violations(page)).toHaveLength(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

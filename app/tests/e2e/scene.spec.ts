@@ -73,7 +73,12 @@ function asks(page: Page, chunks: RegExp): string[] {
   return asked;
 }
 
+// A phone draws no View in space (D13711): the offer is a computer's on the data saver (the saver waits to be asked, gpu.ts).
 async function offered(page: Page) {
+  await page.setViewportSize(COMPUTER);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "connection", { value: { saveData: true } });
+  });
   await page.goto(HOME);
   await hydrated(page);
   const view = page.getByRole("button", { name: "View in space" });
@@ -259,10 +264,8 @@ test.describe("a chunk that does not come", () => {
   });
 
   test("a load that fails under the finger leaves no busy button, and the focus in the page", async ({ page }) => {
-    await page.setViewportSize(PHONE);
     await page.route(SCENE, (route) => route.abort());
-    await page.goto(HOME);
-    await page.getByRole("button", { name: "View in space" }).click();
+    await (await offered(page)).click();
     await expect(page.getByRole("status").filter({ hasText: "Space is not available here" })).toBeVisible();
     await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
     await expect(page.locator("h1")).toBeFocused();
@@ -272,54 +275,27 @@ test.describe("a chunk that does not come", () => {
 test.describe("a phone", () => {
   test.use({ viewport: PHONE });
 
-  test("loads nothing of the 3D before View in space, the worker included", async ({ page }) => {
+  test("loads nothing of the 3D, the worker included, and draws no View in space", async ({ page }) => {
     const asked = asks(page, SCENE);
-    // A first visit's welcome card covers the button: it is told away.
     await page.addInitScript(() => {
       localStorage.setItem("gnoworld:welcomed", "1");
     });
-    const view = await offered(page);
+    await page.goto(HOME);
+    await hydrated(page);
+    await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
     await controlled(page);
     expect(asked).toEqual([]);
     expect((await cacheContents(page)).paths.filter((path) => SCENE.test(path))).toEqual([]);
-    await view.click();
-    await running(page);
-    expect(asked.length).toBeGreaterThan(0);
-    await expect(view).toHaveCount(0);
-    await expect.poll(() => framesOf(page)).toBeGreaterThan(0);
+    await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
   });
 
-  test("View in space sits inside the gutter, and passes axe", async ({ page }) => {
-    const box = await (await offered(page)).boundingBox();
-    if (box === null) throw new Error("no button");
-    expect(box.x).toBeGreaterThanOrEqual(16);
-    expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width - 16);
-    expect((await axeOf(page).analyze()).violations).toEqual([]);
-  });
-
-  test("View in space looks as approved", async ({ page }) => {
-    await expect(await offered(page)).toHaveScreenshot("view-in-space-390.png");
-  });
-
-  test("the keyboard reaches View in space after the page's links", async ({ page }) => {
-    const view = await offered(page);
-    const order = await page.evaluate(() => {
-      const button = [...document.querySelectorAll("button")].find((each) => each.textContent === "View in space");
-      const main = document.querySelector("main");
-      if (button === undefined || main === null) throw new Error("no button or no main");
-      return main.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING;
-    });
-    expect(order).not.toBe(0);
-    await view.focus();
-    await page.keyboard.press("Enter");
-    await running(page);
-    await expect(page.locator("h1")).toBeFocused();
-  });
-
-  test("the phone ends at 899 px: there it waits to be asked, at 900 px it loads by itself", async ({ page }) => {
+  test("the phone ends at 899 px: there it draws no space, at 900 px the scene loads by itself", async ({ page }) => {
+    const asked = asks(page, SCENE);
     await page.setViewportSize({ width: 899, height: 844 });
     await page.goto(HOME);
-    await expect(page.getByRole("button", { name: "View in space" })).toBeVisible();
+    await hydrated(page);
+    await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
+    expect(asked).toEqual([]);
     await page.setViewportSize({ width: 900, height: 844 });
     await page.reload();
     await running(page);
@@ -344,18 +320,36 @@ test.describe("a phone", () => {
     expect(box.y + box.height).toBe(1080 - 64);
   });
 
-  test("the failure's line stays clear of the markets at 900 px, and of the links at 390", async ({ page }) => {
+  test("the failure's line stays clear of the markets at 900 px", async ({ page }) => {
     await page.route(SCENE, (route) => route.abort());
-    for (const size of [{ width: 900, height: 900 }, PHONE]) {
-      await page.setViewportSize(size);
-      await page.goto(HOME);
-      const view = page.getByRole("button", { name: "View in space" });
-      if (size === PHONE) await view.click();
-      const line = page.getByRole("status").filter({ hasText: "Space is not available here" });
-      await expect(line).toBeVisible();
-      const box = await line.boundingBox();
-      if (box === null) throw new Error("no line");
-      expect(box.x + box.width).toBeLessThanOrEqual(size.width - 16);
-    }
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.goto(HOME);
+    const line = page.getByRole("status").filter({ hasText: "Space is not available here" });
+    await expect(line).toBeVisible();
+    const box = await line.boundingBox();
+    if (box === null) throw new Error("no line");
+    expect(box.x + box.width).toBeLessThanOrEqual(900 - 16);
+  });
+});
+
+test.describe("the offer of space on a computer", () => {
+  test("passes axe", async ({ page }) => {
+    await offered(page);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
+  });
+
+  test("the keyboard reaches View in space after the page's links", async ({ page }) => {
+    const view = await offered(page);
+    const order = await page.evaluate(() => {
+      const button = [...document.querySelectorAll("button")].find((each) => each.textContent === "View in space");
+      const main = document.querySelector("main");
+      if (button === undefined || main === null) throw new Error("no button or no main");
+      return main.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING;
+    });
+    expect(order).not.toBe(0);
+    await view.focus();
+    await page.keyboard.press("Enter");
+    await running(page);
+    await expect(page.locator("h1")).toBeFocused();
   });
 });

@@ -2,9 +2,9 @@ import { word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 import { logIn } from "./irc.ts";
-import { EARTH, INES, NIGHT, onEarth, raw, ROOMS, SLOW } from "./earthStage.ts";
+import { INES, NIGHT, onEarth, raw, ROOMS, SLOW } from "./earthStage.ts";
 import { scriptedErgo } from "./scripted.ts";
-import { countShifts, running, shifted } from "./sceneStage.ts";
+import { countShifts, shifted } from "./sceneStage.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { axeOf } from "./axe.ts";
 
@@ -260,13 +260,6 @@ test.describe("frame 85", () => {
   });
 });
 
-// What lies under the pointer at a point of the page: a covered element still passes `toBeVisible`.
-const onTop = (page: Page, x: number, y: number) =>
-  page.evaluate(
-    ([left, top]) => document.elementFromPoint(left ?? 0, top ?? 0)?.closest("[data-chat-layout]") === null,
-    [x, y],
-  );
-
 // Asks the chat's code late, and holds it until the test lets it go: what the page shows meanwhile is the empty state.
 async function chatHeld(page: Page) {
   let release: () => void = () => undefined;
@@ -280,7 +273,23 @@ async function chatHeld(page: Page) {
   return release;
 }
 
-for (const viewport of [COMPUTER, { width: 1100, height: 800 }, PHONE]) {
+// The page's own moves reach the shift observer a task late: after two frames and a beat, the count starts again from none.
+const quiet = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              Reflect.set(globalThis, "__shift", 0);
+              done();
+            }, 100);
+          });
+        });
+      }),
+  );
+
+for (const viewport of [COMPUTER, { width: 1100, height: 800 }]) {
   test.describe(`the chat's wait at ${String(viewport.width)} px`, () => {
     test.use({ viewport, serviceWorkers: "block" });
 
@@ -295,19 +304,7 @@ for (const viewport of [COMPUTER, { width: 1100, height: 800 }, PHONE]) {
       const [title, slot] = [await box(page, "h1"), await box(page, "#chat")];
       // The page's own moves reach the observer a task late: they must not count as the chat's.
       await expect(page.locator("[data-globe]")).toHaveAttribute("data-earth", /none|drawn/, SLOW);
-      await page.evaluate(
-        () =>
-          new Promise<void>((done) => {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  Reflect.set(globalThis, "__shift", 0);
-                  done();
-                }, 100);
-              });
-            });
-          }),
-      );
+      await quiet(page);
       release();
       await expect(page.locator("[data-chat-layout]")).toBeAttached();
       expect(await box(page, "h1")).toEqual(title);
@@ -353,48 +350,48 @@ test.describe("a narrower computer", () => {
   });
 });
 
+// A phone has no globe, no sign and no bubble (D13711): the Earth is its full chat, whose wait and lines are the same.
 test.describe("a phone", () => {
-  test.use({ viewport: PHONE });
+  test.use({ viewport: PHONE, serviceWorkers: "block" });
 
-  test("loads no sign before View in space, and then keeps each on the screen, axe clean", async ({ page }) => {
+  test("says the chat is coming, and moves nothing of the page when it comes", async ({ page }) => {
+    await countShifts(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.routeWebSocket(/\/ws$/, () => undefined);
+    const release = await chatHeld(page);
+    await page.goto("/earth");
+    await hydrated(page);
+    await expect(page).toHaveURL(/\/earth\?.*chat=full/);
+    await expect(page.getByText("Loading the chat").first()).toBeAttached();
+    await quiet(page);
+    release();
+    await expect(page.locator("[data-chat-layout]")).toBeAttached();
+    expect(await shifted(page)).toBeLessThan(0.01);
+  });
+
+  test("shows the Earth's lines in its chat alone: no sign, no bubble, no code of the signs, axe clean", async ({
+    page,
+  }) => {
     await page.clock.setFixedTime(new Date(NIGHT));
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.route("**/api/rooms?world=earth", (route) => route.fulfill({ json: ROOMS }));
     let socket: WebSocketRoute | undefined;
-    const sent: string[] = [];
     const asked: string[] = [];
     page.on("request", (request) => {
       if (/EarthSigns-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
     });
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       socket = ergo;
-      scriptedErgo(ergo, ME, {
-        room: "#earth",
-        history: [],
-        heard: (line) => {
-          sent.push(line);
-        },
-      });
+      scriptedErgo(ergo, ME, { room: "#earth", history: [], heard: () => undefined });
     });
-    await page.goto(EARTH);
+    await page.goto("/earth");
     await hydrated(page);
-    await expect(page.getByRole("heading", { level: 2, name: "#general" })).toBeAttached();
-    await expect(page.locator("[data-signs]")).toHaveCount(0);
-    expect(asked, "no code of the signs before View in space").toEqual([]);
-    await page.getByRole("button", { name: "View in space" }).click();
-    await running(page);
-    await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
-    await signsReady(page);
-    await expect.poll(() => sent.some((line) => line.startsWith("JOIN "))).toBe(true);
+    await expect(page.getByRole("heading", { level: 1, name: "#general" })).toBeAttached();
+    await expect.poll(() => socket !== undefined).toBe(true);
     socket?.send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
-    const shown = bubble(page, "gm from Paris!");
-    await expect(shown).toBeVisible();
-    const found = await shown.boundingBox();
-    if (found === null) throw new Error("no bubble");
-    expect(found.x).toBeGreaterThanOrEqual(0);
-    expect(found.x + found.width).toBeLessThanOrEqual(PHONE.width);
-    expect(await onTop(page, found.x + found.width / 2, found.y + found.height / 2)).toBe(true);
-    await page.getByRole("button", { name: "Credits", exact: true }).click({ trial: true });
+    await expect(page.getByRole("list", { name: "Messages" }).getByText("gm from Paris!")).toBeVisible();
+    await expect(page.locator("[data-signs], [data-bubble], [data-globe]")).toHaveCount(0);
+    expect(asked, "no code of the signs on a phone").toEqual([]);
     expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
