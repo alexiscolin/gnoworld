@@ -48,14 +48,23 @@
       --_h: var(--control-m);
     }
 
-    /* Eight 44 px buttons are wider than a phone's row: the bar stays inside it, at its end, and wraps to a second row, so none is off the screen. */
+    /* Eight 44 px buttons are wider than a phone's row: the bar stays one row inside the screen's inset and scrolls along itself, its
+       first button at the row's start, each button snapping whole. */
     .bar {
       max-inline-size: calc(100% - 2 * var(--space-2xs));
-      /* layout: the buttons that do not fit go to a second row */
-      flex-wrap: wrap;
-      /* layout: the rows keep the bar's end */
-      justify-content: flex-end;
-      white-space: normal;
+      /* layout: one row, whatever its width */
+      flex-wrap: nowrap;
+      /* layout: the bar's own scroll, its start pinned */
+      overflow-x: auto;
+      scroll-snap-type: x proximity;
+      /* raw: the scroll bar's track would add its own height to the row */
+      scrollbar-width: none;
+    }
+
+    .bar button {
+      scroll-snap-align: start;
+      /* layout: a button keeps its 44 px whatever the row holds */
+      flex-shrink: 0;
     }
   }
 }

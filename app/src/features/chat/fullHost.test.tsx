@@ -283,6 +283,40 @@ describe("the skeleton of a page opened full", () => {
       root.unmount();
     });
   });
+
+  it("draws none for a chat expanded from its dock after the first draw", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+    vi.resetModules();
+    const mod = await import("./fullHost.tsx");
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(<mod.FullChatHost />);
+    });
+    // The click on the expand control, after the first draw.
+    history.replaceState(null, "", "/w/x?chat=full");
+    asked.full = true;
+    act(() => {
+      root.render(<mod.FullChatHost />);
+    });
+    expect(document.querySelector("[data-chat-skeleton]")).toBeNull();
+    act(() => {
+      root.unmount();
+    });
+  });
 });
 
 // A page asked with the chat full (`?chat=full`, a shared link) is drawn on the server first, where no document is: the shell's chat host

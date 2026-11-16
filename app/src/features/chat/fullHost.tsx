@@ -72,7 +72,9 @@ export function Pending() {
 
 /** The shell's skeleton over the full chat of a page opened full from its address; the chat itself is the docked one's (DockedChatHost). */
 export function FullChatHost() {
-  return useChatAlone() && isOpening() ? <Shape /> : null;
+  // Read at the first draw of the shell, docked or not: read when the chat is first full, a chat expanded from its dock would count as opened full.
+  const opened = isOpening();
+  return useChatAlone() && opened ? <Shape /> : null;
 }
 
 /** The shell's one chat, drawn once in its seat: in the dock of the page in view, or, the address asking it full, in the window's own place,

@@ -17,7 +17,15 @@ export function SpaceFoot() {
       {state === "taken" ? <Credits /> : null}
       {state === "ask" ? (
         <div className={[styles["offer"], "enter"].join(" ")}>
-          <Button onClick={press}>View in space</Button>
+          <Button
+            onClick={() => {
+              press();
+              // The button goes with the press: the focus it leaves goes to the page's heading, never to the document's start.
+              document.querySelector<HTMLElement>("h1")?.focus();
+            }}
+          >
+            View in space
+          </Button>
         </div>
       ) : null}
       <p role="status" className={["meta", styles["status"]].join(" ")}>

@@ -251,6 +251,15 @@
     .box [role="textbox"] + [aria-hidden="true"],
     .box .field textarea {
       min-block-size: calc(1lh + var(--space-s));
+      /* layout: beside Send, not over its row: the box is one row high */
+      grid-area: 2 / 1;
+    }
+
+    .send {
+      /* layout: Send beside the field, level with the box's foot, so the foot's row of its own is gone */
+      grid-area: 2 / 2;
+      /* layout: against the box's foot */
+      align-self: end;
     }
   }
 }
