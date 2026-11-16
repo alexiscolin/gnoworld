@@ -1,5 +1,5 @@
 // The network the site reads, named always, a testnet saying "Testnet" (DESIGN-SYSTEM.md, Trust): in the header's row, and in the account's
-// pill or the way in after a divider on a computer, where the header's own goes; there the chip alone, no warning icon. The name is a menu of
+// pill or the way in, beside them after a divider on a computer, where the header's own goes; there the chip alone, no warning icon. The name is a menu of
 // the networks (D13501), its code, the chain's and the switch's coming at its first press, as the account's menu does (AccountMenu.tsx).
 import { Button, Chip, Icon } from "@gnoworld/ui";
 import { lazy, Suspense, useState } from "react";

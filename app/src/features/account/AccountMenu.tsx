@@ -27,10 +27,8 @@ function AccountPill({
   universe,
   again,
   onPickable,
-  network,
 }: {
   face: ReactNode;
-  network: ReactNode;
   address: string;
   universe: string;
   again: number;
@@ -42,7 +40,6 @@ function AccountPill({
       <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
         <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
       </Suspense>
-      {network}
     </>
   );
 }
@@ -101,7 +98,7 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
   );
 }
 
-/** The account's menu; `network`, the network's name its pill carries once logged in. */
+/** The account's menu; `network`, the network's name drawn beside its pill once logged in, beside the way in before. */
 export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
@@ -128,14 +125,7 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
     );
   const pill =
     address === undefined ? null : (
-      <AccountPill
-        face={face}
-        network={network}
-        address={address}
-        universe={universe}
-        again={again}
-        onPickable={setPickable}
-      />
+      <AccountPill face={face} address={address} universe={universe} again={again} onPickable={setPickable} />
     );
   // The trigger as the menu draws it, until the menu's code takes its place, open.
   const trigger = <Trigger pill={pill} onClick={ask} />;
@@ -159,6 +149,8 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
       ) : (
         trigger
       )}
+      {/* Beside the pill, never in its button: pressing the network must not open the account's menu. */}
+      {address === undefined ? null : network}
       {address === undefined || !naming ? null : (
         <Suspense fallback={null}>
           <PickName

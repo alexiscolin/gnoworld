@@ -13,7 +13,7 @@ export interface LoginViewProps {
   step: Login["step"];
   problem: Login["problem"];
   onLogIn: () => void;
-  /** The network's name, after the button's words, and after the phone's. */
+  /** The network's name, beside the button and the phone's words. */
   network?: ReactNode;
 }
 
@@ -40,13 +40,11 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
         <Button busy={step !== "idle"} onClick={onLogIn} {...(stopped ? { description: sayProblem(problem) } : {})}>
           {stopped ? <Icon name="alert" /> : null}
           {wordsOf(step, stopped ? sayShort(problem) : undefined)}
-          {network}
         </Button>
       </span>
-      <span className={styles["phone"]}>
-        To log in, use a computer; once logged in you can write from here.
-        {network}
-      </span>
+      <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
+      {/* Beside the button, never in it: a control in a control would press the login with it. */}
+      {network}
       {status}
     </Cluster>
   );

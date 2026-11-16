@@ -1,4 +1,4 @@
-/* The network's name and its testnet's caution, in the header's row or in the account's pill (Network.tsx). */
+/* The network's name and its testnet's caution, in the header's row or beside the account's pill (Network.tsx). */
 @layer components {
   .network,
   .inPill {

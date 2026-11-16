@@ -3,6 +3,8 @@ import { Address } from "@gnoworld/schemas";
 import { act } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { mount } from "../../../tests/mount.tsx";
+import { MemoryRouter } from "react-router";
+import { Network } from "./Network.tsx";
 import { Opened } from "./Opened.tsx";
 
 // Frames 6 and 17: the header's right end is one pill; logged in, the account's face and its address open the menu, which holds the
@@ -10,7 +12,8 @@ import { Opened } from "./Opened.tsx";
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const items = (box: HTMLElement) => [...box.querySelectorAll("[role='menuitem']")].map((item) => item.textContent);
 
-vi.mock("react-router", () => ({
+vi.mock("react-router", async (original) => ({
+  ...(await original<object>()),
   useLocation: () => ({ hash: "", pathname: "/", search: "" }),
   useNavigate: () => () => undefined,
 }));
@@ -66,6 +69,9 @@ const api = vi.hoisted(() => ({
 vi.mock("../../lib/api/login.ts", () => ({ pageLoginApi: () => api }));
 const adena = vi.hoisted(() => ({ connect: vi.fn(() => Promise.resolve({ ok: false, reason: "missing" })) }));
 vi.mock("../../lib/adena/adena.ts", () => ({ connect: adena.connect, pageAdena: () => undefined, signLogin: vi.fn() }));
+
+const chain = vi.hoisted(() => ({ readPage: vi.fn() }));
+vi.mock("../../lib/chain/rpc.ts", async (original) => ({ ...(await original<object>()), readPage: chain.readPage }));
 
 const settle = async () => {
   for (let turn = 0; turn < 5; turn += 1)
@@ -167,5 +173,49 @@ describe("the header's account", SLOW, () => {
     }, SOON);
     expect(box.querySelector("button")?.textContent).toContain("g1jg8m…vsqf5");
     expect(items(box)).toContain("Log out");
+  });
+});
+
+// The network's control is drawn beside the login button and the account's pill, never inside them (a button in a button): pressing its name
+// or choosing a network must not log in, nor open the account's menu.
+describe.each([
+  ["logged out", null],
+  ["logged in", ADDRESS],
+])("the network control, %s", SLOW, (_, address) => {
+  it("is no descendant of another button, and choosing a network neither logs in nor opens the account's menu", async () => {
+    api.me.mockReset().mockResolvedValue({ ok: true, value: { address } });
+    adena.connect.mockClear();
+    chain.readPage.mockResolvedValue({ ok: true, value: "# dao", source: { rpc: "x", chainId: null } });
+    const { StoreProvider } = await import("../../storeContext.tsx");
+    const { AccountMenu } = await import("./AccountMenu.tsx");
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <AccountMenu universe="onyx" network={<Network name="Onyx" testnet inPill />} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    const named = (name: string) =>
+      [...box.querySelectorAll("button")].find((each) => each.textContent.trim() === name);
+    await vi.waitFor(() => {
+      expect(box.textContent).toContain(address === null ? "Connect Adena" : "g1jg8m…vsqf5");
+    }, SOON);
+    expect(box.querySelector("button button")).toBeNull();
+    act(() => {
+      named("Onyx")?.click();
+    });
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll("[role='menuitemradio']")).toHaveLength(2);
+    }, SOON);
+    expect(box.querySelector("button button")).toBeNull();
+    expect(items(box)).not.toContain("Passport");
+    act(() => {
+      [...document.querySelectorAll<HTMLElement>("[role='menuitemradio']")]
+        .find((each) => each.textContent === "gno.land")
+        ?.click();
+    });
+    await settle();
+    expect(adena.connect).not.toHaveBeenCalled();
+    expect(items(box)).not.toContain("Passport");
   });
 });
