@@ -24,6 +24,10 @@ vi.mock("../../lib/api/verdicts.ts", () => ({
     },
   }),
 }));
+// The cards of the same lines, asked with the verdicts: none here. Left to the network, a refused call rests the asker.
+vi.mock("../../lib/api/cards.ts", () => ({
+  pageCardsApi: () => ({ lines: (room: string) => Promise.resolve({ ok: true, value: { room, cards: [] } }) }),
+}));
 // The chunk that finds a link in a line, held back until a test opens it (the first import only: a module is loaded once), and the
 // times it was asked for.
 const chunk = vi.hoisted(() => {
@@ -152,6 +156,8 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     await vi.waitFor(() => {
       expect(asked).toEqual([["a"]]);
     });
+    // Long enough for the cards' answer, which the line's first request also asked, to have come.
+    await act(pausedBriefly);
     act(() => {
       redraw({ lines: [line("a", link), line("held", link), line("c", link)] });
     });
