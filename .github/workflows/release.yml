@@ -54,10 +54,10 @@ jobs:
           set -eu
           ref="ghcr.io/${REPO,,}/${IMAGE}:${SHA:0:12}"
           printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
-          trap 'docker logout ghcr.io' EXIT
           if docker manifest inspect "$ref" >/dev/null 2>&1; then
             echo "$ref exists: left as it is"
-            exit 0
+          else
+            docker tag "release:${IMAGE}" "$ref"
+            docker push "$ref"
           fi
-          docker tag "release:${IMAGE}" "$ref"
-          docker push "$ref"
+          docker logout ghcr.io

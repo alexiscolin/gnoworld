@@ -7934,13 +7934,13 @@ jobs:
           set -eu
           ref="ghcr.io/${REPO,,}/${IMAGE}:${SHA:0:12}"
           printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
-          trap 'docker logout ghcr.io' EXIT
           if docker manifest inspect "$ref" >/dev/null 2>&1; then
             echo "$ref exists: left as it is"
-            exit 0
+          else
+            docker tag "release:${IMAGE}" "$ref"
+            docker push "$ref"
           fi
-          docker tag "release:${IMAGE}" "$ref"
-          docker push "$ref"
+          docker logout ghcr.io
 """
 rel = (wf / "release.yml").read_bytes().decode("utf-8")
 assert re.sub(r"(?m)^(        image: \[)[\w, -]*\]$", r"\1...]", rel) == RELEASE, "release.yml: it differs from the text this checker holds it to"
@@ -8201,9 +8201,10 @@ CASES = [
     (D, "    build:\n      context: ..\n      dockerfile: deploy/web/Dockerfile\n", "    build: ../deploy/web\n", "a service built in a form the list is not held to"),
     (D, "      dockerfile: deploy/web/Dockerfile\n", "      dockerfile: deploy/web/Dockerfile\n      target: build\n", "a service built to a target the release does not build"),
     (D, "  ergo:\n", "  extra:\n    build: ../deploy/extra\n  ergo:\n", "a new service in a build form the list does not read"),
-    (R, '          if docker manifest inspect "$ref" >/dev/null 2>&1; then\n            echo "$ref exists: left as it is"\n            exit 0\n          fi\n', "", "a tag pushed again over itself"),
-    (R, '          docker push "$ref"\n', '          docker push "$ref"\n          docker tag "$ref" "${ref%:*}:latest"\n          docker push "${ref%:*}:latest"\n', "a moving tag beside the commit's"),
-    (R, '          docker push "$ref"\n', "", "a green job that pushes nothing"),
+    (R, '          if docker manifest inspect "$ref" >/dev/null 2>&1; then\n            echo "$ref exists: left as it is"\n          else\n            docker tag "release:${IMAGE}" "$ref"\n            docker push "$ref"\n          fi\n', '          docker tag "release:${IMAGE}" "$ref"\n          docker push "$ref"\n', "a tag pushed again over itself"),
+    (R, '            docker push "$ref"\n', '            docker push "$ref"\n            docker tag "$ref" "${ref%:*}:latest"\n            docker push "${ref%:*}:latest"\n', "a moving tag beside the commit's"),
+    (R, '            docker push "$ref"\n', "", "a green job that pushes nothing"),
+    (R, "          docker logout ghcr.io\n", "", "a login left on the runner"),
     (R, "          set -eu\n          ref=", "          set -eu\n          exit 0\n          ref=", "the push step left before it pushes"),
     (R, "docker login ghcr.io --username", "docker login registry.example.com --username", "the token sent to another registry"),
     (R, '--file "deploy/${IMAGE}/Dockerfile"', '--file "deploy/web/Dockerfile"', "one image published under every name"),
