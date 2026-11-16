@@ -436,10 +436,10 @@ describe("a room made in two writes (F13501): the second one failing leaves noth
     expect(rooms.maker("#earth/coffee")).toBe(A);
   });
 
-  it("a realm's room whose rooms row fails leaves no realm_rooms row and sends no JOIN, and can be made then", () => {
+  it("a realm's room whose realm_rooms row fails leaves no rooms row and sends no JOIN, and can be made then", () => {
     const { db, sent, rooms } = setup();
     const before = rows(db);
-    const mend = failing(db, "rooms");
+    const mend = failing(db, "realm_rooms");
     expect(() => rooms.realm("#bubble/golf-0123456789", undefined, "gno.land/r/x/golf")).toThrow();
     expect(rows(db)).toEqual(before);
     expect(sent).toEqual([]);
