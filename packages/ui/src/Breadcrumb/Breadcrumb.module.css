@@ -37,9 +37,18 @@
   .step {
     /* layout: the arrangement the prototype and the frames draw */
     display: inline-flex;
+    justify-content: center;
+    /* raw: the advance of the "›" it replaced (D13218), measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
+    inline-size: 0.4284em;
     margin-inline: var(--space-2xs);
     opacity: 0.6;
     rotate: -90deg;
+  }
+
+  /* The chevron at three quarters of the label's size, wider than its box and centred on it. */
+  .step svg {
+    inline-size: 0.75em;
+    block-size: 0.75em;
   }
 
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */
