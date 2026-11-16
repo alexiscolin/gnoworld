@@ -41,14 +41,31 @@ const prose = fc
       { weight: 4, arbitrary: fc.constant(" ") },
       {
         weight: 1,
-        arbitrary: fc.constantFrom("*", "**", "_", "__", "~~", "++", "`", "> ", "- ", "1. ", "\n", "[x](https://a.b)"),
+        arbitrary: fc.constantFrom(
+          "*",
+          "**",
+          "_",
+          "__",
+          "~~",
+          "~",
+          "\\",
+          "++",
+          "`",
+          "> ",
+          "- ",
+          "1. ",
+          "\n",
+          "[x](https://a.b)",
+        ),
       },
     ),
     { maxLength: 24 },
   )
   .map((parts) => parts.join(""));
 
-const kept = (md: string) => !/`\s|\s`|\*\*|__|>\s\s|\]\(/.test(md);
+// A backslash before a block mark (`\> a`) reads as text in the room but the editor gives it back bare, a quote: on main as on this
+// branch (F13576), not the tilde fix's to mend.
+const kept = (md: string) => !/`\s|\s`|\*\*|__|>\s\s|\]\(|\\[>\-\d]/.test(md);
 
 describe("the composer's Markdown, to the editor and back", () => {
   it("gives back exactly a draft of the chat's subset", () => {
@@ -115,9 +132,17 @@ describe("the composer's Markdown, to the editor and back", () => {
     }
   });
 
-  // What the reader leaves alone the editor leaves alone: a backslash before the run, a code span.
-  it("leaves a tilde run behind a backslash or in a code span as the room reads it", () => {
-    const drafts = ["\\~~~a~~", "\\~~~a~~ b", "a\\~~~b~~", "\\`~~~a~~`"];
+  // What the reader leaves alone the editor leaves alone: a fence, a code span, a backslash before the run.
+  it("leaves a tilde run in a fence, behind a backslash or in a code span as the room reads it", () => {
+    const drafts = [
+      "```\n~~~a~~\n```",
+      "a ```~~~b~~``` c",
+      "```\na\n```\n\n~~~b~~\n\n```\nc\n```",
+      "\\~~~a~~",
+      "\\~~~a~~ b",
+      "a\\~~~b~~",
+      "\\`~~~a~~`",
+    ];
     for (const md of drafts) {
       expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
     }
