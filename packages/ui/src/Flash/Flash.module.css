@@ -55,13 +55,10 @@
     z-index: 4;
   }
 
-  /* Beside a plate (the fixed one, from 1280) the banner is centred on the free area between the plate and the dock, and kept within it, so it
-     never covers the plate's pills. */
-  @media (width >= 1280px) {
-    :root:has([data-look="plate"]) .flash[data-banner] {
-      inset-inline: calc(var(--page-edge) + var(--plate-w)) calc(var(--space-m) + var(--chat-dock-now));
-      max-inline-size: calc(100vi - var(--page-edge) - var(--plate-w) - var(--space-m) - var(--chat-dock-now));
-    }
+  /* Beside a placed plate the banner centres on the free area the Panel names (--free-start, --free-end, from 1280) and wraps
+     within it, never over the plate's pills; with no plate, on the window. */
+  .flash[data-banner] {
+    inset-inline: var(--free-start) var(--free-end);
   }
 
   /* While a flash shows, what the keyboard reaches scrolls clear of it (WCAG 2.4.11). */

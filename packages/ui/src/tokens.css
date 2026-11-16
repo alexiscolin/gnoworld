@@ -189,6 +189,9 @@
     --chat-dock-s: 380px;
     /* The dock's width at this screen: 380 px, 420 from 1400 px. */
     --chat-dock-now: var(--chat-dock-s);
+    /* The free area's edges beside a placed plate, which the Panel sets from 1280 (its edge, the dock's); none elsewhere. */
+    --free-start: 0px;
+    --free-end: 0px;
     /* The column of a room's times at the lines' end, which a line's bar keeps clear: "20:40" in 10 px mono and a step. */
     --chat-times: 40px;
     /* The inset of the info panel and of the thread's panel, which takes its place: the video's 20 px (the prototype's #chatSide padding). */
