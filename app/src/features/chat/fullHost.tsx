@@ -16,6 +16,8 @@ import { Chat, type ChatProps } from "./Chat.tsx";
 import { FullLoading } from "./FullLoading.tsx";
 import { DockCover } from "./DockCover.tsx";
 import { asksFull, useChatAlone } from "./full.ts";
+import { usePhoneGo } from "./phoneGo.ts";
+import { PlacePageProvider } from "./placePage.ts";
 import { keyOf, leaveDocked, leaveFull, leaveRoom, scrollsOf, restoreScrolls } from "./stillScreen.ts";
 
 let held: ChatProps | undefined;
@@ -40,18 +42,26 @@ function useHolding() {
     return () => {
       holders -= 1;
       queueMicrotask(() => {
-        if (holders === 0) hold(undefined);
+        if (holders === 0) {
+          plated = null;
+          hold(undefined);
+        }
       });
     };
   }, []);
 }
 
+// The page of the place held full (placePage.ts), drawn with the shell's chat by DockedChatHost, which is where the chat stands.
+let plated: ReactNode = null;
+
 // A page's word in the full chat: its chat is the shell's. It draws nothing. A next page whose chat cannot be drawn yet keeps the one
 // before till it can: the full chat never gives way to space between two places.
-function FullChat({ chat }: { chat: ChatProps | undefined }) {
+function FullChat({ chat, plate }: { chat: ChatProps | undefined; plate: ReactNode }) {
   useEffect(() => {
+    plated = plate;
     if (chat !== undefined) hold(chat);
-  }, [chat]);
+    else heard.tell();
+  }, [chat, plate]);
   return null;
 }
 
@@ -124,9 +134,21 @@ function DockSlot({ chat }: { chat: ChatProps | undefined }) {
 
 /** A place's page and its chat: the page with its chat docked in it, or, asked full in the address, the shell's one chat alone (no space,
  * no plate). `chat` is none while it cannot be drawn yet. */
-export function PlaceChat({ chat, page }: { chat: ChatProps | undefined; page: (dock: ReactNode) => ReactNode }) {
+export function PlaceChat({
+  chat,
+  page,
+  plate,
+}: {
+  chat: ChatProps | undefined;
+  page: (dock: ReactNode) => ReactNode;
+  /** The page's own plate (lazy), for the phone's "Its page" sheet of the chat alone (placePage.ts); none for a place with no page. */
+  plate?: ReactNode;
+}) {
   useHolding();
-  return useChatAlone() ? <FullChat chat={chat} /> : page(<DockSlot chat={chat} />);
+  const going = usePhoneGo();
+  const alone = useChatAlone();
+  if (going) return null;
+  return alone ? <FullChat chat={chat} plate={plate} /> : page(<DockSlot chat={chat} />);
 }
 
 // Whether the page was opened full from its address: the skeleton stands for that first draw alone, never for a chat that grows out of its dock.
@@ -156,6 +178,11 @@ export function DockedChatHost() {
     () => held,
     () => undefined,
   );
+  const plate = useSyncExternalStore(
+    heard.subscribe,
+    () => plated,
+    () => null,
+  );
   const alone = useChatAlone();
   // The seat still in the window's own place while the address no longer asks it full: this draw gives the chat back to its page, and its screen is
   // copied first, as it stands (a render only reads; a second run finds the same).
@@ -168,5 +195,10 @@ export function DockedChatHost() {
     if (alone) putSeat(document.body);
   }, [alone]);
   if (chat === undefined) return null;
-  return createPortal(<Chat {...chat} />, seatOf());
+  return createPortal(
+    <PlacePageProvider value={plate}>
+      <Chat {...chat} />
+    </PlacePageProvider>,
+    seatOf(),
+  );
 }

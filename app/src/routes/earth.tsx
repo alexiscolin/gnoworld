@@ -36,7 +36,14 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function Earth() {
   const universe = useLoaderData<typeof loader>();
   const chat = { world: EARTH.slug, place: chatPlace(EARTH, universe, EARTH_KICKER) };
-  return <PlaceChat chat={chat} page={(dock) => <EarthPage universe={universe} chat={dock} />} />;
+  // The same plate as the page's, for the phone's "Its page" sheet of the full chat.
+  return (
+    <PlaceChat
+      chat={chat}
+      plate={<EarthPlate universe={universe} />}
+      page={(dock) => <EarthPage universe={universe} chat={dock} />}
+    />
+  );
 }
 
 function EarthPage({ universe, chat }: { universe: UniverseView; chat: ReactNode }) {

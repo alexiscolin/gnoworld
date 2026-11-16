@@ -17,6 +17,8 @@ export interface PlaceInfoProps {
   countries?: ReactNode;
   /** The place's links out (PlaceMore.tsx's Links). */
   links?: ReactNode;
+  /** The place's page, as a control opening it (a phone's sheet, PlaceSheet.tsx); none on a computer, whose page is beside the chat. */
+  page?: ReactNode;
   /** Who is here, drawn under Here now. */
   here: ReactNode;
   /** Takes the focus from code, as Who's here moves the reader to the list. */
@@ -31,6 +33,7 @@ export function PlaceInfo({
   talking,
   countries,
   links,
+  page,
   here,
   panelRef,
 }: PlaceInfoProps) {
@@ -50,6 +53,7 @@ export function PlaceInfo({
           </div>
         )}
         {links}
+        {page}
         <section className={styles["here"]}>
           <Stack space="2xs">
             <h3 className="label">Here now</h3>

@@ -6,6 +6,7 @@ import { cosmosAt, isHome } from "../cosmosAt.ts";
 import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Hero, usePeople, Worlds, type People } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
+import { usePhoneGo } from "../features/chat/phoneGo.ts";
 import { useMedia } from "../features/chat/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { returning, RETURN_AFTER, riseChrome } from "../features/universe/rise.ts";
@@ -66,7 +67,8 @@ function OverSpace({
           <LazyRail places={{ earth: universe.earth.path, worlds: universe.worlds }} universe={universe.id} />
         </Suspense>
       )}
-      <SpaceFoot />
+      {/* A phone draws no space, so offers none. */}
+      {phone ? null : <SpaceFoot />}
     </>
   );
 }
@@ -93,7 +95,7 @@ function FirstScreen({ to, people }: { to: string; people: People | undefined })
 // A system's name on the hero: the Earth's as the header says it, another's as its namespace.
 const systemTitle = (id: string): string => (isHome(id) ? "gno.land" : nameOf(id));
 
-export default function Home() {
+function Cosmos() {
   const universe = useLoaderData<typeof loader>();
   // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's. The number reads that count,
   // whether the scene runs or not, from a few bytes of its own, so a phone asks nothing of the cosmos before View in space.
@@ -133,6 +135,11 @@ export default function Home() {
       ) : null}
     </>
   );
+}
+
+// A phone has no cosmos views: they go to this home's list (usePhoneGo), and the page draws nothing meanwhile.
+export default function Home() {
+  return usePhoneGo() ? null : <Cosmos />;
 }
 
 // Every route catches its own errors (docs/ARCHITECTURE.md); the app may be what failed, so the

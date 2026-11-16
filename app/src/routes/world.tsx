@@ -54,6 +54,8 @@ function useWorldSpace(world: SiteWorld) {
 const kickerOf = (world: ReturnType<typeof site.world>) =>
   [...(world.genre === undefined ? [] : [world.genre]), KINDS[world.kind ?? "hub"] ?? "Hub"].join(" · ");
 
+const noRing = () => undefined;
+
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
@@ -65,7 +67,11 @@ export default function World() {
     place: chatPlace({ ...world, room: `#${world.slug}`, pinned: pinnedBar(world, universe), inPage: true }, universe),
     chain: { place: world, calls: calls ?? NO_CALLS },
   };
-  return <PlaceChat chat={chat} page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />} />;
+  // The same plate as the page's, for the phone's "Its page" sheet of the full chat (no ring there).
+  const plate = <HubPlate world={world} universe={universe} own={stationOf(world.slug)?.url} onRing={noRing} />;
+  return (
+    <PlaceChat chat={chat} plate={plate} page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />} />
+  );
 }
 
 function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: UniverseView; chat: ReactNode }) {

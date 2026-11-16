@@ -127,6 +127,8 @@ function OwnerLink({ realm, namespace }: { realm: string; namespace: string }) {
   return href === undefined ? <>@{namespace}</> : <Link to={href}>@{namespace}</Link>;
 }
 
+const noRing = () => undefined;
+
 /** A realm's page; `known` is whether its realm is proved to exist: no room is asked and no planet drawn before. */
 export function RealmPage({ found, known }: { found: RealmAt; known: boolean }) {
   const { namespace, name, talk, room, chat, failed, retry } = useRealmChat(found, known);
@@ -134,6 +136,8 @@ export function RealmPage({ found, known }: { found: RealmAt; known: boolean }) 
   return (
     <PlaceChat
       chat={chat}
+      // The same plate as the page's, for the phone's "Its page" sheet of the full chat (no ring there).
+      plate={<RealmPlate found={found} name={name} talk={talk} room={room} onRing={noRing} />}
       page={(dock) => (
         <RealmPlace
           found={found}

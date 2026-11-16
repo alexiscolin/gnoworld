@@ -1,5 +1,8 @@
 // The full chat in the address (?chat=full): read by the chat (features/chat/full.ts), by space (useSpace draws the chat at once), and here
 // before React draws, so a page opened full shows the chat's cover from its first paint and space never starts behind it.
+import { PHONE_QUERY } from "@gnoworld/core";
+import { cosmosAt } from "./cosmosAt.ts";
+
 /** The address's key for the chat's size. */
 export const FULL = "chat";
 
@@ -67,10 +70,30 @@ export function fullChatHref(href: string): string {
   return `${path}?${params.toString()}${hash === undefined ? "" : `#${hash}`}`;
 }
 
+const ECOSYSTEM_PAGE = /^(?:\/net\/[^/]+)?\/e\//;
+
+/** Where a phone leaves the address `at` for, a phone being the full chat only: a place goes to its full chat (what the address asked of
+ * the room or the person kept), the cosmos's addresses and an ecosystem's to the universe's `home`; none anywhere else, on a computer or
+ * in the full chat already. */
+export function phoneGoes(
+  phone: boolean,
+  at: { readonly pathname: string; readonly search: string; readonly hash: string },
+  home: string,
+): string | undefined {
+  if (!phone) return undefined;
+  if (cosmosAt(at.pathname) !== undefined || ECOSYSTEM_PAGE.test(at.pathname)) return home;
+  if (!holdsChat(at.pathname) || asksFull(new URLSearchParams(at.search))) return undefined;
+  return `${fullChatHref(`${at.pathname}${at.search}`)}${at.hash}`;
+}
+
 /** Marks the root of a chat's page opened full (data-chat="full", shellHeader.module.css's cover, space/motion.ts's pause), before React
  * draws; the chat keeps or drops the mark as it opens or shrinks. */
 export function markFullEarly(): void {
-  if (typeof document === "undefined" || !holdsChat(location.pathname)) return;
+  if (typeof document === "undefined") return;
+  // A phone's place is its full chat: the address says so before React reads it, so the page's own first paint never shows.
+  const to = phoneGoes(matchMedia(PHONE_QUERY).matches, location, "");
+  if (to !== undefined && to !== "") history.replaceState(history.state, "", to);
+  if (!holdsChat(location.pathname)) return;
   if (!asksFull(new URLSearchParams(location.search))) return;
   document.documentElement.dataset["chat"] = "full";
 }
