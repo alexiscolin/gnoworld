@@ -15,6 +15,8 @@ import styles from "./RealmBlocks.module.css";
 export { DRAW_LIMIT, INLINE_LIMIT } from "./drawBudget.ts";
 import type { CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
+import { formsRegion } from "./formsRegion.ts";
+import { actionsOf } from "./pageActions.ts";
 
 // A form with its Call is the realm view's own, never a capture's or a chat's: the call card's code comes only as one is drawn.
 const CallableForm = lazy(async () => ({ default: (await import("./CallableForm.tsx")).CallableForm }));
@@ -34,9 +36,8 @@ interface Drawn extends Ink {
   readonly under: { level: 1 | 2 | 3 | 4 | 5 | 6 };
 }
 
-const inlinesOf = (block: PageBlock): readonly Inline[] => {
-  return block.type === "paragraph" || block.type === "heading" ? block.children : [];
-};
+const inlinesOf = (block: PageBlock): readonly Inline[] =>
+  block.type === "paragraph" || block.type === "heading" ? block.children : [];
 
 // What a row costs: a unit for each cell it is drawn with (the head's width, a short row filled), and the nodes in them, so a
 // table of empty cells is no free page.
@@ -48,7 +49,7 @@ const rowWeight =
 const NOTICE_ICON = { notice: "info", caution: "warning" } as const;
 
 // A table in a region of its own, which a keyboard can reach and scroll; its rows as many as the budget has.
-function table(block: Extract<PageBlock, { type: "table" }>, { budget, via, reader }: Drawn): ReactNode {
+function table(block: Extract<PageBlock, { type: "table" }>, { budget, via, reader, action }: Drawn): ReactNode {
   const cell = (tag: "th" | "td", nodes: Inline[], n: number) =>
     createElement(
       tag,
@@ -56,7 +57,7 @@ function table(block: Extract<PageBlock, { type: "table" }>, { budget, via, read
         scope: tag === "th" ? "col" : undefined,
         "data-align": block.align[n] === "none" ? undefined : block.align[n],
       },
-      ...drawInlines(nodes, { via, reader }),
+      ...drawInlines(nodes, { via, reader, action }),
     );
   const rows = budget.fit(block.rows, rowWeight(block.head.length));
   const head = createElement("thead", null, createElement("tr", null, ...block.head.map((c, n) => cell("th", c, n))));
@@ -145,9 +146,15 @@ function columns(block: Extract<PageBlock, { type: "columns" }>, on: Drawn): Rea
 }
 
 // The chat's flat list, its items as many as the budget has.
-function list(block: Extract<PageBlock, { type: "list" }>, { budget, via, reader }: Drawn): ReactNode {
-  const items = budget.fit(block.items, weigh);
-  return items.length === 0 ? undefined : via.block({ ...block, items }, reader);
+function list(block: Extract<PageBlock, { type: "list" }>, on: Drawn): ReactNode {
+  const items = on.budget.fit(block.items, weigh);
+  if (items.length === 0) return undefined;
+  // Drawn here, not by the chat's block, which has no action: a `$help` link in a bullet is a button too (F13526).
+  return createElement(
+    block.ordered ? "ol" : "ul",
+    block.ordered && block.start !== 1 ? { start: block.start } : null,
+    ...items.map((item) => createElement("li", null, ...drawInlines(item, on))),
+  );
 }
 
 type Leaf = Extract<PageBlock, { type: "heading" | "rule" | "paragraph" | "codeBlock" }>;
@@ -203,8 +210,7 @@ export function RealmBlocks({
   via: Drawing;
 } & (
   | { call?: undefined; page?: undefined }
-  /** The realm the page is of: with it, a form a call can carry gets its Call, and `page` is the page's name (its address on
-   * gnoweb) its call cards are named from, so a page drawn again finds them. */
+  /** The page's realm: its forms get their Call; `page`, its gnoweb address, names its cards so a redraw finds them. */
   | { call: CallPlace; page: string }
 )) {
   const warning = useExternalLinks(origin);
@@ -212,19 +218,12 @@ export function RealmBlocks({
   const reader = { ...via.reader, link: warning.link };
   const anchorId = useId();
   const forms: ReactNode[] = [];
-  const drawn = drawAll(blocks, {
-    budget,
-    via,
-    reader,
-    call: call === undefined ? undefined : { place: call, page },
-    forms,
-    anchor: anchorId,
-    under: { level: 1 },
-  });
-  const below =
-    forms.length === 0
-      ? undefined
-      : createElement("section", { className: styles["forms"], "aria-label": "Forms" }, ...forms);
+  const cards: string[] = [];
+  const under: Drawn["under"] = { level: 1 };
+  const named = call === undefined ? undefined : { place: call, page };
+  const action = actionsOf(named, { forms, cards }, () => CARD_LEVEL[under.level]);
+  const drawn = drawAll(blocks, { budget, via, reader, action, call: named, forms, anchor: anchorId, under });
+  const below = formsRegion(forms, cards, styles["forms"]);
   const notice = budget.cut
     ? createElement(
         "p",

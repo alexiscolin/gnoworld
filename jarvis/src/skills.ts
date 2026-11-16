@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, type Stats } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { hiddenIn, visible } from "./untrusted.ts";
+import { hiddenIn, TOOL_RESULT_BYTES, visible } from "./untrusted.ts";
 
 interface Limits {
   readonly file: number;
@@ -34,8 +34,12 @@ interface Folder {
 const failure = (path: string, why: string, options?: ErrorOptions) =>
   new Error(`skills: ${visible(path, false)}: ${why}`, options);
 
-/** The skills of a folder, 64 KiB a file and 512 KiB in all by default; throws on anything else, naming the file. */
-export function loadSkills(folder: string, limits: Limits = { file: 64 * 1024, total: 512 * 1024 }) {
+/**
+ * The skills of a folder, a file at most as big as a tool result (a bigger one would reach Jarvis cut) and 512 KiB in
+ * all by default; throws on anything else, naming the file.
+ */
+export function loadSkills(folder: string, given: Partial<Limits> = {}) {
+  const limits: Limits = { file: TOOL_RESULT_BYTES, total: 512 * 1024, ...given };
   if (!lstatSync(folder).isDirectory()) throw new Error("skills: the folder is no directory");
   const files = new Map<string, { readonly bytes: Buffer; readonly text: string }>();
   let total = 0;
@@ -141,21 +145,12 @@ function descriptionOf(name: string, path: string, text: string): string {
 }
 
 // load_skill: a skill by its name, or one of its references by its file's name, both from what was loaded.
-// gnomcp's gno skill, copied whole, is offered its nine reading references alone, never the five that teach an
-// agent that writes, signs and sends coins; a skill of ours, each of its references.
+// gnomcp's gno skill is offered its reading references, and their parts (`name-2.md`), never the five that teach an
+// agent that writes, signs and sends coins (nor their parts); a skill of ours, each of its references.
 function offers(skill: string, reference: string): boolean {
-  const reading = [
-    "audit",
-    "interrealm",
-    "memory",
-    "networks",
-    "patterns",
-    "render",
-    "security",
-    "stdlib",
-    "sysrealms",
-  ];
-  return skill !== "gno" || reading.some((name) => reference === `${name}.md`);
+  return (
+    skill !== "gno" || !["build", "debug", "gnokey", "mcp", "toolchain"].includes(reference.replace(/(-\d+)?\.md$/, ""))
+  );
 }
 
 function toolOf(names: [string, ...string[]], references: readonly string[], offered: (path: string) => boolean) {

@@ -19,6 +19,7 @@ import { z } from "zod";
 import { logger } from "@gnoworld/service/log";
 import { allowlist } from "./allowlist.ts";
 import { loadSkills } from "./skills.ts";
+import { untrustedBlocks } from "./untrusted.ts";
 
 // The Linux image's file system lists a folder in its names' hash order, where APFS lists them sorted: a test may have
 // every listing come reversed, so the walk's own sort is what it sees.
@@ -160,7 +161,7 @@ describe("loadSkills: what it gives", () => {
 });
 
 // gnomcp's gno skill teaches an agent that writes, signs and sends
-// coins in five of its references; Jarvis is offered its nine reading ones alone, the folder kept whole.
+// coins in five of its references; Jarvis is offered its reading ones and their parts alone, the folder kept whole.
 describe("loadSkills: the gno skill's references Jarvis is never offered", () => {
   const WRITING = ["build.md", "debug.md", "gnokey.md", "mcp.md", "toolchain.md"];
   const WITH_WRITING = () => ({
@@ -171,6 +172,13 @@ describe("loadSkills: the gno skill's references Jarvis is never offered", () =>
   it("offers none of them in load_skill's schema", () => {
     const { tool } = loadSkills(folder(WITH_WRITING()));
     expect(z.toJSONSchema(tool.args, { io: "input" })).toMatchObject({
+      properties: { reference: { enum: ["audit.md", "security.md"] } },
+    });
+  });
+
+  it("offers none of their parts either, whatever the part's number", () => {
+    const files = { ...WITH_WRITING(), "gno/references/gnokey-12.md": "# gnokey, part 12\n" };
+    expect(z.toJSONSchema(loadSkills(folder(files)).tool.args, { io: "input" })).toMatchObject({
       properties: { reference: { enum: ["audit.md", "security.md"] } },
     });
   });
@@ -437,16 +445,32 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
     expect(loadSkills(folder({ "a/SKILL.md": text }), { file: size, total: size }).index).toHaveLength(1);
   });
 
-  it("holds 64 KiB a file and 512 KiB in all by default", () => {
-    const big = (name: string) => skill(name, "d", "b".repeat(64 * 1024 - skill(name, "d", "").length));
+  // F13520: a tool result is cut at 16 KiB (untrustedBlocks), so a file past it would reach Jarvis cut: the loader's cap is that one.
+  it("holds 16 KiB a file and 512 KiB in all by default", () => {
+    const big = (name: string) => skill(name, "d", "b".repeat(16 * 1024 - skill(name, "d", "").length));
     expect(loadSkills(folder({ "a/SKILL.md": big("a") })).index).toHaveLength(1);
-    expect(failure(folder({ "a/SKILL.md": `${big("a")}b` }))).toBe("skills: a/SKILL.md: past 65536 bytes");
-    const eight = Object.fromEntries(
-      ["a", "b", "c", "d", "e", "f", "g", "h"].map((name) => [`${name}/SKILL.md`, big(name)]),
+    expect(failure(folder({ "a/SKILL.md": `${big("a")}b` }))).toBe("skills: a/SKILL.md: past 16384 bytes");
+    const files = Object.fromEntries(
+      Array.from({ length: 32 }, (_, i) => [`s${String(i)}/SKILL.md`, big(`s${String(i)}`)]),
     );
-    expect(loadSkills(folder(eight)).index).toHaveLength(8);
-    expect(failure(folder({ ...eight, "i/SKILL.md": skill("i") }))).toBe(
-      "skills: i/SKILL.md: past 524288 bytes in all",
+    expect(loadSkills(folder(files)).index).toHaveLength(32);
+    expect(failure(folder({ ...files, "t/SKILL.md": skill("t") }))).toBe(
+      "skills: t/SKILL.md: past 524288 bytes in all",
+    );
+  });
+
+  // Every file is held to the cap, one no tool offers too: a write reference past it is split, never exempt.
+  it("refuses a reference no tool offers one byte past the cap, as it does an offered one", () => {
+    const over = "r".repeat(16 * 1024 + 1);
+    expect(failure(folder({ ...TWO(), "gno/references/gnokey.md": over }))).toBe(
+      "skills: gno/references/gnokey.md: past 16384 bytes",
+    );
+  });
+
+  it("refuses a reference one byte past the cap, naming it", () => {
+    const over = "r".repeat(16 * 1024 + 1);
+    expect(failure(folder({ ...TWO(), "gno/references/audit.md": over }))).toBe(
+      "skills: gno/references/audit.md: past 16384 bytes",
     );
   });
 
@@ -541,28 +565,73 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
 describe("loadSkills: the skills folder this repository ships", () => {
   const SHIPPED = fileURLToPath(new URL("../skills", import.meta.url));
 
-  it("loads ours and gnomcp's gno skill, and offers nine of its fourteen references, the reading ones", () => {
-    const skills = loadSkills(SHIPPED);
-    expect(skills.index.map((entry) => entry.name)).toEqual([
+  const GNO = join(SHIPPED, "gno");
+  const offered = () => {
+    const schema = z.object({ properties: z.object({ reference: z.object({ enum: z.array(z.string()) }) }) });
+    return schema.parse(z.toJSONSchema(loadSkills(SHIPPED).tool.args)).properties.reference.enum;
+  };
+
+  it("loads ours and gnomcp's gno skill, and offers its reading references and their parts, never the five that write", () => {
+    expect(loadSkills(SHIPPED).index.map((entry) => entry.name)).toEqual([
       "catch-up",
       "concierge",
       "gno",
       "realm-reader",
       "translation",
     ]);
-    expect(readdirSync(join(SHIPPED, "gno/references"))).toHaveLength(14);
-    const schema = z.object({ properties: z.object({ reference: z.object({ enum: z.array(z.string()) }) }) });
-    expect(schema.parse(z.toJSONSchema(skills.tool.args)).properties.reference.enum).toEqual([
+    // The intended set, spelled out: a part lost, or one added without a decision, fails here.
+    expect(offered()).toEqual([
       "audit.md",
+      "interrealm-2.md",
       "interrealm.md",
       "memory.md",
       "networks.md",
+      "patterns-2.md",
       "patterns.md",
       "render.md",
+      "security-2.md",
+      "security-3.md",
       "security.md",
+      "skill-2.md",
       "stdlib.md",
       "sysrealms.md",
     ]);
+  });
+
+  // F13521: offers() once listed nine names, so a part named otherwise was loaded and never offered, its text lost.
+  it("offers every file of gno's references but the write ones and their parts, and names each part from the file before it", () => {
+    const writing = new Set(["build", "debug", "gnokey", "mcp", "toolchain"]);
+    const files = readdirSync(join(GNO, "references")).sort();
+    const stem = (file: string) => file.replace(/(-\d+)?\.md$/, "");
+    expect(offered()).toEqual(files.filter((file) => !writing.has(stem(file))));
+    const router = readFileSync(join(GNO, "SKILL.md"), "utf8");
+    for (const file of files) {
+      const part = /^(.+)-(\d+)\.md$/.exec(file);
+      if (part === null) {
+        if (file !== "skill-2.md") expect(router, file).toContain(`references/${file}`);
+        continue;
+      }
+      const [, name = "", number = "0"] = part;
+      const first = name === "skill" ? "SKILL.md" : `references/${name}.md`;
+      const before = Number(number) === 2 ? first : `references/${name}-${String(Number(number) - 1)}.md`;
+      const parent = readFileSync(join(GNO, before), "utf8");
+      expect(parent, file).toContain(`*Continued in \`${file}\`.*`);
+    }
+  });
+
+  // F13520: today gno/SKILL.md (17,036 B) and four references reach Jarvis cut at the tool result's 16 KiB.
+  it("loads every shipped file whole through the tool's result cap, none cut", () => {
+    const skills = loadSkills(SHIPPED);
+    const schema = z.object({ properties: z.object({ reference: z.object({ enum: z.array(z.string()) }) }) });
+    const references = schema.parse(z.toJSONSchema(skills.tool.args)).properties.reference.enum;
+    const texts = [
+      ...skills.index.map(({ name }) => ({ name, text: skills.read({ skill: name }) })),
+      ...references.map((reference) => ({ name: reference, text: skills.read({ skill: "gno", reference }) })),
+    ];
+    for (const { name, text } of texts) {
+      const wrapped = untrustedBlocks().wrap("load_skill", text);
+      expect(wrapped, name).toContain(text.slice(-200));
+    }
   });
 
   // gnomcp's gno skill names its sibling skills, its write tools and gnokey commands, a signed write past the call card.
@@ -583,25 +652,34 @@ describe("loadSkills: the skills folder this repository ships", () => {
     }
   });
 
-  it("ships gnomcp's gno skill unchanged, its licence beside it, and a notice naming its source, version and bytes", () => {
-    const gno = join(SHIPPED, "gno");
-    const notice = readFileSync(join(gno, "NOTICE"), "utf8");
+  // The file as gnomcp ships it is its parts joined, the lines that join them taken out (NOTICE says so): the hash is of that.
+  it("ships gnomcp's gno skill whole but for the splits, its licence beside it, and a notice naming its source, version and bytes", () => {
+    const notice = readFileSync(join(GNO, "NOTICE"), "utf8");
     expect(notice).toContain("gnomcp 0.11.0");
     expect(notice).toContain("https://github.com/gnoverse/gno-mcp");
-    expect(readFileSync(join(gno, "LICENSE"), "utf8")).toMatch(/^ +Apache License\n +Version 2\.0, January 2004\n/);
-    // Each file's SHA-256 as gnomcp 0.11.0 ships it, which the notice lists: a change to one fails here.
-    const listed = [...notice.matchAll(/^([0-9a-f]{64}) {2}(\S+)$/gm)].map(([, hash, path]) => [path, hash]);
+    expect(readFileSync(join(GNO, "LICENSE"), "utf8")).toMatch(/^ +Apache License\n +Version 2\.0, January 2004\n/);
+    const listed = [...notice.matchAll(/^([0-9a-f]{64}) {2}(\S+)$/gm)].map(([, hash, path]) => [path ?? "", hash]);
     const shipped = [
       "LICENSE",
       "SKILL.md",
-      ...readdirSync(join(gno, "references")).map((name) => `references/${name}`),
+      ...readdirSync(join(GNO, "references")).map((name) => `references/${name}`),
     ];
-    expect(listed.map(([path]) => path).sort()).toEqual(shipped.sort());
+    const parts = (path: string) => [path, ...shipped.filter((other) => other.startsWith(`${path.slice(0, -3)}-`))];
+    const joiner = /^\*Continue(?:d in|s) `[A-Za-z0-9-]+\.md`\.\*\n/gm;
+    const asShipped = (path: string) =>
+      (path === "SKILL.md" ? [path, "references/skill-2.md"] : parts(path))
+        .map((part) => readFileSync(join(GNO, part), "utf8").replace(joiner, ""))
+        .join("");
+    const paths = listed.map(([path]) => path ?? "");
+    // Each file listed, whole or by its parts, is not one that another listed file lacks: no part is left out of the notice.
+    expect(shipped.filter((path) => !paths.includes(path) && !/-\d+\.md$/.test(path))).toEqual([]);
+    expect(paths.filter((path) => !shipped.includes(path))).toEqual([]);
     for (const [path, hash] of listed) {
       expect(
         createHash("sha256")
-          .update(readFileSync(join(gno, path ?? "")))
+          .update(asShipped(path ?? ""))
           .digest("hex"),
+        path,
       ).toBe(hash);
     }
   });

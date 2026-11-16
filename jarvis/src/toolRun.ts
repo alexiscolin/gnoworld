@@ -68,7 +68,12 @@ async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]
     // A signal fired before it listened fires no more.
     if (run.signal.aborted) stop();
   });
-  const asked: Asked = { text: run.question, cards: run.kept.within(time.signal), signal: time.signal };
+  const asked: Asked = {
+    text: run.question,
+    cards: run.kept.within(time.signal),
+    signal: time.signal,
+    shared: run.shared,
+  };
   let ran: Ran = { ok: false, reason: "error" };
   try {
     ran = await Promise.race([run.parts.tools.run(call, asked), late]);

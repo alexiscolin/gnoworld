@@ -12,6 +12,9 @@ import { adminRoutes } from "./admin.ts";
 import type { Jarvis } from "./jarvis.ts";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
+// A day with nothing spent and nothing reserved, beside the caps.
+const IDLE = { ask: 0, translate: 0 };
+
 // ADR-0002 §6: the admin API that changes Jarvis's quotas, allowlist and budgets, by a team account's session
 // and a fresh signature of each change, its text the action in words.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
@@ -48,7 +51,7 @@ const setup = ({ budgets, setBudget, jarvis, nonceCap }: Options = {}) => {
   const lines: string[] = [];
   const log = logger(PEPPER, (line) => lines.push(line));
   const changes: JarvisBudget[] = [];
-  const current = { ask: 45, translate: 5 };
+  const current = { ask: 45, translate: 5, spent: IDLE, reserved: IDLE };
   const app = makeApp(log, () => true);
   app.route(
     "/api/admin/jarvis",
@@ -130,7 +133,7 @@ const SETTINGS = (over: Partial<JarvisSettings> = {}): JarvisSettings => ({
   quota: 20,
   quotaUnnamed: 5,
   unlimited: [],
-  budgets: { ask: 45, translate: 5 },
+  budgets: { ask: 45, translate: 5, spent: IDLE, reserved: IDLE },
   ...over,
 });
 
@@ -138,6 +141,13 @@ describe("the admin API, read", () => {
   it("answers the quotas, the allowlist and jarvis's budgets to the team", async () => {
     const { call } = setup();
     expect(await answerOf(await call("GET", "", {}))).toEqual([200, SETTINGS()]);
+  });
+
+  // F13524: what jarvis reports as spent and reserved reaches the admin's answer beside the caps, fractions of a dollar kept.
+  it("answers what jarvis says is spent and reserved today beside its caps", async () => {
+    const budgets = { ask: 45, translate: 5, spent: { ask: 0.37, translate: 1 }, reserved: { ask: 2, translate: 0 } };
+    const { call } = setup({ budgets: () => Promise.resolve({ ok: true, budgets }) });
+    expect(await answerOf(await call("GET", "", {}))).toEqual([200, SETTINGS({ budgets })]);
   });
 
   it("answers no budgets when jarvis does not answer, or there is no jarvis", async () => {
@@ -157,7 +167,7 @@ describe("the admin API, read", () => {
     const { call } = setup({
       budgets: () => {
         asked += 1;
-        return Promise.resolve({ ok: true, budgets: { ask: 45, translate: 5 } });
+        return Promise.resolve({ ok: true, budgets: { ask: 45, translate: 5, spent: IDLE, reserved: IDLE } });
       },
     });
     expect(await answerOf(await call("GET", "", { token: null }))).toEqual([401, { error: "unauthenticated" }]);
@@ -246,7 +256,10 @@ describe("the admin API, a change", () => {
   it("sends a budget's change to jarvis, which applies it", async () => {
     const { challenge, prove, change, changes } = setup();
     const made = await challenge({ setting: "budget", budget: "ask", dollars: 30 });
-    expect(await answerOf(await change(prove(made)))).toEqual([200, SETTINGS({ budgets: { ask: 30, translate: 5 } })]);
+    expect(await answerOf(await change(prove(made)))).toEqual([
+      200,
+      SETTINGS({ budgets: { ask: 30, translate: 5, spent: IDLE, reserved: IDLE } }),
+    ]);
     expect(changes).toEqual([{ budget: "ask", dollars: 30 }]);
   });
 
@@ -471,12 +484,12 @@ describe("the admin API, a change", () => {
       [
         { setting: "budget", budget: "ask", dollars: 3 },
         "the daily budget for questions is $3",
-        { quota: 1, quotaUnnamed: 7, budgets: { ask: 3, translate: 5 } },
+        { quota: 1, quotaUnnamed: 7, budgets: { ask: 3, translate: 5, spent: IDLE, reserved: IDLE } },
       ],
       [
         { setting: "budget", budget: "translate", dollars: 1 },
         "the daily budget for translations is $1",
-        { quota: 1, quotaUnnamed: 7, budgets: { ask: 3, translate: 1 } },
+        { quota: 1, quotaUnnamed: 7, budgets: { ask: 3, translate: 1, spent: IDLE, reserved: IDLE } },
       ],
     ];
     for (const [asked, words, end] of ends) {

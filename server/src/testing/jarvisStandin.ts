@@ -16,7 +16,10 @@ import {
 } from "@gnoworld/schemas";
 import { answerOf, DIGEST, translated } from "./jarvisStandinAnswers.ts";
 
-const BUDGETS: JarvisBudgets = { ask: 5, translate: 5 };
+// A day with nothing spent and nothing reserved, beside the caps.
+const IDLE = { ask: 0, translate: 0 };
+
+const BUDGETS: JarvisBudgets = { ask: 5, translate: 5, spent: IDLE, reserved: IDLE };
 const OFF: JarvisExplained = { status: "off" };
 const REFUSED = { error: "refused" };
 

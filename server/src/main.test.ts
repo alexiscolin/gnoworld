@@ -21,6 +21,9 @@ import { loadRoles } from "./roles/roles.ts";
 import { cliFile, cliKey } from "./testing/cliSigner.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
+// A day with nothing spent and nothing reserved, beside the caps.
+const IDLE = { ask: 0, translate: 0 };
+
 interface Server {
   child: ChildProcessByStdio<null, Readable, Readable>;
   out: { stdout: string; stderr: string };
@@ -1201,7 +1204,13 @@ describe("the server's process", { timeout: 30_000 }, () => {
     let asked = false;
     const jarvis = createHttpServer((_, res) => {
       asked = true;
-      setTimeout(() => res.writeHead(200, { "content-type": "application/json" }).end('{"ask":45,"translate":5}'), 500);
+      setTimeout(
+        () =>
+          res
+            .writeHead(200, { "content-type": "application/json" })
+            .end(JSON.stringify({ ask: 45, translate: 5, spent: IDLE, reserved: IDLE })),
+        500,
+      );
     });
     jarvis.listen(0, "127.0.0.1");
     await once(jarvis, "listening");
@@ -1219,7 +1228,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
       const answer = await reading;
       expect([answer.status, await answer.json()]).toEqual([
         200,
-        { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: { ask: 45, translate: 5 } },
+        { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: { ask: 45, translate: 5, spent: IDLE, reserved: IDLE } },
       ]);
       expect(await exit).toBe(0);
     } finally {

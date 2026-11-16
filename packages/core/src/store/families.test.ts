@@ -11,7 +11,23 @@ describe("familyOf", () => {
   it("drops a version directory and a trailing number", () => {
     expect(familyOf("gno.land/r/gnoswap/pool/v1")).toBe("gno.land/r/gnoswap/pool");
     expect(familyOf("gno.land/r/gnoswap/pool/v12")).toBe(familyOf("gno.land/r/gnoswap/pool"));
-    expect(familyOf("gno.land/r/me/game12")).toBe("gno.land/r/me/game");
+    expect(familyOf("gno.land/r/me/game_v12")).toBe("gno.land/r/me/game");
+  });
+
+  // F13523: bare trailing digits are part of the name; only a `/vN` directory or a `_vN` suffix is a version (a bare `vN`
+  // suffix, as in `gov2`, is not: no realm name of the store's tests or fixtures needs it).
+  it("keeps gov2, grc20 and grc721 in families of their own, and the versions of connect4 in one", () => {
+    expect(familyOf("gno.land/r/me/gov2")).toBe("gno.land/r/me/gov2");
+    expect(familyOf("gno.land/r/me/grc20")).toBe("gno.land/r/me/grc20");
+    expect(familyOf("gno.land/r/me/grc721")).toBe("gno.land/r/me/grc721");
+    expect(familyOf("gno.land/r/me/game12")).toBe("gno.land/r/me/game12");
+    expect(familyOf("gno.land/r/me/gov2")).not.toBe(familyOf("gno.land/r/me/go"));
+    expect(familyOf("gno.land/r/me/grc20")).not.toBe(familyOf("gno.land/r/me/grc721"));
+    expect(familyOf("gno.land/r/me/connect4_v2")).toBe("gno.land/r/me/connect4");
+    expect(familyOf("gno.land/r/me/grc20_v2")).toBe("gno.land/r/me/grc20");
+    expect(familyOf("gno.land/r/me/pool_v")).toBe("gno.land/r/me/pool_v");
+    expect(familyOf("gno.land/r/me/foov3")).toBe("gno.land/r/me/foov3");
+    expect(familyOf("gno.land/r/me/pool/v1")).toBe("gno.land/r/me/pool");
   });
 
   it("keeps two realms of one author apart, and a name that is only digits", () => {

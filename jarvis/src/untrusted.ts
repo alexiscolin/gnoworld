@@ -15,6 +15,9 @@ interface Options {
 
 // What a reader cannot see, or a terminal acts on: scripts/hidden.py's set (Default_Ignorable_Code_Point, Cf, Zl, Zp),
 // without its emoji exception, and every control character; tab and new line are a text's lines.
+/** The most a tool result keeps of a text: the limit of its block, and of a skill file, which a tool result carries. */
+export const TOOL_RESULT_BYTES = 16 * 1024;
+
 const hidden = () => /[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}\p{Cc}]/gu;
 const isLine = (character: string) => character === "\t" || character === "\n";
 const pointOf = (character: string) =>
@@ -55,7 +58,7 @@ const skeleton = (text: string) =>
     .replace(/[^0-9a-f]/g, "");
 
 /** A turn's blocks; throws when the limit is no whole number of bytes, or the random source gives other than 16 bytes. */
-export function untrustedBlocks({ random = randomBytes, limit = 16 * 1024 }: Options = {}): Untrusted {
+export function untrustedBlocks({ random = randomBytes, limit = TOOL_RESULT_BYTES }: Options = {}): Untrusted {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1024 * 1024) {
     throw new Error(`untrusted: a limit is a whole number of bytes, 1 to 1048576, not ${String(limit)}`);
   }

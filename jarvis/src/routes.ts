@@ -6,6 +6,8 @@
 import {
   DOOR_CAPS,
   EXPLAIN_VERSION,
+  flightsAlone,
+  isFixedAsk,
   JARVIS_PATHS,
   REALM_EXPLAIN_VERSION,
   JarvisAsk,
@@ -21,6 +23,7 @@ import {
 } from "@gnoworld/schemas";
 import { isBlank } from "@gnoworld/core";
 import type { Log } from "@gnoworld/service/log";
+import { questionOf } from "./asks.ts";
 import type { Budget } from "./budget.ts";
 import type { Digested } from "./digest.ts";
 import type { Explained } from "./explainRealm.ts";
@@ -42,7 +45,7 @@ interface Parts {
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
-  readonly budget: Pick<Budget, "caps" | "change">;
+  readonly budget: Pick<Budget, "change" | "state">;
   readonly log: Log;
 }
 
@@ -51,10 +54,15 @@ const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answ
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
 export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
-    const caps = budget.caps();
+    const [ask, translate] = [budget.state("ask"), budget.state("translate")];
     return {
       status: 200,
-      body: { ask: caps.ask / DOLLAR, translate: caps.translate / DOLLAR } satisfies JarvisBudgets,
+      body: {
+        ask: ask.cap / DOLLAR,
+        translate: translate.cap / DOLLAR,
+        spent: { ask: ask.spent / DOLLAR, translate: translate.spent / DOLLAR },
+        reserved: { ask: ask.reserved / DOLLAR, translate: translate.reserved / DOLLAR },
+      } satisfies JarvisBudgets,
     };
   };
   // A body its schema refuses, logged as this face's own refusals are (http.ts); a reason for a body it holds but cannot serve.
@@ -77,7 +85,8 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
               ? catchUp
               : ask;
         if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
-        return replyOf(await asking(question, signal), log);
+        const shared = isFixedAsk(asked.data);
+        return replyOf(await asking(shared ? { ...question, shared } : question, signal), log, shared);
       },
     },
     [JARVIS_PATHS.explain]: {
@@ -121,34 +130,8 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
   };
 }
 
-// The fixed asks' words, Jarvis's own and constant: the page sets none of them. The place, and a function's
-// realm and name, go in as data blocks beside the room's lines.
-const HERE = "What can I do here, in this place? Say it briefly, with what the place's data tells.";
-const CATCH_UP = "Catch me up on this room: what was said, in a few short lines.";
-// An explanation is the same for every room, so it is written in English whatever the room says.
-const EXPLAIN =
-  "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly, in English.";
-
-function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast" | "explain" } {
-  const room = asked.lines.map(lineOf);
-  const place = { source: "place", text: asked.room };
-  if ("question" in asked) return { question: { text: asked.question, room, read: [place] }, run: "main" };
-  if (asked.ask === "catch-up") return { question: { text: CATCH_UP, room, read: [place] }, run: "fast" };
-  if (asked.ask === "here") return { question: { text: HERE, room, read: [place] }, run: "main" };
-  // The code alone: no line of the room and no room name, so the answer can be kept for every room.
-  const named = { source: "function", text: `${asked.realm} ${asked.function}` };
-  return {
-    question: { text: EXPLAIN, room: [], read: [named], finds: { realm: asked.realm, name: asked.function } },
-    run: "explain",
-  };
-}
-
-// A room's line as data: who said it (the asker, or the others by their number), when, and its words, so its line
-// breaks and quotes pass for no other line.
-const lineOf = ({ speaker, time, text }: { speaker: number; time?: string | undefined; text: string }): string =>
-  JSON.stringify({ who: speaker === 0 ? "asker" : `#${String(speaker)}`, time, text });
-
-function replyOf(result: Result, log: Log): Reply {
+// A fixed ask's answer is shared by everyone who asks the same, so it keeps its flights alone (D13508).
+function replyOf(result: Result, log: Log, shared: boolean): Reply {
   if (result.kind === "answer") {
     const markdown = cut(result.text, log);
     // A text that draws nothing is no answer the wire can carry, but it was paid for.
@@ -160,7 +143,7 @@ function replyOf(result: Result, log: Log): Reply {
     return answered({
       status: "answered",
       markdown,
-      buttons,
+      buttons: shared ? flightsAlone(buttons) : buttons,
       cost: result.cost,
       ...(result.keep === true ? { keep: true, version: EXPLAIN_VERSION } : {}),
     });
@@ -169,8 +152,7 @@ function replyOf(result: Result, log: Log): Reply {
   if (result.kind === "spent")
     return answered(result.cost === undefined ? { status: "spent" } : { status: "spent", cost: result.cost });
   // Every other end that spent answers failed with its cost, which the door adds to the person's share.
-  if ("cost" in result) return answered({ status: "failed", cost: result.cost });
-  return failureOf(result.kind);
+  return "cost" in result ? answered({ status: "failed", cost: result.cost }) : failureOf(result.kind);
 }
 
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none

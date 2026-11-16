@@ -4,9 +4,7 @@
 // model's. Readers get the fly buttons alone. Allowances are spent before the first await.
 import type { DatabaseSync } from "node:sqlite";
 import { JARVIS_NICK } from "@gnoworld/core";
-import { DOOR_CAPS, shortAddress, type AnswerButton, type JarvisAnswer } from "@gnoworld/schemas";
-
-type FlyButton = Extract<AnswerButton, { type: "fly" }>;
+import { DOOR_CAPS, flightsAlone, shortAddress, type JarvisAnswer } from "@gnoworld/schemas";
 import { Hono } from "hono";
 import type { Log } from "@gnoworld/service/log";
 import { guestVerdict, type GuestFault } from "../guest/rules.ts";
@@ -75,7 +73,7 @@ export interface Answers {
 const toldOf = ({ markdown, buttons }: Answered): Answered => ({
   status: "answered",
   markdown,
-  buttons: buttons.filter((button): button is FlyButton => button.type === "fly"),
+  buttons: flightsAlone(buttons),
 });
 // All the words a reader would see: the markdown and each label, judged and sent to the provider together.
 const wordsOf = ({ markdown, buttons }: Answered): string =>

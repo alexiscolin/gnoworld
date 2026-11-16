@@ -30,10 +30,11 @@ const PAGE_BYTES = 64 * 1024;
 export const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
 const kept = (what: string): Ran => ({ ok: true, isError: false, text: `Kept: ${what}` });
 
-function definitionsOf([first, ...rest]: readonly string[]) {
+function definitionsOf([first, ...rest]: readonly string[], { universes }: Places) {
   if (first === undefined) throw new Error("cards: no chain profile");
   const profile = z.enum([first, ...rest]).describe("The realm's chain: one of Jarvis's chain profiles.");
   const realm = z.string().min(1).max(128).describe("The realm's path, such as `gno.land/r/gov/dao`.");
+  const ids = [first, ...rest].map((name) => `${name} is ${String(universes.get(name)?.chainId)}`).join(", ");
   const read =
     " The server reads the realm itself and keeps it only when its page and functions hold every number, link, account and function stated; else it says what is missing.";
   return [
@@ -49,7 +50,7 @@ function definitionsOf([first, ...rest]: readonly string[]) {
     },
     {
       name: "give_button" as const,
-      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain).${read}`,
+      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain profile, and its chainId: ${ids}).${read}`,
       args: z.strictObject({ profile: profile.optional(), button: AnswerButton }),
     },
   ] as const;
@@ -190,7 +191,14 @@ async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ra
   if (asked.cards.full("button")) return refused(`an answer holds ${String(CARDS.buttons)} buttons at most.`);
   const { button, profile } = args;
   if (button.type === "fly") return flyCard(setup, button, asked);
+  if (asked.shared === true) return refused("a shared answer carries flights alone.");
   if (profile === undefined) return refused("an action's button names its realm's chain profile.");
+  // The button runs on the chain it carries (D13508), and the check ran on the profile's universe: the two must be one.
+  const checkedOn = setup.places.universes.get(profile)?.chainId;
+  if (button.chainId !== checkedOn)
+    return refused(
+      `its chainId is ${button.chainId}, but its profile ${profile} is ${String(checkedOn)}: name the chain it was checked on.`,
+    );
   const sourced = await readRealm(setup, { profile, realm: button.action.realm, forms: true, signal: asked.signal });
   if (!sourced.ok) return refused(sourced.why);
   const checked = groundedButton(button, sourcesOf(withQuestion(sourced.read, asked)));
@@ -217,7 +225,7 @@ export function cardTools(setup: Setup) {
   const strange = setup.chains.find((chain) => !setup.places.universes.has(chain));
   if (strange !== undefined)
     throw new Error(`cards: the chain profile ${JSON.stringify(strange)} is no universe of the data`);
-  const definitions = definitionsOf(setup.chains);
+  const definitions = definitionsOf(setup.chains, setup.places);
   const [digest, proposal, button] = definitions;
   const ready: Ready = { ...setup, seen: new Map() };
   return {

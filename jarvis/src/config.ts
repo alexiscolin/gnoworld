@@ -21,6 +21,7 @@ import { WAIT_MAX_MS } from "./model.ts";
 import { DOLLAR, MODELS, type Model } from "./prices.ts";
 import { TOOL_MS } from "./toolRun.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
+import { TOOL_RESULT_BYTES } from "./untrusted.ts";
 
 export interface JarvisConfig {
   anthropicKey: Secret;
@@ -117,7 +118,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       JARVIS_CALL_TIMEOUT_S: whole(600, 60),
       // Two at most, never more (ADR-0002 §5), or none.
       JARVIS_RETRIES: z.enum(["0", "1", "2"]).default("2").transform(Number),
-      JARVIS_TOOL_RESULT_KIB: whole(64, 16),
+      JARVIS_TOOL_RESULT_KIB: whole(64, TOOL_RESULT_BYTES / 1024),
       JARVIS_MODEL: z.enum(MODELS).default("claude-sonnet-5-5"),
       JARVIS_MODEL_FAST: z.enum(MODELS).default("claude-haiku-5-5"),
       JARVIS_MODEL_DEEP: z.enum(MODELS).default("claude-opus-5-5"),

@@ -2,6 +2,7 @@
 // core's reader in a window of its own, a long one scrolling inside it. Every state names the way out: the link to the realm on gnoweb
 // (ADR-0002 §4, gnoweb is the source of truth) stands in its header whatever the page holds, with the height it was read at, the cap's
 // state or the failed read's state and its next step.
+import { withActions } from "@gnoworld/core";
 import { Button, Card, grouped, Skeleton, Stack, useAlone } from "@gnoworld/ui";
 import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useRef, useState } from "react";
@@ -79,7 +80,7 @@ function Body({
   }
   return (
     <RealmBlocks
-      blocks={state.page.blocks}
+      blocks={withActions(state.page.blocks, { origin: origin ?? "", realm: call.realm })}
       via={state.via}
       call={call}
       page={link ?? call.realm}
