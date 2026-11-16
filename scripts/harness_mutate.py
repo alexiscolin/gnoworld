@@ -1098,7 +1098,7 @@ def mutants():
     yield from each(ih, 'if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then', "if false; then", "hooks", "install_hooks installs land from a commit that holds it")
     # D13412: land holds the python3 and the tools its owner's PATH finds, never one from a folder a session can write.
     yield from each(ih, 'sh -s -- --stamp "$share/land.py"', "sh -s -- --stamp", "hooks", "install_hooks writes the tools found into land")
-    yield from each(ih, ' && ! grep -q @PYTHON3@ "$share/land.py"', "", "hooks", "install_hooks links no land its installer left unwritten")
+    yield from each(ih, """ && head -1 "$share/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C /[^ ]+ -I'""", "", "hooks", "install_hooks links no land its installer left unwritten")
     yield from each(ld, "#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I", "#!/usr/bin/env -S -i LC_ALL=C python3 -I", "hooks", "the repository's land runs nowhere")
     yield from each("scripts/agent_pr.py", "    if not title or len(title) > 256 or", "    if False or len(title) > 256 or", "hooks", "a pull request's text needs a title")
     # PR #17's red: the drop folder's /tmp read as the system resolves it. What that is differs by system, so the case runs on both

@@ -2996,8 +2996,9 @@ ln -s "$(command -v git)" "$t/gitfirst/git"
 grep -q "git: $t/gitfirst/git is under " "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home3/.local/bin/land" ] || fail "install_hooks.sh took land's git from a temporary folder: $(cat "$t/out")"
 grep -nE '/opt/homebrew|/usr/local/' "$here/land.py" "$here/agent_pr.py" "$here/install_hooks.sh" && fail "land, its code or its installer names a folder of one machine (D13411)"
 git -C "$i" checkout -q -b oldland landed && sed '1s|@PYTHON3@|python3|' "$here/land.py" >"$i/scripts/land.py" && git -C "$i" add -A && in_i git commit -qm "feat: land with python3 by name"
+git -C "$i" checkout -q -b oldbare oldland && git -C "$i" rm -rq tools && in_i git commit -qm "feat: land with python3 by name, without its installer"
 git -C "$i" checkout -q -b noinstaller landed && git -C "$i" rm -rq tools && in_i git commit -qm "feat: land without its installer" && git -C "$i" checkout -q main
-for b in "oldland|no placeholder took python3" "noinstaller|no land installed"; do
+for b in "oldland|no placeholder took python3" "oldbare|no land installed" "noinstaller|no land installed"; do
 	(cd "$i" && HOME="$i/home4" alexis sh scripts/install_hooks.sh "${b%%|*}" >"$t/out" 2>&1) || fail "install_hooks.sh failed on ${b%%|*}'s land, its hooks with it: $(cat "$t/out")"
 	grep -qF "${b#*|}" "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home4/.local/bin/land" ] || fail "install_hooks.sh linked a land from ${b%%|*}: $(cat "$t/out")"
 done

@@ -53,8 +53,7 @@ found() {
 	system=$(command -p getconf PATH) py= tools= prefixes=
 	for name in python3 git gh gitleaks; do
 		at=$(command -v "$name") || { echo "no $name on your PATH" >&2; exit 1; }
-		r=$(command -p realpath "$at") && d=$(command -p realpath "${at%/*}") || exit 1
-		p=$d/${at##*/}
+		d=$(command -p realpath "${at%/*}") && p=$d/${at##*/} && r=$(command -p realpath "$p") || exit 1
 		for x in "$p" "$r"; do
 			printf '%s\n' "$x" | grep -Eqx '(/[A-Za-z0-9._@+-]+){2,}' ||
 				{ echo "$name: $x holds a character a copy cannot carry (letters, digits and ._@+- alone)" >&2; exit 1; }

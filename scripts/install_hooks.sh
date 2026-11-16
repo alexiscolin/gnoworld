@@ -49,7 +49,7 @@ if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land" # a link there would take the write elsewhere
 	git show "$ref:scripts/land.py" >"$share/land.py"
 	git show "$ref:scripts/agent_pr.py" >"$share/agent_pr.py"
-	if git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$share/land.py" && ! grep -q @PYTHON3@ "$share/land.py"; then
+	if git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$share/land.py" && head -1 "$share/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C /[^ ]+ -I'; then
 		chmod 755 "$share/land.py"
 		printf '%s\n' "$repo" >"$share/repo"
 		ln -s "$share/land.py" "$HOME/.local/bin/land"
