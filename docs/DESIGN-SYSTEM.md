@@ -387,7 +387,7 @@ component with its CSS Module, documented by its props.
 | `EmptyState` | text and one action | Every list has one |
 | `Skeleton` | line, card, disc | Only where data takes longer than 300 ms |
 | `Logo` | mark, mark and wordmark | The header |
-| `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
+| `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`); an optional `note` above the acts, its description, never an act (a guest's "use a computer" on a touch phone, D13718) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
 | `NavItem` | current; a lead, a badge, a meta; a link, a button, or coming soon | An item of a column of places, the full chat's rooms and direct messages: a pill that fills cream when it is the one in view |
 | `Breadcrumb` | a labelled trail of links ending on the current page | The video's kicker: the one label style, a dot in the world's colour, a chevron between steps |
 | `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later release brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing. The package's own parts wear it through `Soon`, which also takes a class (a `NavItem` that is yet to come), and the menu's greyed act wears its `soon` class: the grey is written once. The entry's `ComingSoon` takes no class |
@@ -545,7 +545,8 @@ never the choice written again.
   - **Blocks** are the components, one CSS Module each, so class names never leak: no prefix,
     as the module renames each class with a hash; the utilities keep their plain names.
   - **Utilities** are single-purpose classes, driven by tokens, listed in
-    `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`,
+    `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`, `hit` (under 900 px an invisible
+    44 px box exactly as wide as its control, so neighbours never overlap: small buttons, chips, tabs, switches; D13718),
     `meta` (a secondary line) and `data-text` (figures or a path, broken anywhere), the rows
     `icon-text-meta` and `text-meta` (which `Grid`'s templates of those names add), among
     others, `lit` (the row's hover and current fill) and `dot` (a round mark in its tone; `--size-dot` its size, `--dot-gap` its step
