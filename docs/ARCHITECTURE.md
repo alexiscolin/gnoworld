@@ -117,14 +117,13 @@ features/chat/
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` (`lint/core.config.ts`), `app`'s folders, `sw`, `features`,
 `routes`, `lib`, `store` and the scene (`lint/app.config.ts`), `ui` (`lint/react.config.ts`), and `jarvis`, `service`, `link-reader` and `chain` (`lint/server.config.ts`,
 `lint/chain.config.ts`), each wall proven by `scripts/probe.py`'s `walls` block.
-The scene's folder is `space/`, but `lint/app.config.ts` names `app/src/scene`, so the `space` wall below is kept by review alone until it names `space/`.
 
 | Folder | May import | Never imports |
 |---|---|---|
 | `core` (`packages/core`) | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
 | `lib` | `core`, Zod, the chain client libraries | React, `space`, `features`, `ui` |
 | `store` | `core`, `lib` types | React, `space`, `features` |
-| `space` | `core`, `store` (read and subscribe), three, GSAP | React, `features`, `ui` |
+| `space` | `core`, `store` (read and subscribe), `lib`, three, GSAP, `ui`'s React-free helpers (`typedIn`, `holdsEscape`, `iconNode`) | React, `features`, `ui`'s components |
 | `ui` | `ui` | `features`, `space`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
 | `sw` | `sw` | Anything else: the worker runs alone, before the page |

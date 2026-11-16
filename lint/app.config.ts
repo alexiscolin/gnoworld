@@ -32,8 +32,13 @@ const LIB =
   "lib is the boundaries: core, Zod, the schemas; never React, the design system, the store, a feature, the scene or a route.";
 const STORE =
   "The store holds the state: core, lib, zustand/vanilla; never React, the design system, a feature, the scene or a route.";
-const SCENE = "The scene is three, core and the store: never React, the design system, a feature, a route or lib.";
+const SCENE =
+  "The scene is three, core, lib and the store: never React, the design system's components, a feature or a route.";
+// The design system's helpers that touch no React (typedIn, holdsEscape, iconNode: built for the scene's DOM, ui/src/escape.ts): the one door the scene has to ui.
+const SCENE_UI = ["typedIn", "holdsEscape", "iconNode"];
 // The packages that bring React or the design system, by their names: a zone sees only paths inside the repository.
+const UI = "^(@gnoworld/ui|(\\.\\./)+packages/ui(/src)?)(/|$)";
+const REACTS_ONLY = "^(react|react-dom|react-router)(/|$)";
 const REACTS = "^(react|react-dom|react-router|@gnoworld/ui)(/|$)";
 // The rules that ban these names, bare or through their owners, with the browser's other doors.
 const reaching = (names: readonly string[]): Linter.RulesRecord => ({
@@ -78,22 +83,22 @@ export default defineConfig(
             })),
             {
               target: `${SRC}/routes`,
-              from: `${SRC}/scene`,
+              from: `${SRC}/space`,
               message: "A route never imports the scene: the universe feature mounts it.",
             },
             {
               target: `${SRC}/lib`,
-              from: [`${SRC}/features`, `${SRC}/scene`, `${SRC}/routes`, `${SRC}/store`, "./packages/ui"],
+              from: [`${SRC}/features`, `${SRC}/space`, `${SRC}/routes`, `${SRC}/store`, "./packages/ui"],
               message: LIB,
             },
             {
               target: `${SRC}/store`,
-              from: [`${SRC}/features`, `${SRC}/scene`, `${SRC}/routes`, "./packages/ui"],
+              from: [`${SRC}/features`, `${SRC}/space`, `${SRC}/routes`, "./packages/ui"],
               message: STORE,
             },
             {
-              target: `${SRC}/scene`,
-              from: [`${SRC}/features`, `${SRC}/routes`, `${SRC}/lib`, "./packages/ui"],
+              target: `${SRC}/space`,
+              from: [`${SRC}/features`, `${SRC}/routes`],
               message: SCENE,
             },
           ],
@@ -146,15 +151,17 @@ export default defineConfig(
     },
   },
   {
-    files: [`${SRC}/scene/**`],
+    files: [`${SRC}/space/**`],
     ignores: TESTS,
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
-            { regex: REACTS, message: SCENE },
+            { regex: REACTS_ONLY, message: SCENE },
             { regex: "^zustand(/react)?$", message: SCENE },
+            // By its name or by a path to it: only the helpers above pass.
+            { regex: UI, allowImportNames: SCENE_UI, message: SCENE },
           ],
         },
       ],

@@ -3,8 +3,8 @@
 import { bezier } from "./bezier.ts";
 
 export const OUT4 = bezier([0.23, 1, 0.32, 1]);
-// A label's fade, ms (tokens.css's --motion-label: arrivalBase.test.ts holds the two together), and the app's --ease-emphasized (tokens.css), for what fades in or out of the page's own.
-export const LABEL_MS = 400;
+// The label's fade (space/labelSlots.ts, which the wall keeps from importing this folder), and the app's --ease-emphasized (tokens.css), for what fades in or out of the page's own.
+export { LABEL_MS } from "../../space/labelSlots.ts";
 export const EMPHASIZED = bezier([0.7, 0, 0.2, 1]);
 // When the words start: the plate's fill, the frame and the chat's panel stand by then (space's plate is nearly whole at 0.35 s).
 export const WORDS = 0.3;
