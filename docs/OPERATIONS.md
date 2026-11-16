@@ -193,10 +193,6 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   interface (a rented server), the proxies' network would reach that address's services.
   `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office, until the
   deploy part (D13172) builds a VM that refuses its own public address, proven on it.
-- **Many addresses against the server's shared budgets (C12, D13677).** The server's per-visitor and per-block limits are
-  a first bound: for IPv4 a block is one address, so 8 addresses fill the search's shared second (a ninth visitor is served
-  nothing) and 28 addresses, or 7 /48s, keep the Earth's 30-day window of 5,000 rooms full. The deploy part (D13172) owes
-  per-address limits at the Caddy front, IPv6 grouped by /64 (the audit's nginx item), and this remainder.
 - **A restart of the whole host, or of Docker.** Docker restarts the containers itself,
   without Compose's order: for a moment, a proxy may run before the guard's rules are in, and
   if `web` is not up yet the guard stops, leaving the proxies on a network with nothing in it.
