@@ -209,6 +209,8 @@ describe("the dock when the server does not answer", () => {
 
 describe("the screen's header", () => {
   const at = (entry: string, phone: boolean) => {
+    // An earlier test's screen may still stand in the body: count this one's Back alone.
+    const before = document.querySelectorAll("[aria-label='Back']").length;
     vi.stubGlobal("fetch", roomsAnswer(200));
     // jsdom has none, and a browser's is none while the document is not fully active.
     vi.stubGlobal("visualViewport", null);
@@ -231,7 +233,7 @@ describe("the screen's header", () => {
     act(() => {
       state().loginActions.signedOut();
     });
-    return () => document.querySelector("[aria-label='Back']") !== null;
+    return () => document.querySelectorAll("[aria-label='Back']").length > before;
   };
 
   it("is the phone's, with its back, in the full chat of a phone", async () => {
