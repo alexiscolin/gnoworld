@@ -34,7 +34,16 @@ function Action({
   onFly,
 }: Pick<AnswerCardProps, "chain" | "options" | "onFly"> & { button: AnswerButton }) {
   if (button.type === "action")
-    return <ActionForm exact action={button.action} label={button.label} chain={chain} options={options} />;
+    return (
+      <ActionForm
+        exact
+        cardId={`answer action ${JSON.stringify(button.action)}`}
+        action={button.action}
+        label={button.label}
+        chain={chain}
+        options={options}
+      />
+    );
   return (
     <Button
       onClick={() => {

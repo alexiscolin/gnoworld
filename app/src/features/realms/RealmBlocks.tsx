@@ -30,6 +30,8 @@ interface Drawn extends Ink {
   readonly forms: ReactNode[];
   /** What a form's anchor starts with: this page's, so two pages of one document never share one. */
   readonly anchor: string;
+  /** What a form's call card is named from: the page's own name, the same each time the page is drawn. */
+  readonly cards: string;
   /** The level of the last heading drawn, which a form's card sits under. */
   readonly under: { level: 1 | 2 | 3 | 4 | 5 | 6 };
 }
@@ -106,7 +108,7 @@ function quote(block: Extract<PageBlock, { type: "quote" }>, on: Drawn): ReactNo
 }
 
 // A form's card: read only, or, in a realm's own view, with its Call.
-function card(block: Extract<PageBlock, { type: "form" }>, { budget, call, under }: Drawn): ReactNode {
+function card(block: Extract<PageBlock, { type: "form" }>, { budget, call, under }: Drawn, cardId: string): ReactNode {
   const fields = budget.fit(block.fields, () => 0);
   const shown = { exec: block.exec, path: block.path, fields, left: block.fields.length - fields.length };
   return call === undefined
@@ -114,15 +116,16 @@ function card(block: Extract<PageBlock, { type: "form" }>, { budget, call, under
     : createElement(
         Suspense,
         { fallback: null },
-        createElement(CallableForm, { ...shown, call, level: CARD_LEVEL[under.level] }),
+        createElement(CallableForm, { ...shown, cardId, call, level: CARD_LEVEL[under.level] }),
       );
 }
 
 // A form is taken out of the text and drawn after it, under its anchor; where it stood, a line points to it. The form is the
 // same, read only or with its Call: only its place changes.
 function form(block: Extract<PageBlock, { type: "form" }>, on: Drawn): ReactNode {
-  const id = `${on.anchor}-form-${String(on.forms.length)}`;
-  on.forms.push(createElement("div", { id, key: id }, card(block, on)));
+  const n = String(on.forms.length);
+  const id = `${on.anchor}-form-${n}`;
+  on.forms.push(createElement("div", { id, key: id }, card(block, on, `${on.cards}-form-${n}`)));
   const title = block.exec === "" ? "Form" : `Form: ${block.exec}`;
   return createElement("p", null, createElement("a", { href: `#${id}`, dir: "ltr" }, `${title} \u2193`));
 }
@@ -188,6 +191,7 @@ export function RealmBlocks({
   more,
   via,
   call,
+  page,
 }: {
   blocks: readonly PageBlock[];
   origin?: string;
@@ -195,13 +199,25 @@ export function RealmBlocks({
   via: Drawing;
   /** The realm the page is of: with it, a form a call can carry gets its Call. */
   call?: CallPlace;
+  /** The page's name (its address on gnoweb): its forms' call cards are named from it, so a page drawn again finds them.
+   * Without one the cards are named from this mount alone, as before. */
+  page?: string;
 }) {
   const warning = useExternalLinks(origin);
   const budget = new Budget();
   const reader = { ...via.reader, link: warning.link };
   const anchorId = useId();
   const forms: ReactNode[] = [];
-  const drawn = drawAll(blocks, { budget, via, reader, call, forms, anchor: anchorId, under: { level: 1 } });
+  const drawn = drawAll(blocks, {
+    budget,
+    via,
+    reader,
+    call,
+    forms,
+    anchor: anchorId,
+    cards: page ?? anchorId,
+    under: { level: 1 },
+  });
   const below =
     forms.length === 0
       ? undefined
