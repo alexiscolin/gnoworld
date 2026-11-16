@@ -30,10 +30,11 @@ const PAGE_BYTES = 64 * 1024;
 export const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
 const kept = (what: string): Ran => ({ ok: true, isError: false, text: `Kept: ${what}` });
 
-function definitionsOf([first, ...rest]: readonly string[]) {
+function definitionsOf([first, ...rest]: readonly string[], { universes }: Places) {
   if (first === undefined) throw new Error("cards: no chain profile");
   const profile = z.enum([first, ...rest]).describe("The realm's chain: one of Jarvis's chain profiles.");
   const realm = z.string().min(1).max(128).describe("The realm's path, such as `gno.land/r/gov/dao`.");
+  const ids = [first, ...rest].map((name) => `${name} is ${String(universes.get(name)?.chainId)}`).join(", ");
   const read =
     " The server reads the realm itself and keeps it only when its page and functions hold every number, link, account and function stated; else it says what is missing.";
   return [
@@ -49,7 +50,7 @@ function definitionsOf([first, ...rest]: readonly string[]) {
     },
     {
       name: "give_button" as const,
-      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain profile, and its chainId: the profile's chain's id).${read}`,
+      description: `A button on the answer: fly to a place find_place gave, or open a proposal's call card (then name its chain profile, and its chainId: ${ids}).${read}`,
       args: z.strictObject({ profile: profile.optional(), button: AnswerButton }),
     },
   ] as const;
@@ -223,7 +224,7 @@ export function cardTools(setup: Setup) {
   const strange = setup.chains.find((chain) => !setup.places.universes.has(chain));
   if (strange !== undefined)
     throw new Error(`cards: the chain profile ${JSON.stringify(strange)} is no universe of the data`);
-  const definitions = definitionsOf(setup.chains);
+  const definitions = definitionsOf(setup.chains, setup.places);
   const [digest, proposal, button] = definitions;
   const ready: Ready = { ...setup, seen: new Map() };
   return {

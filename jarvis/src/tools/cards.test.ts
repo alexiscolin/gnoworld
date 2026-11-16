@@ -957,6 +957,13 @@ describe("cardTools", () => {
     expect(buttonTool.args.shape.profile.unwrap().description).toMatch(/\S/);
   });
 
+  it("names each chain profile's chain id in give_button's description, from the universes", () => {
+    const universes = [universe("onyx", { default: true, chainId: "onyx-main" }), universe("gnoland")];
+    const { tools } = setup({ universes });
+    const [, , buttonTool] = tools.definitions;
+    expect(buttonTool.description).toContain("onyx is onyx-main, gnoland is gnoland-1");
+  });
+
   it("refuses a card's arguments sent under a name of no card's", async () => {
     const { tools } = setup();
     const { asked, cards } = askedOf();
