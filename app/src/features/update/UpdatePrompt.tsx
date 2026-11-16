@@ -36,6 +36,7 @@ export function UpdatePrompt() {
     startServiceWorker({
       container: "serviceWorker" in navigator ? navigator.serviceWorker : undefined,
       document,
+      online: window,
       search: location.search,
       production: PRODUCTION,
       reachable: hostAnswers,
