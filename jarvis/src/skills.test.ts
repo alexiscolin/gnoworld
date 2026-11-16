@@ -161,7 +161,7 @@ describe("loadSkills: what it gives", () => {
 });
 
 // gnomcp's gno skill teaches an agent that writes, signs and sends
-// coins in five of its references; Jarvis is offered its nine reading ones alone, the folder kept whole.
+// coins in five of its references; Jarvis is offered its reading ones and their parts alone, the folder kept whole.
 describe("loadSkills: the gno skill's references Jarvis is never offered", () => {
   const WRITING = ["build.md", "debug.md", "gnokey.md", "mcp.md", "toolchain.md"];
   const WITH_WRITING = () => ({
