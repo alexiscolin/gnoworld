@@ -1,4 +1,4 @@
-// gno.land's blog as the Earth's "Latest on X" card reads it: the realm's page (vm/qrender, one read through rpc.ts's readPage)
+// gno.land's blog as the Earth's "Latest on gno.land" card reads it: the realm's page (vm/qrender, one read through rpc.ts's readPage)
 // holds one `### [title](/r/gnoland/blog:p/slug)` line and its day ("30 Oct 2026") a post, newest first; the newest are picked here, each
 // through the schema (hidden characters, slug, day), and a post that fails it is skipped, never half shown.
 import { BlogPost } from "@gnoworld/schemas";

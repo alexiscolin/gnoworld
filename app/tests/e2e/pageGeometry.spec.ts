@@ -247,7 +247,7 @@ test.describe("at the video's size", () => {
     const rows = await brightness(
       page,
       picture,
-      // The Earth's plate holds its latest post on X at y 600, so the rows are read lower, in a plain stretch under its links.
+      // The Earth's plate holds its latest posts on gno.land at y 600, so the rows are read lower, in a plain stretch under its links.
       Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 900 + dy, 340, 901 + dy]),
     );
     const peak = (values: number[]) => values.indexOf(Math.max(...values));

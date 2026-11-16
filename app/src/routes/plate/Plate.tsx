@@ -80,7 +80,7 @@ function ExtraCards({ extras }: Pick<PlateModel, "extras">) {
   );
 }
 
-// The bento of twelve columns. The Earth's and a hub's order (the proposal's s3b.js): the widgets, what the kind adds (Latest on X, Proposals), the
+// The bento of twelve columns. The Earth's and a hub's order (the proposal's s3b.js): the widgets, what the kind adds (Latest on gno.land, Proposals), the
 // network, then a hub's realm from the explorer; a realm's: what it adds, its cards, the network, the widgets.
 function Cards({ model }: { model: PlateModel }) {
   const { hours, extras, realm, can, around, widgets, explorer } = model;

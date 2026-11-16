@@ -30,7 +30,7 @@ const DISPLAY = [
   "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomMenu,RoomSections,Saved,SavedView}.test.tsx",
   "app/src/features/realms/{ReadSource,RealmCard}.test.tsx",
   "app/src/features/universe/Credits.test.tsx",
-  "app/src/features/home/{GoExplore,LatestOnX}.test.tsx",
+  "app/src/features/home/{GoExplore,LatestOnGnoland}.test.tsx",
   "app/src/features/update/UpdatePrompt.test.tsx",
   "app/src/features/follow/FollowButton.test.tsx",
   "app/src/features/account/AccountMenu.test.tsx",

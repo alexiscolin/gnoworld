@@ -1,5 +1,5 @@
 // A universe's Earth, its general chat's plate (frames 37 to 42): where people speak from, who is talking, the activity, "Say hi in #general",
-// the latest on X and the links out; /earth for the default universe, /net/<id>/earth for each.
+// the latest on gno.land and the links out; /earth for the default universe, /net/<id>/earth for each.
 import { EARTH as EARTH_ID } from "@gnoworld/core";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
