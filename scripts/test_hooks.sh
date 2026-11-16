@@ -1285,7 +1285,7 @@ printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expect
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
 # A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
 # GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale.
-# The constants are made small so it is stopped in 2 s.
+# The constants are made small so it is stopped in 2 s: nothing but the hang is waited on, so a loaded host cannot change the verdict.
 printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
 out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
 [ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
@@ -1336,7 +1336,13 @@ gapped "$mu/check.py" '{"r/only/only.gno: if bad {": "a gap"}'
 out=$(checked f GNO="$GNO") || fail "mutate.py judged a gap again alone: $out"
 [ "$out" = "ok    survives: r/only/only.gno: if bad {  (known gap: a gap)" ] || fail "mutate.py did not keep a gap as a gap: $out"
 gapped "$mu/check.py" '{}'
-out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
+# The earlier runs, which end at once, get a minute whatever the host's load; only the run alone that hangs (one copy, 5 words) keeps
+# the 2 s the check gave it, which no load can make it end within.
+out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys, subprocess; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check
+check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1
+real = subprocess.run
+subprocess.run = lambda cmd, **k: real(cmd, **{**k, "timeout": k.get("timeout") if len(cmd) == 5 else 60})
+sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
 [ "$out" = "FAIL  stopped: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not name the survivor whose run alone never ended: $out"
 # gno's output may hold bytes that are no UTF-8, a failing test printing them: mutate.py reads them as U+FFFD and judges on,
 # never stopping on a traceback.
@@ -1501,7 +1507,7 @@ stop() { printf '%s' "$1" | HOME="$t/home" PATH="$t/fakeps:$PATH" CLAUDE_PROJECT
 stop '{"stop_hook_active":false}' || fail "stop_gate blocked a turn with code changed: it only reaps since D13173"
 (GNOWORLD_STRICT=1 stop '{"stop_hook_active":false}') || fail "stop_gate blocked a turn under GNOWORLD_STRICT=1, whose gate left (D13173)"
 [ ! -e "$t/gate-ran" ] || fail "stop_gate ran the repository's check.sh outside the sandbox"
-for n in 1 2 3 4 5 6 7 8 9 10 11 13 14 15 16; do sleep 60 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done # nothing of the suite held open
+for n in 1 2 3 4 5 6 7 8 9 10 11 13 14 15 16; do sleep 600 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done # nothing of the suite held open
 sh -c "trap '' TERM; while :; do sleep 1; done" </dev/null >/dev/null 2>&1 & z12=$! # a worker deaf to TERM
 table() { # $1: the line of a gate's run, or a line that only mentions one
 	printf '%6s %5s %11s %s\n' \
@@ -1523,7 +1529,7 @@ table() { # $1: the line of a gate's run, or a line that only mentions one
 		"$z16" 1 29:59 "node /srv/gnoworld/app/tests/e2e/serve.mjs"
 	[ -z "${1:-}" ] || printf '%6s %5s %11s %s\n' "$$" "${2:-$$}" 05:00 "$1"
 }
-gone() { n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || return 1; sleep 0.1; done; }
+gone() { n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 600 ] || return 1; sleep 0.1; done; }  # 60 s: a bound for a hung test only, a process ends as soon as it is stopped
 alive() { kill -0 "$1" 2>/dev/null; }
 fakeps() { # $1: its exit status; then table's argument
 	code=$1 && shift
@@ -1544,7 +1550,7 @@ rm "$r/.claude/tmp/reaped.log"
 # orphans go.
 fakeps 0 "sh scripts/check.sh" 1 && reap
 for z in "$z1" "$z6"; do gone "$z" || fail "stop_gate took an orphaned check.sh for a live gate: $(grep "^ *$z " "$t/fakeps/table")"; done
-for n in 1 6; do sleep 60 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done
+for n in 1 6; do sleep 600 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done
 fakeps 0 "vim scripts/check.sh" && reap
 for z in "$z1" "$z6"; do gone "$z" || fail "stop_gate took a mention of check.sh for a gate: $(grep "^ *$z " "$t/fakeps/table")"; done
 for z in "$z3" "$z4" "$z5" "$z8" "$z9" "$z10" "$z13" "$z14" "$z15" "$z16"; do alive "$z" || fail "stop_gate stopped $(grep "^ *$z " "$t/fakeps/table")"; done
@@ -2054,11 +2060,11 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || { date +%s >"$SHARD_ROOT/signal.at"; kill -$CINTR "$PPID"; }; sleep 30; : >"$SHARD_ROOT/slept"; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
-	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; ppidlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -INT "$PPID"; sleep 30 ;; termlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -TERM "$PPID"; sleep 30 ;; *) exit "$INTR" ;; esac' \
+	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; ppidlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -INT "$PPID"; sleep 30; : >"$SHARD_ROOT/slept" ;; termlong) echo $$ >>"$SHARD_ROOT/suite.pid"; date +%s >"$SHARD_ROOT/signal.at"; kill -TERM "$PPID"; sleep 30; : >"$SHARD_ROOT/slept" ;; *) exit "$INTR" ;; esac' \
 	'	fi' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
@@ -2068,7 +2074,7 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's); ONLY names the blocks to run, none for all.
-printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\n        open(os.environ["SHARD_ROOT"] + "/slept", "a").close()\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
 cp "$here/harness_mutate.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
@@ -2132,7 +2138,7 @@ cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/repo/" &
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
-	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/slept" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
 	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
@@ -2220,8 +2226,8 @@ for sig in ppidlong termlong; do
 	rm -f "$hs/suite.pid" "$hs/signal.at"
 	out=$(INTR=$sig GROUPED=1 shards 1) && fail "harness_mutate passed after a $sig signal: $out"
 	[ -s "$hs/suite.pid" ] || fail "the suite never ran ($sig): $out"
-	at=$(cat "$hs/signal.at" 2>/dev/null) || fail "the suite sent no $sig signal: $out"
-	[ $(($(date +%s) - at)) -lt 20 ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
+	[ -e "$hs/signal.at" ] || fail "the suite sent no $sig signal: $out"
+	[ ! -e "$hs/slept" ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a suite running after a $sig signal"; }; done
 done
 # The same in the controls, run two at a time before any mutant: the run waited for the two in flight to end by
@@ -2231,16 +2237,15 @@ for sig in INT TERM; do
 	rm -rf "$hs/suite.pid" "$hs/sig.lock" "$hs/signal.at"
 	out=$(CINTR=$sig GROUPED=1 shards 2) && fail "harness_mutate passed after a $sig signal in its controls: $out"
 	[ "$(count suite.pid)" -ge 1 ] || fail "no control was in flight at the $sig signal: $out"
-	at=$(cat "$hs/signal.at" 2>/dev/null) || fail "no control sent the $sig signal: $out"
-	[ $(($(date +%s) - at)) -lt 20 ] || fail "harness_mutate waited for its controls to end by themselves after a $sig signal ($(($(date +%s) - at)) s): $out"
+	[ -e "$hs/signal.at" ] || fail "no control sent the $sig signal: $out"
+	[ ! -e "$hs/slept" ] || fail "harness_mutate waited for its controls to end by themselves after a $sig signal: $out"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after a $sig signal"; }; done
 done
 rm -rf "$hs/suite.pid" "$hs/sig.lock"
-began=$(date +%s)
 out=$(CFAIL=1 CSLEEP=1 PROBED=1 shards 2) && fail "harness_mutate passed with a control failing: $out"
 [ -s "$hs/suite.pid" ] || fail "no control was in flight beside the failing one: $out"
 printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not say which control failed: $out"
-[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the control beside a failed one to end by itself ($(($(date +%s) - began)) s): $out"
+[ ! -e "$hs/slept" ] || fail "harness_mutate waited for the control beside a failed one to end by itself: $out"
 for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after another failed"; }; done
 fi
 
@@ -2589,15 +2594,13 @@ fresh
 # A staged harness file is committed in a person's Terminal alone, never in the sandbox: every file of .githooks/records.sh's list,
 # by name and as it is on disk, its name in any case, with a space or an accent; a path that only looks like one is not.
 harnessed() { said "is committed in Alexis's Terminal alone"; }
-for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
+for f in 'scripts/my file.sh' .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
 	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts CLAUDE.md; do
 	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add -f "$f"
 	[ "$(git -C "$c2" diff --cached --name-only | wc -l | tr -d ' ')" = 1 ] || fail "the case of $f staged other than one path"
-	# A disk that keeps case holds Scripts/ as a folder of its own, which the fold check refuses first, as equal but for case to scripts/.
-	harnessed || { case $f in Scripts/*) said "a path this disk may read as another" ;; *) false ;; esac; } ||
-		fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
-	git -C "$c2" reset -q && rm "$c2/$f" # by the index's spelling, which may not be $f's (Scripts/)
+	harnessed || fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
+	git -C "$c2" reset -q && rm "$c2/$f"
 done
 fresh
 # A variable that makes git read pathspecs otherwise leaves the list whole: GIT_NOGLOB_PATHSPECS made its globs literal names,
@@ -2620,6 +2623,11 @@ for f in Stryker.config.json .Github/workflows/gate.yml; do
 	harnessed || fail "pre-commit let $f, a harness file on a case-blind disk, through in the sandbox (F151, D241)"
 	git -C "$c2" update-index --force-remove "$f"
 done
+# Scripts/tool.sh the same, in a repository that holds no scripts/ (beside one, the fold check refuses it first, whatever the list
+# reads): the list alone refuses it, on a disk that keeps case or not.
+ic="$t/icase" && git init -q "$ic" && git -C "$ic" update-index --add --cacheinfo "100644,$(echo planted | git -C "$ic" hash-object -w --stdin),Scripts/tool.sh"
+out=$(cd "$ic" && sh "$hk/pre-commit" 2>&1 >/dev/null) && fail "pre-commit let Scripts/tool.sh through in the sandbox: $out"
+printf '%s\n' "$out" | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit did not read Scripts/tool.sh as the harness file scripts/ holds, case-blind (F151, D241): $out"
 for f in app/src/scripts/a.ts scriptsx/a.ts app/src/config.ts docs/stryker.config.json.md packages/core/src/args/args.ts; do
 	mkdir -p "$c2/$(dirname "$f")" && echo x >"$c2/$f" && git -C "$c2" add "$f"
 	precommit || fail "pre-commit refused $f, which only looks like a harness file"
@@ -5266,15 +5274,14 @@ printf '%s\n' "$out" | grep -qF "/gone" && printf '%s\n' "$out" | grep -qF "404"
 stopped "a page that answered 404"
 cp "$nc/headers.good" "$nc/app/build/client/_headers"
 # A server that never answers: dead at once, or listening to nothing. The check fails in a bounded time, saying nginx did not start, and
-# leaves nothing running.
-t0=$(date +%s)
-out=$(NOSERVE=exit chk) && fail "check_nginx passed with an nginx that died at once: $out"
-[ "$(($(date +%s) - t0))" -lt 8 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that had already died"
+# leaves nothing running. Proved by what it says, never by seconds: a death is read as one ("exited with") under a limit of 60 s the
+# check never reaches, and a silent nginx fails on the limit it was given ("within 2 s"), with its own server gone.
+out=$(NOSERVE=exit NGINX_START_TIMEOUT=60 chk) && fail "check_nginx passed with an nginx that died at once: $out"
+printf '%s\n' "$out" | grep -q "it exited with" || fail "check_nginx did not see an nginx that had already died, but waited on its limit: $out"
 printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx did not start: $out"
 stopped "an nginx that died at once"
-t0=$(date +%s)
 out=$(NOSERVE=hang NGINX_START_TIMEOUT=2 chk) && fail "check_nginx passed with an nginx that never listens: $out"
-[ "$(($(date +%s) - t0))" -lt 15 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that never listens"
+printf '%s\n' "$out" | grep -q "nothing answered on port [0-9]* within 2 s" || fail "check_nginx did not stop at its limit for an nginx that never listens: $out"
 printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx never answered: $out"
 stopped "an nginx that never listens"
 # A literal upstream host (deploy/web/nginx.conf's ergo and server) is one nginx -t refuses where no such host resolves: the check
@@ -5423,21 +5430,16 @@ out=$(CEILING=2 STEP=1 bload "900 160") && fail "bench.py gave a verdict on a ma
 [ "$(cat "$bl/load.n")" -le 5 ] || fail "bench.py read the load $(cat "$bl/load.n") times in 2 s with a step of 1 s: it does not pause between two reads (F2620)"
 [ "$(cat "$bl/load.n")" -ge 2 ] || fail "bench.py read the load once in 2 s with a step of 1 s: it did not read again"
 # The defaults, with no switch: a ceiling of 60 s said (600 s at loads of 48 to 142 ended on a refusal
-# all the same), and a step of 10 s (one read in the first seconds). It is stopped once seen.
+# all the same), and a step of 10 s (one read in the first seconds). The run is on a clock of its own, which only sleep moves
+# (instantly, by what it is asked), so what the host's speed can change is nothing: seven reads, six naps of 10 s, a refusal at 60 s.
+printf 'import os, runpy, sys, time\nnow = [0.0]\nnaps = open(os.environ["NAPS"], "w")\nreal_sleep = time.sleep\n\n\ndef nap(s):\n    if not sys._getframe(1).f_code.co_filename.endswith("bench.py"):\n        return real_sleep(s)  # subprocess polls with sleep: not bench.py'"'"'s step\n    naps.write(f"{s:g}\\n")\n    naps.flush()\n    now[0] += s\n\n\ntime.monotonic, time.sleep = lambda: now[0], nap\nsys.argv = ["scripts/bench.py"]\nrunpy.run_path("scripts/bench.py", run_name="__main__")\n' >"$bl/clock.py"
 rm -f "$bl/ran" "$bl/load.n" && printf '900 160\n' >"$bl/seq"
-(cd "$bl" && env -u BENCH_WAIT_CEILING -u BENCH_WAIT_STEP BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" python3 -I scripts/bench.py >"$bl/dflt.out" 2>&1 & echo $! >"$bl/dflt.pid")
-tries=0
-until grep -q "up to" "$bl/dflt.out" 2>/dev/null; do
-	tries=$((tries + 1))
-	[ "$tries" -lt 300 ] || { kill "$(cat "$bl/dflt.pid")" 2>/dev/null; fail "bench.py with its defaults never said how long it waits: $(cat "$bl/dflt.out")"; }
-	kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults ended at a busy load before its ceiling: $(cat "$bl/dflt.out")"
-	sleep 0.1
-done
-sleep 2
-kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults gave up within seconds at a busy load: $(cat "$bl/dflt.out")"
-kill "$(cat "$bl/dflt.pid")" 2>/dev/null
-grep -qF "up to 60 s" "$bl/dflt.out" || fail "bench.py's default ceiling is not 60 s (F2620, the harness audit): $(cat "$bl/dflt.out")"
-[ "$(cat "$bl/load.n")" -le 2 ] || fail "bench.py's default step is not seconds long: $(cat "$bl/load.n") reads within 3 s (F2620)"
+out=$(cd "$bl" && env -u BENCH_WAIT_CEILING -u BENCH_WAIT_STEP NAPS="$bl/naps" BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" python3 -I clock.py 2>&1) && fail "bench.py with its defaults passed at a busy load: $out"
+printf '%s\n' "$out" | grep -qF "up to 60 s" || fail "bench.py's default ceiling is not 60 s (F2620, the harness audit): $out"
+printf '%s\n' "$out" | grep -qF "stayed at 90.0 on 16 cores for 60 s" || fail "bench.py with its defaults gave up before 60 s at a busy load: $out"
+[ "$(sort "$bl/naps" | uniq -c | tr -s ' ')" = " 6 10" ] || fail "bench.py's default step is not 10 s: $(sort "$bl/naps" | uniq -c | tr -s ' ') (F2620)"
+[ "$(cat "$bl/load.n")" = 7 ] || fail "bench.py read the load $(cat "$bl/load.n") times in its 60 s at a step of 10 s, not 7 (F2620)"
+[ ! -e "$bl/ran" ] || fail "bench.py ran the benches at a busy load with its defaults"
 # A load that cannot be read is no quiet one: bench.py refuses, saying so, and runs no bench (it would measure a busy machine unannounced),
 # whether load.py fails, prints nothing or garbage, or reports no core.
 cp "$bl/scripts/load.py" "$bl/load.good"
@@ -6781,10 +6783,10 @@ assert n, "harness_mutate.py holds no 600 any more: update test_hooks.sh's harne
 open(p, "w").write(s)
 PY
 printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { [ -z "${HANG_CONTROL:-}" ] || { sleep 15 & echo $! >>"$SHARD_ROOT/child.pid"; wait; }; exit 0; }' \
+	'[ -n "$ONLY" ] || { [ -z "${HANG_CONTROL:-}" ] || { sleep 3600 & echo $! >>"$SHARD_ROOT/child.pid"; wait; }; exit 0; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
-	'	grep -q KEEP1 g.txt || { [ -z "${TRAP:-}" ] || trap "" TERM; sleep 15 & echo $! >>"$SHARD_ROOT/child.pid"; wait; }' \
+	'	grep -q KEEP1 g.txt || { [ -z "${TRAP:-}" ] || trap "" TERM; sleep 3600 & echo $! >>"$SHARD_ROOT/child.pid"; wait; }' \
 	'	grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q " SPARE" g.txt && grep -q KEEP4 h.txt && grep -q " SPARE2" h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 reap() { [ ! -e "$hs/child.pid" ] || for p in $(cat "$hs/child.pid"); do kill -9 "$p" 2>/dev/null || true; done; }
@@ -6795,7 +6797,7 @@ printf '%s\n' "$out" | grep -q "Traceback" && { reap; fail "harness_mutate print
 [ -s "$hs/child.pid" ] || { reap; fail "the hung suite never started its child"; }
 for p in $(cat "$hs/child.pid"); do
 	n=0
-	until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || { reap; fail "harness_mutate left the hung suite's child $p running: its process group was not stopped"; }; sleep 0.1; done
+	until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 600 ] || { reap; fail "harness_mutate left the hung suite's child $p running: its process group was not stopped"; }; sleep 0.1; done
 done
 for k in keep2 keep3 keep4 keep5; do printf '%s\n' "$out" | grep -q "^ok    killed: planted $k #1" || { reap; fail "harness_mutate lost the verdict of planted $k after a hung suite: $out"; }; done
 reap
@@ -6805,7 +6807,7 @@ out=$(TRAP=1 shards 1) || { reap; fail "harness_mutate failed when a suite that 
 printf '%s\n' "$out" | grep "planted keep1 #1" | grep -qiE "time(d)? ?out|too long|limit" || { reap; fail "harness_mutate did not stop a suite that ignores TERM, or did not print that planted keep1 was won by time: $out"; }
 for p in $(cat "$hs/child.pid" 2>/dev/null); do
 	n=0
-	until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || { reap; fail "harness_mutate left the child $p of a suite that ignores TERM running: its group was not killed"; }; sleep 0.1; done
+	until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 600 ] || { reap; fail "harness_mutate left the child $p of a suite that ignores TERM running: its group was not killed"; }; sleep 0.1; done
 done
 printf '%s\n' "$out" | grep -q "^ok    killed: planted keep2 #1" || { reap; fail "harness_mutate lost the verdicts after a suite that ignores TERM: $out"; }
 reap
@@ -6816,7 +6818,7 @@ printf '%s\n' "$out" | grep -q "Traceback" && { reap; fail "harness_mutate print
 printf '%s\n' "$out" | grep -qiE "control|untouched" || { reap; fail "harness_mutate did not say a control hung: $out"; }
 printf '%s\n' "$out" | grep -q "^ok    killed: " && { reap; fail "harness_mutate judged mutants after its control hung: $out"; }
 n=0
-for p in $(cat "$hs/child.pid" 2>/dev/null); do until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || { reap; fail "harness_mutate left the hung control's child running"; }; sleep 0.1; done; done
+for p in $(cat "$hs/child.pid" 2>/dev/null); do until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 600 ] || { reap; fail "harness_mutate left the hung control's child running"; }; sleep 0.1; done; done
 reap
 fi
 
@@ -6998,15 +7000,14 @@ tallied=$(printf '%s' "${out#* (}" | tr -d ')' | tr ',' '\n' | sed 's/^ *//' | L
 [ "$tallied" = "1 closed before an answer,2 ECONNRESET,2 answered 503,2 unanswered after 6 s" ] ||
 	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting: [$out]"
 # web's port closed: every socket settles at once with its error's code (macOS gives a few EINVAL among them under load), so the
-# 641st goes then, not at the cap, set here to 30 s for a verdict no loaded host can blur.
+# 641st goes then, not at the cap. The cap is raised to 60 s and made to print CAP when it is what asks the 641st: no clock reads
+# the verdict, the marker does.
 grep -q 'setTimeout(ask, 6000);' "$dc/crowd.js" || fail "deploy/test.sh's crowd has no 6 s cap for deploy_checks to raise: update test_hooks.sh's deploy_checks"
 start_web ""
 stop_web
-began=$(date +%s)
-crowd 's/setTimeout(ask, 6000);/setTimeout(ask, 30000);/'
-took=$(($(date +%s) - began))
+crowd 's/setTimeout(ask, 6000);/setTimeout(() => { if (!asked) console.log("CAP"); ask(); }, 60000);/'
+case $out in CAP*) fail "deploy/test.sh's crowd waited out its cap though its 640 had all settled at once: the 641st goes once they have: [$out]" ;; esac
 case $out in "0 none ("*ECONNREFUSED*")") ;; *) fail "deploy/test.sh's crowd did not print the code of an error it met, web's port closed: [$out]" ;; esac
-[ "$took" -lt 15 ] || fail "deploy/test.sh's crowd waited out its cap ($took s) though its 640 had all settled at once: the 641st goes once they have"
 sed -n '/^pass() {/,/^# --- What the host offers/p' "$ds" | sed '$d' >"$dc/fns"
 sed -n '/^\tcloses() {/,/^\t}$/p' "$ds" >>"$dc/fns"
 sed -n '/^\tcloses /p' "$ds" >"$dc/calls"
