@@ -1,4 +1,4 @@
-#!/usr/bin/env -S -i LC_ALL=C /opt/homebrew/bin/python3 -I
+#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I
 """land: the owner's one command for a pull request (D13211, D13213). A session drops a git bundle of one branch and the pull
 request's text, `<branch>.bundle` and `<branch>.md` (the title, a blank line, the body), in its drop folder; `land`, run in the owner's
 Terminal with no argument, copies them into a private folder, checks the bundle holds that one branch, fetches it and GitHub's main
@@ -6,7 +6,8 @@ into its own bare copy (git's object checks on), runs gitleaks over every commit
 subjects, each harness file touched with its lines added and removed, the declaration lines, any workflow file, how the branch on
 GitHub changes, 16 hex of the tip), asks [y/N], then pushes that tip with the owner's gh login and opens the pull request or says the
 one that exists. It reuses agent-pr's reading of the drop folder, its bare copy and its scans (scripts/agent_pr.py, beside it here and
-once installed); the shebang empties the environment, and nothing of the caller's but the two files is read.
+once installed); the shebang empties the environment, and nothing of the caller's but the two files is read. The installer
+writes in the python3 above and the folders TOOLS names, those its owner's PATH finds (D13412): this copy runs nowhere.
 Usage: land"""
 import importlib.machinery
 import importlib.util
@@ -18,7 +19,7 @@ import sys
 
 HOME = pwd.getpwuid(os.getuid()).pw_dir
 GITHUB = "https://github.com"
-TOOLS = "/opt/homebrew/bin:/usr/bin:/bin"
+TOOLS = "@TOOLS@"
 STATE = os.path.join(HOME, ".local/share/land")
 SPACE = f"/private/tmp/claude-{os.getuid()}/land/"
 # The harness list and the declarations a reviewer reads (records.sh, check_regressions.py, CLAUDE.md).

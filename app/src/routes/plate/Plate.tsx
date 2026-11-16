@@ -37,13 +37,13 @@ function Band({ figures, note }: PlateModel["figures"]) {
 // The rollup's calls per function, by name, for Try it's rows.
 const counted = (rollup: RealmRollup | undefined) => new Map(rollup?.functions.map(({ name, calls }) => [name, calls]));
 
-// The realm's own cards, in their order: its calls per day beside who calls it, what it can do, its page and Try it.
+// The realm's own cards, in their order: its calls per day, who calls it, what it can do, its page and Try it.
 function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; can: PlateModel["can"] }) {
   const { rollup } = realm;
   const callers = rollup !== undefined && rollup.top.length > 0;
   return (
     <>
-      {rollup === undefined ? null : <Calls rollup={rollup} worlds={realm.worlds} beside={callers} />}
+      {rollup === undefined ? null : <Calls rollup={rollup} worlds={realm.worlds} />}
       {rollup === undefined || !callers ? null : <Callers rollup={rollup} worlds={realm.worlds} />}
       {can?.some(({ label }) => label === "Token") === true ? <TokenBlock realm={realm.realm} /> : null}
       {can === undefined ? null : (

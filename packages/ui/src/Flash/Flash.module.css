@@ -55,6 +55,12 @@
     z-index: 4;
   }
 
+  /* Beside a placed plate the banner centres on the free area the Panel names (--banner-start, --banner-end, from 1280) and wraps
+     within it, never over the plate's pills; with no plate, on the window. */
+  .flash[data-banner] {
+    inset-inline: var(--banner-start) var(--banner-end);
+  }
+
   /* While a flash shows, what the keyboard reaches scrolls clear of it (WCAG 2.4.11). */
   /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller. */
   :root:has(.flash:popover-open, .flash[data-banner]) {

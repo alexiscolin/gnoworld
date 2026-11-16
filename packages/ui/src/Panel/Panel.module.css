@@ -130,7 +130,7 @@
     display: none;
   }
 
-  /* The one breakpoint of the plate and the dock beside it: 808, 320 and the margins leave 104 px of sky at 1280. Under it the
+  /* The one breakpoint of the plate and the dock beside it: the plate (608 at 1280, narrowing to it), 320 and the margins leave sky at 1280. Under it the
      plate is a block in the page and the chat takes the page, as a phone's does (DESIGN-SYSTEM.md, Breakpoints). */
   /* raw: the width where the plate and the dock fit with a sky between */
   @media (width >= 1280px) {
@@ -165,6 +165,12 @@
       inset-block-end: var(--space-m);
       inset-inline-start: var(--page-edge);
       inline-size: var(--plate-w);
+    }
+
+    /* The free area beside a placed plate, a step in from its edge and the dock's: the arrival banner (Flash) centres in it. */
+    :root:has(.place) {
+      --banner-start: calc(var(--page-edge) + var(--plate-w) + var(--space-s));
+      --banner-end: calc(var(--space-m) + var(--chat-dock-now) + var(--space-s));
     }
 
     /* The one outline around plate, scene and dock, the same colour all round: the plates inside it draw none. */

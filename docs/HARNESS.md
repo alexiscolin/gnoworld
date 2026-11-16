@@ -84,7 +84,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    non-ASCII character: D241), then wants each staged file as it is on disk, and runs Prettier on them and `scripts/check_docs.py`
    (D13173): seconds. It runs no gate: `sh scripts/check.sh` is what a session runs before committing code, and GitHub's gate judges each
    pull request. In the owner's shell it runs the scan alone, nothing of the working tree. So a harness change reaches GitHub as a git
-   bundle the owner approves with `land` (D13213), installed once in `~/.local/bin` by main's `install_hooks.sh`: the session drops the
+   bundle the owner approves with `land` (D13213), installed once in `~/.local/bin` by main's `install_hooks.sh`, with the python3,
+   git, gh and gitleaks his PATH finds written in (D13412): the session drops the
    bundle of one branch and the pull request's text in `/private/tmp/claude-<uid>/land/`; `land`, in the owner's Terminal, copies them,
    checks the bundle holds that branch, never main, from GitHub's main, runs that main's own secret scan over the range and its
    commit-msg on each message (what pre-push and commit-msg held for his own push), gitleaks over the text, refuses a character the
@@ -117,7 +118,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    D13165): `main` takes no push. Claude can neither: the push asks, and the ruleset refuses `main` any push.
 10. **The CI** on GitHub judges every pull request to main, every push to main and a run by hand: one job reads what the
     change calls for with the base commit's own detector, the checks run side by side, and `gate-ok`, the one check main
-    will require, reads every result with the base commit's verdict; `nightly.yml` runs the long checks at night.
+    will require, reads every result with the base commit's verdict; `nightly.yml` runs the long checks at night;
+    `release.yml` pushes each image the stack builds to GitHub's packages, from main alone.
 
 ## The gate
 
@@ -534,6 +536,7 @@ costs context in every session.
 | `scripts/land.py`, `scripts/agent_pr.py` | `land`, the owner's one command for a pull request (D13211, D13213), and the bundle reading and scans it reuses |
 | `.github/workflows/gate.yml` | the gate on GitHub: a pull request to main, a push to main or a run by hand, `gate-ok` its verdict |
 | `.github/workflows/nightly.yml` | the night on GitHub: 41 journeys, StrykerJS and the harness whole, the history's secrets; a red night opens one issue |
+| `.github/workflows/release.yml` | main's images: each push to main builds every image of `deploy/compose.yaml` and pushes it once to `ghcr.io/<owner>/<repository>/<image>:<12 hex of the commit>`; its one job writes packages alone, the token named in its push step alone, with no build cache, and the ci section holds the file to its every byte. A branch's own copy of the file runs on that branch's push, so a tag is trusted only as far as the repository's write access is |
 | `.github/CODEOWNERS` | the core, whose change needs an owner's approval once main's ruleset asks for it |
 | `scripts/ci_changes.sh`, `scripts/ci_gate_ok.py` | what a change calls for, and gate-ok's verdict, each run from the base commit |
 | `.github/failures.json` | the problem matcher every job of the gate registers: our tools' failure lines as its annotations, read with no login (D13177) |
