@@ -7314,7 +7314,10 @@ out=$(CALLS="$dc/calls" ANSWERS="$down|$down|$down" sh "$dc/d13702.sh" 2>&1)
 case $out in *"::warning"*"indexer"*) ;; *) fail "deploy/test-jarvis.sh's indexer_check gave no warning for an indexer down on three tries: $out" ;; esac
 case $out in *"skip  "*) ;; *) fail "deploy/test-jarvis.sh's indexer_check did not skip an indexer down on three tries: $out" ;; esac
 case $out in *"FAIL  "* | *"ok    "*) fail "deploy/test-jarvis.sh's indexer_check counted an indexer down on three tries: $out" ;; esac
-for answers in "$down|failed: refused|$down" "$down|$down|failed: [{\"type\":\"text\",\"text\":\"wrong shape\"}]" "refused|refused|refused"; do
+other='failed: [{"type":"text","text":"gno_history: error_unavailable: time filtering not supported by current indexer schema"}]'
+bare='failed: [{"type":"text","text":"gno_history: indexer unreachable"}]'
+for answers in "$down|failed: refused|$down" "$down|$down|failed: [{\"type\":\"text\",\"text\":\"wrong shape\"}]" "refused|refused|refused" \
+	"$other|$other|$other" "$bare|$bare|$bare"; do
 	out=$(CALLS="$dc/calls" ANSWERS="$answers" sh "$dc/d13702.sh" 2>&1)
 	case $out in "FAIL  "*) ;; *) fail "deploy/test-jarvis.sh's indexer_check let a wrong answer of ours pass or skip [$answers]: $out" ;; esac
 done

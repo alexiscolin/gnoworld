@@ -368,11 +368,11 @@ gnomcp_read() { docker exec -e TOOL="$1" -e ARGS="$2" "$jarvis" /nodejs/bin/node
 expect "gnomcp reads Onyx's node through the reader" "$(gnomcp_read gno_status '{"profile":"onyx"}')" read
 expect "gnomcp reads gno.land's node through the reader" "$(gnomcp_read gno_status '{"profile":"gnoland"}')" read
 # gno.land's indexer, live, times out now and then (F13163): three tries, the last one's answer judged; "outage" when all three
-# were gnomcp's own word for the indexer down (error_unavailable, indexer unreachable), never our reader's or gnomcp's fault.
+# were gnomcp's own words for the indexer down, "error_unavailable: indexer unreachable: ", never another error_unavailable.
 indexer_read() {
 	tries=0 down=0
 	until got=$(gnomcp_read gno_history '{"profile":"gnoland","realm":"gno.land/r/gnoland/home"}') && [ "$got" = read ]; do
-		case $got in "failed: "*error_unavailable* | "failed: "*"indexer unreachable"*) down=$((down + 1)) ;; esac
+		case $got in "failed: "*"error_unavailable: indexer unreachable: "*) down=$((down + 1)) ;; esac
 		tries=$((tries + 1)) && [ "$tries" -lt 3 ] || break
 		sleep 5
 	done
@@ -380,7 +380,8 @@ indexer_read() {
 	echo "$got"
 }
 # An outage of gno.land's indexer on all three tries is theirs, not ours (D13702): a warning, the check skipped and counted for nothing.
-# The two reads above go through the same reader, so a fault of ours still fails there; any other wrong answer here fails too.
+# Our way to it is proven apart: the reader's egress to indexer.gno.land live (the guard's checks above), its relay names and
+# gnomcp's tx-indexer-url pinned by jarvis/src/config.test.ts; any other wrong answer here fails.
 indexer_check() {
 	got=$(indexer_read)
 	if [ "$got" = outage ]; then
