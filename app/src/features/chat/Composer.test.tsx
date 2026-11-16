@@ -30,6 +30,8 @@ const toPartner = () =>
     />,
   );
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
+// The form's submit button, its attributes: its name is its aria-label (IconButton's, D13219).
+const submitOf = (markup: string) => /<button\b([^>]*\btype="submit"[^>]*)>/.exec(markup)?.[1] ?? "";
 
 describe("Composer", () => {
   // A refusal must not put its draft back over what the reader has typed since.
@@ -573,8 +575,8 @@ describe("Composer: an edit", () => {
     const markup = draw();
     expect(words(markup)).toContain("Editing a message");
     expect(names(markup)).toContain("Cancel the edit");
-    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>.*>Save<\/span><\/button>/);
-    expect(markup).not.toMatch(/>Send<\/span><\/button>/);
+    expect(submitOf(markup)).toContain('aria-label="Save"');
+    expect(names(markup)).not.toContain("Send");
   });
 
   it("starts from the words of the message edited, and sends with Save", () => {
@@ -595,13 +597,13 @@ describe("Composer: an edit", () => {
   it("refuses to save an edit that composes to an action, and says so", () => {
     const markup = draw({ draft: "/me waves" });
     expect(words(markup)).toContain("An edit cannot be an action.");
-    expect(markup).toMatch(
-      /<button[^>]*disabled=""[^>]*type="submit"[^>]*>.*>Save<\/span><\/button>|<button[^>]*type="submit"[^>]*disabled=""[^>]*>.*>Save<\/span><\/button>/,
-    );
+    expect(submitOf(markup)).toContain('aria-label="Save"');
+    expect(submitOf(markup)).toContain('disabled=""');
   });
 
   it("lets a plain edit save, and an action go as a new message", () => {
-    const enabled = (markup: string) => !/<button[^>]*disabled=""[^>]*>.*>(Save|Send)<\/span><\/button>/.test(markup);
+    const enabled = (markup: string) =>
+      /aria-label="(Save|Send)"/.test(submitOf(markup)) && !submitOf(markup).includes('disabled=""');
     const edit = draw({ draft: "the new words" });
     const action = draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined });
     expect(words(edit)).not.toContain("An edit cannot be an action.");
@@ -620,7 +622,7 @@ describe("Composer: an edit", () => {
     const markup = draw({ editing: undefined, onCancelEdit: undefined });
     expect(words(markup)).not.toContain("Editing a message");
     expect(names(markup)).not.toContain("Cancel the edit");
-    expect(markup).toMatch(/>Send<\/span><\/button>/);
+    expect(submitOf(markup)).toContain('aria-label="Send"');
   });
 });
 
