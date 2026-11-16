@@ -230,7 +230,6 @@ describe("the tokens", () => {
     ["--popover-wide", "440px"],
     ["--thumb-s", "32px"],
     ["--thumb-m", "52px"],
-    ["--plate-w", "808px"],
     ["--chat-dock", "420px"],
     ["--chat-dock-s", "380px"],
     ["--thumb-l", "64px"],
@@ -251,6 +250,19 @@ describe("the tokens", () => {
     ["--space-2xl", "64px"],
   ])("set %s to %s", (name, px) => {
     expect(value(name)).toBe(px);
+  });
+
+  // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/decisions.md, the floor chosen).
+  it("set the plate to 808 px at the video's width, narrowing with the window to a floor", () => {
+    const [, floor = "", share = "", cap = ""] =
+      /^clamp\((\d+)px, ([\d.]+)vi, (\d+)px\)$/.exec(value("--plate-w") ?? "") ?? [];
+    const at = (width: number) => Math.min(Number(cap), Math.max(Number(floor), (Number(share) * width) / 100));
+    expect(Number(cap)).toBe(808);
+    expect(Math.round(at(1728))).toBe(808);
+    expect(at(1491)).toBeLessThan(808);
+    expect(at(1280)).toBeLessThan(at(1491));
+    expect(at(900)).toBe(Number(floor));
+    expect(Number(floor)).toBeGreaterThanOrEqual(480);
   });
 
   // The video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.

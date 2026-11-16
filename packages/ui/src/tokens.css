@@ -148,8 +148,8 @@
     --dialog-wide: 760px;
     --popover-w: 300px;
     --popover-wide: 440px;
-    /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
-    --plate-w: 808px;
+    /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90): 808 px at the video's 1728, narrowing with the window to a floor that keeps a realm's stats card and charts readable. */
+    --plate-w: clamp(560px, 46.76vi, 808px);
     /* The plate's inner step, the step between its zones and the day chart's height; a narrow plate sets the first two smaller. */
     --plate-pad: var(--space-m);
     --plate-zone: var(--space-xl);
