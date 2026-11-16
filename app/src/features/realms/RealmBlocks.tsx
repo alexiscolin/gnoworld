@@ -16,12 +16,10 @@ export { DRAW_LIMIT, INLINE_LIMIT } from "./drawBudget.ts";
 import type { CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
 import { formsRegion } from "./formsRegion.ts";
+import { actionsOf } from "./pageActions.ts";
 
 // A form with its Call is the realm view's own, never a capture's or a chat's: the call card's code comes only as one is drawn.
 const CallableForm = lazy(async () => ({ default: (await import("./CallableForm.tsx")).CallableForm }));
-// A page's action and its card are the realm view's own too, one chunk: the call card's code comes only as one is drawn.
-const PageAction = lazy(async () => ({ default: (await import("./PageAction.tsx")).PageAction }));
-const ActionCard = lazy(async () => ({ default: (await import("./PageAction.tsx")).ActionCard }));
 
 // A form's card, one level under the heading before it, and no deeper than a card's title goes.
 const CARD_LEVEL = { 1: 2, 2: 3, 3: 4, 4: 4, 5: 4, 6: 4 } as const;
@@ -212,8 +210,7 @@ export function RealmBlocks({
   via: Drawing;
 } & (
   | { call?: undefined; page?: undefined }
-  /** The realm the page is of: with it, a form a call can carry gets its Call, and `page` is the page's name (its address on
-   * gnoweb) its call cards are named from, so a page drawn again finds them. */
+  /** The page's realm: its forms get their Call; `page`, its gnoweb address, names its cards so a redraw finds them. */
   | { call: CallPlace; page: string }
 )) {
   const warning = useExternalLinks(origin);
@@ -224,20 +221,7 @@ export function RealmBlocks({
   const cards: string[] = [];
   const under: Drawn["under"] = { level: 1 };
   const named = call === undefined ? undefined : { place: call, page };
-  // An action's button where its link stood, its card (nothing till opened) with the forms: a card is a block, never inside a paragraph.
-  // Named from the page, as its forms' cards are (D13541), so a page drawn again finds it.
-  const action: Drawn["action"] =
-    named === undefined
-      ? undefined
-      : (node, label) => {
-          const id = `${named.page}-action-${String(forms.length)}`;
-          const card = createElement(ActionCard, { id, place: named.place, level: CARD_LEVEL[under.level] });
-          cards.push(id);
-          forms.push(createElement(Suspense, { key: id, fallback: null }, card));
-          const words = createElement("span", null, ...label);
-          const button = createElement(PageAction, { id, func: node.func, args: node.args, place: named.place, label });
-          return createElement(Suspense, { key: id, fallback: words }, button);
-        };
+  const action = actionsOf(named, { forms, cards }, () => CARD_LEVEL[under.level]);
   const drawn = drawAll(blocks, { budget, via, reader, action, call: named, forms, anchor: anchorId, under });
   const below = formsRegion(forms, cards, styles["forms"]);
   const notice = budget.cut
