@@ -17,9 +17,9 @@ export default defineConfig({
   // starts, and the journeys may run beside it.
   outputDir: "test-results-stories",
   fullyParallel: true,
-  // One folder of approved pictures per platform, compared to
+  // The pictures spec's other run, a folder per platform outside the repository (PICTURES_BASE, D13500), compared to
   // the pixel: Playwright's default tolerance let a border go from 20% to 10% white unseen.
-  snapshotPathTemplate: "{testDir}/__screenshots__/{platform}/{arg}{ext}",
+  snapshotPathTemplate: `${process.env["PICTURES_BASE"] ?? "{testDir}/__pictures__"}/{platform}/{arg}{ext}`,
   expect: { toHaveScreenshot: { threshold: 0, maxDiffPixels: 0 } },
   // In the sandbox, Chromium runs as one process, and eight at once each building Storybook's pages crash.
   ...(sandboxed ? { workers: 1 } : {}),
