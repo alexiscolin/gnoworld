@@ -41,14 +41,31 @@ const prose = fc
       { weight: 4, arbitrary: fc.constant(" ") },
       {
         weight: 1,
-        arbitrary: fc.constantFrom("*", "**", "_", "__", "~~", "++", "`", "> ", "- ", "1. ", "\n", "[x](https://a.b)"),
+        arbitrary: fc.constantFrom(
+          "*",
+          "**",
+          "_",
+          "__",
+          "~~",
+          "~",
+          "\\",
+          "++",
+          "`",
+          "> ",
+          "- ",
+          "1. ",
+          "\n",
+          "[x](https://a.b)",
+        ),
       },
     ),
     { maxLength: 24 },
   )
   .map((parts) => parts.join(""));
 
-const kept = (md: string) => !/`\s|\s`|\*\*|__|>\s\s|\]\(/.test(md);
+// A backslash before a block mark (`\> a`) reads as text in the room but the editor gives it back bare, a quote: on main as on this
+// branch (F13576), not the tilde fix's to mend.
+const kept = (md: string) => !/`\s|\s`|\*\*|__|>\s\s|\]\(|\\[>\-\d]/.test(md);
 
 describe("the composer's Markdown, to the editor and back", () => {
   it("gives back exactly a draft of the chat's subset", () => {
@@ -104,6 +121,29 @@ describe("the composer's Markdown, to the editor and back", () => {
   // fast-check found `"1. \n1. "` (seed -1916808078): empty list items.
   it("leaves the room's reading of empty list items as it was", () => {
     for (const md of ["1. \n1. ", "1. ", "- \n- ", "1. \n\n1. ", "- ", "a\n- \n- b", "1. a\n1. ", "1. a\n1. \n1. b"]) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
+  });
+
+  // fast-check found a run of four tildes before `a~~` (F13632, seed 1772115532): the reader leaves a run of 3+ as text, so no `~~` in it strikes.
+  it("leaves the room's reading of a tilde run of three or more as it was", () => {
+    for (const md of ["~~~~a~~", "~~~a~~", "~~~~a~~~~", "a ~~~~a~~ b", "~~a~~ ~~~b~~", "`~~~a~~` ~~~b~~"]) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
+  });
+
+  // What the reader leaves alone the editor leaves alone: a fence, a code span, a backslash before the run.
+  it("leaves a tilde run in a fence, behind a backslash or in a code span as the room reads it", () => {
+    const drafts = [
+      "```\n~~~a~~\n```",
+      "a ```~~~b~~``` c",
+      "```\na\n```\n\n~~~b~~\n\n```\nc\n```",
+      "\\~~~a~~",
+      "\\~~~a~~ b",
+      "a\\~~~b~~",
+      "\\`~~~a~~`",
+    ];
+    for (const md of drafts) {
       expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
     }
   });

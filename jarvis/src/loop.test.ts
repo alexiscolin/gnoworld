@@ -923,6 +923,21 @@ describe("the loop: a question whose asker left", () => {
     run.close();
   });
 
+  it("tells a tool's run that a question is a shared one, as the ask says, and never when it says nothing", async () => {
+    const seen: (boolean | undefined)[] = [];
+    const run = setup({
+      steps: [asking(status()), ended(), asking(status()), ended()],
+      run: (_call, asked) => {
+        seen.push(asked.shared);
+        return Promise.resolve({ ok: true, text: "42", isError: false });
+      },
+    });
+    await run.loop.ask({ ...QUESTION, shared: true });
+    await run.loop.ask(QUESTION);
+    expect(seen).toEqual([true, undefined]);
+    run.close();
+  });
+
   it("stops at once when the asker leaves during a run that never ends, never waiting the tool's time", async () => {
     const left = new AbortController();
     const run = setup({

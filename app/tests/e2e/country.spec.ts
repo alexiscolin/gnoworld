@@ -127,6 +127,8 @@ test.describe("the country tag", () => {
       expect(Math.abs(code.y + code.height / 2 - (face.y + face.height / 2))).toBeLessThanOrEqual(1);
       expect(Math.round(code.width)).toBe(22);
       expect(Math.round(code.height)).toBe(15);
+      // The letters fit the box on every font: nothing spills past its padding.
+      expect(await head.locator("[data-line-country]").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
       expect((await axeOf(page).include("ol[aria-label='Messages']").analyze()).violations).toEqual([]);
       await expect(head).toHaveScreenshot(`country-line-${screen}.png`, { mask: [head.locator("time")] });
     });
