@@ -2,7 +2,7 @@
 // Whether this GPU may have space, read on a canvas of its own whose context goes back at once (ADR-0002 §8). The gate's browsers have a
 // software GPU: a test build or the dev server lets `?test-gpu` pass it; a production build holds no trace of it, the build replacing both.
 import { isWeakGpu, PHONE_QUERY, sceneOffer, type SceneOffer } from "@gnoworld/core";
-import { savesData } from "../../lib/saveData.ts";
+import { asksToSaveData, savesData } from "../../lib/saveData.ts";
 
 declare global {
   interface ImportMetaEnv {
@@ -38,5 +38,6 @@ export function gpuCanDraw(): boolean {
 // space, so it never makes the probe's WebGL2 context.
 export function offerOf(): SceneOffer {
   const phone = matchMedia(PHONE_QUERY).matches;
-  return sceneOffer({ weak: !phone && !gpuCanDraw(), phone, savesData: savesData() });
+  // A computer waits for its reader's own Save-Data alone; a phone for a 2G estimate too (D13721).
+  return sceneOffer({ weak: !phone && !gpuCanDraw(), phone, savesData: phone ? savesData() : asksToSaveData() });
 }

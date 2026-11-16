@@ -10,8 +10,41 @@ const phone = (matches: boolean) =>
   }));
 
 afterEach(() => {
+  Reflect.deleteProperty(navigator, "connection");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+// A computer's strong GPU, as the probe reads it.
+const strongGpu = () =>
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    getExtension: (name: string) =>
+      name === "WEBGL_debug_renderer_info" ? { UNMASKED_RENDERER_WEBGL: 1 } : { loseContext: () => undefined },
+    getParameter: () => "Apple M2 Pro",
+  } as unknown as RenderingContext);
+const link = (connection: { saveData?: boolean; effectiveType?: string }) =>
+  Object.defineProperty(navigator, "connection", { value: connection, configurable: true });
+
+describe("offerOf, the link (D13721)", () => {
+  it("takes space on a computer whose link the browser estimates at 2g: only the reader's own Save-Data waits there", () => {
+    phone(false);
+    strongGpu();
+    link({ effectiveType: "2g", saveData: false });
+    expect(offerOf()).toBe("auto");
+  });
+
+  it("waits to be asked on a computer whose reader asks to save data", () => {
+    phone(false);
+    strongGpu();
+    link({ effectiveType: "4g", saveData: true });
+    expect(offerOf()).toBe("ask");
+  });
+
+  it("keeps a phone's ask at an estimated 2g", () => {
+    phone(true);
+    link({ effectiveType: "2g" });
+    expect(offerOf()).toBe("ask");
+  });
 });
 
 describe("offerOf", () => {

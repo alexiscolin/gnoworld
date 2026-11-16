@@ -7,7 +7,7 @@ const pressed = vi.hoisted(() => vi.fn());
 const saves = vi.hoisted(() => ({ on: false }));
 vi.mock("./space.ts", () => ({ offer: { state: "ask", heard: { subscribe: () => () => undefined } }, press: pressed }));
 vi.mock("./gpu.ts", () => ({ gpuCanDraw: () => true }));
-vi.mock("../../lib/saveData.ts", () => ({ savesData: () => saves.on }));
+vi.mock("../../lib/saveData.ts", () => ({ asksToSaveData: () => saves.on }));
 
 // A window at `wide` or not, which a test may widen: its listeners hear the change.
 function windowOf(phone: boolean) {

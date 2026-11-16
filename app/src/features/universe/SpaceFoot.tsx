@@ -3,7 +3,7 @@
 import { PHONE_QUERY } from "@gnoworld/core";
 import { Button } from "@gnoworld/ui";
 import { useEffect, useSyncExternalStore } from "react";
-import { savesData } from "../../lib/saveData.ts";
+import { asksToSaveData } from "../../lib/saveData.ts";
 import { Credits } from "./Credits.tsx";
 import { gpuCanDraw } from "./gpu.ts";
 import { offer, press } from "./space.ts";
@@ -21,7 +21,7 @@ export function SpaceFoot() {
     if (state !== "ask") return;
     const phone = matchMedia(PHONE_QUERY);
     const widened = () => {
-      if (!phone.matches && !savesData() && gpuCanDraw()) press();
+      if (!phone.matches && !asksToSaveData() && gpuCanDraw()) press();
     };
     widened();
     phone.addEventListener("change", widened);
