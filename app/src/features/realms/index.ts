@@ -5,5 +5,7 @@ export { ReadFailed, ReadSource } from "./ReadSource.tsx";
 export { ActionForm } from "./ActionForm.tsx";
 export { InlineCard } from "./InlineCard.tsx";
 // What an answer of Jarvis is checked and drawn with: the callable listing, the leaving warning's links and the call's place.
+// Whether a realm exists as far as anything read says: the network switch asks it of the other chain's answer.
+export { knownOf } from "./known.ts";
 export { useExternalLinks } from "./useExternalLinks.tsx";
 export type { CallPlace } from "./InlineCard.tsx";

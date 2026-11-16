@@ -15,7 +15,6 @@ import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
 import { Row } from "./MenuRow.tsx";
 import { Trigger } from "./Trigger.tsx";
-import buttonStyles from "../Button/Button.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -154,7 +153,7 @@ export function Menu({
   lead,
   wordsHidden = false,
   openAtOnce = false,
-  busy = false,
+  busy,
   at,
 }: MenuProps) {
   // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
@@ -180,7 +179,8 @@ export function Menu({
   return (
     <>
       <Trigger
-        attrs={busy ? { ...trigger, "aria-busy": true } : trigger}
+        attrs={trigger}
+        busy={busy}
         plain={false}
         icon={icon === undefined ? undefined : { name: icon, size, emphasis }}
         tabbable
@@ -188,7 +188,6 @@ export function Menu({
       >
         {lead}
         {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
-        {busy ? <span className={buttonStyles["spinner"]} aria-hidden="true" /> : null}
       </Trigger>
       <div {...panel} aria-label={label} onKeyDown={move}>
         {items.map((item, at) => (

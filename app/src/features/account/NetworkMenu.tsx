@@ -7,7 +7,7 @@ import universes from "../../../data/universes.json" with { type: "json" };
 import { readPage } from "../../lib/chain/rpc.ts";
 import { pageFetch } from "../../lib/query/policy.ts";
 import { site } from "../../places.ts";
-import { knownOf } from "../realms/known.ts";
+import { knownOf } from "../realms/index.ts";
 import { raisePill } from "../../topPill.tsx";
 import { switchTo } from "./networkSwitch.ts";
 
@@ -29,10 +29,10 @@ export function NetworkMenu({ name }: { name: string }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   // The switch in progress: a new choice or another place ends it, and what it read then changes nothing.
-  const going = useRef<AbortController>(undefined);
+  const goingRef = useRef<AbortController>(undefined);
   useEffect(
     () => () => {
-      going.current?.abort();
+      goingRef.current?.abort();
       setBusy(false);
     },
     [pathname],
@@ -51,9 +51,9 @@ export function NetworkMenu({ name }: { name: string }) {
         checked: each.id === here,
         ...(each.testnet ? { note: "Testnet" } : {}),
         onSelect: () => {
-          going.current?.abort();
+          goingRef.current?.abort();
           const stop = new AbortController();
-          going.current = stop;
+          goingRef.current = stop;
           setBusy(true);
           switchTo({ site, pathname, to: each.id, holds: (universe, realm) => holds(universe, realm, stop.signal) })
             .then(({ path, line }) => {

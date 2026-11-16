@@ -408,7 +408,7 @@ describe("Menu, a choice among items", () => {
     expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
   });
 
-  it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", async () => {
+  it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", () => {
     render(
       <Menu
         trigger="Network"

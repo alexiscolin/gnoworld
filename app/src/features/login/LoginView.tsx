@@ -31,7 +31,14 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
       {problem === undefined ? null : sayProblem(problem)}
     </p>
   );
-  if (session.kind !== "out") return status;
+  // Beside the account's pill, never in its button: pressing the network must not open the account's menu.
+  if (session.kind !== "out")
+    return (
+      <>
+        {network}
+        {status}
+      </>
+    );
   // Why the last login stopped is the button's own words, short; its status region says it whole to a screen reader alone.
   const stopped = step === "idle" && problem !== undefined;
   return (

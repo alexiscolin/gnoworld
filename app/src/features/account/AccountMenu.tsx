@@ -98,7 +98,7 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
   );
 }
 
-/** The account's menu; `network`, the network's name drawn beside its pill once logged in, beside the way in before. */
+/** The account's menu; `network`, the network's name LoginControl draws beside the way in, or beside the pill once logged in. */
 export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
@@ -149,8 +149,6 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
       ) : (
         trigger
       )}
-      {/* Beside the pill, never in its button: pressing the network must not open the account's menu. */}
-      {address === undefined ? null : network}
       {address === undefined || !naming ? null : (
         <Suspense fallback={null}>
           <PickName

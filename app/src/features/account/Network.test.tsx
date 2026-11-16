@@ -8,7 +8,9 @@ import { Network } from "./Network.tsx";
 
 // The network named right of the login button is a menu of the networks (D13501): Onyx and gno.land, the current one checked, "Testnet" kept
 // on Onyx; choosing one keeps the place when that network's chain holds it, else goes to its home and says so. The chain's read is faked.
-const chain = vi.hoisted(() => ({ readPage: vi.fn() }));
+const chain = vi.hoisted(() => ({
+  readPage: vi.fn<(rpc: string, source: unknown, options: { signal?: AbortSignal }) => Promise<unknown>>(),
+}));
 vi.mock("../../lib/chain/rpc.ts", async (original) => ({
   ...(await original<object>()),
   readPage: chain.readPage,
@@ -32,7 +34,7 @@ const Go = () => {
     <i
       data-go=""
       onClick={() => {
-        void navigate("/w/bubble");
+        Promise.resolve(navigate("/w/bubble")).catch(reportError);
       }}
     />
   );
