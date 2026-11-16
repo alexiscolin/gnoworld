@@ -115,6 +115,14 @@ describe("the composer's Markdown, to the editor and back", () => {
     }
   });
 
+  // What the reader leaves alone the editor leaves alone: a backslash before the run, a code span.
+  it("leaves a tilde run behind a backslash or in a code span as the room reads it", () => {
+    const drafts = ["\\~~~a~~", "\\~~~a~~ b", "a\\~~~b~~", "\\`~~~a~~`"];
+    for (const md of drafts) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
+  });
+
   // The room's reader, not the text, is what must not change: the tree of the draft and of what the editor gives back.
   it("leaves the room's reading of a draft as it was, on drafts of marks and blocks mixed", () => {
     // A failed property prints its shrunk counterexample and its seed, which `fc.assert` takes back to replay it.
