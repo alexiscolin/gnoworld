@@ -543,6 +543,8 @@ def mutants():
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more")
     yield from each(hm, "pool.submit(run, *c): c for c in " "controls}", "pool.submit(run, *c): c for c in controls[:1]}", "hooks", "harness_mutate's control runs in every tree")
+    yield from each(hm, "OUTPUT[(tree, test)] = proc.communicate(timeout=" "LIMIT)[0]", 'OUTPUT[(tree, test)] = ""', "hooks", "harness_mutate shows what a failed control said")
+    yield from each(hm, "stderr=subprocess." "STDOUT, text=True, start_new_session=True)", "stderr=subprocess.DEVNULL, text=True, start_new_session=True)", "hooks", "harness_mutate shows a failed control's stderr")
     yield from each(hm, "    if not found" ":  # a harness that lost", "    if False:  # a harness that lost", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge")
     yield from each(hm, "if sys.argv[1:]" ":\n    sys.exit(\"usage", "if False:\n    sys.exit(\"usage", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "if failures" ":\n    sys.exit", "if False:\n    sys.exit", "hooks", "a survivor fails harness_mutate")
@@ -1989,6 +1991,14 @@ def stop(proc):
             proc.wait(wait)
 
 
+OUTPUT = {}  # (tree, test) -> the last run's output, which a failed control shows (the night's said nothing of why)
+
+
+def said(tree, test, lines=40):
+    """The last lines a suite printed in tree, indented, for the message that stops the run."""
+    return "\n".join("  " + line for line in OUTPUT.get((tree, test), "").splitlines()[-lines:])
+
+
 def run(tree, test, only=""):
     """A test's exit code in the worktree `tree`; `only` names its sections, empty for all of them, None for a suite past its
     LIMIT, whose group is stopped. A suite cut short by a signal (a Ctrl+C reaches every suite in flight) has no verdict, as a
@@ -1996,16 +2006,16 @@ def run(tree, test, only=""):
     env = {**os.environ, "ONLY": only}
     if STOP.is_set():  # a worker of a pool that is stopping picks up no suite
         raise Cut("the run was stopped")
-    proc = subprocess.Popen(TESTS[test], cwd=tree, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    proc = subprocess.Popen(TESTS[test], cwd=tree, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     LIVE.add(proc)
     try:
         if STOP.is_set():  # stopped between the check above and LIVE: stopped() has not seen this suite, so it ends here
             raise Cut("the run was stopped")
-        proc.communicate(timeout=LIMIT)
+        OUTPUT[(tree, test)] = proc.communicate(timeout=LIMIT)[0]
     except subprocess.TimeoutExpired:
         stop(proc)
         with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.communicate(timeout=GRACE)
+            OUTPUT[(tree, test)] = proc.communicate(timeout=GRACE)[0] or ""
         return None
     except BaseException:
         stop(proc)
@@ -2104,9 +2114,9 @@ with contextlib.ExitStack() as stack:
             for future in concurrent.futures.as_completed(waiting):  # in the order they end: a failure is not kept waiting behind a slow one
                 (tree, test), code = waiting[future], future.result()
                 if code is None:  # a hung control is no pass: it proves nothing about the mutants
-                    sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first")
+                    sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first. It said:\n{said(tree, test)}")
                 if code != 0:
-                    sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
+                    sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first. It said:\n{said(tree, test)}")
         except BaseException as e:  # an interrupt, or a control that failed or hung: the one beside it is stopped, not waited for
             stopped(e, pool)
             raise

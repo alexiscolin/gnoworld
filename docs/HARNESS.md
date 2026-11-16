@@ -377,7 +377,8 @@ costs context in every session.
   must refuse, and what it must let through.
 - **`scripts/harness_mutate.py`** switches each guard off in turn, in a throwaway copy, and runs
   the section of the probe or hook tests that belongs to it (`ONLY=<section>`): a guard whose
-  removal no test notices is a guard nobody checks, and the run prints the test to add.
+  removal no test notices is a guard nobody checks, and the run prints the test to add. Its control, each suite whole on an untouched
+  copy first, stops the run when it fails, with the last forty lines that suite printed (F13436).
 - **A removal or a narrowing lands with no test of its own** three read-only passes read it (a `reviewer`, the
   `security-reviewer`, a second `reviewer` over the gate as a whole), and every job GitHub runs runs once before the push (D13186); a case
   that tested what is removed goes with it, on a `Removed-test:` line.
