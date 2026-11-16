@@ -27,7 +27,7 @@ function Account({ universe }: { universe: UniverseView }) {
   // browser never has it) a guest reads why atop it.
   const phone = useMedia(PHONE_QUERY);
   return (
-    <Cluster space="2xs" wrap={phone ? "no" : "yes"}>
+    <Cluster space="2xs" wrap={phone ? "no" : "yes"} className={styles["controls"]}>
       <SearchButton className="" emphasis={phone ? "plain" : "outline"} />
       <BellSlot phone={phone} />
       <AccountMenu

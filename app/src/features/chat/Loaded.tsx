@@ -21,6 +21,7 @@ import { JarvisTold } from "./jarvisTold.tsx";
 import { Saved } from "./Saved.tsx";
 import { Media } from "./Media.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
+import { NoticeModes } from "./NoticeModes.tsx";
 import { RoomsMenu } from "./RoomsMenu.tsx";
 import { unreadOf } from "./unread.ts";
 import { useOpened, useWhoIsHere } from "./whoIsHere.tsx";
@@ -128,6 +129,10 @@ function DmNote({ shown, id }: { shown: Shown | undefined; id: string }) {
   ) : null;
 }
 
+// The room's notification modes, for a phone's drawer: none for a guest or a direct message.
+const modesOf = (room: string | undefined, { notify }: Noticing) =>
+  room === undefined || notify === undefined ? undefined : <NoticeModes room={room} {...notify} />;
+
 export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, place } = props;
   const { room, acts, me, people, shown, lines, members, noteId } = useConversation(props);
@@ -159,6 +164,7 @@ export function Loaded(props: LoadedProps) {
       place={place}
       title={shown?.title ?? place.name}
       chips={<RoomChips sections={sections} current={room} badges={noticing.badges} />}
+      modes={modesOf(room, noticing)}
       menu={{
         label: "Rooms",
         content: <RoomsMenu sections={sections} room={room} failed={failed} noticing={noticing} />,

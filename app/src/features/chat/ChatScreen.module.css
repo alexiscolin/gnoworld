@@ -116,10 +116,10 @@
       block-size: calc(var(--chat-vtop) + var(--chat-vh) - var(--_top));
     }
 
+    /* The header holds the place band (PhoneBand.module.css), which has its own gutter, padding and rule. */
     .screen[data-full][data-compact] [data-region="header"] {
-      padding-block: var(--space-2xs);
-      /* the lines' own gutter, so the header's controls and the name keep the row at 320 px */
-      padding-inline: var(--chat-inset);
+      padding: 0;
+      border-block-end: 0;
     }
 
     :root:has(.screen[data-full][data-compact]) {
@@ -131,18 +131,22 @@
       padding-block-start: 0;
     }
 
-    /* The phone header's place while its code comes (ChatTop.tsx): its row and the band's height (PhoneBand.module.css: its planet's square and the padding;
-       the slim one on a short window), so the conversation does not move down as it arrives. */
+    /* The band's place while its code comes (ChatTop.tsx): its height at rest (PhoneBand.module.css: a step, the place's 88 px, the rooms' row, a few
+       pixels and the rule), so the conversation does not move down as it arrives; one row on a short window. */
+    :root:has(.topWaiting, [data-phone-band]) {
+      --phone-band: calc(var(--space-xs) + var(--control-m) * 3 + var(--space-3xs) + var(--line-width));
+    }
+
+    @media (height < 500px) {
+      :root:has(.topWaiting) {
+        --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) + var(--line-width));
+      }
+    }
+
     .topWaiting {
       /* layout: reserved room, nothing drawn */
       display: block;
-      block-size: calc(var(--control-m) * 3 + var(--space-s) + var(--space-2xs) * 4);
-    }
-
-    @media (height < 640px) {
-      .topWaiting {
-        block-size: calc(var(--control-m) + var(--control-s) + var(--space-2xs) * 4);
-      }
+      block-size: var(--phone-band);
     }
 
     /* The row of worlds at the foot (PhoneWorlds.tsx, about 75 px: its planet, its name, its padding and rule, and the home bar's inset):

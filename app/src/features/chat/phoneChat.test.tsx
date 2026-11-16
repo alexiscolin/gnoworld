@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Link, MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
@@ -37,12 +37,15 @@ vi.mock("./PhoneInfo.tsx", () => ({
     ) : null,
 }));
 
-// The band (planet, key info, Its page) is PhoneBand.test.tsx's: here it is its press and its fold.
+// The band (planet, key info, one press to Info) is PhoneBand.test.tsx's: here it is its press, its fold and the row it holds.
 vi.mock("./PhoneBand.tsx", () => ({
-  PhoneBand: ({ onPage, folded }: { onPage: () => void; folded: boolean }) => (
-    <button type="button" data-band={folded ? "folded" : "open"} onClick={onPage}>
-      band
-    </button>
+  PhoneBand: ({ onInfo, folded, children }: { onInfo: () => void; folded: boolean; children: ReactNode }) => (
+    <>
+      <button type="button" data-band={folded ? "folded" : "open"} onClick={onInfo}>
+        band
+      </button>
+      {children}
+    </>
   ),
 }));
 
@@ -53,7 +56,12 @@ function Probe() {
     <>
       <output>{search}</output>
       <PhoneTop
-        header={{ title: "#games", rooms: null, acts: [] }}
+        header={{
+          title: "#games",
+          rooms: <i>rooms</i>,
+          chips: <b>chips</b>,
+          search: { label: "Search", icon: "search-messages" },
+        }}
         info={
           {
             place: { kicker: "k" },
@@ -83,30 +91,31 @@ const draw = (at = "/r/news?chat=full") => {
 const sheets = (box: HTMLElement) => all(box, "p").map((p) => p.textContent);
 
 describe("a phone's Info sheet", () => {
-  it("draws no Back, and the place band above the sheets", () => {
+  it("draws no Back, and the place band with the rooms' row in it above the sheets", () => {
     const box = draw();
     expect(button(box, "Back")).toBeUndefined();
     expect(button(box, "band")?.getAttribute("data-band")).toBe("open");
+    expect(one(box, "i").textContent + one(box, "b").textContent).toBe("roomschips");
   });
 
-  it("opens the page sheet from the band's Its page", () => {
+  it("opens the Info sheet from the band's one press", () => {
     const box = draw();
     click(button(box, "band"));
-    expect(sheets(box)).toEqual(["The page sheet"]);
-    expect(one(box, "output").textContent).toBe("?chat=full&sheet=page");
+    expect(sheets(box)).toEqual(["The info sheet"]);
+    expect(one(box, "output").textContent).toBe("?chat=full&sheet=info");
   });
 
   it("opens at Info, by an entry whose address holds it", () => {
     const box = draw();
     expect(sheets(box)).toEqual([]);
-    click(button(box, "Info"));
+    click(button(box, "band"));
     expect(sheets(box)).toEqual(["The info sheet"]);
     expect(one(box, "output").textContent).toBe("?chat=full&sheet=info");
   });
 
   it("opens the page sheet from the info and closes it back to the info, then the info", () => {
     const box = draw();
-    click(button(box, "Info"));
+    click(button(box, "band"));
     click(button(box, "flip"));
     expect(sheets(box)).toEqual(["The page sheet"]);
     click(button(box, "flip"));
@@ -123,7 +132,7 @@ describe("a phone's Info sheet", () => {
 
   it("shuts as another page opens", () => {
     const box = draw();
-    click(button(box, "Info"));
+    click(button(box, "band"));
     click(box.querySelector<HTMLElement>("a[href='/r/other?chat=full']") ?? undefined);
     expect(sheets(box)).toEqual([]);
   });

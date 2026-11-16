@@ -9,6 +9,7 @@ import { useFull } from "./full.ts";
 import { roomHref } from "./names.ts";
 import { roomsChanged } from "./roomsListed.ts";
 import { useApp } from "../../storeContext.tsx";
+import styles from "./NewRoom.module.css";
 
 type Reason =
   Awaited<ReturnType<ReturnType<typeof pageRoomsApi>["make"]>> extends infer R
@@ -45,7 +46,20 @@ export function useMayMakeRoom(sections: RoomList["sections"]): boolean {
   return signedIn && onEarth(sections);
 }
 
-export function NewRoom() {
+function Trigger({ wide, onOpen }: { wide: boolean; onOpen: () => void }) {
+  return wide ? (
+    <div className={styles["wide"]}>
+      <Button icon="plus" onClick={onOpen}>
+        New room
+      </Button>
+    </div>
+  ) : (
+    <IconButton icon="plus" label="New room" size="xs" onClick={onOpen} />
+  );
+}
+
+/** Its button: a "+" by default; `wide`, a phone drawer's, the full-width outlined button at the list's foot. */
+export function NewRoom({ wide = false }: { wide?: boolean }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string>();
@@ -82,11 +96,9 @@ export function NewRoom() {
   };
   return (
     <>
-      <IconButton
-        icon="plus"
-        label="New room"
-        size="xs"
-        onClick={() => {
+      <Trigger
+        wide={wide}
+        onOpen={() => {
           setOpen(true);
         }}
       />

@@ -237,19 +237,19 @@
       overflow: auto;
     }
 
-    /* A line to start: the field is a finger's height (the placeholder centred in it), and the box has its resting edge, one more line wide on each side. */
+    /* The box has its resting edge, one more line wide on each side; its field keeps the base's room, two lines to type before it grows. */
     .box {
       border: var(--line-width) solid var(--color-line-strong);
     }
 
-    .box [role="textbox"],
-    .box [role="textbox"] + [aria-hidden="true"],
-    .box .field textarea {
-      min-block-size: var(--control-m);
-      padding-block: calc((var(--control-m) - 1lh) / 2);
+    /* Three lines' room at rest, which Send (44 px) and its inset sit inside. */
+    .box:not(:focus-within) [role="textbox"],
+    .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
+    .box:not(:focus-within) .field textarea {
+      min-block-size: calc(3lh + var(--space-s));
     }
 
-    /* At rest the box is one line: the field and Send side by side, the foot (the format control and the quick actions' /) shown once the
+    /* At rest the field and Send are side by side, the foot (the format control and the quick actions' /) shown once the
        box has the focus, inside it, so the keyboard comes with the box whole above it. */
     .box:not(:focus-within) [role="textbox"],
     .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
@@ -261,10 +261,10 @@
     .box:not(:focus-within) .send {
       /* layout: Send beside the field, level with it, its edge a step in */
       grid-area: 2 / 2;
-      /* layout: level with the field's line */
-      align-self: center;
-      /* layout: a step in from the box's edge, none above or below */
-      margin: 0 var(--space-3xs) 0 0;
+      /* layout: level with the field's foot, where its last line is */
+      align-self: end;
+      /* layout: the same step in from the box's end and its foot, inside its edge */
+      margin: 0 var(--space-xs) var(--space-xs) 0;
     }
 
     .box:not(:focus-within) .acts {

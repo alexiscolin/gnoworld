@@ -25,8 +25,8 @@
   }
 
   .testnet {
-    /* layout: a phone's warning, drawn only there (shellHeader.tsx) */
-    display: flex;
+    /* layout: a phone's warning, drawn only there (shellHeader.tsx); the chip or the dot, one of them shown */
+    display: grid;
     /* layout: the chip or the dot on the logo's line */
     align-items: center;
     min-inline-size: 0;
@@ -408,11 +408,15 @@
 
     .brand {
       /* layout: the logo and the testnet's warning on one line, a step apart, giving way before the controls */
-      display: flex;
+      display: grid;
+      /* layout: the logo and the warning side by side, from the start */
+      grid-auto-flow: column;
+      /* layout: from the start, never spread */
+      justify-content: start;
       /* layout: they share a middle */
       align-items: center;
       /* layout: a step between the logo and the warning */
-      gap: var(--space-2xs);
+      column-gap: var(--space-2xs);
       min-inline-size: 0;
     }
 
@@ -440,6 +444,12 @@
     .network {
       /* layout: the account's menu holds the network */
       display: none;
+    }
+
+    /* The search, the bell and the menu: the large icon (--icon-l) in their 44 px targets, still plain. */
+    .controls button > svg {
+      inline-size: var(--icon-l);
+      block-size: var(--icon-l);
     }
   }
 

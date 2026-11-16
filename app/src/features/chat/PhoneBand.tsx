@@ -1,77 +1,116 @@
-// A phone's place band, under the chat header: the planet the wide full chat draws in its info column (PlaceView's, MiniSpace with no
-// cosmos) beside the place's key words, and "Its page". It folds to a slim row (a small planet and the name) while a chat field has the focus
-// and on a short window (PhoneBand.module.css), and while the lines are scrolled up (`folded`, bandFold.ts). The engine's code is asked
-// after the first paint (a lazy import), and MiniSpace makes its WebGL context only where gpuCanDraw says the device can draw: none on any other.
-import { Cluster, Kicker, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useState } from "react";
+// A phone's place band, the top of its chat: the place's kind, name and counts over its planet (the one the wide full chat draws in its info
+// column: PlaceView's MiniSpace with no cosmos), all one button to Info; under it the rooms' row (PhoneHeader.tsx, its `children`). It is the
+// world's own plate (data-world: --color-plate). It folds to a slim row (the room's name, a small planet) while the lines are scrolled up
+// (`folded`, bandFold.ts), and with the rooms' row hidden while a chat field has the focus and on a short window (PhoneBand.module.css). The
+// planet is a big disc at the band's end, its top half showing, the band's foot cropping it; its box never changes size, only its scale, so the fold moves no canvas; the engine's code is asked after the first paint (a lazy
+// import), and MiniSpace makes its WebGL context only where gpuCanDraw says the device can draw, the planet's still standing where it cannot.
+import { Cluster, Icon, Kicker, Stack } from "@gnoworld/ui";
+import { lazy, Suspense, useId, useState, type ReactNode } from "react";
 import { groundOn } from "../../earthGround.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
-import { PageButton } from "./PlaceSheet.tsx";
 import { worldOf } from "./PlaceView.tsx";
 import styles from "./PhoneBand.module.css";
 
 const MiniSpace = lazy(() => import("../../MiniSpace.tsx"));
 
-const firstLine = (text: string): string => text.split("\n", 1)[0] ?? "";
+// "3 talking now · 12 here", "Quiet · 12 here": only what is known.
+function countsOf(talking: number | undefined, present: number | undefined): string {
+  const said = [
+    talking === undefined ? undefined : talking > 0 ? `${String(talking)} talking now` : "Quiet",
+    present === undefined ? undefined : `${String(present)} here`,
+  ];
+  return said.filter((each) => each !== undefined).join(" · ");
+}
+
+// The planet in its fixed box: its still stands till the engine has drawn, and stays where it cannot draw (no GPU).
+function Planet({ place }: { place: ChatPlace }) {
+  const [ground] = useState(groundOn);
+  const [drawn, setDrawn] = useState(false);
+  return (
+    <div className={styles["planet"]} aria-hidden="true">
+      {drawn ? null : (
+        <div className={styles["still"]}>
+          <WorldPlanet world={worldOf(place)} fallback="" name={place.name} size="l" decorative />
+        </div>
+      )}
+      <Suspense fallback={null}>
+        <MiniSpace
+          world={worldOf(place)}
+          ground={ground}
+          onDrawn={() => {
+            setDrawn(true);
+          }}
+        />
+      </Suspense>
+    </div>
+  );
+}
 
 export function PhoneBand({
   place,
+  title,
+  mark,
   talking,
   present,
   folded,
-  onPage,
+  onInfo,
+  children,
 }: {
   place: ChatPlace;
+  /** The room in view (or a direct message's partner): the page's heading, and the folded row's name. */
+  title: ReactNode;
+  /** A short mark by the counts, always in view: a direct message's "Not encrypted". */
+  mark?: ReactNode;
   talking?: number | undefined;
   present?: number | undefined;
   folded: boolean;
-  onPage: () => void;
+  onInfo: () => void;
+  /** The rooms' row. */
+  children?: ReactNode;
 }) {
-  const [ground] = useState(groundOn);
-  const [drawn, setDrawn] = useState(false);
-  const counts = [
-    talking === undefined ? undefined : `${String(talking)} talking now`,
-    present === undefined ? undefined : `${String(present)} here now`,
-  ].filter((each) => each !== undefined);
+  const metaId = useId();
   return (
-    <section aria-label={place.name} className={styles["band"]} data-folded={folded ? "" : undefined}>
-      <Cluster space="xs" wrap="no">
-        <div className={styles["planet"]} aria-hidden="true">
-          {/* The planet's still (the worlds row's picture) stands till the engine has drawn, and stays where it cannot draw (no GPU). */}
-          {drawn ? null : (
-            <div className={styles["still"]}>
-              <WorldPlanet world={worldOf(place)} fallback="" name={place.name} size="l" decorative />
-            </div>
-          )}
-          <Suspense fallback={null}>
-            <MiniSpace
-              world={worldOf(place)}
-              ground={ground}
-              onDrawn={() => {
-                setDrawn(true);
-              }}
-            />
-          </Suspense>
-        </div>
-        <div className={styles["words"]}>
-          <Stack space="3xs">
-            <div className={styles["more"]}>
-              <Kicker>{place.kicker}</Kicker>
-            </div>
-            <p className={`${styles["name"] ?? ""} truncate`}>{place.name}</p>
-            <p className={`${styles["more"] ?? ""} meta truncate`}>{firstLine(place.description)}</p>
-            <div className={styles["more"]}>
-              <Cluster justify="between" space="2xs" wrap="no">
-                <p className="meta truncate">{counts.join(" · ")}</p>
-                <div className={styles["page"]}>
-                  <PageButton onOpen={onPage} />
-                </div>
-              </Cluster>
-            </div>
+    <section
+      aria-label={place.name}
+      className={styles["band"]}
+      data-phone-band=""
+      data-world=""
+      data-earth={place.earth === true ? "" : undefined}
+      data-folded={folded ? "" : undefined}
+    >
+      <h1 className="visually-hidden">{title}</h1>
+      <Planet place={place} />
+      <Cluster space="xs" wrap="no" className={styles["place"]}>
+        {/* The whole row is the press: its words are for the eye (the button says the place and, described, its counts). */}
+        <button
+          type="button"
+          className={styles["press"]}
+          aria-label={`${place.name}: info and its page`}
+          aria-describedby={metaId}
+          onClick={onInfo}
+        />
+        <Stack space="3xs" className={styles["text"]}>
+          <Stack space="3xs" aria-hidden="true">
+            <Kicker>{place.kicker}</Kicker>
+            <Cluster space="2xs" wrap="no" className={styles["name"]}>
+              <span className={`${styles["rest"] ?? ""} truncate`}>{place.name}</span>
+              <span className={`${styles["folded"] ?? ""} truncate`}>{title}</span>
+              <Icon name="chevron" />
+            </Cluster>
           </Stack>
-        </div>
+          <Cluster space="2xs" wrap="no" className={styles["counts"]}>
+            <p id={metaId} className={`${styles["meta"] ?? ""} meta truncate`}>
+              {talking !== undefined && talking > 0 ? (
+                <span className="dot" data-tone="warm" aria-hidden="true" />
+              ) : null}
+              {countsOf(talking, present)}
+            </p>
+            {mark === undefined ? null : <span className={styles["mark"]}>{mark}</span>}
+          </Cluster>
+        </Stack>
       </Cluster>
+      {children}
     </section>
   );
 }

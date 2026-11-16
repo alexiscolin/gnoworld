@@ -39,8 +39,7 @@ const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer
   failed: (error) => <ErrorView kind={errorKind(error)} size="inline" urgent />,
 });
 
-// A phone's row of worlds at the chat's foot, its code asked once the window is a phone's (a computer's chat never carries it). Its place is
-// reserved by the wrapper (ChatScreen.module.css), so its arrival moves nothing.
+// A phone's row of worlds at the chat's foot, its code asked once the window is a phone's. Its place is reserved by the wrapper (ChatScreen.module.css).
 const PhoneWorlds = chunked(async () => ({ default: (await import("./PhoneWorlds.tsx")).PhoneWorlds }), {
   waiting: null,
   failed: () => null,
@@ -87,8 +86,10 @@ export interface ChatScreenProps {
   /** What the name opens, and the mark after it (ChatHeader's). */
   menu?: ChatHeaderProps["menu"];
   mark?: ChatHeaderProps["mark"];
-  /** The rooms as chips under the header, drawn in the dock only: the full chat has its column, a phone its drawer. */
+  /** The rooms as chips: under the dock's header, and in a phone's band; the wide full chat has its column. */
   chips?: ReactNode;
+  /** The room's notification modes, in a phone's drawer (where its name's menu no longer is); none for a guest. */
+  modes?: ReactNode;
   /** The rooms' column; on a phone it sits behind the header's control instead. */
   rail: ReactElement;
   /** What the account has not seen in the rooms, on that control. */
@@ -123,9 +124,10 @@ const inPlaceView = (full: boolean, compact: boolean, thread: ReactNode): boolea
   full && !compact && thread === undefined;
 
 // The narrow full chat's rooms: the worlds join them in the drawer on a phone (the window under 900 px) alone.
-const roomsOf = (props: { unread: number; rail: ReactElement; phone: boolean }, rows: WorldsProps) => (
-  <RoomsDrawer {...props} worlds={props.phone ? rows : undefined} />
-);
+const roomsOf = (
+  props: { unread: number; rail: ReactElement; phone: boolean; modes: ReactNode },
+  rows: WorldsProps,
+) => <RoomsDrawer {...props} worlds={props.phone ? rows : undefined} />;
 
 // What closes the full chat: none where the page is the chat and would open it again.
 const closeFull = (dockable: boolean, place: ChatPlace) => (takesPage(dockable, place) ? null : <FullButton full />);
@@ -185,7 +187,7 @@ function useBox(place: ChatPlace) {
 }
 
 export function ChatScreen(props: ChatScreenProps) {
-  const { place, title, chips, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
+  const { place, title, chips, modes, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
   const { status, children, search } = props;
   const { dockable, full, screenRef, compact, setCompact, phone, narrow } = useBox(place);
   const navigate = useNavigate();
@@ -198,12 +200,12 @@ export function ChatScreen(props: ChatScreenProps) {
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
   // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: fullMove.ts).
   const columns = { ...useColumns(), band: bar.wide };
-  const rooms = narrow ? roomsOf({ unread, rail, phone }, worlds.rows) : undefined;
+  const rooms = narrow ? roomsOf({ unread, rail, phone, modes }, worlds.rows) : undefined;
   const header = (
     <ChatTop
-      {...{ place, title, menu, mark, rooms, talking, room, people, present, phone, screen: screenRef }}
+      {...{ place, title, menu, mark, rooms, chips, talking, room, people, present, phone, screen: screenRef }}
       buttons={inPlaceView(full, compact, thread) ? undefined : buttons}
-      acts={placeActs(searching.act, here.ask)}
+      search={searching.act}
       docked={dockable}
       onClose={() => {
         closeChat(place, navigate);
@@ -250,7 +252,7 @@ export function ChatScreen(props: ChatScreenProps) {
           {children}
           {phone ? (
             <div className={styles["worlds"]}>
-              <PhoneWorlds worlds={place.worlds} current={place.slug} />
+              <PhoneWorlds {...worlds.rows} />
             </div>
           ) : null}
         </ChatLayout>

@@ -213,8 +213,8 @@ const drawPanel = (entry: string) => {
 
 describe("the screen's header", () => {
   const at = (entry: string, phone: boolean) => {
-    // An earlier test's screen may still stand in the body: count this one's Info alone (the phone header's: it has no Back).
-    const before = document.querySelectorAll("[aria-label='Info']").length;
+    // An earlier test's screen may still stand in the body: count this one's band press alone (the phone's: one button to Info).
+    const before = document.querySelectorAll("[aria-label$=': info and its page']").length;
     vi.stubGlobal("fetch", roomsAnswer(200));
     // jsdom has none, and a browser's is none while the document is not fully active.
     vi.stubGlobal("visualViewport", null);
@@ -230,7 +230,7 @@ describe("the screen's header", () => {
     act(() => {
       state().loginActions.signedOut();
     });
-    return () => document.querySelectorAll("[aria-label='Info']").length > before;
+    return () => document.querySelectorAll("[aria-label$=': info and its page']").length > before;
   };
 
   it("is the phone's, with its Info, in the full chat of a phone", async () => {

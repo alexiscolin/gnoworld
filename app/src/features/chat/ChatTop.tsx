@@ -1,4 +1,4 @@
-// The chat's header: a phone's (back, name, Rooms, acts, Info and its sheet; its code asked once the window is a phone's, so a computer's
+// The chat's header: a phone's (the place band, its rooms' row and the Info sheet; its code asked once the window is a phone's, so a computer's
 // chat never carries it) or the wide chat's and the dock's.
 import type { ComponentProps, RefObject } from "react";
 import { ErrorView, errorKind } from "../errors/index.ts";
@@ -17,20 +17,21 @@ export function ChatTop({
   place,
   phone,
   screen,
-  acts,
+  search,
+  chips,
   talking,
   room,
   people,
   present,
   ...header
 }: ChatHeaderProps &
-  Phone["header"] &
+  Pick<Phone["header"], "search" | "chips"> &
   Phone["info"] & { present?: number | undefined; phone: boolean; screen: RefObject<HTMLElement | null> }) {
   if (!phone) return <ChatHeader world={place.name} {...header} />;
-  const { title, menu, mark, rooms } = header;
+  const { title, mark, rooms } = header;
   return (
     <PhoneTop
-      header={{ title, menu, mark, rooms, acts }}
+      header={{ title, mark, rooms, chips, search }}
       info={{ place, talking, room, people }}
       present={present}
       screen={screen}

@@ -1,27 +1,90 @@
-/* A phone's place band: the planet (a square) beside the place's words. Folded (the lines scrolled up, a chat field focused, a short window)
-   it is a small planet and the name. --phone-band is its height for the budgets that count it (PhoneHeader.module.css's pill, MessageBox's
-   field cap): the planet's square and the padding round it. */
+/* A phone's place band: the world's plate, its words and planet as one press to Info, the rooms' row under them. Three states: at rest
+   (the place's name, the planet at 88 px, the rooms' row), scrolled (data-folded: the room's name, the planet at half scale, the row stays)
+   and typing (a chat field has the focus: folded, and no row, the keyboard owns the foot); on a window under 500 px tall the rows share one
+   line. --phone-band is the height the budgets that count it use (the arrival's pill, MessageBox's field cap); its rest value is ChatScreen.module.css's. The planet's box never
+   resizes, only scales: a resized box would reallocate the engine's canvas on every frame of the fold. */
 @layer components {
   .band {
-    --_planet: calc(var(--control-m) * 2 + var(--space-s));
+    --_planet: calc(var(--control-m) * 2);
+    /* the planet's box: its disc (0.72 of it) is the large one, of which the band shows the top half */
+    --_disc-box: calc(var(--control-m) * 8);
 
-    /* layout: as the header's row (PhoneHeader.module.css), the band gives way to the screen's width */
-    min-inline-size: 0;
-    padding-block: var(--space-2xs);
-    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    /* layout: the planet's box and its crop; the planet under the band's words */
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: var(--color-plate);
+    /* layout: the lines' own gutter, the notch's side added (S and E), a step over the place and a few pixels under the rooms' row */
+    padding: var(--space-xs) calc(var(--space-s) + env(safe-area-inset-right)) var(--space-3xs)
+      calc(var(--space-s) + env(safe-area-inset-left));
+    border-block-end: var(--line-width) solid var(--color-line);
   }
 
-  :root:has(.band) {
-    --phone-band: calc(var(--control-m) * 2 + var(--space-s) + var(--space-2xs) * 2);
+  .band[data-earth] {
+    --world: var(--world-earth);
+  }
+
+  .place {
+    position: relative;
+    min-block-size: var(--_planet);
+    /* the planet's room, kept at the end whatever its scale */
+    padding-inline-end: calc(var(--control-m) * 2 + var(--space-xs));
+  }
+
+  /* The whole row is the press; the words and the planet over it are for the eye and let the press through. */
+  .press {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-box);
+  }
+
+  .text,
+  .planet {
+    pointer-events: none;
+  }
+
+  .text {
+    /* layout: the words take the row and give way at their end */
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+
+  .name {
+    font: var(--font-title-m);
+  }
+
+  .folded {
+    display: none;
+    font: var(--font-card-title);
+  }
+
+  .counts {
+    min-inline-size: 0;
+  }
+
+  .meta {
+    color: var(--color-text-soft);
+  }
+
+  .mark {
+    /* layout: kept whole beside the counts */
+    flex: none;
   }
 
   .planet {
-    position: relative;
-    /* layout: the planet keeps its square */
-    flex: none;
-    inline-size: var(--_planet);
-    block-size: var(--_planet);
+    position: absolute;
+    /* the box's middle on the band's foot (the bottom half is cropped), its centre near the band's end, so the foot and the end crop it */
+    inset-inline-end: calc(var(--_disc-box) / -2.5);
+    inset-block-end: 0;
+    translate: 0 50%;
+    /* raw: under the band's words, over its plate (the band isolates its own stack) */
+    z-index: -1;
+    /* raw: dimmed, so the words and the room chips over it read */
+    opacity: 0.55;
+    inline-size: var(--_disc-box);
+    block-size: var(--_disc-box);
     overflow: clip;
+    transition: scale calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
   .still {
@@ -32,48 +95,79 @@
     --thumb-l: 100%;
   }
 
-  .words {
-    /* layout: the words take the row and give way at their end */
-    flex: 1 1 0;
-    min-inline-size: 0;
-  }
-
-  .page {
-    /* layout: the button keeps its words on one line; the counts beside it give way */
-    flex: none;
-    white-space: nowrap;
-  }
-
-  .name {
-    font: var(--font-card-title);
-  }
-
-  /* Folded: a chat field has the focus (the keyboard is up), the lines are scrolled up, or the window is short (a phone on its side, a small phone upright: under 640 px the composer, its note and the row of worlds need the room). */
+  /* Folded: scrolled up (data-folded) or a chat field focused (not the rooms' filter in a drawer, whose dialog stands in the row). */
   .band[data-folded],
-  :root:has([data-chat-screen] :is(textarea, input):focus) .band {
-    --_planet: var(--control-s);
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .band {
+    --_planet: var(--control-m);
+
+    padding-block-start: var(--space-2xs);
   }
 
-  .band[data-folded] .more,
-  :root:has([data-chat-screen] :is(textarea, input):focus) .band .more {
+  .band[data-folded] .planet,
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .band .planet {
+    scale: 0.5;
+  }
+
+  .band[data-folded] :is(.rest, .counts),
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .band :is(.rest, .counts) {
     display: none;
   }
 
-  :root:has([data-chat-screen] :is(textarea, input):focus) {
-    --phone-band: calc(var(--control-s) + var(--space-2xs) * 2);
+  .band[data-folded] .folded,
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .band .folded {
+    display: block;
   }
 
-  @media (height < 640px) {
+  :root:has(.band[data-folded]) {
+    --phone-band: calc(var(--space-2xs) + var(--control-m) * 2 + var(--space-3xs) + var(--line-width));
+  }
+
+  /* Typing: no rooms' row, the band is the one folded row. */
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) {
+    --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) + var(--line-width));
+  }
+
+  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .band {
+    padding-block-end: var(--space-2xs);
+  }
+
+  /* A window under 500 px tall (a phone on its side): folded, the place and the rooms' row on one line. */
+  @media (height < 500px) {
     .band {
-      --_planet: var(--control-s);
+      --_planet: var(--control-m);
+
+      /* layout: the place at the start, the rooms' row in the rest */
+      display: grid;
+      /* layout: the two parts' shares */
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      /* layout: one line of the band's rows */
+      align-items: center;
+      /* layout: one line of the band's rows */
+      column-gap: var(--space-xs);
+      padding-block: var(--space-2xs);
     }
 
-    .more {
+    .planet {
+      scale: 0.5;
+    }
+
+    .rest,
+    .counts {
       display: none;
     }
 
-    :root:has(.band) {
-      --phone-band: calc(var(--control-s) + var(--space-2xs) * 2);
+    .folded {
+      display: block;
     }
+
+    :root:has(.band),
+    :root:has(.band[data-folded]) {
+      --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) + var(--line-width));
+    }
+  }
+
+  /* The arrival's pill stands under the shell's header (--shell-head) and this band; ChatScreen's compact rule is the wide chat's. */
+  :root:has([data-chat-screen][data-full][data-compact] .band) {
+    --banner-under: calc(var(--flash-room) + var(--shell-head) + var(--phone-band));
   }
 }

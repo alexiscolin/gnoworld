@@ -41,4 +41,33 @@ describe("the place band's fold", () => {
     list.dispatchEvent(new Event("scroll"));
     expect(told).toHaveLength(2);
   });
+
+  it("never folds while the focus is inside the band: the control being used stays where it is", () => {
+    const screen = document.createElement("div");
+    const band = document.createElement("section");
+    band.setAttribute("data-phone-band", "");
+    const chip = document.createElement("a");
+    chip.href = "#";
+    band.append(chip);
+    const list = document.createElement("ol");
+    list.setAttribute("aria-label", "Messages");
+    screen.append(band, list);
+    document.body.append(screen);
+    Object.defineProperties(list, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 400, configurable: true },
+    });
+    const told: boolean[] = [];
+    const stop = new AbortController();
+    followLines(screen, (fold) => told.push(fold(false)), stop.signal);
+    chip.focus();
+    list.scrollTop = 0;
+    list.dispatchEvent(new Event("scroll"));
+    expect(told).toEqual([]);
+    chip.blur();
+    list.dispatchEvent(new Event("scroll"));
+    expect(told).toEqual([true]);
+    stop.abort();
+    screen.remove();
+  });
 });

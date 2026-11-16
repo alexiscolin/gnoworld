@@ -2,7 +2,7 @@
 // one: folding gives the lines the band's height, which moves their end nearer, so a single threshold would flick back and forth.
 import { useEffect, useState, type RefObject } from "react";
 
-// raw: px from the end of the lines, past which the band folds, and under which it unfolds; the gap is wider than the band's own fold (about 90 px)
+// raw: px from the end of the lines, past which the band folds, and under which it unfolds; the gap is wider than the band's own fold (44 px)
 export const FAR = 240;
 export const NEAR = 48;
 
@@ -26,6 +26,8 @@ export function followLines(
     "scroll",
     ({ target }) => {
       if (!(target instanceof HTMLElement) || !target.matches('ol[aria-label="Messages"]')) return;
+      // The control in use stays where it is: no fold under a finger on the band's own chips and buttons.
+      if (screen.querySelector("[data-phone-band]")?.contains(document.activeElement)) return;
       set((folded) => nextFold(folded, awayFromEnd(target)));
     },
     { capture: true, signal },
