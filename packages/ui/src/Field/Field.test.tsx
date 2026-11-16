@@ -290,8 +290,8 @@ describe("Field", () => {
 
   // A box of lines grows with its draft (field-sizing), and a guest's composer is one plain line with no bar: the native grip at its
   // corner has no use and sat badly placed (the workshop, 2026-11-16). jsdom applies no stylesheet, so the source is read.
-  it("shows no resize grip: every `resize` its stylesheet sets is none", () => {
-    const css = readFileSync(`.${new URL("./Field.module.css", import.meta.url).pathname}`, "utf8");
+  it("shows no resize grip: the reset gives every textarea `resize: none`", () => {
+    const css = readFileSync(`.${new URL("../reset.css", import.meta.url).pathname}`, "utf8");
     const sets = [...css.matchAll(/(?:^|[\s;{])resize\s*:\s*([^;}]+)/g)].map(([, value]) => value?.trim());
     expect(sets.length).toBeGreaterThan(0);
     expect(sets.filter((value) => value !== "none")).toEqual([]);
