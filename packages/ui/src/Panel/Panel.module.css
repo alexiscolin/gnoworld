@@ -169,8 +169,8 @@
 
     /* The free area beside a placed plate, from its edge to the dock's: the arrival banner (Flash) centres in it. */
     :root:has(.place) {
-      --free-start: calc(var(--page-edge) + var(--plate-w));
-      --free-end: calc(var(--space-m) + var(--chat-dock-now));
+      --banner-start: calc(var(--page-edge) + var(--plate-w));
+      --banner-end: calc(var(--space-m) + var(--chat-dock-now));
     }
 
     /* The one outline around plate, scene and dock, the same colour all round: the plates inside it draw none. */
