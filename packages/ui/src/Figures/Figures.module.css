@@ -15,7 +15,13 @@
     border-inline-start: var(--line-width) solid var(--color-line);
   }
 
-  @container plate (max-width: 37.5rem) {
+  /* raw: under 44 rem four figures leave a cell under 7 rem, where "addresses" and "Imported by" break: two a row, as on a narrow plate */
+  @container plate (max-width: 44rem) {
+    .band .cell {
+      /* layout: half the row */
+      grid-column: span 6;
+    }
+
     .cell:nth-child(odd)::before {
       display: none;
     }
