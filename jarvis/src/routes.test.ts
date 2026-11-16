@@ -340,14 +340,51 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     const { url } = await served();
     const response = await fetch(`${url}${JARVIS_PATHS.budgets}`);
     expect(response.status).toBe(200);
-    expect(JarvisBudgets.parse(await response.json())).toEqual({ ask: 45, translate: 5 });
+    expect(JarvisBudgets.parse(await response.json())).toEqual({
+      ask: 45,
+      translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
+    });
+  });
+
+  // F13524: the caps alone were answered; what is reserved and what is spent today are beside them, in dollars, whole or not.
+  it("answers what is reserved beside each cap, then what is spent once the call settles, a fraction of a dollar kept", async () => {
+    const { url, budget } = await served();
+    const read = async () => JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json());
+    expect(await read()).toEqual({
+      ask: 45,
+      translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
+    });
+    const held = budget.reserve("ask", 2 * DOLLAR);
+    if (!held.ok) throw new Error("the budget refused");
+    expect(await read()).toMatchObject({ spent: { ask: 0, translate: 0 }, reserved: { ask: 2, translate: 0 } });
+    budget.settle(held.hold, 0.37 * DOLLAR);
+    expect(await read()).toMatchObject({ spent: { ask: 0.37, translate: 0 }, reserved: { ask: 0, translate: 0 } });
+    const other = budget.reserve("translate", DOLLAR);
+    if (!other.ok) throw new Error("the budget refused");
+    expect(await read()).toMatchObject({ spent: { ask: 0.37, translate: 0 }, reserved: { ask: 0, translate: 1 } });
+    budget.settle(other.hold, 0.25 * DOLLAR);
+    expect(await read()).toEqual({
+      ask: 45,
+      translate: 5,
+      spent: { ask: 0.37, translate: 0.25 },
+      reserved: { ask: 0, translate: 0 },
+    });
   });
 
   it("changes a budget at once, logs the change, and answers both", async () => {
     const { post, budget, events } = await served({ ask: asking({ kind: "spent" }) });
     const response = await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 120 });
     expect(response.status).toBe(200);
-    expect(JarvisBudgets.parse(await response.json())).toEqual({ ask: 120, translate: 5 });
+    expect(JarvisBudgets.parse(await response.json())).toEqual({
+      ask: 120,
+      translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
+    });
     expect(budget.caps()).toEqual({ ask: 120 * DOLLAR, translate: 5 * DOLLAR });
     expect(budget.state("ask").cap).toBe(120 * DOLLAR);
     expect(events()).toContainEqual({ event: "jarvis_budget_changed", setting: "ask", value: 120 });
@@ -387,10 +424,14 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 1 })).json()).toEqual({
       ask: 1,
       translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
     });
     expect(await (await post(JARVIS_PATHS.budgets, { budget: "ask", dollars: 500 })).json()).toEqual({
       ask: 500,
       translate: 5,
+      spent: { ask: 0, translate: 0 },
+      reserved: { ask: 0, translate: 0 },
     });
   });
 });

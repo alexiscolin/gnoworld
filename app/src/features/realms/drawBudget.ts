@@ -1,6 +1,7 @@
 // What a realm page may draw: the budget a page's blocks, items and nodes are counted against, and what the drawing of
 // each shares.
 import type { Inline } from "@gnoworld/core";
+import type { ReactNode } from "react";
 import type { Drawing } from "../chat/index.ts";
 
 /** The most blocks, list items and form fields a page draws, and the most inline nodes in them: 256 KB of `*a* ` is
@@ -45,4 +46,6 @@ export interface Ink {
   readonly budget: Budget;
   readonly via: Drawing;
   readonly reader: Drawing["reader"];
+  /** Draws a page's action (a `$help` link of its own realm) from its drawn words: none, and the words alone, outside a realm's view. */
+  readonly action?: ((node: Extract<Inline, { type: "action" }>, label: ReactNode[]) => ReactNode) | undefined;
 }

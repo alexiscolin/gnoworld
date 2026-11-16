@@ -82,7 +82,11 @@ function rowOf(realm: StoreRealm, id: number, newest: number | null): StoreRow {
 
 export function storeOf(realms: readonly StoreRealm[]): Store {
   const heights = realms.flatMap(({ lastHeight }) => (lastHeight === null ? [] : [lastHeight]));
-  const newest = heights.length === 0 ? null : Math.max(...heights);
+  // A loop: a spread of this many heights throws a RangeError.
+  const newest = heights.reduce<number | null>(
+    (most, height) => (most === null || height > most ? height : most),
+    null,
+  );
   const rows = realms.map((realm, id) => rowOf(realm, id, newest));
   // The newest last block of a family stands for it; a family none of whose versions has one keeps its first.
   const standing = new Map<string, StoreRow>();
