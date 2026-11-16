@@ -52,15 +52,6 @@
     --color-card: color-mix(in oklab, var(--p-text) 3%, transparent);
     --color-card-hover: color-mix(in oklab, var(--p-text) 6%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
-    /* A row's light (ui's \`lit\`): its fill under the pointer, and the one in view's; a row drawn another way sets them on itself. */
-    --lit-fill: var(--color-fill);
-    --lit-now: var(--color-fill-hover);
-    /* What comes in over the page (ui's \`appears\`): the enter's time, the scale it grows from, the offset it comes from; each caller sets its own. */
-    --appear-time: var(--motion-fast);
-    --appear-grow: none;
-    --appear-from: none;
-    /* The room after a dot (ui's \`dot\`), which a row of its own may widen. */
-    --dot-gap: var(--space-2xs);
     --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
@@ -250,6 +241,15 @@
     --pk: 0.9s;
     --spark-line: 0.9s;
     --spark-area: 1.2s;
+    /* A row's light (ui's \`lit\`): its fill under the pointer, and the one in view's; a row drawn another way sets them on itself. */
+    --lit-fill: var(--color-fill);
+    --lit-now: var(--color-fill-hover);
+    /* What comes in over the page (ui's \`appears\`): the enter's time, the scale it grows from, the offset it comes from; each caller sets its own. */
+    --appear-time: var(--motion-fast);
+    --appear-grow: none;
+    --appear-from: none;
+    /* The room after a dot (ui's \`dot\`), which a row of its own may widen. */
+    --dot-gap: var(--space-2xs);
     --motion-spin: 0.8s;
     --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
     /* The arrival's curve, GSAP's power3.out, for what the arrival does in CSS (the title's power4.out is the arrival's own). */
