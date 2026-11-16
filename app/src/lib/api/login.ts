@@ -24,6 +24,8 @@ export function loginApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     me: () => send({ path: "me", schema: Me }),
     /** The session ended, its cookie cleared by the server. */
     logout: () => send({ path: "logout", body: {}, schema: z.undefined() }),
+    /** The account's other sessions ended, this one kept. */
+    logoutOthers: () => send({ path: "logout-others", body: {}, schema: z.undefined() }),
   };
 }
 

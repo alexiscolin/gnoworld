@@ -12,6 +12,7 @@ import { useLinks, useLinksFailed } from "../../useLinks.ts";
 import universes from "../../../data/universes.json" with { type: "json" };
 import { AskUnlink } from "./AskUnlink.tsx";
 import { linkedOn, linkProblem } from "./linkWords.ts";
+import { OtherSessions } from "./OtherSessions.tsx";
 import { Section } from "./Section.tsx";
 import { useSignInAgain } from "./useSignInAgain.ts";
 
@@ -164,6 +165,7 @@ export function AccountsSection({ account }: { account: Address }) {
           setLinking(true);
         }}
       />
+      <OtherSessions />
       {list === undefined ? null : <OwnerNote worlds={list.worlds} />}
       {failed ? <Unread account={account} /> : null}
       <p role="status" className="meta">

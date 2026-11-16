@@ -101,6 +101,15 @@ export function loginRoutes(
     return c.body(null, 204);
   });
 
+  // Every other session of the caller's address ends, this cookie staying good: ADR-0002 §4's "revocable in the settings".
+  app.post("/logout-others", (c) => {
+    if (!calls.take(visitorOf(c), now())) return refuse(c, "limit");
+    const token = tokenOf(c);
+    if (login.session(token) === undefined) return answer(c, "unauthenticated", 401);
+    login.logoutOthers(token);
+    return c.body(null, 204);
+  });
+
   return app;
 }
 

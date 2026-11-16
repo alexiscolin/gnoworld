@@ -76,6 +76,13 @@ const CALLS = [
     ok: { status: 204 },
     run: (api: ReturnType<typeof loginApi>) => api.logout(),
   },
+  {
+    name: "logoutOthers",
+    url: "/api/login/logout-others",
+    method: "POST",
+    ok: { status: 204 },
+    run: (api: ReturnType<typeof loginApi>) => api.logoutOthers(),
+  },
 ] as const;
 const POSTS = CALLS.filter((call) => call.method === "POST");
 
@@ -154,6 +161,12 @@ describe("the login's calls to the server", () => {
       reason: "internal",
       body: { error: "internal" },
     });
+  });
+
+  it("logs out the other sessions with an empty object, the server answering with no body", async () => {
+    const { api, sent } = server({ status: 204 });
+    expect(await api.logoutOthers()).toEqual({ ok: true, value: undefined });
+    expect(sent[0]?.init.body).toBe("{}");
   });
 
   // Every code the server answers (packages/schemas' ApiError), on every POST.

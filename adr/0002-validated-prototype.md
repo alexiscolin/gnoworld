@@ -532,7 +532,8 @@ since Adena's SDK is young (0.1.x) and its docs lag its code.
   the chain id (`gnoland-1`, `onyx-1`) and the exact text, since with nothing to check it
   says yes. The server then checks the nonce (unused, unexpired) and the domain itself.
   Session and multisig accounts cannot sign in.
-- **A login lasts 30 days on a device,** renewed on use and revocable in the settings and by moderators. Ergo checks a token the server issued, so a reconnect needs no new
+- **A login lasts 30 days on a device,** renewed on use and revocable in the settings (Settings, Accounts: "Log out my other
+  sessions", D13601) and by moderators. Ergo checks a token the server issued, so a reconnect needs no new
   signature and no chain read (§7).
 - **Before "sign in Adena",** the network is read again and compared with the universe's
   chain. Adena is asked to switch, or to add a community chain and then switch; it never

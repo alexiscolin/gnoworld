@@ -202,6 +202,56 @@ describe("the session", () => {
     expect(await answer(await me(app, session(token)))).toEqual([200, NOBODY]);
   });
 
+  it("logs out the other sessions of the account: 204 with no body, the caller's own cookie still good", async () => {
+    const { app } = setup();
+    const who = wallet();
+    const [mine, other] = [tokenOf(await login(app, who)), tokenOf(await login(app, who))];
+    const stranger = tokenOf(await login(app));
+    const response = await post(app, "logout-others", { body: {}, headers: { cookie: session(mine) } });
+    expect([response.status, await response.text(), response.headers.get("set-cookie")]).toEqual([204, "", null]);
+    expect(await answer(await me(app, session(mine)))).toEqual([200, JSON.stringify({ address: who.address })]);
+    expect(await answer(await me(app, session(other)))).toEqual([200, NOBODY]);
+    expect((await answer(await me(app, session(stranger))))[1]).not.toBe(NOBODY);
+  });
+
+  it("answers 401 unauthenticated to logout-others without a live session, and ends nothing", async () => {
+    const { app, rows } = setup();
+    const who = wallet();
+    const [token, ended] = [tokenOf(await login(app, who)), tokenOf(await login(app, who))];
+    await post(app, "logout", { body: {}, headers: { cookie: session(ended) } });
+    const before = rows("tokens");
+    for (const cookie of [undefined, session("A".repeat(43)), session(ended)]) {
+      const response = await post(app, "logout-others", {
+        body: {},
+        ...(cookie === undefined ? {} : { headers: { cookie } }),
+      });
+      expect(await answer(response)).toEqual([401, JSON.stringify({ error: "unauthenticated" })]);
+    }
+    expect(rows("tokens")).toEqual(before);
+    expect((await me(app, session(token))).status).toBe(200);
+  });
+
+  it("limits logout-others per visitor with the other calls, before any work and before the 401: the 11th call of a minute is a 429", async () => {
+    const { app, rows } = setup();
+    const who = wallet();
+    const mine = tokenOf(await login(app, who));
+    const other = tokenOf(await login(app, who, { peer: "203.0.113.9" }));
+    const ask = (cookie: string | undefined, peer = PEER) =>
+      post(app, "logout-others", { body: {}, ...(cookie === undefined ? {} : { headers: { cookie } }), peer });
+    // Exhaust PEER's ten with calls that end nothing: its login took two, so eight more.
+    const unauthenticated = JSON.stringify({ error: "unauthenticated" });
+    for (let i = 0; i < 8; i++) expect(await answer(await ask(undefined))).toEqual([401, unauthenticated]);
+    const before = rows("tokens");
+    expect(await answer(await ask(undefined))).toEqual([429, TOO_MANY]);
+    expect(await answer(await ask(session("A".repeat(43))))).toEqual([429, TOO_MANY]);
+    // A live session's call past the limit does no work: the other session is still there.
+    expect(await answer(await ask(session(mine)))).toEqual([429, TOO_MANY]);
+    expect(rows("tokens")).toEqual(before);
+    expect((await me(app, session(other))).status).toBe(200);
+    expect((await ask(session(mine), "203.0.113.8")).status).toBe(204);
+    expect(await answer(await me(app, session(other)))).toEqual([200, NOBODY]);
+  });
+
   it("never limits /me or a logout", async () => {
     const { app } = setup();
     const token = tokenOf(await login(app));
@@ -221,13 +271,15 @@ describe("cross-site requests", () => {
     ["our Origin with a path", "https://gnoworld.test/"],
   ])("refuses every POST with %s, 403, and changes nothing", async (_, origin) => {
     const { app, rows } = setup();
-    const token = tokenOf(await login(app));
+    const owner = wallet();
+    const [token, second] = [tokenOf(await login(app, owner)), tokenOf(await login(app, owner))];
     const made = await challenge(app);
     const who = wallet();
     const bodies: [string, unknown][] = [
       ["challenge", { chainId: "onyx-1" }],
       ["verify", { nonce: made.nonce, address: who.address, proof: who.sign("onyx-1", made.text) }],
       ["logout", {}],
+      ["logout-others", {}],
     ];
     const before = [rows("nonces"), rows("accounts"), rows("tokens")];
     for (const [path, body] of bodies) {
@@ -236,6 +288,7 @@ describe("cross-site requests", () => {
     }
     expect([rows("nonces"), rows("accounts"), rows("tokens")]).toEqual(before);
     expect((await me(app, session(token))).status).toBe(200);
+    expect((await me(app, session(second))).status).toBe(200);
     expect((await verify(app, made, { who })).status).toBe(200);
   });
 
@@ -617,7 +670,7 @@ describe("limits", () => {
 });
 
 describe("the routes", () => {
-  it("serve the login's four routes, and nothing under an admin path", () => {
+  it("serve the login's five routes, and nothing under an admin path", () => {
     const { app } = setup();
     const paths = app.routes.filter(({ method }) => method !== "ALL").map(({ method, path }) => `${method} ${path}`);
     expect(paths).toEqual(
@@ -626,6 +679,7 @@ describe("the routes", () => {
         "POST /api/login/verify",
         "GET /api/login/me",
         "POST /api/login/logout",
+        "POST /api/login/logout-others",
       ]),
     );
     expect(app.routes.filter(({ path }) => /(^|\/)admin(\/|$)/i.test(path))).toEqual([]);

@@ -136,6 +136,28 @@ describe("the text a link asks to sign", () => {
   });
 });
 
+describe("the sessions a link leaves alone", () => {
+  it("ends only the session's own address's other tokens: a linked account's sessions stay", async () => {
+    const s = setup();
+    const [a, b] = [wallet(), wallet()];
+    await s.link(a, b);
+    const signIn = async (me: Wallet): Promise<string> => {
+      const made = s.login.challenge(CHAIN, HOST);
+      if (typeof made === "string") throw new Error(made);
+      const result = await s.login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign(CHAIN, made.text) },
+        () => true,
+        HOST,
+      );
+      if (typeof result === "string") throw new Error(result);
+      return result.token;
+    };
+    const [a1, a2, b1] = [await signIn(a), await signIn(a), await signIn(b)];
+    s.login.logoutOthers(a1);
+    expect([a1, a2, b1].map((token) => s.login.session(token))).toEqual([a.address, undefined, b.address]);
+  });
+});
+
 describe("a link names every account it joins, and is spent only as a link", () => {
   const joining = (list: Address[]): string =>
     list.length === 1 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list.at(-1) ?? ""}`;
