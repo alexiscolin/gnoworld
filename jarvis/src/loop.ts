@@ -27,6 +27,8 @@ export interface Question {
   readonly room: readonly string[];
   readonly read?: readonly { readonly source: string; readonly text: string }[];
   readonly finds?: { readonly realm: string; readonly name: string };
+  /** A fixed ask, whose answer is shared: its cards carry flights alone. */
+  readonly shared?: boolean | undefined;
 }
 /** How a question ended: its answer and its cards, or why there is none. `cost` is what the budget settled for the
  * question's turns, in millionths of a dollar, on every end that spent; `invalid` and `gone` carry none, and `spent` only when earlier turns spent. */
@@ -65,6 +67,7 @@ export interface Parts {
 export interface Run {
   readonly parts: Parts;
   readonly question: string;
+  readonly shared: boolean | undefined;
   readonly kept: Kept;
   readonly blocks: Untrusted;
   readonly trace: Trace;
@@ -120,6 +123,7 @@ async function ask(parts: Parts, prompt: Prompt, asked: { question: Question; si
   const run: Run = {
     parts,
     question: question.text,
+    shared: question.shared,
     kept,
     blocks,
     trace,

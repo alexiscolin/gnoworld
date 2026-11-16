@@ -38,6 +38,8 @@ export interface Asked {
   readonly text: string;
   readonly cards: Kept;
   readonly signal: AbortSignal;
+  /** Whether the answer is shared by everyone who asks the same (a fixed ask): it carries flights alone. */
+  readonly shared?: boolean | undefined;
 }
 
 /** A question's holder of cards, empty. */

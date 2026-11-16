@@ -139,11 +139,20 @@ export function getMarkdown(editor: LexicalEditor): string {
   return editor.getEditorState().read(() => $convertToMarkdownString(TRANSFORMERS, undefined, true));
 }
 
+// The reader opens nothing from a tilde run of 3 or more, but the editor's `~~` would strike inside it: such a run is escaped (the
+// editor unescapes `\~` on import) outside a fence, so what the editor reads is what the room reads (F13632). An escape is read first and
+// left alone: `\~~~a~~` has no run.
+const ESCAPE_FENCE_OR_TILDES = /\\[\s\S]|```[\s\S]*?```|~{3,}/g;
+const readAsTheRoomDoes = (markdown: string): string =>
+  markdown.replaceAll(ESCAPE_FENCE_OR_TILDES, (found) =>
+    found.startsWith("~") ? found.replaceAll("~", "\\~") : found,
+  );
+
 /** Puts `markdown` in the editor, its marks drawn as what they mean; no history entry and no selection taken. */
 export function setMarkdown(editor: LexicalEditor, markdown: string): void {
   editor.update(
     () => {
-      $convertFromMarkdownString(markdown, TRANSFORMERS, undefined, true);
+      $convertFromMarkdownString(readAsTheRoomDoes(markdown), TRANSFORMERS, undefined, true);
       // The field always holds a paragraph to type in.
       if ($getRoot().isEmpty()) $getRoot().append($createParagraphNode());
     },

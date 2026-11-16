@@ -152,6 +152,14 @@ describe("POST /ask: a question to the loop", () => {
     expect(signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("marks the question of a fixed ask shared for the loop's tools, and a person's own never", async () => {
+    const ask = asking({ kind: "spent" });
+    const { post } = await served({ ask });
+    await post(JARVIS_PATHS.ask, question());
+    await post(JARVIS_PATHS.ask, { ask: "here", room: ROOM, lines: [] });
+    expect(ask.mock.calls.map(([handed]) => "shared" in handed && handed.shared)).toEqual([false, true]);
+  });
+
   it("answers the loop's answer with its text and the buttons its tools kept, as the door's schema reads it", async () => {
     const kept = { digests: [], proposals: [], buttons: [{ button: fly, read: { profile: "onyx", height: 7 } }] };
     const { post } = await served({
