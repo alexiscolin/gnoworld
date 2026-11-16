@@ -15,11 +15,7 @@ one token and one component, so the design system can be rebuilt with nothing du
 | The recorded tour (3 min 36, one frame per second) | 216 frames | 216 |
 | Files of the live prototype | 39 | 39 (its script is byte-identical to `app.js`) |
 
-The per-rule maps are in `docs/design/audit/`: `selectors.json` (every rule and its line),
-`lot1-map.json` to `lot4-map.json` (each rule's target: token, base, utility, composition,
-component and variant, region, feature, scene or dead; its off-token values and their snap; its
-duplicates), `script-map.json` (inline styles, icons, screens, classes), and `brief.md` (the
-targets and rules the mapping used).
+The targets and rules the mapping used are in `docs/design/audit/brief.md`; the per-rule maps themselves are not kept.
 
 ## What the prototype does
 

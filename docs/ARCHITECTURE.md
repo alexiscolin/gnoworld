@@ -58,7 +58,7 @@ app/                         the web client
                              (`lib/keep`, `lib/drafts`: the browser's `localStorage`, each field through its schema); they parse with
                              `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature, kept here: the store imports
-                             no feature (`store/login.ts`); React reads it through `storeContext.tsx`
+                             no feature (`store/login.ts`); React reads it through `storeContext.tsx`, a file loose in `src/`, not in `store/`
     space/                   three.js only: renderer, loop, flights, the cosmos, the
                              planets (`planet/`, `earth/`, `parts/`, `shaders/`), the rig, level of detail, labels
     sw/                      the service worker, and the page's side of it (ADR-0001 §12)
@@ -121,8 +121,8 @@ Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`:
 | Folder | May import | Never imports |
 |---|---|---|
 | `core` (`packages/core`) | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
-| `lib` | `core`, Zod, the chain client libraries | React, `space`, `features`, `ui` |
-| `store` | `core`, `lib` types | React, `space`, `features` |
+| `lib` | `core`, Zod, the chain client libraries | React, `space`, `features`, `routes`, `store`, `ui` |
+| `store` | `core`, `lib` types | React, `space`, `features`, `routes`, `ui` |
 | `space` | `core`, `store` (read and subscribe), `lib`'s `saveData`, three, GSAP, `ui`'s React-free helpers (`typedIn`, `holdsEscape`, `iconNode`) | React, `features`, `ui`'s components, the rest of `lib`, by import or at run time |
 | `ui` | `ui` | `features`, `space`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
@@ -133,6 +133,7 @@ Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`:
 | `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
 | `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `space` directly: the canvas is mounted by the universe feature |
+| the files loose in `app/src` (`meta.ts`, `knownOf.ts`, `csp.ts`, the build's data checks) | any folder above | No wall of their own: lint's zones name `sw`, `features`, `routes`, `lib`, `store` and `space` as targets, so a loose file is checked only by the rules every file has, and a folder reaches one as it reaches any |
 
 This is ADR-0001 §12's split: a bug is either in the space or in the interface, and
 the store is where they meet.
@@ -159,7 +160,7 @@ option compares syntax trees). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, and in `sw` only `fetch` and the cache (the worker fetches and caches;
 its page side asks whether the host answers), a read of a chain's node or the indexer only in
-`packages/chain`, however it is written (`gnoworld/chain-read`), `Intl` formatting only in `core`'s formatters, no clock
+`packages/chain`, however it is written (`gnoworld/chain-read`), no clock
 in `core`, `console` only through the logger, no `Map`, `WeakMap` or `Set` at a module's top in `server/src` or a
 package's `src`. **Dead code:** knip, at zero.
 
@@ -187,8 +188,8 @@ package's `src`. **Dead code:** knip, at zero.
 - Named exports only, except route modules (React Router). No barrel files, except each
   feature's `index.ts`, its public surface.
 - Imports by package name across workspaces (`@gnoworld/core`, `@gnoworld/schemas`) and by
-  `#` subpath imports inside one (`#lib/adena`), with `import type` for types. Never tsconfig
-  `paths`: Node ignores them.
+  relative paths inside one (`../lib/adena.ts`), with `import type` for types. Never tsconfig
+  `paths`, never `#` subpath imports: Node ignores the first, and no workspace declares the second.
 - Functions are verbs (`pickBubbles`, `placeSystems`), types are nouns, booleans read as
   questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
 - Exported functions in `core` and `lib` carry a one-line TSDoc: what it returns and when it
@@ -410,7 +411,7 @@ Each change that adds a resource proves it is released:
 
 | Budget | Limit | Where |
 |---|---|---|
-| JavaScript before the first usable screen | 150 KB compressed | ADR-0001 §12 |
+| JavaScript before the first usable screen | 279,143 B gzip on an Earth's or a world's page, 276,255 B on a page with no plate, each 256 B over its measure | `app/tests/e2e/budgets.spec.ts` (ADR-0001 §12 set 150 KB; the caps are the measured sizes) |
 | Total on mobile | 3 MB | ADR-0001 §12 |
 | LCP, CLS, TBT (the lab stand-in for INP) on a mid-range mobile profile | 2.5 s, 0.1, 200 ms | ADR-0002 §2. INP itself is measured in the field |
 | Frames while travelling | 60 fps on a mid-range phone | ADR-0001 §12 |
