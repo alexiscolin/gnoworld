@@ -50,7 +50,7 @@ export function ThreadPanel({
   );
   return (
     <Failing
-      fallback={<Standing word="Could not open the thread." close={close} />}
+      fallback={() => <Standing word="Could not open the thread." close={close} />}
       renew={() => {
         Thread = lazy(load);
         renewComposer();

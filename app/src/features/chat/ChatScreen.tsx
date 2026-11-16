@@ -22,7 +22,7 @@ import { useSearching, type SearchInput } from "./Searching.tsx";
 import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
-import { ErrorView } from "../errors/index.ts";
+import { ErrorView, errorKind } from "../errors/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatWorld } from "./place.ts";
 import { DOCKED, useMedia } from "./useMedia.ts";
@@ -36,7 +36,7 @@ import styles from "./ChatScreen.module.css";
 // notice that the rooms could not load.
 const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
   waiting: null,
-  failed: <ErrorView kind="crash" size="inline" urgent />,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" urgent />,
 });
 
 /** The place a chat is in: what the page knows of its world and of the worlds beside it. */

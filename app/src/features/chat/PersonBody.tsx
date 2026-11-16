@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useId, useState } from "react";
 import { queryClient } from "../../lib/query/client.ts";
 import { PendingCard, PendingFigure, TabRow } from "../../TabRow.tsx";
-import { ErrorView, useWhere } from "../errors/index.ts";
+import { ErrorView, errorKind, useWhere } from "../errors/index.ts";
 import { wholeGnot } from "./personData.ts";
 import { personOptions } from "./personQueries.ts";
 import type { PersonTab } from "./PersonBlocks.tsx";
@@ -73,11 +73,11 @@ export function PersonBody({ address }: { address: string }) {
   const where = useWhere();
   const [tab, setTab] = useState<PersonTab>("activity");
   const tabsId = useId();
-  const { data, isError, refetch, dataUpdatedAt } = useQuery(personOptions(address), queryClient);
+  const { data, isError, error, refetch, dataUpdatedAt } = useQuery(personOptions(address), queryClient);
   if (isError)
     return (
       <ErrorView
-        kind="unavailable"
+        kind={errorKind(error)}
         size="inline"
         where={where}
         onRetry={() => {

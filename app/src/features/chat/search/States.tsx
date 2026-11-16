@@ -1,7 +1,7 @@
 // What the chat's search shows apart from results: before typing, and nothing found (the canvas's States frame).
 import { shortAddress } from "@gnoworld/schemas";
 import { Button, Chip, Cluster, Stack } from "@gnoworld/ui";
-import { ErrorView } from "../../errors/index.ts";
+import { ErrorView, errorKind } from "../../errors/index.ts";
 import { isUnread } from "../../../lib/query/client.ts";
 import { pageRecent } from "../../../lib/keep/recent.ts";
 import { roomLabel } from "../names.ts";
@@ -111,7 +111,7 @@ export function Trouble({ search }: { search: Search }) {
     return <p role="status">Busy, try again in a moment.</p>;
   return (
     <ErrorView
-      kind="unavailable"
+      kind={errorKind(search.error)}
       size="inline"
       urgent
       onRetry={() => {

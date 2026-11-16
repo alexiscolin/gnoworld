@@ -5,7 +5,7 @@
 // a guest reads, a room letting accounts alone speak.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
-import { ErrorView } from "../errors/index.ts";
+import { ErrorView, errorKind } from "../errors/index.ts";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -29,14 +29,14 @@ import { useVerdicts } from "./useVerdicts.ts";
 const AccountChat = lazy(async () => ({ default: (await import("./AccountChat.tsx")).AccountChat }));
 
 // What says the rooms could not load, and asks again.
-function RoomsFailed({ onRetry }: { onRetry: () => void }) {
-  return <ErrorView kind="unavailable" size="inline" urgent onRetry={onRetry} />;
+function RoomsFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  return <ErrorView kind={errorKind(error)} size="inline" urgent onRetry={onRetry} />;
 }
 
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer. A world listed before shows its rooms at
 // once, the new list replacing them when it comes; a fresh list that failed leaves the one shown (roomsListed.ts).
 function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, query: string | undefined) {
-  const { data, isError } = useQuery(
+  const { data, isError, error } = useQuery(
     { ...roomsOptions(world, query ?? ""), enabled: query !== undefined },
     queryClient,
   );
@@ -55,7 +55,7 @@ function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, que
   useEffect(() => {
     if (query !== undefined && (sections !== undefined || isError)) store.getState().chatActions.listed(sections);
   }, [store, query, sections, isError]);
-  return { loaded: sections !== undefined || (query !== undefined && isError), sections };
+  return { loaded: sections !== undefined || (query !== undefined && isError), sections, error };
 }
 
 // The shown room's verdicts, which a link's player waits on, followed and asked for the reader; and whether the reader
@@ -114,6 +114,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   const failed =
     loaded && sections === undefined ? (
       <RoomsFailed
+        error={asked.error}
         onRetry={() => {
           setAttempt((n) => n + 1);
         }}

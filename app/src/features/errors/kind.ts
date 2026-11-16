@@ -1,4 +1,5 @@
 import { isRouteErrorResponse } from "react-router";
+import { Unread } from "../../lib/query/client.ts";
 
 export type ErrorKind =
   "not-found" | "gone" | "forbidden" | "too-many" | "offline" | "unavailable" | "new-version" | "crash";
@@ -33,11 +34,17 @@ function bySaying(error: unknown, online: boolean): ErrorKind {
   return !online || (error instanceof TypeError && UNREACHED.test(said)) ? "offline" : "crash";
 }
 
+// A read that did not come whole carries its own status; with none, or one unlisted, it is the service not answering.
+function ofRead(error: Unread<unknown>, online: boolean): ErrorKind {
+  return STATUS[error.failure?.status ?? 0] ?? (online ? "unavailable" : "offline");
+}
+
 /** What kind of failure `error` is, for the words and the way on it gets; `online` is the browser's own word on its network. */
 export function errorKind(
   error: unknown,
   online = typeof navigator === "undefined" || !("onLine" in navigator) || navigator.onLine,
 ): ErrorKind {
+  if (error instanceof Unread) return ofRead(error, online);
   const status = statusOf(error);
   return status === undefined ? bySaying(error, online) : (STATUS[status] ?? "crash");
 }

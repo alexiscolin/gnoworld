@@ -5,7 +5,7 @@ import type { RoomList, SearchHit } from "@gnoworld/schemas";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { ErrorView } from "../errors/index.ts";
+import { ErrorView, errorKind } from "../errors/index.ts";
 import { chunked } from "./Failing.tsx";
 import type { ChatLink } from "./linkTypes.ts";
 import { roomHref, roomWorld } from "./names.ts";
@@ -15,11 +15,11 @@ import { opensChatSearch } from "./searchKeys.ts";
 
 const Panel = chunked(async () => ({ default: (await import("./search/ChatSearch.tsx")).ChatSearch }), {
   waiting: null,
-  failed: <ErrorView kind="crash" size="inline" />,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" />,
 });
 const Banner = chunked(async () => ({ default: (await import("./search/JumpBanner.tsx")).default }), {
   waiting: null,
-  failed: null,
+  failed: () => null,
 });
 
 type Store = ReturnType<typeof useAppStore>;

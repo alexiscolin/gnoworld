@@ -5,7 +5,7 @@ import { Cluster, Tooltip } from "@gnoworld/ui";
 import { useState } from "react";
 import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
-import { ErrorView } from "../errors/index.ts";
+import { ErrorView, errorKind } from "../errors/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import { listAhead } from "./roomsListed.ts";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
@@ -16,7 +16,7 @@ import styles from "./Worlds.module.css";
 // The credits' dialog is the universe's own, its code asked at the first press: the column carries only the button.
 const CreditsDialog = chunked(async () => ({ default: (await import("../credits/index.ts")).CreditsDialog }), {
   waiting: null,
-  failed: <ErrorView kind="crash" size="inline" />,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" />,
 });
 
 export interface WorldsProps {
