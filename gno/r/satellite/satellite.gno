@@ -75,11 +75,8 @@ func (r rental) heldFrom(by address, now, hold int) bool {
 // for none. It outlives the rental's record: Close and Rent of another world
 // remove the record, never the hold.
 func holdOf(world string) int {
-	v := holds.Get(world)
-	if v == nil {
-		return 0
-	}
-	n, _ := strconv.Atoi(v.(string))
+	v, _ := holds.Get(world).(string)
+	n, _ := strconv.Atoi(v) // no hold: "" reads as 0
 	return n
 }
 
