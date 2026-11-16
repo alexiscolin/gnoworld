@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import type { Line } from "./room.ts";
-import { canEdit, editsFolded, foldEdits, redactedLines, shownLine, shownLines } from "./shown.ts";
+import { canEdit, foldEdits, redactedLines, shownLine, type ShownLine } from "./shown.ts";
 
+const shownLines = (lines: readonly Line[]): readonly ShownLine[] => foldEdits(lines).shown;
+const editsFolded = (lines: readonly Line[]) => foldEdits(lines).folded;
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const at = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -136,10 +138,8 @@ describe("shownLines: a room's lines as shown, each edit in its line's place", (
 describe("foldEdits: the shown lines and the folded edits together", () => {
   const lines = [line("a", 0, "helo"), line("b", 1, "next"), { ...line("e", 2, "hello"), ...{ edits: "a" } }];
 
-  test("gives what shownLines and editsFolded give", () => {
+  test("gives the shown lines and the folded edits together", () => {
     const { shown, folded } = foldEdits(lines);
-    expect(shown).toEqual(shownLines(lines));
-    expect(folded).toEqual(editsFolded(lines));
     expect(texts(shown)).toEqual(["a:hello", "b:next"]);
     expect(folded.get("e")).toBe("a");
   });

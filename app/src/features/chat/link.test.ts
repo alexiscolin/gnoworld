@@ -8,7 +8,8 @@ import { createAppStore } from "../../store/index.ts";
 import { totalUnseen, unseenNotices } from "../../store/notices.ts";
 import { HISTORY_RING } from "./history.ts";
 import { makeKit } from "./accountKit.ts";
-import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
+import { HISTORY_LINES } from "./history.ts";
+import { chatLink, ROOMS_JOINED, type LinkDeps } from "./link.ts";
 import { WAITING } from "./outbox.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

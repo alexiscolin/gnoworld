@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { anchorOf, type RealmFunctions } from "./choice.ts";
 import {
-  anchorOf,
   ANCHORS,
   asciiBytes,
   natureOf,
@@ -11,7 +11,6 @@ import {
   worldPath,
   type Anchor,
   type Nature,
-  type RealmFunctions,
 } from "./look.ts";
 import { labOf, type Lab } from "./palette.ts";
 import { planetRecipe, worldRecipe } from "./recipe.ts";

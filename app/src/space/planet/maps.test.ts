@@ -10,7 +10,7 @@ import {
   Texture,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
-import { decodeOptions, freeMap, loadMap, mapBytes, mapUrl, prepareMap } from "./maps.ts";
+import { decodeOptions, freeMap, loadMap, mapUrl, prepareMap } from "./maps.ts";
 
 const decoded = vi.hoisted(() => ({
   bitmap: { width: 4096, height: 2048, close: vi.fn() },
@@ -34,12 +34,6 @@ vi.mock("three", async (original) => ({
     }
   },
 }));
-
-const sized = (width: number, height: number, format?: typeof RedFormat): Texture => {
-  const texture = new Texture({ width, height });
-  if (format !== undefined) texture.format = format;
-  return texture;
-};
 
 describe("mapUrl", () => {
   const FILES = /^\/textures\/[\w-]+\.\d+\.[0-9a-f]{8}\.webp$/;
@@ -117,7 +111,6 @@ describe("loadMap", () => {
     texture.onUpdate?.(texture);
     expect(decoded.bitmap.close).toHaveBeenCalledTimes(1);
     expect(texture.image).toEqual({ width: 4096, height: 2048 });
-    expect(mapBytes([texture])).toBe(Math.round(4096 * 2048 * 4 * (4 / 3)));
   });
 });
 
@@ -156,24 +149,5 @@ describe("freeMap", () => {
     const disposed = vi.spyOn(texture, "dispose");
     freeMap(texture);
     expect(disposed).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("mapBytes", () => {
-  it("counts four bytes a pixel and a third more for the mipmaps", () => {
-    expect(mapBytes([sized(2048, 1024)])).toBe(11184811);
-  });
-
-  it("counts one byte a pixel on one channel", () => {
-    expect(mapBytes([sized(2048, 1024, RedFormat)])).toBe(2796203);
-  });
-
-  it("adds up the maps, each once, however many planets share it", () => {
-    const one = sized(1024, 512);
-    expect(mapBytes([one, one, sized(1024, 512)])).toBe(mapBytes([one]) * 2);
-  });
-
-  it("counts nothing for a map still loading", () => {
-    expect(mapBytes([new Texture()])).toBe(0);
   });
 });

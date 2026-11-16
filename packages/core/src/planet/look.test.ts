@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { anchorOf } from "./choice.ts";
 import {
-  anchorOf,
   ANCHORS,
   asciiBytes,
   MAPS,

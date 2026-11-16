@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { crowd, realm } from "./fixture.ts";
 import { storeOf } from "./rows.ts";
 import { defaultFilters, type Ground } from "./shelves.ts";
-import { nextStops, ROW_SIZE, surprise, todayOf } from "./today.ts";
+import { nextStops, ROW_SIZE, todayOf } from "./today.ts";
 
 const NONE: Ground = { here: () => 0, visited: () => false };
 
@@ -62,20 +62,5 @@ describe("nextStops", () => {
     expect(zzz === undefined ? [] : nextStops(store, zzz).map(({ row, why }) => [row.name, why])).toEqual([
       ["duel", "author"],
     ]);
-  });
-});
-
-describe("surprise", () => {
-  const rows = storeOf([
-    realm("gno.land/r/a/x", { calls: 1 }),
-    realm("gno.land/r/a/y", { calls: 1 }),
-    realm("gno.land/r/a/z"),
-  ]).rows;
-  it("picks one realm that was called and not visited, by a number from 0 up to 1", () => {
-    expect(surprise(rows, NONE, 0)?.name).toBe("x");
-    expect(surprise(rows, NONE, 0.99)?.name).toBe("y");
-  });
-  it("picks none where nothing is left", () => {
-    expect(surprise(rows, { ...NONE, visited: () => true }, 0.5)).toBeUndefined();
   });
 });

@@ -2,7 +2,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { realmType } from "@gnoworld/core";
-import { evalCall, evalNameOf, isAddress, userCall } from "./evalCall.ts";
+import { evalNameOf, isAddress } from "@gnoworld/core";
+import { evalCall, userCall } from "./evalCall.ts";
 
 // Tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
 // (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's

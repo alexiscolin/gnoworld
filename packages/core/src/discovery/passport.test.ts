@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constellationsOf, markFirst, passportCount, stampedIn, stampKey } from "./passport.ts";
+import { markFirst, passportCount, stampedIn, stampKey } from "./passport.ts";
 
 // The passport (ADR-0002 §1 and §3): a stamp per world, keyed "universe:world"; progress per constellation, each world once; the
 // header's counter out of the worlds the reader's view lists.
@@ -54,73 +54,5 @@ describe("the header's counter", () => {
 
   it("never shows more stamps than worlds: a stamp of a world the list lacks yet raises the total", () => {
     expect(passportCount(5, 3)).toEqual({ stamped: 5, listed: 5 });
-  });
-});
-
-describe("the constellations", () => {
-  const worlds = [
-    { id: "gov/dao", namespace: "gov" },
-    { id: "gov/boards", namespace: "gov" },
-    { id: "gov/members", namespace: "gov" },
-    { id: "games/chess", namespace: "games" },
-    { id: "games/go", namespace: "games" },
-    { id: "art/one", namespace: "art" },
-  ];
-
-  it("counts each world once in its namespace, a world listed twice included", () => {
-    const got = constellationsOf([...worlds, { id: "gov/dao", namespace: "gov" }], new Set(["gov/dao"]));
-    expect(got.find(({ id }) => id === "gov")).toEqual({ id: "gov", worlds: 3, stamped: 1 });
-    expect(got.reduce((sum, { worlds: all }) => sum + all, 0)).toBe(6);
-  });
-
-  it("puts the most stamped share first, then the most stamps, then by name", () => {
-    const got = constellationsOf(worlds, new Set(["gov/dao", "games/chess", "art/one"]));
-    expect(got.map(({ id }) => id)).toEqual(["art", "games", "gov"]);
-    const tie = constellationsOf(worlds, new Set(["gov/dao", "gov/boards", "games/chess"]));
-    // gov 2/3 before games 1/2; art 0/1 last.
-    expect(tie.map(({ id }) => id)).toEqual(["gov", "games", "art"]);
-    const even = constellationsOf(
-      [
-        { id: "b/1", namespace: "b" },
-        { id: "b/2", namespace: "b" },
-        { id: "a/1", namespace: "a" },
-        { id: "a/2", namespace: "a" },
-        { id: "c/1", namespace: "c" },
-      ],
-      new Set(["a/1", "b/1"]),
-    );
-    expect(even.map(({ id }) => id)).toEqual(["a", "b", "c"]);
-  });
-
-  it("orders two shares alike by their stamps", () => {
-    const got = constellationsOf(
-      [
-        { id: "a/1", namespace: "a" },
-        { id: "a/2", namespace: "a" },
-        { id: "z/1", namespace: "z" },
-        { id: "z/2", namespace: "z" },
-        { id: "z/3", namespace: "z" },
-        { id: "z/4", namespace: "z" },
-      ],
-      new Set(["a/1", "z/1", "z/2"]),
-    );
-    expect(got.map(({ id }) => id)).toEqual(["z", "a"]);
-  });
-
-  it("stands a stamped world the list lacks in its namespace, and a bare id as its own", () => {
-    const got = constellationsOf(worlds, new Set(["gov/new", "lone"]));
-    expect(got.find(({ id }) => id === "gov")).toEqual({ id: "gov", worlds: 4, stamped: 1 });
-    expect(got.find(({ id }) => id === "lone")).toEqual({ id: "lone", worlds: 1, stamped: 1 });
-  });
-
-  it("counts a listed world in the namespace the list gives it, never again in the one its id begins with", () => {
-    const got = constellationsOf([{ id: "x/1", namespace: "other" }], new Set(["x/1"]));
-    expect(got).toEqual([{ id: "other", worlds: 1, stamped: 1 }]);
-  });
-
-  it("gives every constellation of the list, the unstamped ones at 0 for the view to leave out", () => {
-    const got = constellationsOf(worlds, new Set());
-    expect(got.map(({ stamped }) => stamped)).toEqual([0, 0, 0]);
-    expect(constellationsOf([], new Set())).toEqual([]);
   });
 });

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Send } from "@gnoworld/service/net";
 import { fakeChain, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
-import { makeOwnerReaders, makeOwners } from "./owners.ts";
+import { makeOwnerReaders, type OwnersOptions } from "./owners.ts";
+
+const makeOwners = (options: OwnersOptions) => makeOwnerReaders(options).act;
 
 // Who holds a namespace, read on the chain the server
 // is configured with, cached 60 s. The expression is one string (`gno.land/r/sys/users.func() string {...}()`), so an answer is `("g1..." string)`,

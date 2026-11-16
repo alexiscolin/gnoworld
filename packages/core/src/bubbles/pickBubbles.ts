@@ -8,8 +8,6 @@ import { isFarSide } from "./farSide.ts";
 import { isOpen, newestFirst, readWindow } from "./window.ts";
 import type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 
-export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
-
 /** A bubble keeps this many times `maxChars` graphemes of its line, marks included: the words it shows are read from them and cut
  * to `maxChars` with their ellipsis late (app BubbleWords), the Markdown reader not being the first screen's (ADR-0001 §12). */
 const RAW = 4;

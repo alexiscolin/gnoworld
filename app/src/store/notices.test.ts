@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import { DMS_KEPT } from "./dms.ts";
 import { createAppStore, type AppState } from "./index.ts";
-import { badgeOf, modeOf, NOTICES_KEPT, placeCounts, totalUnseen, unseenNotices } from "./notices.ts";
+import { modeOf, NOTICES_KEPT, placeCounts, totalUnseen, unseenNotices } from "./notices.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -19,6 +19,8 @@ const read = (line: string): IrcMessage => {
 };
 
 // The notices a page holds, which of them are unseen, and what each room counts.
+const badgeOf = (state: AppState, where: string): number => placeCounts(state).get(where) ?? 0;
+
 describe("the store's notices slice", () => {
   const setup = (rooms: readonly string[] = [GAMES, MAIN]) => {
     const store = createAppStore();

@@ -9,7 +9,6 @@ export {
   EarthOrbit,
   EarthRooms,
   Ecosystems,
-  EMBED_PREFIXES,
   holdsHidden,
   Events,
   Genres,
@@ -61,7 +60,7 @@ export {
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
-export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
+export { jarvisExamples } from "./jarvisExamples.ts";
 export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { HIDE_IDS, PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
@@ -114,3 +113,9 @@ export {
   tagsOf,
   type RealmTag,
 } from "./explain.ts";
+
+// What other workspaces' tests read; the product reads none of them.
+/** @internal */
+export { EMBED_PREFIXES } from "./data.ts";
+/** @internal */
+export { JARVIS_EXAMPLES } from "./jarvisExamples.ts";

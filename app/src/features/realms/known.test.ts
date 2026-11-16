@@ -2,7 +2,8 @@
 import { createElement } from "react";
 import { expect, test, vi } from "vitest";
 import { mount } from "../../../tests/mount.tsx";
-import { knownOf, useKnown } from "./known.ts";
+import { knownOf } from "../../knownOf.ts";
+import { useKnown } from "./known.ts";
 
 const failed = (kind: string) => ({ state: "failed", failure: { kind, next: "" } }) as never;
 
