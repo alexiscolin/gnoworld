@@ -91,6 +91,16 @@ describe("a line counted in room_said (F13510): the Earth's idleness and daily c
     await check(said("hello", "m1"));
     expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
   });
+
+  // F13517: a hide that could not be sent turns `unchecked` uncounted; its retry must not take another line's count.
+  it("keeps an honest line's count when a hide sent again is retried and hidden", async () => {
+    const { check, db } = setup(() => Promise.resolve(answer()));
+    await check(said("hello there", "m1"));
+    await check(said("buy spam", "m2"));
+    checkAgain(db, "m2");
+    await check(said("buy spam", "m2"));
+    expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
+  });
 });
 
 describe("checking a message", () => {
