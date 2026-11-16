@@ -216,6 +216,13 @@ describe("the second's limit by default (F13503)", () => {
       t.clock.now += 1000;
     }
   });
+
+  it("spends no site token on a call the account's own limit refused", async () => {
+    const t = setup(500);
+    const body = { places: [t.place("#bubble", T0)] };
+    for (let n = 0; n < 500; n += 1) await t.post(body, "bob");
+    expect((await t.post(body, "alice")).status).toBe(204);
+  });
 });
 
 describe("the counts a page reads", () => {

@@ -58,8 +58,9 @@ export function unreadRoutes({
   app.post("/", async (c) => {
     const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
-    // The site's limit first: a call it refuses spends no account's allowance.
-    if (!together.take("all", now()) || !writes.take(who, now())) return refuse(c, "limit");
+    // A full second refuses without spending the account's allowance; an account over its own spends no site token.
+    if (together.full("all", now()) || !writes.take(who, now()) || !together.take("all", now()))
+      return refuse(c, "limit");
     const body = UnreadPlaces.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
     unread.places(
