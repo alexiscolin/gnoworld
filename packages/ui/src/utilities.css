@@ -176,11 +176,9 @@
     flex: none;
   }
 
-  /* A phone's finger (WCAG 2.5.5): a control under 44 px keeps its look and gains an invisible box to 44 px high, never wider than the
-     control, so side-by-side controls never cover each other; rows that wrap keep a gap of the difference. Where a control clips its
-     own overflow, the box is cut. A stretched button (its card's box) and a link-look one (a run of words) take none. Added by Button, IconButton, Chip,
-     Tabs and Switch; a bare button (a name that opens a card) has it without the class. `--hit-inline` widens the box where a control is
-     narrower than a finger (the Switch's track). */
+  /* A phone's finger (WCAG 2.5.5): a control under 44 px gains an invisible box 44 px high, never wider than it, so neighbours never cover
+     each other; a stretched or link-look button takes none; a bare button has it without the class; `--hit-inline` widens a narrow one
+     (the Switch's track). */
   @media (width < 900px) {
     :is(.hit, button.bare):not([data-stretch], [data-emphasis="link"]) {
       position: relative;

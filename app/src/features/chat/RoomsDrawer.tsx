@@ -15,10 +15,9 @@ const leave = (close: () => void) => (event: MouseEvent) => {
   if (event.target instanceof Element && event.target.closest("a") !== null) close();
 };
 
-/** The control for the rooms and the drawer holding `rail`, on a narrow chat's screen: the control is drawn in the header's place, the
- * drawer, a modal dialog, over the screen whatever place draws it. Its code comes once the screen is narrow. On a `phone` (the window
- * under 900 px) the control is 44 px and the drawer a side one, keeping its title and Close and scrolling `rail` and, below it,
- * `worlds`; a compact chat of a computer's window keeps its small control and plain dialog. */
+/** The rooms' control and the drawer holding `rail`, on a narrow chat's screen, its code once the screen is narrow. On a `phone` the
+ * control is 44 px and the drawer a side one, its title and Close kept over `rail` and `worlds`; a computer's compact chat keeps its small
+ * control and plain dialog. */
 export function RoomsDrawer({
   unread,
   rail,
