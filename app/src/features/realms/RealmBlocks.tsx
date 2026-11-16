@@ -15,6 +15,7 @@ import styles from "./RealmBlocks.module.css";
 export { DRAW_LIMIT, INLINE_LIMIT } from "./drawBudget.ts";
 import type { CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
+import { formsRegion } from "./formsRegion.ts";
 
 // A form with its Call is the realm view's own, never a capture's or a chat's: the call card's code comes only as one is drawn.
 const CallableForm = lazy(async () => ({ default: (await import("./CallableForm.tsx")).CallableForm }));
@@ -37,9 +38,8 @@ interface Drawn extends Ink {
   readonly under: { level: 1 | 2 | 3 | 4 | 5 | 6 };
 }
 
-const inlinesOf = (block: PageBlock): readonly Inline[] => {
-  return block.type === "paragraph" || block.type === "heading" ? block.children : [];
-};
+const inlinesOf = (block: PageBlock): readonly Inline[] =>
+  block.type === "paragraph" || block.type === "heading" ? block.children : [];
 
 // What a row costs: a unit for each cell it is drawn with (the head's width, a short row filled), and the nodes in them, so a
 // table of empty cells is no free page.
@@ -221,6 +221,7 @@ export function RealmBlocks({
   const reader = { ...via.reader, link: warning.link };
   const anchorId = useId();
   const forms: ReactNode[] = [];
+  const cards: string[] = [];
   const under: Drawn["under"] = { level: 1 };
   const named = call === undefined ? undefined : { place: call, page };
   // An action's button where its link stood, its card (nothing till opened) with the forms: a card is a block, never inside a paragraph.
@@ -231,16 +232,14 @@ export function RealmBlocks({
       : (node, label) => {
           const id = `${named.page}-action-${String(forms.length)}`;
           const card = createElement(ActionCard, { id, place: named.place, level: CARD_LEVEL[under.level] });
+          cards.push(id);
           forms.push(createElement(Suspense, { key: id, fallback: null }, card));
           const words = createElement("span", null, ...label);
           const button = createElement(PageAction, { id, func: node.func, args: node.args, place: named.place, label });
           return createElement(Suspense, { key: id, fallback: words }, button);
         };
   const drawn = drawAll(blocks, { budget, via, reader, action, call: named, forms, anchor: anchorId, under });
-  const below =
-    forms.length === 0
-      ? undefined
-      : createElement("section", { className: styles["forms"], "aria-label": "Forms" }, ...forms);
+  const below = formsRegion(forms, cards, styles["forms"]);
   const notice = budget.cut
     ? createElement(
         "p",

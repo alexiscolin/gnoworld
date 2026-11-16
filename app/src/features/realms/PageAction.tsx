@@ -4,7 +4,8 @@
 import { prefill, type HelpArg } from "@gnoworld/core";
 import { Button } from "@gnoworld/ui";
 import type { ReactNode } from "react";
-import { useAppStore } from "../../storeContext.tsx";
+import { callsIn } from "../calls/index.ts";
+import { useApp, useAppStore } from "../../storeContext.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import { useCallable, writeOf } from "./useCallable.ts";
 
@@ -41,4 +42,24 @@ export function PageAction({
 /** The card an action `id` opens, under the page's forms: nothing until it is opened. */
 export function ActionCard({ id, place, level }: { id: string; place: CallPlace; level: 2 | 3 | 4 }) {
   return <InlineCard id={id} place={place} level={level} />;
+}
+
+/** The page's forms region: drawn when a plain form stands in it or a card of `cards` is open, never as an empty region. */
+export function ActionForms({
+  cards,
+  plain,
+  className,
+  children,
+}: {
+  cards: readonly string[];
+  plain: number;
+  className?: string | undefined;
+  children?: ReactNode;
+}) {
+  const open = useApp((state) => cards.some((id) => callsIn(state)?.calls[id] !== undefined));
+  return plain > 0 || open ? (
+    <section className={className} aria-label="Forms">
+      {children}
+    </section>
+  ) : null;
 }

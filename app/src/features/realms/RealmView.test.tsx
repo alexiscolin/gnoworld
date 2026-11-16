@@ -400,6 +400,17 @@ describe("a realm's view, with `$help` links on its page", () => {
     expect(links(box, "Vote YES").filter((a) => a.getAttribute("href")?.includes("$help"))).toHaveLength(0);
   });
 
+  test("draws no Forms region while no card is open, and one once the action is pressed", async () => {
+    const box = await shown(link("Vote YES", "func=Vote&option=YES"));
+    await vi.waitFor(() => {
+      expect(actions(box, "Vote YES")).toHaveLength(1);
+    });
+    expect(box.querySelector("[aria-label='Forms']")).toBeNull();
+    await pressed(box, "Vote YES");
+    await filled(box, ["YES"]);
+    expect(all(box, "[aria-label='Forms']")).toHaveLength(1);
+  });
+
   test("draws a `$help` link in a bulleted list as an action too (F13526)", async () => {
     const box = await shown(
       `- ${link("Vote YES", "func=Vote&option=YES")}\n- ${link("Vote NO", "func=Vote&option=NO")}`,
