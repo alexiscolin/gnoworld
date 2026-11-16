@@ -147,12 +147,13 @@
    growth held to the room the visual viewport leaves (viewport.ts), so Send never leaves the screen. */
 @layer components {
   @media (width < 900px) {
-    .box .send button[data-size],
-    .box .acts button[data-size] {
+    .box .send button,
+    .box .acts button {
       --_h: var(--control-m);
     }
 
     .acts:has(> .fold) {
+      /* layout: the foot's controls in a row, as the quick actions' own */
       display: flex;
     }
 
@@ -164,8 +165,8 @@
       display: none;
     }
 
-    /* Over the box's container query, which shrinks a narrow box's tools to 24 px. */
-    .format button[data-tool]:enabled {
+    /* Over the box's container query, which shrinks a narrow box's tools to 24 px (ui's Button: its selector's weight, one more class). */
+    .box .format button:enabled {
       --_h: var(--control-m);
     }
 
@@ -173,7 +174,7 @@
     .box .field textarea {
       /* layout: a share of the screen, so a long draft scrolls in its field and the foot stays in view */
       --_share: 0.3;
-      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh, 100dvb) * var(--_share)));
+      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh) * var(--_share)));
       overflow: auto;
     }
   }

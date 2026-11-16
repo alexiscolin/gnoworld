@@ -1,7 +1,7 @@
 // The full-screen chat's column of worlds (the video's left edge, frame 80): the picture of each world's real planet at 44 px, the world in
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
-import { Cluster, Tooltip } from "@gnoworld/ui";
+import { Cluster, Stack, Tooltip } from "@gnoworld/ui";
 import { useState } from "react";
 import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
@@ -44,12 +44,46 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
   return worlds.toSorted((a, b) => place(a) - place(b));
 }
 
-// A world as a row: its planet and its name, a link at the control's height; its unseen lines after the name.
-function WorldRows({ worlds, current, followed = NONE, unread }: WorldsProps) {
+// The followed worlds the hubs do not hold: the rest of the column, which WorldsMore draws.
+const beyond = ({ worlds, followed = NONE }: Pick<WorldsProps, "worlds" | "followed">) =>
+  followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id));
+
+// The textures' credit, which the pictures carry wherever they show (DESIGN-SYSTEM.md): the button and the universe's own dialog,
+// asked at the first press.
+function Credits({ className }: { className: string | undefined }) {
+  const [asked, setAsked] = useState(false);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className={`label ${className ?? ""}`}
+        onClick={() => {
+          setAsked(true);
+          setOpen(true);
+        }}
+      >
+        Credits
+      </button>
+      {asked ? (
+        <CreditsDialog
+          open={open}
+          onClose={() => {
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+// A world as a row: its planet and its name, a link at the control's height; its unseen lines after the name. Under the rows, what the
+// column holds past the hubs (the worlds followed, the places opened last, "+" to Discover) and the credits.
+function WorldRows({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
   const session = useApp(({ login }) => login.session);
   return (
     <nav aria-label="Worlds">
-      <ul className={styles["rows"]}>
+      <Stack as="ul" space="3xs">
         {inRailOrder(worlds, followed).map((world) => (
           <li key={world.slug}>
             <RouterLink
@@ -60,15 +94,19 @@ function WorldRows({ worlds, current, followed = NONE, unread }: WorldsProps) {
               aria-current={world.slug === current ? "page" : undefined}
               className={styles["row"]}
             >
-              <span className={styles["planet"]}>
-                <WorldPlanet world={hubWorldOf(world)} fallback="" name={world.name} decorative />
-              </span>
-              <span className="truncate">{world.name}</span>
-              {world.slug === current ? null : <UnreadPill count={unread?.[world.slug] ?? 0} />}
+              <Cluster space="s" wrap="no" className={styles["rowBody"]}>
+                <span className={styles["planet"]}>
+                  <WorldPlanet world={hubWorldOf(world)} fallback="" name={world.name} decorative />
+                </span>
+                <span className="truncate">{world.name}</span>
+                {world.slug === current ? null : <UnreadPill count={unread?.[world.slug] ?? 0} />}
+              </Cluster>
             </RouterLink>
           </li>
         ))}
-      </ul>
+      </Stack>
+      <WorldsMore universe={universe} followed={beyond({ worlds, followed })} />
+      <Credits className={styles["creditsRow"]} />
     </nav>
   );
 }
@@ -79,8 +117,6 @@ export function Worlds(props: WorldsProps) {
 
 function Column({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
   const session = useApp(({ login }) => login.session);
-  const [asked, setAsked] = useState(false);
-  const [open, setOpen] = useState(false);
   return (
     <nav aria-label="Worlds" className={[styles["list"], "fill-column"].join(" ")}>
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
@@ -106,28 +142,8 @@ function Column({ worlds, current, followed = NONE, universe, unread }: WorldsPr
           </li>
         ))}
       </Cluster>
-      <WorldsMore
-        universe={universe}
-        followed={followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id))}
-      />
-      <button
-        type="button"
-        className={["label", styles["credits"]].join(" ")}
-        onClick={() => {
-          setAsked(true);
-          setOpen(true);
-        }}
-      >
-        Credits
-      </button>
-      {asked ? (
-        <CreditsDialog
-          open={open}
-          onClose={() => {
-            setOpen(false);
-          }}
-        />
-      ) : null}
+      <WorldsMore universe={universe} followed={beyond({ worlds, followed })} />
+      <Credits className={styles["credits"]} />
     </nav>
   );
 }

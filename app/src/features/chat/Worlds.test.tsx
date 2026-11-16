@@ -185,9 +185,20 @@ describe("Worlds, as rows (a phone's drawer)", () => {
     expect(current.map((link) => link.textContent)).toEqual(["GovDAO"]);
   });
 
-  it("draws no tooltip, no credits button and no remove control: a drawer's list only links", () => {
+  it("holds under the rows what the column holds: the places followed and opened, the way to Discover, and the credits", async () => {
+    modals();
     const box = rows();
-    expect(button(box, "Credits")).toBeUndefined();
-    expect(all(box, "button")).toEqual([]);
+    const nav = one(box, 'nav[aria-label="Worlds"]');
+    expect(nav.querySelector("hr")).not.toBeNull();
+    expect(button(nav, "Find more worlds")).toBeDefined();
+    const credits = button(box, "Credits");
+    expect(all(nav, ":scope > *").at(-1)).toBe(credits);
+    click(credits);
+    await settled(() => all(box, "dialog[open]").length === 1);
+    expect(one(box, "dialog").textContent).toContain("Solar System Scope");
+  });
+
+  it("makes the credits a row's height, as the rows are", () => {
+    expect(button(rows(), "Credits")?.className).toContain("creditsRow");
   });
 });

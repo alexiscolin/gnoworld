@@ -1,31 +1,19 @@
-/* A phone's chat header: two rows of 44 px controls in portrait; one row in a short landscape window, where height is what is scarce. */
+/* A phone's chat header: two rows of 44 px controls in portrait (Stack of two Clusters); one row in a short landscape window, where height
+   is what is scarce. */
 @layer components {
   .bar {
-    /* layout: the rows one under the other, a small step apart */
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3xs);
     /* the notch's side, in landscape */
     padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
-  }
-
-  .top,
-  .tools {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2xs);
   }
 
   .title {
     /* layout: the name takes the row and gives way at its end */
     flex: 1 1 0;
     min-inline-size: 0;
-    margin: 0;
-    font: var(--font-title-room);
-    letter-spacing: var(--tracking-tight);
   }
 
   .mark {
+    /* layout: kept whole beside the name */
     flex: none;
   }
 
@@ -39,11 +27,26 @@
     margin-inline-end: auto;
   }
 
+  /* The arrival's pill stands under the header (--banner-under, over ChatScreen's compact one, which this selector outweighs): the rows'
+     height, a step between them, the region's padding (ChatScreen.module.css) and its rule. Only a phone draws this header. */
+  :root:has([data-chat-screen][data-full][data-compact] .bar) {
+    --banner-under: calc(
+      var(--flash-room) + var(--control-m) * 2 + var(--space-3xs) + var(--space-2xs) * 2 + var(--line-width)
+    );
+  }
+
   /* Short windows (a phone on its side): one row, the name first, Rooms and the acts after it, Info at the end. */
   @media (height < 500px) {
+    :root:has([data-chat-screen][data-full][data-compact] .bar) {
+      --banner-under: calc(var(--flash-room) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width));
+    }
+
     .bar {
+      /* layout: one row in place of two */
       flex-direction: row;
+      /* layout: centred on the row's line */
       align-items: center;
+      /* layout: a step between the controls, as the rows' own */
       gap: var(--space-2xs);
     }
 
@@ -66,6 +69,7 @@
 
     .rooms {
       order: 3;
+      /* layout: Rooms stands by the name here, the acts after it */
       margin-inline-end: 0;
     }
 

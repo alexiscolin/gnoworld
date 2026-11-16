@@ -57,4 +57,21 @@ describe("a phone's chat header", () => {
     const box = draw({ acts: [{ label: "Events", icon: "calendar" }] });
     expect(button(box, "Events")).toBeUndefined();
   });
+
+  it("cuts a long name to one line with an ellipsis (ChatHeader's own name, never a copy)", () => {
+    const heading = one(draw({ title: "#a-room-with-a-very-long-name-indeed" }), "h1");
+    expect(heading.classList.contains("truncate")).toBe(true);
+    expect(heading.getAttribute("title")).toBe("#a-room-with-a-very-long-name-indeed");
+  });
+
+  it("keeps the room name's menu (the rooms and the notification modes): the name opens it", () => {
+    const box = draw({ menu: { label: "Rooms", content: <p>Notify me of every message</p> } });
+    expect(document.querySelector("dialog[open]")).toBeNull();
+    click(button(box, "#games"));
+    expect(document.querySelector("dialog[open]")?.textContent).toContain("Notify me of every message");
+  });
+
+  it("draws a plain name where there is no menu", () => {
+    expect(button(draw(), "#games")).toBeUndefined();
+  });
 });

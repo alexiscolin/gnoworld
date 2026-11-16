@@ -52,9 +52,9 @@ function Where({ world, title, menu }: Pick<ChatHeaderProps, "world" | "title" |
   );
 }
 
-// The room's name, and when it has a menu a button that opens it in the design system's dialog, which the first screen holds
+// The room's name (shared with the phone's header), and when it has a menu a button that opens it in the design system's dialog, which the first screen holds
 // already: a chevron after the name says it opens. It is open on the page it was opened on: a room picked in it closes it.
-function Name({ title, menu, short = false }: Pick<ChatHeaderProps, "title" | "menu"> & { short?: boolean }) {
+export function Name({ title, menu, short = false }: Pick<ChatHeaderProps, "title" | "menu"> & { short?: boolean }) {
   const { key } = useLocation();
   const [openAt, setOpenAt] = useState<string>();
   const open = openAt === key;

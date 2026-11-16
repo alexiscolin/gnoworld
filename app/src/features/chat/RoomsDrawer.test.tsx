@@ -5,11 +5,12 @@ import { all, button, click, mount } from "../../../tests/mount.tsx";
 import { RoomsDrawer } from "./RoomsDrawer.tsx";
 
 // The rooms on a phone: one control, and a drawer with the rooms, then the worlds below them.
-const draw = (unread = 0) =>
+const draw = (unread = 0, phone = true) =>
   mount(
     <MemoryRouter>
       <RoomsDrawer
         unread={unread}
+        phone={phone}
         rail={<a href="/r/news">news</a>}
         worlds={
           <nav aria-label="Worlds">
@@ -47,5 +48,23 @@ describe("the rooms' drawer", () => {
     });
     click(link ?? undefined);
     expect(document.querySelector("dialog[open]")).toBeNull();
+  });
+
+  // A compact chat in a computer's window (900 px wide, say) is no phone: main's drawer, its small control, no worlds.
+  it("keeps a computer's compact chat's small control and plain dialog, the rooms alone", () => {
+    const box = draw(0, false);
+    expect(button(box, "Rooms")?.getAttribute("data-size")).toBe("s");
+    click(button(box, "Rooms"));
+    const dialog = document.querySelector("dialog[open]");
+    expect(dialog?.hasAttribute("data-side")).toBe(false);
+    expect(dialog?.querySelector("[data-drawer-body]")).toBeNull();
+    expect(all(dialog ?? document.body, "a").map((link) => link.textContent)).toEqual(["news"]);
+  });
+
+  it("is a start-side drawer with a 44 px control on a phone", () => {
+    const box = draw();
+    expect(button(box, "Rooms")?.getAttribute("data-size")).toBe("m");
+    click(button(box, "Rooms"));
+    expect(document.querySelector("dialog[open]")?.hasAttribute("data-side")).toBe(true);
   });
 });

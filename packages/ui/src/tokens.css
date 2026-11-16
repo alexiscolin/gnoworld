@@ -198,6 +198,10 @@
     --chat-panel-inset: 20px;
     /* The inset of what the chat draws, set by the screen it is in: the video's 32 px; 24 in its dock, a phone's gutter. */
     --chat-inset: var(--space-l);
+    /* A phone's full chat is as tall as the visual viewport (so the on-screen keyboard never covers the composer) and starts where it
+       does: viewport.ts sets both on the screen; the dynamic viewport's height and no offset elsewhere. */
+    --chat-vh: 100dvb;
+    --chat-vtop: 0px;
     /* How far the composer's box goes out past its column's inset, and the inset of its words from its edge; the dock sets both (app's QuickActions.module.css). */
     --box-bleed: 0px;
     --box-in: var(--space-s);

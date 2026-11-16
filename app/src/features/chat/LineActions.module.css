@@ -38,3 +38,14 @@
     inset-block-start: var(--space-3xs);
   }
 }
+
+/* A phone's bar: real 44 px buttons side by side, so no button's box lies over its neighbour's (a reaction is the one pressed). The
+   selector outweighs ui's size rule by its pseudo-class. */
+@layer components {
+  @media (width < 900px) {
+    .bar button:enabled,
+    .bar button:disabled {
+      --_h: var(--control-m);
+    }
+  }
+}

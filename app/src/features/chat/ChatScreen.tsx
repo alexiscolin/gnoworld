@@ -115,6 +115,11 @@ const takesPage = (dockable: boolean, { inPage }: ChatPlace) => !dockable && inP
 const inPlaceView = (full: boolean, compact: boolean, thread: ReactNode): boolean =>
   full && !compact && thread === undefined;
 
+// The narrow full chat's rooms: the worlds join them in the drawer on a phone (the window under 900 px) alone.
+const roomsOf = (props: { unread: number; rail: ReactElement; phone: boolean }, rows: ReactNode) => (
+  <RoomsDrawer {...props} worlds={props.phone ? rows : undefined} />
+);
+
 // What closes the full chat: none where the page is the chat and would open it again.
 const closeFull = (dockable: boolean, place: ChatPlace) => (takesPage(dockable, place) ? null : <FullButton full />);
 
@@ -189,7 +194,7 @@ export function ChatScreen(props: ChatScreenProps) {
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
   // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: fullMove.ts).
   const columns = { ...useColumns(), band: bar.wide };
-  const rooms = compact && full ? <RoomsDrawer unread={unread} rail={rail} worlds={worlds.rows} /> : undefined;
+  const rooms = compact && full ? roomsOf({ unread, rail, phone }, worlds.rows) : undefined;
   const head = useHeader({
     phone,
     desktop: {
@@ -205,7 +210,7 @@ export function ChatScreen(props: ChatScreenProps) {
       },
     },
     phoneOf: {
-      header: { title, mark, rooms, acts: placeActs(searching.act, here.ask) },
+      header: { title, menu, mark, rooms, acts: placeActs(searching.act, here.ask) },
       info: { place, talking, room, people },
     },
   });

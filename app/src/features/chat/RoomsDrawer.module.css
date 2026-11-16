@@ -3,16 +3,20 @@
   .drawer {
     /* layout: the title over a body that takes the height left and scrolls alone */
     display: grid;
+    /* layout: the title's own height, the body the rest */
     grid-template-rows: auto minmax(0, 1fr);
     block-size: 100%;
   }
 
   .title {
+    /* layout: no margin of the paragraph's own */
     margin: 0;
     /* layout: level with Close, which the drawer draws at its top end corner (ui's Dialog) */
     min-block-size: calc(var(--control-m) + 2 * var(--space-s));
     padding-inline: var(--space-m);
+    /* layout: the name centred on the row's line */
     display: flex;
+    /* layout: the name centred on the row's line */
     align-items: center;
     border-block-end: var(--line-width) solid var(--color-line);
     font: var(--font-title-room);
