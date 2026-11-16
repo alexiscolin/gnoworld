@@ -75,6 +75,7 @@ describe("Log out my other sessions", () => {
     await settled(() => said(box).includes("Your session has ended. Sign in again to log out your other sessions."));
     expect(one(box, "#settings-accounts").textContent).not.toContain("change links");
     expect(said(box)).not.toContain(DONE);
+    expect(button(box, "Sign in again to confirm"), "offers the sign-in").toBeDefined();
   });
 
   it("takes back an earlier failure's line when the next try goes through", async () => {

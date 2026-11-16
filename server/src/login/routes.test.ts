@@ -231,6 +231,16 @@ describe("the session", () => {
     expect((await me(app, session(token))).status).toBe(200);
   });
 
+  it("answers 401 to logout-others from a session signed more than ten minutes ago, and ends nothing", async () => {
+    const { app, clock } = setup();
+    const who = wallet();
+    const [old, other] = [tokenOf(await login(app, who)), tokenOf(await login(app, who))];
+    clock.now += 10 * MINUTE + 1;
+    const response = await post(app, "logout-others", { body: {}, headers: { cookie: session(old) } });
+    expect(await answer(response)).toEqual([401, JSON.stringify({ error: "unauthenticated" })]);
+    expect(await answer(await me(app, session(other)))).toEqual([200, JSON.stringify({ address: who.address })]);
+  });
+
   it("limits logout-others per visitor with the other calls, before any work and before the 401: the 11th call of a minute is a 429", async () => {
     const { app, rows } = setup();
     const who = wallet();

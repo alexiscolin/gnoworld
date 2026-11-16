@@ -4,21 +4,29 @@ import { Button, Cluster } from "@gnoworld/ui";
 import { useState } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { linkProblem } from "./linkWords.ts";
+import { useSignInAgain } from "./useSignInAgain.ts";
 
 export function OtherSessions() {
   const [said, setSaid] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stale, setStale] = useState(false);
 
   async function logOut(): Promise<void> {
     setSaid("");
     setBusy(true);
+    setStale(false);
     const done = await pageLoginApi().logoutOthers();
     setBusy(false);
     if (done.ok) setSaid("Your other sessions are logged out.");
-    else if (done.reason === "unauthenticated")
+    else if (done.reason === "unauthenticated") {
       setSaid("Your session has ended. Sign in again to log out your other sessions.");
-    else setSaid(linkProblem(done.reason));
+      setStale(true);
+    } else setSaid(linkProblem(done.reason));
   }
+
+  const again = useSignInAgain(() => {
+    logOut().catch(reportError);
+  });
 
   return (
     <Cluster space="xs">
@@ -32,6 +40,11 @@ export function OtherSessions() {
       >
         Log out my other sessions
       </Button>
+      {stale ? (
+        <Button size="s" onClick={again.ask} disabled={again.waiting}>
+          Sign in again to confirm
+        </Button>
+      ) : null}
       <span role="status" className="meta">
         {said}
       </span>
