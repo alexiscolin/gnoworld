@@ -76,7 +76,7 @@ async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
   // The model's one client refuses an environment that would add headers to its requests.
   const send = connectAnthropic(config.anthropicKey, config.caps.callTimeoutMs);
   const tracing = startTracing(process.env);
-  const skills = loadSkills(config.skills);
+  const skills = loadSkills(config.skills, { file: config.caps.toolResultBytes });
   const places = loadPlaces(config.places);
   const gnomcp = await startGnomcp({ ...config.gnomcp, profiles: config.profiles, log });
   try {
