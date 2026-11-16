@@ -143,7 +143,7 @@ cache, every test of the node, ui and compiled projects but the `timing` ones. T
 `.claude/`), `deploy/`, `evals/` and `tools/` get no type check; `deploy/`, tier 1, gets its related tests, the others none before the
 night: their suites are their own, `test_hooks.sh`, `probe.py` and `deploy/test.sh` on GitHub and by hand while the
 change is written (`ONLY=<section> sh scripts/test_hooks.sh`, `python3 -I scripts/probe.py`, with `.node-version`'s Node first on the
-PATH, as any version manager puts it there, or in nvm's default folder, D13416), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
+PATH, as any version manager puts it there; check.sh and the evals take nvm's default folder too, D13416), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
 elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed. So a
 series built in a scratch clone under the temp folder, whose `.git/hooks` the sandbox writes, gets no verdict there (D13407, F13415): its
 product commits are committed in the worktree with the clone's dates (the same hashes) and check.sh runs on that committed tree; a
@@ -373,9 +373,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
 - **The owner's user settings** (`~/.claude/settings.json`, every project): the
   file tools, which the sandbox does not hold and bypass mode does not ask for, are denied the programs that
   run outside the sandbox with the owner's rights: the folders on `PATH` the owner owns and where their links lead (`~/.local`,
-  `~/.opencode`, `/opt/homebrew`, `~/.orbstack`, `/Applications`), what those settings run (`~/.claude/skills`,
+  the package managers' and the tools' own, `/Applications`), what those settings run (`~/.claude/skills`,
   `hooks`, `statusline.sh`, `plugins`, `dev-mods`, `agents`, `commands`, the file itself, `~/.claude.json`), the
-  same of the second profile `~/.claude-work`, launchd's agents, zsh's startup files and what they source, the
+  same of a second profile, launchd's agents, zsh's startup files and what they source, the
   tools' config (`~/.config`, `~/.npmrc`, `~/.gitconfig`, `~/.docker`), python3's user site, `~/.ssh`, `~/.nvm`,
   every project's settings in the folder holding the checkouts, and the main checkout's git config and hooks. A deny holds in every
   mode, bypass included.
@@ -441,8 +441,8 @@ costs context in every session.
   copy of the commit reviewed, never a worktree; otherwise
   `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha from the chief's message.
 - **In bypass mode the file tools write the programs that run outside the sandbox** (claimed, the writes not run):
-  `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then `~/.opencode/bin` and
-  `/opt/homebrew/bin` (the hooks' `python3`); herdr's `open.sh`, the hooks and the owner's scripts call programs by name; no deny
+  `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then other tools' folders and a
+  package manager's (the hooks' `python3`); herdr's `open.sh`, the hooks and the owner's scripts call programs by name; no deny
   names those folders, nor `~/.claude/skills/` (the two excluded scripts) or `~/Library/LaunchAgents/`. Closing them is the owner's
   user settings' to do.
 - **Claude Code's memory stays open:** the auto memory every gnoworld session loads, the chief's included

@@ -23,9 +23,8 @@ A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` tak
 branch reaches GitHub through `land`, the owner's one command (D13211, D13213; `docs/HARNESS.md`, "A change, from plan to merge"). The install
 turns off fast-forward merges in this clone, so a merge always makes a commit, which pre-merge-commit checks (`merge.ff false`; a pull
 stays a fast-forward, `pull.ff only`). A commit runs the secret scan, and from Claude Code's sandbox Prettier on the staged files and
-the docs check, a harness file refused (D241, D13173); `sh scripts/check.sh` is what you run before committing code. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
-has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
-first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
+the docs check, a harness file refused (D241, D13173); `sh scripts/check.sh` is what you run before committing code. The gate needs the Node `.node-version` pins (first on PATH, as any version
+manager puts it there, or in nvm's default folder, D13416; with nvm, `nvm use` picks it, since `.nvmrc` links to `.node-version`), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
 The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten on an app change, the night 41 of the 109): `node app/node_modules/@playwright/test/cli.js install chromium`
 (the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
