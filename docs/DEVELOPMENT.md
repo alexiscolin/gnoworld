@@ -13,7 +13,9 @@ from the objects themselves, whatever a replace ref would show instead:
 git --no-replace-objects show main:scripts/install_hooks.sh | sh
 ```
 
-It installs `land` too (D13213) when python3, git, gh and gitleaks are on your PATH outside your home and temporary folders and
+It also writes this machine's twins of the project's rules (the main checkout's, the worktrees' and the temporary folder's
+paths, `scripts/machine_rules.py`) into every Claude profile's user settings, a copy of each file kept beside it (D13413). It
+installs `land` too (D13213) when python3, git, gh and gitleaks are on your PATH outside your home and temporary folders and
 every Claude profile already keeps their folders from its sessions, which `tools/agent-github/install.sh` writes (D13412);
 otherwise it says why, installs the hooks alone, and keeps the land already installed.
 

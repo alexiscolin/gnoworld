@@ -259,23 +259,28 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
 - **Every worktree's closed files, to every session.** A relative rule guards the session's own tree alone,
   and the file tools reach every worktree, so each closed path has twins: each relative `denyWrite`
-  entry again under `~/Server/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there and in the main checkout
-  (`~/Server/gnoworld/…`); and a linked worktree's `.git`, the file that names
-  git's folder. One class has no sibling twin on purpose: the paths `OPENED` names in the section `siblings` (`scripts/check.sh`,
+  entry again under the worktrees' folder (`<main checkout>-wt/*/`), each relative `Read` and `Edit` deny again there and in
+  the main checkout; and a linked worktree's `.git`, the file that names git's folder. Those folders are each machine's, so the
+  committed `settings.json` names none (D13411): `scripts/machine_rules.py` derives the twins from its relative rules and
+  `install_hooks.sh` writes them into every Claude profile's user settings, a copy of each file kept, adding only (D13413);
+  Claude Code adds those lists to the project's. One class has no sibling twin on purpose: the paths `OPENED` names in
+  `machine_rules.py` (`scripts/check.sh`,
   `check_docs.py`, `ergo.sh`, `hidden.py`, `related.py`, `speeds.py`, `workshop.sb`, `workshop.sh`, `stop_gate.sh`, `borrow_node_modules.sh`,
-  the workflows, agents, commands and rules) are open to a worktree's own session, which builds its harness changes there (the
+  the workflows, agents, commands and rules, agent-github's tools) are open to a worktree's own session, which builds its harness changes there (the
   speed plan's unlock of 2026-11-06); the main checkout keeps them closed, and the section fails on a twin added for one of them.
   `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
-  real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the rules as Claude Code
-  does and, in its sandbox, writes into a sibling to see each write refused. A session carries the twins once its own
-  checkout's `settings.json` does; the chief's session, started in the main checkout, reads that checkout's settings, and
-  the owner may copy the twins into the main checkout's local settings, which every session of the repository reads.
+  real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the committed rules and
+  the twins as Claude Code does, on a layout of its own under the home folder and on one outside it, and, in its sandbox,
+  writes into a sibling to see each write refused. A session carries the twins once `install_hooks.sh` has run on its
+  machine; until then the committed rules guard its own tree alone.
 - **The instructions at a tree's root and above it:** Claude Code reads `CLAUDE.md` and `CLAUDE.local.md` in every
   folder above the one it starts in (its memory page), and `.claude`'s own `CLAUDE.md` and `.claude/rules/` there by its source.
-  Closed: to commands in `/private/tmp/claude-501/`, the folder above the temp folder's throwaway trees; to
-  the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`, and above the next parts' trees in
-  `~/Server/gnoworld-wt/`; `AGENTS.md` and `.claude`'s own beside them everywhere (read there where no
-  `CLAUDE.md` stands, or when the settings ask for both kinds). Not closed: the memory and the imports (Known limits).
+  Closed: to commands in the uid's temporary folder (`/private/tmp/claude-<uid>/`), the folder above its throwaway trees;
+  to the file tools there, in `/private/tmp/` (by both spellings), in `~`, and above the next parts' trees in the worktrees'
+  folder; `AGENTS.md` and `.claude`'s own beside them everywhere (read there where no `CLAUDE.md` stands, or when the
+  settings ask for both kinds). Above the main checkout no rule stands (D13414): no session's working directories or write
+  roots hold that folder, and the section `siblings` fails if `blockWritesOutsideWorkingDirectories`, the sandbox or its write
+  roots stop covering it. Not closed: the memory and the imports (Known limits).
 - **The instructions below a tree's root**  Claude Code loads a subfolder's `CLAUDE.md` and
   `CLAUDE.local.md`, an `AGENTS.md` where no `CLAUDE.md` stands, and a subfolder's `.claude` rules and skills, once it reads
   a file there (its memory and skills pages). Closed at any depth (`**/`), to commands and the file tools, in a session's own tree, in
