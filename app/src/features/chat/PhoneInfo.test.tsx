@@ -10,7 +10,8 @@ import { PhoneInfo } from "./PhoneInfo.tsx";
 // The small view of space needs the store, the router and an engine: Info's own tests read the links, these the sheet.
 // PlaceView alone reaches the planet's lazy chunks (MiniSpace, the signs): the sheet must not mount it while closed.
 const view = vi.hoisted(() => ({ mounted: 0 }));
-vi.mock("./PlaceView.tsx", () => ({
+vi.mock("./PlaceView.tsx", async (original) => ({
+  ...(await original<typeof import("./PlaceView.tsx")>()),
   PlaceView: () => {
     useEffect(() => {
       view.mounted += 1;
@@ -149,18 +150,38 @@ describe("the info sheet of a phone", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("shows the kicker and the title once each: the info's own, then the page's under the name", () => {
+  it("shows the kicker and the name once each, in the title row, for the info and for the page", () => {
     const words = (box: HTMLElement, text: string) =>
       all(box, "*").filter((each) => each.children.length === 0 && each.textContent === text).length;
+    for (const paged of [false, true]) {
+      const box = draw(true, () => undefined, { paged });
+      expect(words(box, "k")).toBe(1);
+      expect(words(box, "golf")).toBe(1);
+      expect(words(box, "Info")).toBe(0);
+    }
+  });
+
+  it("puts Back at the title row's start while the page shows, so the focus goes Back, title, Close, and none of the info", async () => {
+    const box = draw(true, () => undefined, { paged: true });
+    await settled(() => all(box, "[data-plate]").length === 1);
+    const names = all(box, "button").map((each) => each.getAttribute("aria-label"));
+    expect(names.slice(0, 2)).toEqual(["Back to Info", "Close"]);
+    const back = one(box, "button[aria-label='Back to Info']");
+    expect(back.compareDocumentPosition(one(box, "h2")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(all(box, "button").every((each) => each.textContent !== "Back to Info")).toBe(true);
+  });
+
+  it("ends the info with the Credits button, and not the page", async () => {
     const info = sheet(true, () => undefined);
-    expect(words(info, "k")).toBe(1);
-    expect(words(info, "Info")).toBe(1);
-    expect(
-      words(
-        draw(true, () => undefined, { paged: true }),
-        "k",
-      ),
-    ).toBe(1);
+    expect(all(info, "button").some((each) => each.textContent === "Credits")).toBe(true);
+    const page = draw(true, () => undefined, { paged: true });
+    await settled(() => all(page, "[data-plate]").length === 1);
+    expect(all(page, "button").some((each) => each.textContent === "Credits")).toBe(false);
+  });
+
+  it("leads with the place's picture, not Back, while the info shows", () => {
+    const box = draw(true, () => undefined);
+    expect(all(box, "button").map((each) => each.getAttribute("aria-label"))).not.toContain("Back to Info");
   });
 
   it("never draws the planet: the band over the chat holds it, and a second view would make a second WebGL context", async () => {

@@ -243,6 +243,17 @@ describe("the palette in a phone's history", () => {
     expect(at(box)).toBe("/");
   });
 
+  it("is the phone's whole-screen sheet on a phone, the large sheet on a computer", async () => {
+    phone(true);
+    const small = await mountInStore(<Page />);
+    await openIt(small.box);
+    expect(drawerOf(small.box)?.dataset["width"]).toBe("screen");
+    phone(false);
+    const wide = await mountInStore(<Page />);
+    await openIt(wide.box);
+    expect(drawerOf(wide.box)?.dataset["width"]).toBe("sheet");
+  });
+
   it("pushes nothing on a computer", async () => {
     phone(false);
     const { box } = await mountInStore(<Page />);

@@ -1,0 +1,13 @@
+/* A phone's two main actions: equal halves of one line (never a primary and a secondary on two rows). */
+@layer components {
+  .halves {
+    /* layout: one row of equal columns, whatever the words' lengths */
+    display: grid;
+    /* layout: equal halves, each able to shrink under its words */
+    grid-auto-columns: minmax(0, 1fr);
+    /* layout: side by side */
+    grid-auto-flow: column;
+    /* layout: the two halves a step apart */
+    gap: var(--space-2xs);
+  }
+}

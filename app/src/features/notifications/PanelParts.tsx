@@ -4,14 +4,19 @@ import { whenOf, type Item } from "./feed.ts";
 import { hrefProp } from "../chat/index.ts";
 import styles from "./Panel.module.css";
 
-// The panel's head: its title and the way to mark everything read.
-export function Head({ onMarkAll }: { onMarkAll: () => void }) {
+// The panel's head: its title and the way to mark everything read; on a phone, where the panel covers the screen and the bell with it, Close.
+export function Head({ onMarkAll, onClose }: { onMarkAll: () => void; onClose: () => void }) {
   return (
     <Cluster justify="between" space="s">
       <h2 className={styles["title"]}>Notifications</h2>
-      <Button emphasis="link" size="s" onClick={onMarkAll}>
-        <span className={`label ${String(styles["markAll"])}`}>Mark all read</span>
-      </Button>
+      <Cluster space="2xs">
+        <Button emphasis="link" size="s" onClick={onMarkAll}>
+          <span className={`label ${String(styles["markAll"])}`}>Mark all read</span>
+        </Button>
+        <span className={styles["close"]}>
+          <IconButton icon="close" label="Close" emphasis="plain" onClick={onClose} />
+        </span>
+      </Cluster>
     </Cluster>
   );
 }

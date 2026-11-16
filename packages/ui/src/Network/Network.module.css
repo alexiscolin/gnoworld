@@ -7,6 +7,13 @@
     overflow: visible;
   }
 
+  /* A phone's card is narrower than the lanes' pills can be sure of: nothing is drawn past the graph's own box. */
+  @media (width < 900px) {
+    .net {
+      overflow: hidden;
+    }
+  }
+
   /* The curves keep their dash while the arrival is off, so a line is whole. */
   .edge {
     fill: none;

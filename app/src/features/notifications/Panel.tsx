@@ -128,10 +128,12 @@ export function Panel({
           onMarkAll={() => {
             markRead("all");
           }}
+          onClose={onClose}
         />
         <Tabs
           label="Kinds"
           size="s"
+          countTone="new"
           tabs={KINDS.map(({ id, label }) => ({ id, label, count: unread(id) }))}
           selected={kind}
           onSelect={(id) => {

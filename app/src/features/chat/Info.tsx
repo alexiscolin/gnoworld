@@ -25,6 +25,7 @@ export function Info({
   close,
   page,
   planet = true,
+  bare = false,
 }: Pick<ChatScreenProps, "place" | "talking" | "people"> & {
   /** The place's buttons, in the planet's bar (PlaceView.tsx). */
   buttons: ReactNode;
@@ -34,6 +35,8 @@ export function Info({
   page?: ReactNode;
   /** Whether the place's small planet is drawn at the panel's top; a phone's band holds it, so its sheet does not (a second WebGL context). */
   planet?: boolean;
+  /** Without its own kicker and name, where a sheet's title row says them (PhoneInfo.tsx). */
+  bare?: boolean;
   room: ChatScreenProps["here"];
   panelRef: RefObject<HTMLElement | null>;
 }) {
@@ -42,6 +45,7 @@ export function Info({
       view={planet ? <PlaceView place={place} buttons={buttons} close={close} /> : undefined}
       kicker={place.kicker}
       name={place.name}
+      bare={bare}
       description={place.description}
       talking={talking}
       countries={room === undefined ? undefined : <CountriesFigure lines={room.lines} members={room.members} />}

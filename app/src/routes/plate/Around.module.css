@@ -4,6 +4,18 @@
     white-space: nowrap;
   }
 
+  /* A phone's list: the count centred on its row's line, whole at the card's end. */
+  @media (width < 900px) {
+    .note {
+      /* layout: the count centred on the row's line, never shrunk or cut */
+      display: inline-flex;
+      /* layout: centred on that line */
+      align-items: center;
+      /* layout: it keeps its size */
+      flex: none;
+    }
+  }
+
   /* The graph draws from this box's own width: a phone's narrow card gives it the card's, never the column's minimum. */
   .graph {
     min-inline-size: 0;

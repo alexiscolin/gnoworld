@@ -19,6 +19,8 @@ export interface PlaceInfoProps {
   links?: ReactNode;
   /** The place's page, as a control opening it (a phone's sheet, PlaceSheet.tsx); none on a computer, whose page is beside the chat. */
   page?: ReactNode;
+  /** Without the kicker and the name: the sheet this is in has them in its title. */
+  bare?: boolean;
   /** Who is here, drawn under Here now. */
   here: ReactNode;
   /** Takes the focus from code, as Who's here moves the reader to the list. */
@@ -34,6 +36,7 @@ export function PlaceInfo({
   countries,
   links,
   page,
+  bare = false,
   here,
   panelRef,
 }: PlaceInfoProps) {
@@ -41,8 +44,12 @@ export function PlaceInfo({
     <aside ref={panelRef} tabIndex={-1} aria-label={name} className={styles["panel"]}>
       <Stack space="xs">
         {view}
-        <Kicker>{kicker}</Kicker>
-        <h2 className={styles["name"]}>{name}</h2>
+        {bare ? null : (
+          <>
+            <Kicker>{kicker}</Kicker>
+            <h2 className={styles["name"]}>{name}</h2>
+          </>
+        )}
         <p className={styles["about"]}>{description}</p>
         {talking === undefined ? null : (
           <div className={styles["stats"]}>

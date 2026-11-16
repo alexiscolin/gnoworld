@@ -10,6 +10,12 @@
     rotate: 180deg;
   }
 
+  /* The textures' credit at the sheet's foot: a plain muted link-look button, a 44 px row. */
+  .credits {
+    min-block-size: var(--control-m);
+    color: var(--color-text-muted);
+  }
+
   .page {
     padding-block-start: var(--space-xs);
   }

@@ -12,11 +12,17 @@ import { PlateFrame } from "./PlateFrame.tsx";
 import { sectionId } from "./sectionId.ts";
 
 /** The control that opens the place's page; nothing for a place with no page. */
-export function PageButton({ onOpen }: { onOpen: () => void }) {
+export function PageButton({ onOpen, primary = false }: { onOpen: () => void; primary?: boolean }) {
   const plate = usePlacePage();
   if (plate === null || plate === undefined) return null;
   return (
-    <Button emphasis="outline" icon="news" description="Opens the place's page" onClick={onOpen}>
+    <Button
+      emphasis={primary ? "solid" : "outline"}
+      {...(primary ? { size: "l" as const, stretch: true } : {})}
+      icon="news"
+      description="Opens the place's page"
+      onClick={onOpen}
+    >
       Its page
     </Button>
   );

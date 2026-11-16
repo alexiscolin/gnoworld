@@ -2,9 +2,10 @@
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
+import { noMedia } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { InPageSheet } from "../chat/placePage.ts";
 import { Actions } from "./Actions.tsx";
@@ -15,6 +16,7 @@ const PLACE = { name: "Bubble", path: "/net/onyx/w/bubble" };
 const FOLLOW = "onyx:bubble";
 const PROPOSALS = "/net/onyx/r/gov/dao";
 let host: HTMLElement | undefined;
+beforeEach(noMedia);
 afterEach(() => {
   host?.remove();
   host = undefined;
@@ -190,5 +192,34 @@ describe("a world's main action, in a room nobody spoke in", () => {
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} />);
     expect(box.querySelector("a[href='#page']")?.textContent).toBe("Read its page");
     expect(box.querySelector("a[href='#chat']")).toBeNull();
+  });
+});
+
+// A phone: the two main actions in equal halves on one line, Follow and Share small on a line of their own, never a primary and a
+// secondary wrapped to two rows.
+describe("a phone's actions", () => {
+  const rowsOf = (box: HTMLElement) =>
+    [...box.querySelectorAll("[data-row]")].map((row) =>
+      [...row.querySelectorAll("a, button")].map((n) => n.textContent),
+    );
+  const onPhone = (matches: boolean) => {
+    vi.stubGlobal("matchMedia", () => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  };
+
+  it("sets the main actions in one row and Follow and Share in another", async () => {
+    onPhone(true);
+    const lead = { label: "Read its page", href: "#page" };
+    const second = { label: "Try a function", href: "#try" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    expect(rowsOf(box)).toEqual([
+      ["Read its page", "Try a function"],
+      ["Follow", "Share"],
+    ]);
+  });
+
+  it("keeps the computer's single row", async () => {
+    onPhone(false);
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} />);
+    expect(rowsOf(box)).toEqual([]);
   });
 });

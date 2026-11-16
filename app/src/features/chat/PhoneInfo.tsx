@@ -4,11 +4,15 @@
 // "Its page" swaps the sheet's content for the place's page, with a way back: one modal.
 import type { ComponentProps, MouseEvent } from "react";
 import { useRef } from "react";
-import { Button, Dialog } from "@gnoworld/ui";
+import { Dialog, IconButton, PlanetThumb } from "@gnoworld/ui";
+import { discOf } from "../../lib/worldDisc.ts";
+import { worldOf } from "./PlaceView.tsx";
 import { Info } from "./Info.tsx";
 import styles from "./PhoneInfo.module.css";
 import { PageButton, PlacePage } from "./PlaceSheet.tsx";
 import { sectionId } from "./sectionId.ts";
+import type { ChatPlace } from "./ChatScreen.tsx";
+import { Credits } from "./Worlds.tsx";
 
 type InfoProps = ComponentProps<typeof Info>;
 
@@ -24,6 +28,17 @@ function follow(event: MouseEvent<HTMLElement>, onClose: () => void) {
   const target = id === undefined ? null : event.currentTarget.ownerDocument.getElementById(id);
   if (target !== null && event.currentTarget.contains(target)) target.scrollIntoView({ block: "start" });
   else onClose();
+}
+
+// The title row's mark: the place's picture for the info, Back for the page.
+function Lead({ place, paged, onBack }: { place: ChatPlace; paged: boolean; onBack: () => void }) {
+  return paged ? (
+    <span className={styles["back"]}>
+      <IconButton icon="arrow" label="Back to Info" emphasis="plain" onClick={onBack} />
+    </span>
+  ) : (
+    <PlanetThumb src={discOf(worldOf(place))} name={place.name} decorative />
+  );
 }
 
 export function PhoneInfo({
@@ -43,12 +58,21 @@ export function PhoneInfo({
     onClose: () => void;
   }) {
   const ownRef = useRef<HTMLElement>(null);
-  // The info draws its own kicker and name; the page, which the route gave neither, gets them in the title. Close and Escape go back to
-  // the info first.
+  // One heading for both: the place's kicker and name in the title row, with its picture at the start for the info and Back for the page
+  // (so Back costs no row of its own). Close and Escape go back to the info first.
   return (
     <Dialog
-      title={paged ? place.name : "Info"}
-      {...(paged ? { kicker: place.kicker } : {})}
+      title={place.name}
+      kicker={place.kicker}
+      lead={
+        <Lead
+          place={place}
+          paged={paged}
+          onBack={() => {
+            onPage(false);
+          }}
+        />
+      }
       wide="screen"
       open={open}
       onClose={
@@ -67,38 +91,30 @@ export function PhoneInfo({
           }}
         >
           {paged ? (
-            <>
-              <span className={styles["back"]}>
-                <Button
-                  emphasis="quiet"
-                  icon="arrow"
-                  onClick={() => {
-                    onPage(false);
-                  }}
-                >
-                  Back to Info
-                </Button>
-              </span>
-              <PlacePage place={place} />
-            </>
+            <PlacePage place={place} />
           ) : (
-            <Info
-              {...info}
-              place={place}
-              panelRef={panelRef ?? ownRef}
-              buttons={null}
-              close={null}
-              planet={false}
-              page={
-                <div className={styles["page"]}>
-                  <PageButton
-                    onOpen={() => {
-                      onPage(true);
-                    }}
-                  />
-                </div>
-              }
-            />
+            <>
+              <Info
+                {...info}
+                place={place}
+                panelRef={panelRef ?? ownRef}
+                buttons={null}
+                close={null}
+                planet={false}
+                bare
+                page={
+                  <div className={styles["page"]}>
+                    <PageButton
+                      primary
+                      onOpen={() => {
+                        onPage(true);
+                      }}
+                    />
+                  </div>
+                }
+              />
+              <Credits className={styles["credits"]} />
+            </>
           )}
         </div>
       ) : null}

@@ -197,6 +197,13 @@
     font-weight: 500;
   }
 
+  /* On a phone the palette is the whole-screen sheet's body: the screen's height less the title row and the sheet's paddings. */
+  @media (width < 900px) {
+    .palette {
+      block-size: calc(100dvb - var(--space-2xl) - var(--space-xl));
+    }
+  }
+
   /* A phone has the results alone. */
   @media (width <= 640px) {
     .body {

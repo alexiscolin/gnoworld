@@ -1,12 +1,14 @@
 // A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
 // (a size budget on that paint); the share sheet's code comes at the first press.
-import { Button, Cluster, type IconName } from "@gnoworld/ui";
+import { PHONE_QUERY } from "@gnoworld/core";
+import { Button, Cluster, Stack, type IconName } from "@gnoworld/ui";
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
 import { fullChatHref } from "../../fullChat.ts";
-import { composerBox, sheetHref, useInPageSheet } from "../chat/index.ts";
+import { composerBox, sheetHref, useInPageSheet, useMedia } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
+import styles from "./Actions.module.css";
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once. The composer is the
 // chat's own field: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
@@ -55,6 +57,9 @@ const useNobodySpoke = (room: string | undefined) =>
     return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
   });
 
+// A phone's two main actions are equal halves of one line (Actions.module.css); elsewhere they are as wide as their words.
+const fitOf = (phone: boolean) => (phone ? ({ stretch: true } as const) : ({ pad: "wide" } as const));
+
 // The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
 function Leads({
@@ -63,17 +68,19 @@ function Leads({
   room,
   lead,
   second,
-}: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
+  phone,
+}: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second"> & { phone: boolean }) {
+  const fit = fitOf(phone);
   const first = useNobodySpoke(room);
   const sheet = useInPageSheet();
   if (proposals !== undefined && isSitePath(proposals)) {
     return (
       <>
-        <Button href={proposalsHref(proposals, sheet)} pad="wide" emphasis="solid" icon="arrow">
+        <Button href={proposalsHref(proposals, sheet)} {...fit} emphasis="solid" icon="arrow">
           Read the proposals
         </Button>
         {room === undefined ? null : (
-          <Button href="#chat" pad="wide" icon="chat">
+          <Button href="#chat" {...fit} icon="chat">
             {`Say hi in ${room}`}
           </Button>
         )}
@@ -87,11 +94,11 @@ function Leads({
   };
   return (
     <>
-      <Button href={main.href} pad="wide" emphasis="solid" icon={main.icon ?? "arrow"}>
+      <Button href={main.href} {...fit} emphasis="solid" icon={main.icon ?? "arrow"}>
         {main.label}
       </Button>
       {second === undefined ? null : (
-        <Button href={second.href} pad="wide" icon={second.icon ?? "arrow"}>
+        <Button href={second.href} {...fit} icon={second.icon ?? "arrow"}>
           {second.label}
         </Button>
       )}
@@ -107,19 +114,40 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
       document.removeEventListener("click", toComposer);
     };
   }, []);
+  const phone = useMedia(PHONE_QUERY);
+  const share = (size: "s" | "m") => (
+    <Button
+      icon="share"
+      size={size}
+      onClick={() => {
+        sharePlace(place);
+      }}
+    >
+      Share
+    </Button>
+  );
+  // On a phone: the main actions in halves, then Follow and Share small on a line of their own, never a primary and a secondary wrapped.
+  if (phone) {
+    return (
+      <Stack space="2xs" className={className}>
+        <div data-row="" className={styles["halves"]}>
+          <Leads {...leads} phone />
+        </div>
+        <div data-row="">
+          <Cluster space="2xs" wrap="no" justify="start">
+            <FollowButton kind="worlds" id={follow} size="s" />
+            {share("s")}
+          </Cluster>
+        </div>
+      </Stack>
+    );
+  }
   return (
     <Cluster space="2xs" wrap="scroll" className={className}>
-      <Leads {...leads} />
+      <Leads {...leads} phone={false} />
       {/* Follow and Share in words, as frame 30 draws them: icons alone left what each does unclear. */}
       <FollowButton kind="worlds" id={follow} size="m" />
-      <Button
-        icon="share"
-        onClick={() => {
-          sharePlace(place);
-        }}
-      >
-        Share
-      </Button>
+      {share("m")}
     </Cluster>
   );
 }

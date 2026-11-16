@@ -25,11 +25,13 @@ export function ToggleChips<Id extends string>({
 }
 
 /** The chips wrapping whole, never cut, the sort at the row's end: the palette's filters and
- * Discover's. */
+ * Discover's. On a phone the chips are one row that scrolls across (Cluster's own phone rule). */
 export function FilterRow({ chips, sort }: { chips: ReactNode; sort: ReactNode }) {
   return (
     <Sidebar side="end" space="2xs" align="center">
-      <Cluster space="2xs">{chips}</Cluster>
+      <Cluster space="2xs" wrap="scroll">
+        {chips}
+      </Cluster>
       {sort}
     </Sidebar>
   );

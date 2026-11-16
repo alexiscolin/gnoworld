@@ -52,6 +52,22 @@
     }
   }
 
+  /* Close is a phone's: the panel there is the whole screen, inside the notch and the bars, and covers the bell. */
+  .close {
+    display: none;
+  }
+
+  @media (width < 900px) {
+    .place {
+      inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      inline-size: auto;
+    }
+
+    .close {
+      display: contents;
+    }
+  }
+
   .title {
     font: var(--font-title-s);
   }
