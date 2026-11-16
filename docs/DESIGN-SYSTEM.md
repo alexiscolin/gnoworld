@@ -162,7 +162,7 @@ the brightest planet behind the header's pills.
 | `--font-chat-l` | 15 px, leading 1.5 | Geist 400 | A chat's lines with room for them: the full chat's and the dock's on a computer |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
 | `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus |
-| `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
+| `--font-lead` | 17 px, leading 1.5 | Geist 400 | A world's description |
 | `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
 | `--font-title-room` | 22 px, leading 1 | Geist 300 | A room's name in the chat's header |
@@ -508,7 +508,7 @@ fraction such as 899.5 included, falls on one side alone. The scripts' queries (
   plate goes below the planet. The Earth alone keeps its chat a block of the page under the
   globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
   Credits.
-- 1200 px: the dock opens by itself on a world.
+- 1280 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 
 **When space runs short,** things drop in this order, never overlapping:
