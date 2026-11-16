@@ -42,7 +42,7 @@ interface Parts {
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
-  readonly budget: Pick<Budget, "caps" | "change">;
+  readonly budget: Pick<Budget, "caps" | "change" | "state">;
   readonly log: Log;
 }
 
@@ -52,9 +52,15 @@ const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answ
 export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
+    const [ask, translate] = [budget.state("ask"), budget.state("translate")];
     return {
       status: 200,
-      body: { ask: caps.ask / DOLLAR, translate: caps.translate / DOLLAR } satisfies JarvisBudgets,
+      body: {
+        ask: caps.ask / DOLLAR,
+        translate: caps.translate / DOLLAR,
+        spent: { ask: ask.spent / DOLLAR, translate: translate.spent / DOLLAR },
+        reserved: { ask: ask.reserved / DOLLAR, translate: translate.reserved / DOLLAR },
+      } satisfies JarvisBudgets,
     };
   };
   // A body its schema refuses, logged as this face's own refusals are (http.ts); a reason for a body it holds but cannot serve.

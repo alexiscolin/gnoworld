@@ -187,8 +187,12 @@ const count = (max: number) => z.int().check(z.gte(1), z.lte(max));
 export const JarvisBudget = z.strictObject({ budget: z.enum(["ask", "translate"]), dollars: count(DOOR_CAPS.dollars) });
 export type JarvisBudget = z.infer<typeof JarvisBudget>;
 
-/** Both of jarvis's budgets a day, in whole dollars. */
-export const JarvisBudgets = z.strictObject({ ask: count(DOOR_CAPS.dollars), translate: count(DOOR_CAPS.dollars) });
+// What a budget has spent or has reserved today, in dollars: a fraction of one, and past its cap when a call cost more.
+const Used = z.strictObject({ ask: z.number().check(z.gte(0)), translate: z.number().check(z.gte(0)) });
+
+const Dollars = count(DOOR_CAPS.dollars);
+/** Both of jarvis's budgets a day, in whole dollars, and what each has spent and has reserved today, in dollars. */
+export const JarvisBudgets = z.strictObject({ ask: Dollars, translate: Dollars, spent: Used, reserved: Used });
 export type JarvisBudgets = z.infer<typeof JarvisBudgets>;
 
 /** One change an admin signs afresh (ADR-0002 §6): a quota, an account's quota taken off or given back, a budget. */

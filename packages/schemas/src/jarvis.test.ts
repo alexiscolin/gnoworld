@@ -256,6 +256,8 @@ describe("AnswerButton", () => {
 });
 
 // The door's bodies, between the client, the console and the server.
+// Nothing spent or reserved today.
+const IDLE = { ask: 0, translate: 0 };
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const fly = () => ({ type: "fly", label: "The poll", place: "/w/bubble" });
 const answered = (over: Record<string, unknown> = {}) => ({
@@ -452,9 +454,24 @@ describe("JarvisBudget and JarvisBudgets", () => {
   it("are whole dollars from one to the cap, by kind", () => {
     expect(JarvisBudget.safeParse({ budget: "ask", dollars: 45 }).success).toBe(true);
     expect(JarvisBudget.safeParse({ budget: "ask", dollars: 45, setting: "budget" }).success).toBe(false);
-    expect(JarvisBudgets.safeParse({ ask: 45, translate: 5 }).success).toBe(true);
+    const day = { ask: 45, translate: 5, spent: IDLE, reserved: IDLE };
+    expect(JarvisBudgets.safeParse(day).success).toBe(true);
     expect(JarvisBudgets.safeParse({ ask: 45 }).success).toBe(false);
-    expect(JarvisBudgets.safeParse({ ask: 0, translate: 5 }).success).toBe(false);
+    expect(JarvisBudgets.safeParse({ ...day, ask: 0 }).success).toBe(false);
+  });
+
+  // F13524: what a budget spent and reserved today, in dollars: a fraction is kept, a negative, a missing or an extra one is refused.
+  it("carries what is spent and reserved, fractions of a dollar included, and refuses the rest", () => {
+    const day = { ask: 45, translate: 5, spent: IDLE, reserved: IDLE };
+    const takes = (over: Record<string, unknown>) => JarvisBudgets.safeParse({ ...day, ...over }).success;
+    expect(takes({ spent: { ask: 0.37, translate: 12.5 }, reserved: { ask: 2, translate: 0 } })).toBe(true);
+    expect(takes({ spent: { ask: 50, translate: 0 } })).toBe(true);
+    expect(takes({ spent: { ask: -0.01, translate: 0 } })).toBe(false);
+    expect(takes({ reserved: { ask: 0, translate: Number.NaN } })).toBe(false);
+    expect(takes({ spent: { ask: 0 } })).toBe(false);
+    expect(takes({ spent: { ...IDLE, other: 1 } })).toBe(false);
+    expect(JarvisBudgets.safeParse({ ask: 45, translate: 5 }).success).toBe(false);
+    expect(JarvisBudgets.safeParse({ ...day, extra: 1 }).success).toBe(false);
   });
 });
 
@@ -463,7 +480,7 @@ describe("JarvisSettings", () => {
     const settings = (over: Record<string, unknown>) =>
       JarvisSettings.safeParse({ quota: 20, quotaUnnamed: 5, unlimited: [ADDRESS], budgets: null, ...over }).success;
     expect(settings({})).toBe(true);
-    expect(settings({ budgets: { ask: 45, translate: 5 } })).toBe(true);
+    expect(settings({ budgets: { ask: 45, translate: 5, spent: IDLE, reserved: IDLE } })).toBe(true);
     expect(settings({ unlimited: Array.from({ length: DOOR_CAPS.unlimited + 1 }, () => ADDRESS) })).toBe(false);
     expect(settings({ unlimited: ["g1nobody"] })).toBe(false);
   });

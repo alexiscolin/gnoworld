@@ -279,11 +279,15 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
   it("serves its budgets while off, read and changed", async () => {
     const { env } = await setup();
     const url = await listening(start({ ...env, JARVIS: "off", JARVIS_BUDGET_USD: "3" }));
-    expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toEqual({
+    expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toMatchObject({
       ask: 3,
       translate: 1,
+      spent: { ask: 0, translate: 0 },
     });
-    expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
+    expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toMatchObject({
+      ask: 3,
+      translate: 2,
+    });
   });
 
   // An operator who lowers a budget's setting and starts jarvis again learns the file keeps its own.
