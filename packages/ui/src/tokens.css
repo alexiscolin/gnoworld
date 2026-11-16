@@ -205,6 +205,10 @@
        does: viewport.ts sets both on the screen; the dynamic viewport's height and no offset elsewhere. */
     --chat-vh: 100dvb;
     --chat-vtop: 0px;
+    /* What a phone's chat keeps over and under its lines, set while they are drawn (PhoneBand.module.css, ChatScreen.module.css): the place band's
+       height and the row of worlds'; the composer's budget counts both. */
+    --phone-band: 0px;
+    --phone-worlds: 0px;
     /* How far the composer's box goes out past its column's inset, and the inset of its words from its edge; the dock sets both (app's QuickActions.module.css). */
     --box-bleed: 0px;
     --box-in: var(--space-s);
