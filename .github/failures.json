@@ -1,0 +1,29 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "gnoworld-failure",
+      "pattern": [
+        {
+          "regexp": "^((?:FAIL  |test_hooks: |test\\.sh: \\d+ check\\(s\\) failed|check_docs: |check_regressions: the safety net shrank|probe: \\d+ of the harness's promises do not hold|ci_changes\\.sh: |--- FAIL: ).*)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "gnoworld-coverage",
+      "pattern": [{ "regexp": "^(?:\\u001b\\[[0-9;]*m)*(ERROR: Coverage for [^\\u001b]*)", "message": 1 }]
+    },
+    {
+      "owner": "gnoworld-mutants",
+      "pattern": [{ "regexp": "(Final mutation score \\S+ under breaking threshold .*)$", "message": 1 }]
+    },
+    {
+      "owner": "gnoworld-survivor",
+      "severity": "warning",
+      "pattern": [
+        { "regexp": "^\\[(?:Survived|NoCoverage)\\] (.+)$", "message": 1 },
+        { "regexp": "^([^\\s:]+):(\\d+):(\\d+)$", "file": 1, "line": 2, "column": 3 }
+      ]
+    }
+  ]
+}

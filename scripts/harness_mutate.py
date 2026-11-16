@@ -55,14 +55,14 @@ SECTIONS = {
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/ci_annotate.py": "ci_annotate", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/related.py": "gate_lanes", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
-    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
+    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/failures.json": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
 }
 
 
@@ -1346,34 +1346,17 @@ def mutants():
     yield from each("scripts/related.py", '("app", "server", "jarvis", "link-reader", "packages")', '("app", "server", "packages")', "hooks", "related.py walks jarvis/src and link-reader/src")
     yield from each("scripts/related.py", '    "jarvis/src/testing/fakeGnomcp.ts": "process.cwd()",\n', "", "hooks", "related.py lets a fake's own process folder stand")
     yield from each("scripts/related.py", '    "link-reader/src/picture.ts": "import.meta.resolve(`${pkg}/package.json`)",\n', "", "hooks", "related.py lets a package's resolved file stand")
-    yield from each(ci, "        if: failure()\n        env:\n          GH_TOKEN", "        env:\n          GH_TOKEN", "hooks", "the token reaches the annotating step after a failure alone")
-    yield from each(ci, "      contents: read\n      actions: read\n", "      contents: read\n      actions: write\n", "hooks", "gate-ok only reads its run")
-    yield from each(ci, ' || rm -f "$out/$id.log"', "", "hooks", "a download that failed leaves no log")
-    yield from each(ci, '          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" "$out"\n', "", "hooks", "gate-ok's last step annotates")
-    yield from each(ci, 'env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids', 'python3 -I scripts/ci_annotate.py --ids', "hooks", "gate-ok lists the failed jobs with the base's script")
-    a = "scripts/ci_annotate.py"
-    for find, replace, label in (
-        ('.replace("%", "%25")', "", "ci_annotate escapes a %"),
-        ('.replace("\\r", "%0D")', "", "ci_annotate escapes a carriage return"),
-        ('.replace(":", "%3A")', "", "ci_annotate escapes a title\'s colon"),
-        ('errors="replace").lstrip', 'errors="strict").lstrip', "ci_annotate reads a log that is no UTF-8"),
-        ("FAILED = {\"failure\", \"timed_out\", \"cancelled\"}", "FAILED = {\"failure\"}", "ci_annotate reads a timed-out job"),
-        ("lines[:first] + ", "lines + ", "ci_annotate stops at the first error"),
-        ('line.startswith("##[endgroup]")', "False", "ci_annotate counts no group mark"),
-        ("LINES, CHARS, MOST = 30, 4000, 10", "LINES, CHARS, MOST = 30, 3000, 10", "ci_annotate keeps 4000 characters"),
-        ("LINES, CHARS, MOST = 30, 4000, 10", "LINES, CHARS, MOST = 30, 4000, 20", "ci_annotate writes ten annotations at most"),
-        ('or "no log was read for this job"', 'or ""', "ci_annotate says a job had no log"),
-        ("if bad:", "if False:", "ci_annotate takes an integer id alone"),
-        ('job.get("name") or ""', 'job["name"]', "ci_annotate reads a job with no name"),
-        ("KeyError, TypeError, AttributeError)", "KeyError, TypeError)", "ci_annotate refuses an entry that is no object in one line"),
-        ("except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:", "except OSError as e:", "ci_annotate refuses a list that is no JSON in one line"),
-    ):
-        yield from each(a, find, replace, "hooks", label)
+    # Each job's failures, annotations of its own (D13177); risk bounded, its survivors failing it (F13184, F13243).
+    yield from each(ci, "      - *checkout\n      - *failures\n      - name: zizmor 1.32.0", "      - *checkout\n      - name: zizmor 1.32.0", "hooks", "every job of the gate annotates its failures")
+    yield from each(ci, 'run: echo "::add-matcher::.github/failures.json"', 'run: echo "::add-matcher::.github/none.json"', "hooks", "the gate registers its failure matcher")
+    yield from each(".github/failures.json", "FAIL  |", "", "hooks", "the failure matcher shows a failed check's line")
+    yield from each(".github/failures.json", "(Final mutation score", "(Final score", "hooks", "the failure matcher shows StrykerJS's broken threshold")
     yield from each(ci, "--concurrency 2 --incrementalFile", '--concurrency "$(nproc)" --incrementalFile', "hooks", "risk runs two workers (F13243)")
     yield from each(ci, '"; exit 1 ;;\n          esac\n          pnpm exec stryker run', '";;\n          esac\n          pnpm exec stryker run', "hooks", "risk fails when stryker_lines.py ends otherwise than 0 or 3")
     yield from each(ci, "    timeout-minutes: 30\n", "    timeout-minutes: 120\n", "hooks", "risk holds its 30 minutes")
     yield from each(ci, "NODE_OPTIONS: --max-old-space-size=3072", "NODE_HEAP: --max-old-space-size=3072", "hooks", "risk's processes have a 3 GB heap each (F13243)")
     yield from each(ci, "          0) ;;\n          3) echo", "          0) exit 0 ;;\n          3) echo", "hooks", "risk runs StrykerJS when the script gives it the lines")
+    yield from each("deploy/test.sh", '	failed_checks="${failed_checks:+$failed_checks; }${1%%: wanted \\[*}"\n', "", "hooks", "deploy/test.sh's last line names its failed checks")
     for find, replace, label in (
         ("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7", "the CI pins its actions"),
         ("permissions:\n  contents: read\n", "permissions:\n  contents: write\n", "the CI only reads"),

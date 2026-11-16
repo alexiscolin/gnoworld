@@ -1,11 +1,11 @@
 # The gate on GitHub's machines. One job, `changes`, reads what
 # the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
-# at most but deploy/test.sh's; `gate-ok`, the one check main will require, reads every result with the base commit's
-# scripts/ci_gate_ok.py. It reads the repository, and after a failure gate-ok's last step reads the repository's Actions data
-# to write each failed job's end as an annotation with the base's scripts/ci_annotate.py (after the verdict, in a job
-# already failed, so it can never pass a run); it holds no secret, pins every action and download, and runs on a pull request
-# to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only token and no
-# secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
+# at most but deploy/test.sh's and risk's; `gate-ok`, the one check main will require, reads every result with the base commit's
+# scripts/ci_gate_ok.py. Each job's second step registers .github/failures.json, so the failure lines our tools print are that job's
+# annotations, read with no login (D13177); no job holds a token or a right of its own. It reads the repository, holds no secret, pins
+# every action and download, and runs on a pull request to main, a push to main or by hand, never on a fork's privileged events: a pull
+# request's run gets a read-only token and no secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section
+# ci, holds each promise.
 # A run judged against a base that has no ci_gate_ok.py fails gate-ok, by design; a run by
 # hand then judges against the base that has it.
 name: gate
@@ -50,6 +50,9 @@ jobs:
         with:
           fetch-depth: 0 # the base commit and its history are read
           persist-credentials: false
+      - &failures
+        name: Our tools' failure lines, as this job's annotations (read with no login, D13177)
+        run: echo "::add-matcher::.github/failures.json"
       - name: The base, then what the change calls for, by the base commit's own detector
         id: diff
         env:
@@ -87,6 +90,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - *failures
       - &node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -110,6 +114,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - *checkout-history
+      - *failures
       - *node
       - *pnpm
       - &gitleaks
@@ -155,6 +160,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - *checkout
+      - *failures
       - name: zizmor 1.32.0 (released 2026-11-02), installed by its wheel's hash alone
         run: |
           set -eu
@@ -190,6 +196,7 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - *checkout
+      - *failures
       - &go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -213,6 +220,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *node
       - *pnpm
       - &chromium
@@ -238,6 +246,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -265,6 +274,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -310,6 +320,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout
+      - *failures
       - *go
       - &gno-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -342,6 +353,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -365,6 +377,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -392,6 +405,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -418,6 +432,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - *checkout
+      - *failures
       - *node
       - *pnpm
       - name: The stack's static proofs, read as text (Vitest's job runs on a change of code alone, and these tests read deploy/)
@@ -437,6 +452,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - *checkout-history
+      - *failures
       - *go
       - *node
       - *pnpm
@@ -452,7 +468,8 @@ jobs:
         run: sh scripts/test_hooks.sh
 
   # The one check main requires. It reads every result with the base's ci_gate_ok.py: a failed or cancelled job fails it, and so
-  # does a skipped one the change called for; deploy/ and gno/ are read again from git, apart from `changes`.
+  # does a skipped one the change called for; deploy/ and gno/ are read again from git, apart from `changes`. A failed job's cause is in
+  # its own annotations: gate-ok can read no log while its run lasts.
   gate-ok:
     needs:
       - changes
@@ -472,9 +489,6 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
     steps:
       - *checkout-history
       - *base
@@ -483,17 +497,3 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
         run: python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py" "$EVENT"
-      - name: Each failed job's end, as an annotation Claude reads with no login (D13177)
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -eu
-          out="$RUNNER_TEMP/failed"
-          mkdir -p "$out"
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" >"$out/jobs.json"
-          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" --ids "$out" >"$out/ids"
-          while read -r id; do
-            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" >"$out/$id.log" || rm -f "$out/$id.log"
-          done <"$out/ids"
-          env -u GH_TOKEN python3 -I "$RUNNER_TEMP/base/scripts/ci_annotate.py" "$out"
