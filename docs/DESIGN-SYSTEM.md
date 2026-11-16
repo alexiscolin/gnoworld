@@ -108,7 +108,11 @@ the plate's `Panel` and a named `Planet` do. A box that sets `--world` without i
 - about me (a mention of me): amber.
 
 Each one comes with an icon or a word as well. The current row of a list is the hover fill one
-step stronger and its title at 500; hover alone is the resting fill. Live is amber; progress is
+step stronger and its title at 500; hover alone is the resting fill. One utility draws both, `lit` (`utilities.css`): a row, a
+disclosure, a nav item, a list's option, a menu's act, a search hit or a shelf wears it and writes neither fill. The hover reads
+`--lit-fill` (the resting fill) and the one in view (`aria-current`, `aria-selected`, `data-current`) reads `--lit-now` (the stronger
+step), which wins under the pointer too; a part that is lit another way sets them (a greyed act, `--lit-fill: transparent`; the cream
+shelf, `--lit-now`). The menu's and the listbox's hover is the stronger step too, which this paragraph does not say: kept as it looks (F13245). Live is amber; progress is
 text on the hover fill; a trend is text with its caret, coral when it falls.
 
 **One cream primary per region** (the plate, the dock, a card, a dialog). The flash carries none.
@@ -246,8 +250,11 @@ it again would show an action no one can press until then.
 
 Enter and leave: everything that appears also leaves. It enters on `--ease-standard`
 with a 4–12 px travel from where it comes, and leaves on `--ease-in` in about 70% of the time, with a fade and a few
-pixels at most. Dialogs and popovers use `@starting-style` and `transition-behavior: allow-discrete`. The scene sets the
-pace; the page follows its phases.
+pixels at most. One class writes it, `appears` (`packages/ui/src/appears.css`): the floating surfaces, the dialog, the bell's panel and
+the welcome card wear it, and set `--appear-time` (the enter's duration, `--motion-fast` by default), `--appear-grow` (the scale it comes
+from) and `--appear-from` (the offset it comes from) for what differs. It uses `@starting-style` and `transition-behavior:
+allow-discrete`, and shows when a popover is shown, a dialog is `open` or the element has `data-open`. The scene sets the pace; the page
+follows its phases.
 
 Named behaviours:
 - **Arrival on a world:** the planet settles, the plate comes in, the figures count up. All of it
@@ -381,7 +388,7 @@ component with its CSS Module, documented by its props.
 | `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
 | `NavItem` | current; a lead, a badge, a meta; a link, a button, or coming soon | An item of a column of places, the full chat's rooms and direct messages: a pill that fills cream when it is the one in view |
 | `Breadcrumb` | a labelled trail of links ending on the current page | The video's kicker: the one label style, a dot in the world's colour, a chevron between steps |
-| `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later release brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing |
+| `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later release brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing. The package's own parts wear it through `Soon`, which also takes a class (a `NavItem` that is yet to come), and the menu's greyed act wears its `soon` class: the grey is written once. The entry's `ComingSoon` takes no class |
 | `PagedList` | rows, a filter, sorts | 12 rows a page; the filter (64 characters) and the sorts show past 12 rows, a foot counts and adds 12 up to 100 |
 | `Figures` | cells of a label, a value (a count that counts up, or a word), a unit, a line under it, a small line of its last values | The figures band of a world's plate, in one hub card |
 | `Sparkline` | tone up (mint), down (coral), flat (muted); from the range or from zero; fills its box; arrives | A small line of how a value moved, its area shaded, for the eye alone: the words beside it say the change (a price's 24 h). Fewer than two values draw nothing |
@@ -439,7 +446,9 @@ The link and market cards, all in `app/src/features/`, none in `ui`:
   primary way on chosen by the kind of failure and outline ways to the Earth and the Galaxy; `inline` is an `EmptyState` of look `failed`, one line
   with its retry, for a card or a panel that failed alone. `errorKind` sorts a failure into one of eight kinds (not found, gone, forbidden, too many,
   offline, unavailable, new version, crash) and `RouteError` is every route's one boundary: a reference to quote after a crash, the message and
-  stack in development only. A new screen that reads something shows a failed read through `ErrorView`, never a message of its own.
+  stack in development only. A new screen that reads something shows a failed read through `ErrorView`, never a message of its own. `inline` takes `urgent` (an
+  alert, for a list the reader waits on; a polite status otherwise) and, drawing no way on, no `where`: a chunk that failed, drawn at the module's start,
+  has none to give. Its retry is `onRetry`, else a reload of the page.
 - **The passport** (`features/passport/PassportView.tsx`): a wide `Dialog` headed by the account's name, a `Badge` as its lead, a row of `Stat`s
   (the stamps with a thin `Progress` against the worlds listed, the systems, the worlds charted first, the challenge steps) beside `Tabs` for
   Challenges, Stamps and Charted; each stamp is a `Stamp`, a card's lazy parts sit behind `Skeleton`s. It reads this device alone.
@@ -511,6 +520,10 @@ fraction such as 899.5 included, falls on one side alone. The scripts' queries (
 
 Components use container queries, so they fit wherever they are placed.
 
+**Inside the package.** `Pressable` (`packages/ui/src/Pressable.tsx`, not in the entry) is what `Row`, `NavItem` and `Chip` press with: a link
+(the page's own, for an `href`), a button of type button (for an `onClick`), or the words alone; a new part that is a link or a button uses it,
+never the choice written again.
+
 ## CSS rules
 
 - **The method is CUBE CSS** (composition, utility, block, exception) on CSS Modules, in
@@ -530,7 +543,8 @@ Components use container queries, so they fit wherever they are placed.
     `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`,
     `meta` (a secondary line) and `data-text` (figures or a path, broken anywhere), the rows
     `icon-text-meta` and `text-meta` (which `Grid`'s templates of those names add), among
-    others. Their layer comes after the blocks', so a utility beats a block's rule on the same
+    others, `lit` (the row's hover and current fill) and `dot` (a round mark in its tone; `--size-dot` its size, `--dot-gap` its step
+    before the words). Their layer comes after the blocks', so a utility beats a block's rule on the same
     element.
   - **Exceptions** are states read from attributes, `[aria-pressed="true"]`,
     `[aria-expanded]`, `[data-state="busy"]`, never modifier classes: the state the
