@@ -2971,6 +2971,7 @@ ran "install_hooks.sh, its branch moved"
 # which must be GitHub's; the installed command finds its code through its link. A commit without it installs no land.
 [ ! -e "$HOME/.local/share/land/repo" ] || [ "$(cat "$HOME/.local/share/land/repo")" != o/r ] || fail "install_hooks.sh installed land from a commit without it"
 git -C "$i" checkout -q -b landed main && cp "$here/land.py" "$here/agent_pr.py" "$i/scripts/"
+mkdir -p "$i/tools/agent-github" && cp "$here/../tools/agent-github/install.sh" "$i/tools/agent-github/"
 git -C "$i" add -A && in_i git commit -qm "feat: land" && git -C "$i" checkout -q main && git -C "$i" remote add origin git@github.com:o/r.git
 lh="$i/home/.local"
 (cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) || fail "install_hooks.sh failed with land in its commit"
@@ -2978,6 +2979,35 @@ lh="$i/home/.local"
 	[ "$(cat "$lh/share/land/repo")" = o/r ] || fail "install_hooks.sh did not install land, its code and its repository"
 out=$(python3 -I "$lh/bin/land" x 2>&1) && fail "the installed land took an argument: $out"
 printf '%s\n' "$out" | grep -q "^usage: land" || fail "the installed land did not run through its link: $out"
+# The copy installed runs the python3 and the tools the owner's PATH found, written in (D13412), from an empty environment: a
+# python3 first on the PATH it is called from never runs. The repository's own copy runs nowhere.
+head -1 "$lh/share/land/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C (/[^ /@]+)+/python3 -I' && grep -Eqx 'TOOLS = "/[^"@]+"' "$lh/share/land/land.py" ||
+	fail "install_hooks.sh did not write the python3 and the tools found into land: $(head -1 "$lh/share/land/land.py"), $(grep '^TOOLS = ' "$lh/share/land/land.py")"
+mkdir -p "$t/early" "$t/gitfirst" && printf '#!/bin/sh\n: >"%s/ran"\n' "$i" >"$t/early/python3" && chmod +x "$t/early/python3"
+out=$(PATH="$t/early:$PATH" "$lh/bin/land" x 2>&1) && fail "the installed land took an argument: $out"
+printf '%s\n' "$out" | grep -q "^usage: land" || fail "the installed land did not run with its own python3: $out"
+ran "the installed land, a python3 first on its PATH"
+cp "$here/land.py" "$t/land_repo.py" && chmod +x "$t/land_repo.py"
+out=$("$t/land_repo.py" 2>&1) && fail "the repository's land ran, no python3 written in: $out"
+printf '%s\n' "$out" | grep -qF "@PYTHON3@" || fail "the repository's land failed otherwise than on its placeholder: $out"
+# A tool found first in a folder a session can write is refused, and no land installed: a git in the temporary folder.
+ln -s "$(command -v git)" "$t/gitfirst/git"
+(cd "$i" && HOME="$i/home3" PATH="$t/gitfirst:$PATH" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's git from a temporary folder, its hooks with it: $(cat "$t/out")"
+grep -q "git: $t/gitfirst/git is under " "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home3/.local/bin/land" ] || fail "install_hooks.sh took land's git from a temporary folder: $(cat "$t/out")"
+grep -nE '/opt/homebrew|/usr/local/' "$here/land.py" "$here/agent_pr.py" "$here/install_hooks.sh" && fail "land, its code or its installer names a folder of one machine (D13411)"
+git -C "$i" checkout -q -b oldland landed && sed '1s|@PYTHON3@|python3|' "$here/land.py" >"$i/scripts/land.py" && git -C "$i" add -A && in_i git commit -qm "feat: land with python3 by name"
+git -C "$i" checkout -q -b noinstaller landed && git -C "$i" rm -rq tools && in_i git commit -qm "feat: land without its installer" && git -C "$i" checkout -q main
+for b in "oldland|no placeholder took python3" "noinstaller|no land installed"; do
+	(cd "$i" && HOME="$i/home4" alexis sh scripts/install_hooks.sh "${b%%|*}" >"$t/out" 2>&1) || fail "install_hooks.sh failed on ${b%%|*}'s land, its hooks with it: $(cat "$t/out")"
+	grep -qF "${b#*|}" "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home4/.local/bin/land" ] || fail "install_hooks.sh linked a land from ${b%%|*}: $(cat "$t/out")"
+done
+# A profile whose sessions may write the tools found (agent-github's installer never run there) gets no land.
+case :$(command -p getconf PATH): in *":$(dirname "$(command -v gitleaks)"):"*) ;; *)
+	mkdir -p "$i/home5/.claude" && echo '{}' >"$i/home5/.claude/settings.json"
+	(cd "$i" && HOME="$i/home5" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's profile, its hooks with it: $(cat "$t/out")"
+	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
+	;;
+esac
 git -C "$i" remote set-url origin https://example.com/o/r.git
 git -C "$i" config --unset merge.ff
 (cd "$i" && HOME="$i/home2" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) && fail "install_hooks.sh installed land for an origin that is not GitHub's"

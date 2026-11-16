@@ -1,9 +1,11 @@
-#!/usr/bin/env -S -i LC_ALL=C /opt/homebrew/bin/python3 -I
+#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I
 """agent-pr: publish with the token this machine holds for a repository (the owner's own, or the agent
 account's): push one agent/** branch from a git bundle, or open a pull request, to a repository its allow list names. It runs outside the sandbox (a Claude Code
 excluded command), so it trusts nothing of its caller's: the shebang empties the environment; it never runs git in the
 caller's repository (the bundle carries the commits); it reads no file but under the caller's temporary space, following no
-link; the token reaches git and gh in their environment alone, git only for github.com.
+link; the token reaches git and gh in their environment alone, git only for github.com. Its installer writes in the python3
+of the shebang and the folders TOOLS names, those of the git, gh and gitleaks its owner's PATH finds (D13412): the
+repository's copy runs nowhere.
 
 Usage: agent-pr push <owner/repo> <bundle>
        agent-pr open <owner/repo> <agent/branch> <pr file: the title, a blank line, the body>
@@ -18,7 +20,7 @@ import sys
 import tempfile
 
 GITHUB = "https://github.com"
-TOOLS = "/opt/homebrew/bin:/usr/bin:/bin"
+TOOLS = "@TOOLS@"
 STATE = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".local/share/agent-github")
 # One drop folder in the caller's temporary space, where no worktree lives (the sandbox hides some files of those).
 SPACE = f"/private/tmp/claude-{os.getuid()}/agent-pr/"

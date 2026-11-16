@@ -59,7 +59,7 @@ SECTIONS = {
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
-    "scripts/install_hooks.sh": "installed,outside", "scripts/land.py": "land", "scripts/agent_pr.py": "land", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
+    "scripts/install_hooks.sh": "installed,outside", "scripts/land.py": "land,installed", "scripts/agent_pr.py": "land", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/related.py": "gate_lanes", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/failures.json": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
@@ -1096,6 +1096,10 @@ def mutants():
     ):
         yield from each(ld, find, replace, "hooks", label)
     yield from each(ih, 'if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then', "if false; then", "hooks", "install_hooks installs land from a commit that holds it")
+    # D13412: land holds the python3 and the tools its owner's PATH finds, never one from a folder a session can write.
+    yield from each(ih, 'sh -s -- --stamp "$share/land.py"', "sh -s -- --stamp", "hooks", "install_hooks writes the tools found into land")
+    yield from each(ih, ' && ! grep -q @PYTHON3@ "$share/land.py"', "", "hooks", "install_hooks links no land its installer left unwritten")
+    yield from each(ld, "#!/usr/bin/env -S -i LC_ALL=C @PYTHON3@ -I", "#!/usr/bin/env -S -i LC_ALL=C python3 -I", "hooks", "the repository's land runs nowhere")
     yield from each("scripts/agent_pr.py", "    if not title or len(title) > 256 or", "    if False or len(title) > 256 or", "hooks", "a pull request's text needs a title")
     # PR #17's red: the drop folder's /tmp read as the system resolves it. What that is differs by system, so the case runs on both
     # (the Mac's sandbox, GitHub's Linux); the mutant, killed on both, keeps the rewritten path plain for the checks after it.

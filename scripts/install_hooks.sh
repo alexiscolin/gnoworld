@@ -36,7 +36,8 @@ git config pull.ff only
 	exit 1
 }
 # land (D13211), the owner's one command for a pull request, and agent-pr's code it reuses, from the same commit, beside the GitHub
-# repository origin names, which it lands to; a commit without it installs none.
+# repository origin names, which it lands to; a commit without it installs none. agent-github's installer, of that commit too,
+# writes into land the python3, git, gh and gitleaks the owner's PATH finds, or refuses (D13412): no land then, the hooks all the same.
 if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	url=$(git config --get remote.origin.url) || url=
 	case $url in git@github.com:*) repo=${url#git@github.com:} ;; https://github.com/*) repo=${url#https://github.com/} ;; *) repo= ;; esac
@@ -48,7 +49,11 @@ if git cat-file -e "$ref:scripts/land.py" 2>/dev/null; then
 	rm -f "$share/land.py" "$share/agent_pr.py" "$HOME/.local/bin/land" # a link there would take the write elsewhere
 	git show "$ref:scripts/land.py" >"$share/land.py"
 	git show "$ref:scripts/agent_pr.py" >"$share/agent_pr.py"
-	chmod 755 "$share/land.py"
-	printf '%s\n' "$repo" >"$share/repo"
-	ln -s "$share/land.py" "$HOME/.local/bin/land"
+	if git show "$ref:tools/agent-github/install.sh" | sh -s -- --stamp "$share/land.py" && ! grep -q @PYTHON3@ "$share/land.py"; then
+		chmod 755 "$share/land.py"
+		printf '%s\n' "$repo" >"$share/repo"
+		ln -s "$share/land.py" "$HOME/.local/bin/land"
+	else
+		echo "install_hooks: no land installed, for the reason above; the hooks are" >&2
+	fi
 fi
