@@ -4,10 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 // The page that showed space goes, and the moons' asking and looking go with it.
 const stopped = vi.hoisted(() => vi.fn());
 const flies = vi.hoisted(() => ({ on: false }));
+// Set once the engine's chunk has come and the page has made its Space.
+const made = vi.hoisted(() => ({ on: false }));
 const fed = vi.hoisted(() => vi.fn());
 vi.mock("./moonRooms.ts", () => ({ feedMoons: fed, stopMoons: stopped }));
 vi.mock("../../space/scene.ts", () => ({
   Space: class {
+    constructor() {
+      made.on = true;
+    }
     covered = false;
     universe = undefined;
     rig = { flying: false };
@@ -39,7 +44,9 @@ describe("release", () => {
     const { offer, release, show } = await import("./space.ts");
     offer.state = "taken";
     show({ kind: "universe" }, () => undefined);
-    await new Promise((done) => setTimeout(done, 50));
+    await vi.waitFor(() => {
+      expect(made.on).toBe(true);
+    });
     release();
     expect(stopped).not.toHaveBeenCalled();
     await Promise.resolve();
@@ -56,7 +63,9 @@ describe("release", () => {
     const { offer, show } = await import("./space.ts");
     offer.state = "taken";
     show({ kind: "universe" }, () => undefined);
-    await new Promise((done) => setTimeout(done, 50));
+    await vi.waitFor(() => {
+      expect(made.on).toBe(true);
+    });
     stopped.mockClear();
     show(undefined, () => undefined);
     expect(stopped).toHaveBeenCalledTimes(1);
@@ -71,7 +80,9 @@ describe("release", () => {
     const { offer, show } = await import("./space.ts");
     offer.state = "taken";
     show({ kind: "universe" }, () => undefined);
-    await new Promise((done) => setTimeout(done, 50));
+    await vi.waitFor(() => {
+      expect(made.on).toBe(true);
+    });
     show(undefined, () => undefined);
     fed.mockClear();
     show({ kind: "universe" }, () => undefined);
@@ -91,7 +102,9 @@ describe("release", () => {
     offer.state = "taken";
     flies.on = true;
     show({ kind: "world", id: "bubble" }, () => undefined);
-    await new Promise((done) => setTimeout(done, 50));
+    await vi.waitFor(() => {
+      expect(made.on).toBe(true);
+    });
     const box = document.createElement("div");
     box.dataset["globe"] = "";
     box.dataset["flown"] = "landed";
