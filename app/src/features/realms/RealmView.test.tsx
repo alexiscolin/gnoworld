@@ -212,6 +212,20 @@ describe("a realm's view", () => {
   });
 });
 
+// A fetch that answers /status with a height, `vm/qfuncs` with `writes` and any other query with the page.
+const serving = (page: string, writes: unknown) =>
+  vi.fn<ChainFetch>((url) =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify(
+          url.includes("/status")
+            ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
+            : queryEnvelope({ data: url.includes("vm%2Fqfuncs") ? JSON.stringify(writes) : page }),
+        ),
+      ),
+    ),
+  );
+
 // The call cards: the form's, after its figure, and the write rows'.
 const CARDS = "figure + article, #functions [aria-label='Write functions'] article";
 
@@ -220,18 +234,7 @@ describe("a realm's view, with a form on its page", () => {
   const WRITES = [{ FuncName: "SetBio", Params: [CUR, { Name: "bio", Type: "string" }], Results: null }];
   const form = (exec: string) =>
     `# Bio\n\n<gno-form exec="${exec}">\n<gno-input name="bio" type="text" value="hi" />\n</gno-form>`;
-  const fetcher = (page: string) =>
-    vi.fn<ChainFetch>((url) =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify(
-            url.includes("/status")
-              ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
-              : queryEnvelope({ data: url.includes("vm%2Fqfuncs") ? JSON.stringify(WRITES) : page }),
-          ),
-        ),
-      ),
-    );
+  const fetcher = (page: string) => serving(page, WRITES);
   const callOf = (box: HTMLElement) =>
     vi.waitFor(() => {
       const found = button(one(box, "figure"), "Call SetBio");
@@ -358,5 +361,84 @@ describe("a realm's view that moves from one realm to another", () => {
     await answer(A, "OnlyInA");
     expect(box.textContent).not.toContain("Call OnlyInA");
     expect(button(box, "Call OnlyInB")).toBeDefined();
+  });
+});
+
+// D13502, F13525: a `$help` link of the page's own realm is an action that opens the call card prefilled (core's withActions),
+// and only when the chain lists the function with every argument the link names; the card names the function it calls.
+describe("a realm's view, with `$help` links on its page", () => {
+  const FUNCTIONS = [
+    { FuncName: "Vote", Params: [CUR, { Name: "option", Type: "string" }], Results: null },
+    { FuncName: "Transfer", Params: [CUR, { Name: "to", Type: "string" }], Results: null },
+  ];
+  const link = (label: string, query: string, realm = "poll") => `[${label}](/r/demo/${realm}$help&${query})`;
+  const PAGE = "[aria-label='Rendered page of gno.land/r/demo/poll']";
+  const CARD = "[aria-label='Forms'] article";
+  const shown = async (...lines: string[]) =>
+    view(serving(`# Poll\n\n${lines.join("\n\n")}`, FUNCTIONS), "gno.land/r/demo/poll");
+  const actions = (box: HTMLElement, text: string) =>
+    all(one(box, PAGE), "button").filter((b) => b.textContent.includes(text));
+  const links = (box: HTMLElement, text: string) =>
+    all(one(box, PAGE), "a").filter((a) => a.textContent.includes(text));
+  const filled = (box: HTMLElement, ...cards: string[][]) =>
+    vi.waitFor(() => {
+      expect(all(box, CARD).map((card) => inputs(card).map((i) => i.value))).toEqual(cards);
+    });
+  const pressed = async (box: HTMLElement, text: string) => {
+    const action = await vi.waitFor(() => {
+      const [found] = actions(box, text);
+      if (found === undefined) throw new Error("no action yet");
+      return found;
+    });
+    click(action);
+  };
+
+  test("draws the page's own `$help` link as an action, and pressing it opens the card with the option filled", async () => {
+    const box = await shown(link("**Vote** YES", "func=Vote&option=YES"));
+    await pressed(box, "Vote YES");
+    await filled(box, ["YES"]);
+    expect(links(box, "Vote YES").filter((a) => a.getAttribute("href")?.includes("$help"))).toHaveLength(0);
+  });
+
+  test("keeps another realm's `$help` link a link, with no action", async () => {
+    const box = await shown(link("Vote YES", "func=Vote&option=YES", "other"));
+    expect(actions(box, "Vote YES")).toHaveLength(0);
+    expect(links(box, "Vote YES")).toHaveLength(1);
+  });
+
+  test.each([
+    ["a function the chain does not list", "func=Burn&option=YES"],
+    ["an argument that is no parameter of its function", "func=Vote&option=YES&bogus=1"],
+  ])("draws no action for %s: its words alone, no link and no card", async (_, query) => {
+    const box = await shown(link("Vote YES", query));
+    await vi.waitFor(() => {
+      expect(button(box, "Call Vote")).toBeDefined();
+    });
+    expect(actions(box, "Vote YES")).toHaveLength(0);
+    expect(links(box, "Vote YES")).toHaveLength(0);
+    expect(one(box, PAGE).textContent).toContain("Vote YES");
+    expect(all(box, CARD)).toHaveLength(0);
+  });
+
+  test("takes no coins from a link: a `send` in it is dropped, the card holds the function's own fields alone", async () => {
+    const box = await shown(link("Vote YES", "func=Vote&option=YES&send=1ugnot"));
+    await pressed(box, "Vote YES");
+    await filled(box, ["YES"]);
+    expect(one(box, CARD).textContent).not.toContain("ugnot");
+  });
+
+  test("gives each of two actions a card of its own, filled with its own text, the first one untouched", async () => {
+    const box = await shown(link("Vote YES", "func=Vote&option=YES"), link("Vote NO", "func=Vote&option=NO"));
+    await pressed(box, "Vote YES");
+    await pressed(box, "Vote NO");
+    await filled(box, ["YES"], ["NO"]);
+  });
+
+  test("names the function it calls on the card, whatever the link's words say", async () => {
+    const box = await shown(link("Vote YES", "func=Transfer&to=g1attacker"));
+    await pressed(box, "Vote YES");
+    await filled(box, ["g1attacker"]);
+    expect(one(box, CARD).textContent).toContain("Transfer");
+    expect(one(box, CARD).textContent).not.toContain("Vote");
   });
 });

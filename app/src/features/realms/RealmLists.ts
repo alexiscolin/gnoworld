@@ -7,8 +7,10 @@ import { weigh, type Ink } from "./drawBudget.ts";
 
 // A page's nodes as elements: the chat's drawing, but an image (a link to it, flagged by the reader) is a card, its link
 // drawn as any other is, so it passes the same checks and the same warning off gnoweb. One in a mark is a plain link.
-export function drawInlines(nodes: readonly Inline[], { via, reader }: Pick<Ink, "via" | "reader">): ReactNode[] {
+export function drawInlines(nodes: readonly Inline[], on: Pick<Ink, "via" | "reader" | "action">): ReactNode[] {
+  const { via, reader, action } = on;
   return nodes.flatMap((node) => {
+    if (node.type === "action" && action !== undefined) return [action(node, drawInlines(node.children, on))];
     const drawn = via.inlines([node], reader);
     return node.type === "link" && node.image === true
       ? [createElement("span", { "data-image": "", key: undefined }, createElement(Icon, { name: "image" }), ...drawn)]
