@@ -160,6 +160,48 @@ describe("readTokens", () => {
     expect(store.height()).toBe(3);
   });
 
+  // F13515: the other reads here refuse an answer carrying `errors` (txsOf's schema does), heightAfter's did not: errors beside a
+  // height were read as the height, and the walk stepped past a transaction that was never found too large.
+  it("refuses a height read that answers errors, never stepping past a transaction on it", async () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(TOKEN_TABLES);
+    const inner = chain(
+      page(
+        { block_height: 1, events: [born, mint("100")] },
+        { block_height: 2, events: [mint("1")] },
+        { block_height: 3, events: [mint("5")] },
+      ).data.getTransactions,
+    );
+    const send: Send = (...args) => {
+      const body = JSON.parse(typeof args[1].body === "string" ? args[1].body : "") as {
+        query: string;
+        variables: Record<string, number>;
+      };
+      if (body.query.includes("limit: 1) { block_height }"))
+        return Promise.resolve(
+          Response.json({
+            data: { getTransactions: [{ block_height: 2 }] },
+            errors: [{ message: "indexer unavailable" }],
+          }),
+        );
+      const { above = -1, limit } = body.variables;
+      const events = limit !== undefined && body.query.includes("response { events");
+      if (events && above < 2 && above + limit >= 2) return Promise.resolve(new Response("x".repeat(5_000_000)));
+      return inner(...args);
+    };
+    const log: string[] = [];
+    const read = await readTokens({
+      db,
+      log: (name) => void log.push(name),
+      reader: { send, indexer: "https://i.example/q" },
+      universe: "onyx",
+      isStopped: () => false,
+      now: () => Date.parse("2026-11-12T12:00:00Z"),
+    });
+    expect(read.ok).toBe(false);
+    expect(log).not.toContain("token_block_too_large");
+  });
+
   it("resets the store it is given when the chain restarted, so the route sharing it reads the new table", async () => {
     const db = new DatabaseSync(":memory:");
     db.exec(TOKEN_TABLES);

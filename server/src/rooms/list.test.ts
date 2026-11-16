@@ -6,7 +6,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
-import { ROOM_SAID } from "./earth.ts";
+import { guestSaid, ROOM_SAID } from "./earth.ts";
 import { ensureNamed, ensureRooms, ROOM_TABLES } from "./rooms.ts";
 import { listRoutes } from "./list.ts";
 import type { Typed } from "./types.ts";
@@ -426,10 +426,8 @@ describe("GET /api/rooms?world=earth, the public square", () => {
       t.db
         .prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, 'g1x', ?)")
         .run(`#earth/${name}`, madeAt);
-      for (let n = 0; n < lines; n += 1)
-        t.db
-          .prepare("INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'h', 'pass', ?)")
-          .run(`${name}-${String(n)}`, `#earth/${name}`, at);
+      // Lines are counted in room_said as they pass (F13510).
+      for (let n = 0; n < lines; n += 1) guestSaid(t.db)(`#earth/${name}`, at);
     };
     return { ...t, make };
   };
