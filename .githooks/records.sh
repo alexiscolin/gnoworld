@@ -11,7 +11,7 @@ export GIT_NO_REPLACE_OBJECTS=1
 harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude CLAUDE.md .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
 	jarvis/package.json jarvis/tsconfig.json link-reader/package.json link-reader/tsconfig.json 'packages/*/package.json' 'packages/*/tsconfig.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs evals/package.json evals/pnpm-workspace.yaml \
 	evals/pnpm-lock.yaml evals/tsconfig.json evals/.pnpmfile.cjs evals/.pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
-	tsconfig.base.json app/tsconfig.json stryker.config.json stryker.all.config.json '*.gitattributes' knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore app/tests/stories/pictures.spec.ts deploy/test.sh )
+	tsconfig.base.json app/tsconfig.json stryker.config.json stryker.all.config.json '*.gitattributes' knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore app/tests/stories/pictures.spec.ts deploy/test.sh tools/agent-github )
 # The paths of a tree this disk may read as another (git's `$@` lists them NUL-separated: ls-files -z for the index, ls-tree -r -z
 # --name-only HEAD for a commit): a byte outside ASCII (the disk folds more letters than git can match: ſ is s on APFS), or a folder or
 # file name equal but for case to another (Packages/evil/package.json lands as packages/evil/, a workspace pnpm installs). Prints one

@@ -6,6 +6,7 @@
 # base branch, its patterns follow most of .gitignore's rules, and the last matching line wins (docs.github.com, about-code-owners).
 /.github/ @alexiscolin
 /scripts/ @alexiscolin
+/tools/agent-github/ @alexiscolin
 /.githooks/ @alexiscolin
 /.claude/ @alexiscolin
 /.mcp.json @alexiscolin

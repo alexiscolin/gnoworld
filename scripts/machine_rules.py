@@ -23,7 +23,7 @@ KEPT = ("**/.claude/skills", "**/CLAUDE.local.md", ".git/hooks", ".git/config", 
 OPENED = ("/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**",
           "/**/.claude/rules/**", "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh", "/scripts/check.sh",
           "/scripts/check_docs.py", "/scripts/ergo.sh", "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py",
-          "/scripts/workshop.sb", "/scripts/workshop.sh")
+          "/scripts/workshop.sb", "/scripts/workshop.sh", "/tools/agent-github/**")
 
 
 def rules(settings, main, home, uid):

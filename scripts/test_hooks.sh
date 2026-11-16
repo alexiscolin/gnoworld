@@ -153,7 +153,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/.git
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)", "Edit(/jarvis/package.json)", "Edit(/evals/package.json)",
            "Edit(/link-reader/package.json)", "Edit(/evals/pnpm-workspace.yaml)", "Edit(/evals/.pnpmfile.cjs)", "Edit(/evals/.pnpmfile.mjs)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
-           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)",
+           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(/tools/agent-github/**)",
            "Edit(/scripts/check.sh)", "Edit(/scripts/check_docs.py)", "Edit(/scripts/ergo.sh)", "Edit(/scripts/hidden.py)", "Edit(/scripts/related.py)",
            "Edit(/scripts/speeds.py)", "Edit(/scripts/workshop.sb)", "Edit(/scripts/workshop.sh)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
@@ -240,6 +240,7 @@ assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktr
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
+assert "tools/agent-github" in listed, "agent-github's installer, which writes every profile's denies and which install_hooks.sh runs, is outside the harness list (F13449)"
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json", "CLAUDE.md"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs, or the instructions every session reads (a nested one no commit may hold: check_docs refuses it)"
 # Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
 # tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
@@ -563,7 +564,7 @@ TMPU = f"/private/tmp/claude-{os.getuid()}"
 ABOVE = ("/private/tmp", TMPU)
 tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
 # The generator's lists as the owner chose them (Alexis's unlock, 2026-11-06: a worktree's harness, rules and configs open to its
-# session): a change to one is a change of who may write what, read in review.
+# session, agent-github's tools among them, F13449): a change to one is a change of who may write what, read in review.
 INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules", "AGENTS.md", ".claude/AGENTS.md")
 KEPT = {"**/.claude/skills", "**/CLAUDE.local.md", ".git/hooks", ".git/config", ".git/commondir", ".githooks/pre-commit", ".githooks/pre-push",
         ".githooks/records.sh", ".mcp.json", ".node-version", ".npmrc", ".pnpmfile.cjs", ".pnpmfile.mjs", "CLAUDE.local.md", "package.json",
@@ -571,7 +572,7 @@ KEPT = {"**/.claude/skills", "**/CLAUDE.local.md", ".git/hooks", ".git/config", 
         "scripts/guard.py", "scripts/install_hooks.sh", "scripts/scan_secrets.sh", "scripts/worktree.sh"}
 OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
           "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh", "/scripts/check.sh", "/scripts/check_docs.py", "/scripts/ergo.sh",
-          "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py", "/scripts/workshop.sb", "/scripts/workshop.sh"}
+          "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py", "/scripts/workshop.sb", "/scripts/workshop.sh", "/tools/agent-github/**"}
 assert tuple(mr["INSTRUCTIONS"]) == INSTRUCTIONS and set(mr["KEPT"]) == KEPT and set(mr["OPENED"]) == OPENED, "machine_rules.py's lists are not the owner's"
 s = json.load(open(sys.argv[1]))
 committed_writes, committed_deny = s["sandbox"]["filesystem"]["denyWrite"], s["permissions"]["deny"]

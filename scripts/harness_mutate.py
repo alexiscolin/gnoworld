@@ -1156,7 +1156,7 @@ def mutants():
         ('writes |= {f"{new}/*/{w}" for w in KEPT}', 'writes |= {f"{os.path.dirname(new)}/**/{w}" for w in KEPT}', "no twin closing a throwaway tree outside the worktrees' folder (F4890)"),
         ('".githooks/pre-commit",\n        ".githooks/pre-push"', '".githooks/pre-push"', "a sibling's pre-commit hook, to commands (7w3)"),
         ('"scripts/guard.py", "scripts/install_hooks.sh"', '"scripts/install_hooks.sh"', "a sibling's guard, to commands (7w3)"),
-        ('"/scripts/workshop.sb", "/scripts/workshop.sh")', '"/scripts/workshop.sb", "/scripts/workshop.sh", "/scripts/guard.py")', "a sibling's guard, to the file tools (7w3)"),
+        ('"/scripts/workshop.sb", "/scripts/workshop.sh", "/tools/agent-github/**")', '"/scripts/workshop.sb", "/scripts/workshop.sh", "/tools/agent-github/**", "/scripts/guard.py")', "a sibling's guard, to the file tools (7w3)"),
         ('"AGENTS.md", ".claude/AGENTS.md")', '"AGENTS.md")', "an AGENTS.md of .claude, read above a session's folder (7w3, F5323)"),
         ('main, new, tmp = short(main), short(main + "-wt"), f"/private/tmp/claude-{uid}"', 'main, new, tmp = short(main), short(main + "-wt"), "/private/tmp/claude-501"', "the uid's own temporary folder (D13413)"),
         ('rule = lambda p: p if p.startswith("~") else "/" + p', "rule = lambda p: p", "an absolute rule written // (the permissions page)"),
@@ -1177,6 +1177,9 @@ def mutants():
         yield from each(".claude/settings.json", f'        "{path}",\n', "", "hooks", f"the sandbox keeps commands out of {path} (7z, S4)")
     for rule, why in (("Edit(//tmp/CLAUDE.md)", "above every worktree, by /tmp"), ("Edit(~/.claude/rules/**)", "of the home folder")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep the instructions {why} out of the file tools (7z, S4)")
+    # agent-github's tools, which install_hooks.sh runs and which write every profile's denies, closed in the session's own tree (F13449).
+    yield from each(".claude/settings.json", '      "Edit(/tools/agent-github/**)",\n', "", "hooks", "settings keep agent-github's tools out of the file tools (F13449)")
+    yield from each(".claude/settings.json", '        "tools/agent-github",\n', "", "hooks", "the sandbox keeps commands out of agent-github's tools (F13449)")
     # The file tools write the session's folders alone; the instructions below a tree's root, and StrykerJS's copies left out of what
     # those close.
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
