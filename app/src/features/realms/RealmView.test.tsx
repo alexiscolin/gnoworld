@@ -400,6 +400,15 @@ describe("a realm's view, with `$help` links on its page", () => {
     expect(links(box, "Vote YES").filter((a) => a.getAttribute("href")?.includes("$help"))).toHaveLength(0);
   });
 
+  test("draws a `$help` link in a bulleted list as an action too (F13526)", async () => {
+    const box = await shown(
+      `- ${link("Vote YES", "func=Vote&option=YES")}\n- ${link("Vote NO", "func=Vote&option=NO")}`,
+    );
+    await pressed(box, "Vote NO");
+    await filled(box, ["NO"]);
+    expect(actions(box, "Vote YES")).toHaveLength(1);
+  });
+
   test("keeps another realm's `$help` link a link, with no action", async () => {
     const box = await shown(link("Vote YES", "func=Vote&option=YES", "other"));
     expect(actions(box, "Vote YES")).toHaveLength(0);

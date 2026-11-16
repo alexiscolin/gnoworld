@@ -148,9 +148,15 @@ function columns(block: Extract<PageBlock, { type: "columns" }>, on: Drawn): Rea
 }
 
 // The chat's flat list, its items as many as the budget has.
-function list(block: Extract<PageBlock, { type: "list" }>, { budget, via, reader }: Drawn): ReactNode {
-  const items = budget.fit(block.items, weigh);
-  return items.length === 0 ? undefined : via.block({ ...block, items }, reader);
+function list(block: Extract<PageBlock, { type: "list" }>, on: Drawn): ReactNode {
+  const items = on.budget.fit(block.items, weigh);
+  if (items.length === 0) return undefined;
+  // Drawn here, not by the chat's block, which has no action: a `$help` link in a bullet is a button too (F13526).
+  return createElement(
+    block.ordered ? "ol" : "ul",
+    block.ordered && block.start !== 1 ? { start: block.start } : null,
+    ...items.map((item) => createElement("li", null, ...drawInlines(item, on))),
+  );
 }
 
 type Leaf = Extract<PageBlock, { type: "heading" | "rule" | "paragraph" | "codeBlock" }>;
