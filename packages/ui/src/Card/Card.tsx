@@ -49,7 +49,7 @@ export function Card({ children, ...own }: CardProps) {
   const titleId = useId();
   const { ref, state } = useRise(own.rises === true);
   // Named by its header's title, when it has a header: one that keeps its own heading (CallRow's) points at no missing id.
-  const headed = [children].flat(2).some((child) => isValidElement(child) && child.type === Header);
+  const headed = [children].flat().some((child) => isValidElement(child) && child.type === Header);
   return (
     <article
       className={styles["card"]}
