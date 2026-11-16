@@ -68,6 +68,8 @@ if [ "$action" = remove ]; then
 fi
 [ ! -e "$dir" ] || { echo "worktree.sh: $dir exists; name a new folder" >&2; exit 1; }
 git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.sh: $base is no commit" >&2; exit 1; }
+# The base read once, as its commit: read again by name, a branch a session moves between two reads would lead elsewhere.
+base=$(git rev-parse --verify "$base^{commit}")
 # The root's node_modules is taken apart below, which a link to a folder (borrow_node_modules.sh skips it) cannot be.
 [ -d "$src/node_modules" ] && [ ! -L "$src/node_modules" ] || { echo "worktree.sh: $src/node_modules is a link or missing; it must be the real folder of this tree's installed packages" >&2; exit 1; }
 # The packages linked below are this tree's, whose lockfile and package files its install follows: a base with others would
@@ -78,6 +80,17 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.s
 # is entered: git would run it with its own config.
 . "$(dirname "$0")/../.githooks/records.sh"
 differ=$(harness --ignore-submodules=all --name-only "$base" && git diff --name-only "$base" -- CLAUDE.md) # a base git cannot read stops here
+# A base equal to main as GitHub serves it (origin's, read by git ls-remote) is no session's plumbing, as no session pushes main
+# (D13165): its harness may differ from this tree's, a worktree whose branch was merged; its package files may not. The remote's
+# address comes from the common folder's config, which no session writes; GitHub's ssh address is read over https, with no key.
+if [ -n "$differ" ]; then
+	url=$(git config --get remote.origin.url) || url=
+	case $url in git@github.com:*) url=https://github.com/${url#git@github.com:} ;; esac
+	served=$(GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote --exit-code -- "$url" refs/heads/main 2>/dev/null | cut -f1)
+	if [ "$(git rev-parse --verify "$base^{commit}")" = "$served" ]; then
+		differ=$(printf '%s\n' "$differ" | grep -E '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.pnpmfile\.[cm]js|\.npmrc)$' || :)
+	fi
+fi
 [ -z "$differ" ] || {
 	echo "worktree.sh: $base's harness or package files are not this tree's, whose installed packages the new tree would link; install them here first, or make the tree by hand: $(echo "$differ" | tr '\n' ' ')" >&2
 	exit 1

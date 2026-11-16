@@ -4,7 +4,7 @@
 # token or runs outside the sandbox. Usage: sh test.sh [agent-pr]; from the sandbox; it needs git, python3 and gitleaks.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-helper=${1:-$here/agent-pr}
+helper=${1:-$here/../../scripts/agent_pr.py} # agent-pr's code, which land reuses (D13211)
 t=$(mktemp -d "${TMPDIR:-/tmp}/agent-pr-test.XXXXXX")
 t=$(cd "$t" && pwd -P)
 fails=0
@@ -425,8 +425,8 @@ guard '{"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content":
 
 # 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: each profile
 # gets the denies of every profile, the sandbox on, the exclusion and the hook; a profile that turns hooks off is refused.
-fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github"
-cp "$here/agent-pr" "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/"
+fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts"
+cp "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/" && cp "$helper" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts/agent_pr.py"
 echo '{"permissions": {"deny": ["Edit(~/.zshrc)"]}, "sandbox": {"excludedCommands": ["x *"]}}' >"$fh/.claude/settings.json"
 echo '{"theme": "dark"}' >"$fh/.claude-work/settings.json"
 sed -e "s|^raw=.*|raw=file://$t/raw|" -e "s|^api=.*|api=file://$t/api|" -e "s|--proto '=https'|--proto '=https,file'|" "$here/install.sh" >"$t/install.sh"
@@ -449,7 +449,7 @@ for profile in (".claude", ".claude-work"):
 assert "Edit(~/.zshrc)" in json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"]
 PY
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/proj\nalexis/other agent')" ] || fail "the allow list is not the repositories given"
-cmp -s "$fh/.local/bin/agent-pr" "$here/agent-pr" || fail "the helper installed is not the commit's"
+cmp -s "$fh/.local/bin/agent-pr" "$helper" || fail "the helper installed is not the commit's"
 grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
 [ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
@@ -467,7 +467,7 @@ inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the 
 echo '{"permissions": {"allow": ["Read(~/.local/share/agent-github/**)"]}}' >"$fh/.claude-work/settings.json"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting the state folder"
 echo '{}' >"$fh/.claude-work/settings.json"
-mkdir -p "$t/raw/a/b/0123456/tools" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456/tools/"
+mkdir -p "$t/raw/a/b/0123456" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts" "$t/raw/a/b/0123456/"
 inst a/b main 0123456 alexis/proj && fail "the installer took a short commit id"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 ../x && fail "the installer took a malformed repository"
 inst a/b main ffffffffffffffffffffffffffffffffffffffff alexis/proj && fail "the installer installed from a commit that holds nothing"

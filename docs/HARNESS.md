@@ -28,7 +28,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 ## Who does what
 
 - **The owner** approves each slice's plan, reviews blind first, runs what the
-  sandbox refuses (the push, the merge into `main` on GitHub), and accepts or
+  sandbox refuses (the push, through `land`; the merge into `main` on GitHub), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its own range of finding numbers
@@ -83,8 +83,15 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    open itself for writing, which the sandbox forbids, it first refuses a harness file (`.githooks/records.sh`'s list, and a path with a
    non-ASCII character: D241), then wants each staged file as it is on disk, and runs Prettier on them and `scripts/check_docs.py`
    (D13173): seconds. It runs no gate: `sh scripts/check.sh` is what a session runs before committing code, and GitHub's gate judges each
-   pull request. In the owner's shell it runs the scan alone, nothing of the working tree. So a harness change reaches a branch as a
-   patch the owner applies and commits in the owner's Terminal. `pre-merge-commit` gives a merge commit the same checks, and a merge always makes one
+   pull request. In the owner's shell it runs the scan alone, nothing of the working tree. So a harness change reaches GitHub as a git
+   bundle the owner approves with `land` (D13213), installed once in `~/.local/bin` by main's `install_hooks.sh`: the session drops the
+   bundle of one branch and the pull request's text in `/private/tmp/claude-<uid>/land/`; `land`, in the owner's Terminal, copies them,
+   checks the bundle holds that branch, never main, from GitHub's main, runs that main's own secret scan over the range and its
+   commit-msg on each message (what pre-push and commit-msg held for his own push), gitleaks over the text, refuses a character the
+   Terminal would not show as itself, lists the subjects, each
+   harness file with its lines added and removed, the declaration lines, any workflow file, how the branch on GitHub changes and 16 hex
+   of the tip, and on his y pushes that tip with his gh login and opens the pull request (`scripts/land.py`, which reuses
+   `scripts/agent_pr.py`'s reading and scans). The change exists only on GitHub until he merges it. `pre-merge-commit` gives a merge commit the same checks, and a merge always makes one
    (the install's `merge.ff false`). pre-commit reaches `git commit` and `git merge` alone: cherry-pick, revert, rebase, am and git's
    plumbing (`stash create` then `update-ref`, as `commit-tree`) commit with no hook, which guard.py refuses when typed, not when a
    script file runs them; such a commit meets its wall on GitHub, whose changes job refuses a harness file no commit declares on a line
@@ -129,7 +136,11 @@ cache, every test of the node, ui and compiled projects but the `timing` ones. T
 night: their suites are their own, `test_hooks.sh`, `probe.py` and `deploy/test.sh` on GitHub and by hand while the
 change is written (`ONLY=<section> sh scripts/test_hooks.sh`, `python3 -I scripts/probe.py`, with `.node-version`'s Node first on the
 PATH, `~/.nvm/versions/node/v<version>/bin`), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
-elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed.
+elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed. So a
+series built in a scratch clone under the temp folder, whose `.git/hooks` the sandbox writes, gets no verdict there (D13407, F13415): its
+product commits are committed in the worktree with the clone's dates (the same hashes) and check.sh runs on that committed tree; a
+harness series, which only `land` puts on GitHub, runs check.sh's lanes by hand in the clone before its land: the paths
+`scripts/related.py` gives for its changed files through Vitest's `related` command, the lint job's steps, its sections.
 It records nothing: no hook reads a record (D13173). No commit's gate walks a journey: a session
 that writes or changes one runs that spec itself before committing (`node app/node_modules/@playwright/test/cli.js test -c
 app/playwright.config.ts <spec>`).
@@ -221,7 +232,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   from any session, the main checkout's `.git/hooks`, `.git/config`, `scripts/` and `.githooks/`), an edit of the
   instructions every session reads (`CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`: the owner's alone),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, committed in the owner's
-  Terminal (D241), and the owner sees each such file in the pull request; a merge into a branch that changes the harness is the owner's too,
+  Terminal (D241), approved as a listed bundle with `land` (D13213), and the owner sees each such file in its listing and the pull request; a merge into a branch that changes the harness is the owner's too,
   in the owner's terminal, never another session's. In the owner's shell the hooks run nothing of
   the repository but the secret scan installed from `main`.
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
@@ -504,7 +515,8 @@ costs context in every session.
 | `scripts/ergo.sh`, `scripts/workshop.sb`, `scripts/load.py` | the Ergo the server's tests start; the workshop's Seatbelt profile; the machine's load, for the benches |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/stryker_lines.py` | the code GitHub's StrykerJS mutates: the changed tier-1 lines |
-| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone; a copy borrowing the installed packages, a workspace's `.bin` its own |
+| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone, from a base whose harness is the tree's or main as GitHub serves it; a copy borrowing the installed packages, a workspace's `.bin` its own |
+| `scripts/land.py`, `scripts/agent_pr.py` | `land`, the owner's one command for a pull request (D13211, D13213), and the bundle reading and scans it reuses |
 | `.github/workflows/gate.yml` | the gate on GitHub: a pull request to main, a push to main or a run by hand, `gate-ok` its verdict |
 | `.github/workflows/nightly.yml` | the night on GitHub: 41 journeys, StrykerJS and the harness whole, the history's secrets; a red night opens one issue |
 | `.github/CODEOWNERS` | the core, whose change needs an owner's approval once main's ruleset asks for it |

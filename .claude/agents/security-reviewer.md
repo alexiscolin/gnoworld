@@ -24,6 +24,10 @@ Look for:
 - the CSP, `innerHTML`, links and media hosts;
 - for Jarvis, ADR-0002 §5's injection layers and the tool allowlist;
 - for realms, `.claude/rules/gno.md`.
+- in harness code that handles paths, two paths compared only once spelled the same way: resolve only a trusted,
+  root-owned prefix (macOS's /tmp, a link to /private/tmp), or compare the device and inode of what was opened, never
+  `realpath` a path a caller controls before a no-follow walk; and a test through that link, which hides on the Mac what
+  fails on GitHub's Linux (PR #17's red, D13409);
 - the weight: high and medium for what harms people or the system (injection, who may call what, secrets,
   overload, leaks); a way to game a display's ranking or count is a low, for after the demo (Alexis, 2026-11-04).
 
