@@ -275,7 +275,7 @@ describe("Field", () => {
     expect(screen.getByRole("status").textContent).toBe("");
   });
 
-  it("takes the handle off a box of lines that grows on its own, and leaves it on the others", () => {
+  it("fixes a box of lines at two rows with no handle when it is not resizable, and leaves the handle on the others", () => {
     const { rerender } = render(<Field kind="lines" label="Message" value="" onChange={vi.fn()} />);
     expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(false);
     rerender(<Field kind="lines" label="Message" resizable={false} value="" onChange={vi.fn()} />);

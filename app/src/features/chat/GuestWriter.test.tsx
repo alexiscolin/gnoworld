@@ -34,8 +34,9 @@ describe("a guest's composer", () => {
     };
     expect(box.getAttribute("aria-invalid")).toBeNull();
     type("hello");
+    // Enter sends the guest's line (D432), through Field's own key: a key that added a line instead would fail here.
     act(() => {
-      one(view, "form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
     });
     await settled(() => view.querySelector("[role='alert']") !== null);
     expect(box.getAttribute("aria-invalid")).toBe("true");
