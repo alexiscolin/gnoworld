@@ -5,10 +5,12 @@ import { Button, Chip, Dialog } from "@gnoworld/ui";
 import { useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { countWords } from "./unread.ts";
+import styles from "./RoomsDrawer.module.css";
 
-/** The control for the rooms and the drawer holding `rail`, on a phone's screen: the control is drawn in the header's place, the
- * drawer, a modal dialog, over the screen whatever place draws it. Its code comes once the screen is a phone's. */
-export function RoomsDrawer({ unread, rail }: { unread: number; rail: ReactNode }) {
+/** The control for the rooms and the drawer holding `rail` and, below it, `worlds`, on a phone's screen: the control is drawn in the
+ * header's place, the drawer, a modal dialog, over the screen whatever place draws it. Its code comes once the screen is a phone's.
+ * The drawer keeps its title and Close and scrolls what is under them. */
+export function RoomsDrawer({ unread, rail, worlds }: { unread: number; rail: ReactNode; worlds?: ReactNode }) {
   // Open at an address: a move to another closes it, as the room behind it changes (as Saved's does).
   const { key } = useLocation();
   const [opened, setOpened] = useState<string>();
@@ -21,7 +23,7 @@ export function RoomsDrawer({ unread, rail }: { unread: number; rail: ReactNode 
         <Button
           icon="menu"
           emphasis="quiet"
-          size="s"
+          size="m"
           onClick={() => {
             setOpened(key);
           }}
@@ -40,14 +42,23 @@ export function RoomsDrawer({ unread, rail }: { unread: number; rail: ReactNode 
           )}
         </Button>
       </div>
-      <Dialog title="Rooms" open={opened === key} onClose={close}>
-        {/* A link followed leaves the drawer, the room in view's own too, whose address does not change. */}
-        <div
-          onClick={(event) => {
-            if (event.target instanceof Element && event.target.closest("a") !== null) close();
-          }}
-        >
-          {rail}
+      <Dialog title="Rooms" side="start" open={opened === key} onClose={close}>
+        <div className={styles["drawer"]}>
+          {/* The dialog's own title is for assistive technology alone in a drawer: this one is the sighted reader's, beside Close. */}
+          <p className={styles["title"]} aria-hidden="true">
+            Rooms
+          </p>
+          {/* A link followed leaves the drawer, the room in view's own too, whose address does not change. */}
+          <div
+            className={styles["body"]}
+            data-drawer-body=""
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("a") !== null) close();
+            }}
+          >
+            {rail}
+            {worlds}
+          </div>
         </div>
       </Dialog>
     </>

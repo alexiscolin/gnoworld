@@ -118,3 +118,46 @@
     color: var(--color-text);
   }
 }
+
+/* The worlds as rows, in a phone's drawer under the rooms: a link at the control's height, the planet at its start. */
+@layer components {
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .row {
+    /* layout: the planet, the name that gives way at its end, the unseen count at the row's end */
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    min-block-size: var(--control-m);
+    padding-inline: var(--space-s);
+    border-radius: var(--radius-s);
+    color: var(--color-text);
+    text-decoration: none;
+    font: var(--font-ui);
+  }
+
+  .row:hover {
+    background: var(--color-fill-hover);
+  }
+
+  .row[aria-current="page"] {
+    background: var(--color-fill);
+  }
+
+  /* The planet a small control's size, not the column's 44 px */
+  .row > .planet {
+    flex: none;
+    inline-size: var(--control-s);
+    block-size: var(--control-s);
+  }
+
+  /* The pill ends the row instead of hanging off a planet's corner. */
+  .row .pill {
+    position: static;
+    margin-inline-start: auto;
+  }
+}

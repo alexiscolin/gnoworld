@@ -58,12 +58,13 @@ describe("the composer's box", () => {
     expect(names.slice(4, 7)).toEqual(["Code", "Link tool", "Quote"]);
   });
 
-  it("holds Send alone at its foot: no @ nor / button", () => {
+  it("holds Send and the phone's format control at its foot: no @ nor / button", () => {
     // The buttons outside the format bar, by their names.
     const foot = all(draw(), "button")
       .filter((each) => each.closest('[aria-label="Format"]') === null)
       .map((each) => each.getAttribute("aria-label") ?? each.textContent);
-    expect(foot).toEqual(["Send"]);
+    // Formatting is the phone's fold control, hidden by CSS where the bar always shows.
+    expect(foot).toEqual(["Formatting", "Send"]);
   });
 
   it("applies a format of the bar to the draft", () => {
@@ -90,5 +91,23 @@ describe("the composer's box", () => {
     const sending = draw({ send: "Save", goes: false });
     expect(button(sending, "Save")?.hasAttribute("disabled")).toBe(true);
     expect(draw().querySelector("button[type='submit']")?.hasAttribute("disabled")).toBe(false);
+  });
+
+  // A phone shows the bar through one control (the CSS hides it until then), which says whether it is open.
+  it("opens the format bar from one control that says whether it is open", () => {
+    const box = draw();
+    const bar = one(box, '[role="group"][aria-label="Format"]');
+    expect(bar.hasAttribute("data-open")).toBe(false);
+    const fold = button(box, "Formatting");
+    expect(fold?.getAttribute("aria-expanded")).toBe("false");
+    click(fold);
+    expect(bar.hasAttribute("data-open")).toBe(true);
+    expect(button(box, "Formatting")?.getAttribute("aria-expanded")).toBe("true");
+    click(button(box, "Formatting"));
+    expect(bar.hasAttribute("data-open")).toBe(false);
+  });
+
+  it("draws no format control for a box with no bar", () => {
+    expect(button(draw({ onFormat: undefined }), "Formatting")).toBeUndefined();
   });
 });

@@ -60,4 +60,11 @@
     max-block-size: 44dvb;
     overflow: auto;
   }
+
+  /* A phone: the composer clears the home indicator (no inset while the keyboard is up). */
+  @media (width < 900px) {
+    .dock {
+      padding-block-end: max(calc(var(--space-s) + var(--space-3xs)), env(safe-area-inset-bottom));
+    }
+  }
 }

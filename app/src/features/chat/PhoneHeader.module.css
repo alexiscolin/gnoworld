@@ -1,0 +1,80 @@
+/* A phone's chat header: two rows of 44 px controls in portrait; one row in a short landscape window, where height is what is scarce. */
+@layer components {
+  .bar {
+    /* layout: the rows one under the other, a small step apart */
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3xs);
+    /* the notch's side, in landscape */
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+
+  .top,
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xs);
+  }
+
+  .title {
+    /* layout: the name takes the row and gives way at its end */
+    flex: 1 1 0;
+    min-inline-size: 0;
+    margin: 0;
+    font: var(--font-title-room);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .mark {
+    flex: none;
+  }
+
+  /* The arrow of Send points up and Back's points against the text: the icon's own points along it. */
+  .back svg {
+    rotate: 180deg;
+  }
+
+  .rooms {
+    /* layout: Rooms takes the row's start; the acts follow at its end */
+    margin-inline-end: auto;
+  }
+
+  /* Short windows (a phone on its side): one row, the name first, Rooms and the acts after it, Info at the end. */
+  @media (height < 500px) {
+    .bar {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--space-2xs);
+    }
+
+    .top,
+    .tools {
+      display: contents;
+    }
+
+    .back {
+      order: 0;
+    }
+
+    .title {
+      order: 1;
+    }
+
+    .mark {
+      order: 2;
+    }
+
+    .rooms {
+      order: 3;
+      margin-inline-end: 0;
+    }
+
+    .tools > :not(.rooms) {
+      order: 4;
+    }
+
+    .top > :last-child {
+      order: 5;
+    }
+  }
+}

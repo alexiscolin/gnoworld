@@ -102,6 +102,38 @@
     --chat-inset: var(--space-s);
   }
 
+  /* A phone's full chat (under 900 px): the visual viewport's height, which viewport.ts keeps in --chat-vh (100dvh where it is unset), so
+     the on-screen keyboard never covers the composer; a header of 44 px rows, whose height the arrival's pill stands under; and no room
+     kept free over the lines for that pill, which floats over them instead of leaving an empty band. */
+  @media (width < 900px) {
+    .screen[data-full] {
+      inset-block: calc(var(--flash-room) + var(--chat-vtop, 0px)) auto;
+      block-size: calc(var(--chat-vh, 100dvh) - var(--flash-room));
+    }
+
+    .screen[data-full][data-compact] [data-region="header"] {
+      padding-block: var(--space-2xs);
+    }
+
+    :root:has(.screen[data-full][data-compact]) {
+      --chat-head: 0px;
+      --banner-under: calc(
+        var(--flash-room) + var(--control-m) * 2 + var(--space-3xs) + var(--space-2xs) * 2 + var(--line-width)
+      );
+    }
+
+    .screen[data-full][data-compact] [data-region="conversation"] {
+      padding-block-start: 0;
+    }
+  }
+
+  /* On its side the header is one row. */
+  @media (width < 900px) and (height < 500px) {
+    :root:has(.screen[data-full][data-compact]) {
+      --banner-under: calc(var(--flash-room) + var(--control-m) + var(--space-2xs) * 2 + var(--line-width));
+    }
+  }
+
   .rail {
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;

@@ -357,3 +357,19 @@
     color: var(--color-new);
   }
 }
+
+/* A phone's finger: an author's name, one line high, gains an invisible box to 44 px (WCAG 2.5.5 target size), its look unchanged. */
+@layer components {
+  @media (width < 900px) {
+    .author button {
+      position: relative;
+    }
+
+    .author button::after {
+      content: "";
+      position: absolute;
+      inset-block: calc((1lh - var(--control-m)) / 2);
+      inset-inline: 0;
+    }
+  }
+}

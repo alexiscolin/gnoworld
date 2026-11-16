@@ -28,4 +28,17 @@
     font: var(--font-count);
     color: var(--color-text-muted);
   }
+
+  /* A phone: the title and Close stay at the panel's top while the thread scrolls under them (a short landscape window shows a few lines
+     of a thread), at the room's own surface. */
+  @media (width < 900px) {
+    .head {
+      position: sticky;
+      inset-block-start: 0;
+      /* raw: over the lines, which the panel's own inset and avatars never reach */
+      z-index: 1;
+      padding-block: var(--space-2xs);
+      background: var(--color-surface);
+    }
+  }
 }

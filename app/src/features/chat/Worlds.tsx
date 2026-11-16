@@ -29,6 +29,8 @@ export interface WorldsProps {
   universe: { id: string; isDefault: boolean };
   /** Each world's lines not yet seen, by its slug: a pill beside its planet, the world in view's left to its rooms. */
   unread?: Readonly<Record<string, number>> | undefined;
+  /** Rows with each world's name in words, no column: a phone's drawer holds the worlds below the rooms. */
+  rows?: boolean | undefined;
 }
 
 const NONE: readonly string[] = [];
@@ -42,7 +44,40 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
   return worlds.toSorted((a, b) => place(a) - place(b));
 }
 
-export function Worlds({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
+// A world as a row: its planet and its name, a link at the control's height; its unseen lines after the name.
+function WorldRows({ worlds, current, followed = NONE, unread }: WorldsProps) {
+  const session = useApp(({ login }) => login.session);
+  return (
+    <nav aria-label="Worlds">
+      <ul className={styles["rows"]}>
+        {inRailOrder(worlds, followed).map((world) => (
+          <li key={world.slug}>
+            <RouterLink
+              href={world.href}
+              onPointerEnter={() => {
+                listAhead(world.slug, session);
+              }}
+              aria-current={world.slug === current ? "page" : undefined}
+              className={styles["row"]}
+            >
+              <span className={styles["planet"]}>
+                <WorldPlanet world={hubWorldOf(world)} fallback="" name={world.name} decorative />
+              </span>
+              <span className="truncate">{world.name}</span>
+              {world.slug === current ? null : <UnreadPill count={unread?.[world.slug] ?? 0} />}
+            </RouterLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+export function Worlds(props: WorldsProps) {
+  return props.rows === true ? <WorldRows {...props} /> : <Column {...props} />;
+}
+
+function Column({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
   const session = useApp(({ login }) => login.session);
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);

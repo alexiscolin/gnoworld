@@ -167,3 +167,27 @@ describe("Worlds, the unread pills", () => {
     expect(pills(mount(<Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" />))).toEqual([]);
   });
 });
+
+// A phone has no column: the worlds are rows of a navigation, each its planet and its name, in the rail's order.
+describe("Worlds, as rows (a phone's drawer)", () => {
+  const rows = (current = "bubble") =>
+    mount(<Worlds rows universe={UNIVERSE} worlds={[BUBBLE, EARTH, GOVDAO]} current={current} />);
+
+  it("is the navigation named Worlds, one link to each world with its name in words, the Earth first", () => {
+    const nav = one(rows(), 'nav[aria-label="Worlds"]');
+    const links = all(nav, "a");
+    expect(links.map((link) => link.textContent)).toEqual(["Earth", "Bubble", "GovDAO"]);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/earth", "/w/bubble", "/w/govdao"]);
+  });
+
+  it("marks the world in view as the current page, and no other", () => {
+    const current = all(rows("govdao"), 'a[aria-current="page"]');
+    expect(current.map((link) => link.textContent)).toEqual(["GovDAO"]);
+  });
+
+  it("draws no tooltip, no credits button and no remove control: a drawer's list only links", () => {
+    const box = rows();
+    expect(button(box, "Credits")).toBeUndefined();
+    expect(all(box, "button")).toEqual([]);
+  });
+});

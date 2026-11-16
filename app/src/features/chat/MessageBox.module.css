@@ -108,7 +108,13 @@
     margin: var(--space-3xs) 0 var(--space-2xs) calc(var(--_in) - var(--space-2xs));
   }
 
-  .acts:empty {
+  /* Nothing but the phone's format control (MessageBox.tsx): no foot to draw. */
+  .acts:not(:has(> :not(.fold))) {
+    display: none;
+  }
+
+  /* The phone's fold control, hidden where the bar always shows. */
+  .fold {
     display: none;
   }
 
@@ -133,6 +139,42 @@
   @container (inline-size < 18rem) {
     .rule[data-drops] {
       display: none;
+    }
+  }
+}
+
+/* A phone: Send and the foot's controls at 44 px, the format bar folded behind its control (tools at 44 px, wrapping), and the field's
+   growth held to the room the visual viewport leaves (viewport.ts), so Send never leaves the screen. */
+@layer components {
+  @media (width < 900px) {
+    .box .send button[data-size],
+    .box .acts button[data-size] {
+      --_h: var(--control-m);
+    }
+
+    .acts:has(> .fold) {
+      display: flex;
+    }
+
+    .fold {
+      display: contents;
+    }
+
+    .format:not([data-open]) {
+      display: none;
+    }
+
+    /* Over the box's container query, which shrinks a narrow box's tools to 24 px. */
+    .format button[data-tool]:enabled {
+      --_h: var(--control-m);
+    }
+
+    .box [role="textbox"],
+    .box .field textarea {
+      /* layout: a share of the screen, so a long draft scrolls in its field and the foot stays in view */
+      --_share: 0.3;
+      max-block-size: min(calc(10lh + var(--space-s)), calc(var(--chat-vh, 100dvh) * var(--_share)));
+      overflow: auto;
     }
   }
 }
