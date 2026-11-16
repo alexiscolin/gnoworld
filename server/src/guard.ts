@@ -39,8 +39,11 @@ export async function json(c: Context): Promise<unknown> {
   return jsonOf(await c.req.text());
 }
 
-/** The login's session token of a request: its one cookie. */
-export const tokenOf = (c: Context): string | undefined => getCookie(c, "__Host-session");
+/** The login's one cookie, which holds the session token. */
+export const SESSION_COOKIE = "__Host-session";
+
+/** The login's session token of a request. */
+export const tokenOf = (c: Context): string | undefined => getCookie(c, SESSION_COOKIE);
 
 /** What the session `session` knows of a request's cookie (an account, or none). */
 export const sessionOf = <T>(c: Context, session: (token: string | undefined) => T): T => session(tokenOf(c));
