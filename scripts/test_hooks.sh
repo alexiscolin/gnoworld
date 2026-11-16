@@ -120,9 +120,6 @@ assert nested <= set(box["filesystem"]["denyWrite"]), "a command can write instr
 stryker = json.load(open(sys.argv[1].replace(".claude/settings.json", "stryker.config.json")))
 copied = [w for w in box["filesystem"]["denyWrite"] if w.startswith("**/") and w[3:].split("/")[0].lower() not in {p.lower() for p in stryker["ignorePatterns"]}]
 assert not copied, f"StrykerJS copies into its sandboxes what the sandbox refuses it to write there: {copied}"
-# The worktrees sit in ~/Server/gnoworld-wt, outside every other session's writable folders (Alexis, 2026-11-04). A worktree's own
-# .git, which names the folder worktree.sh takes git's config from outside the sandbox, is denied to its own session too (F5095).
-assert "~/Server/gnoworld-wt/*/.git" in box["filesystem"]["denyWrite"], "a session can point its worktree's git at another config (F5095)"
 # worktree.sh alone leaves the sandbox: it writes the trees it makes and removes, in its one root.
 assert box.get("excludedCommands") == ["sh scripts/worktree.sh *"], "a command other than worktree.sh runs outside the sandbox"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
@@ -156,12 +153,11 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/.git
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)", "Edit(/jarvis/package.json)", "Edit(/evals/package.json)",
            "Edit(/link-reader/package.json)", "Edit(/evals/pnpm-workspace.yaml)", "Edit(/evals/.pnpmfile.cjs)", "Edit(/evals/.pnpmfile.mjs)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
-           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
+           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(/tools/agent-github/**)",
            "Edit(/scripts/check.sh)", "Edit(/scripts/check_docs.py)", "Edit(/scripts/ergo.sh)", "Edit(/scripts/hidden.py)", "Edit(/scripts/related.py)",
-           "Edit(/scripts/speeds.py)", "Edit(/scripts/workshop.sb)", "Edit(/scripts/workshop.sh)",
-           "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
+           "Edit(/scripts/speeds.py)", "Edit(/scripts/workshop.sb)", "Edit(/scripts/workshop.sh)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
-# This tree's own, and the main checkout's few that 10a names (F5058, F5095): the other twins of every other worktree's and the main checkout's are the section `siblings`' (7z).
+# This tree's own: the twins of every other worktree's and the main checkout's are machine_rules.py's, judged by the section `siblings` (D13413).
 own = lambda rules: {r for r in rules if r in outside or not r.split("(", 1)[1].startswith(("//", "~/"))}
 assert own(edits(deny)) == outside, "the edits refused are not exactly the files run outside the sandbox and the instructions"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
@@ -244,6 +240,7 @@ assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktr
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
+assert "tools/agent-github" in listed, "agent-github's installer, which writes every profile's denies and which install_hooks.sh runs, is outside the harness list (F13449)"
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json", "CLAUDE.md"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs, or the instructions every session reads (a nested one no commit may hold: check_docs refuses it)"
 # Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
 # tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
@@ -549,83 +546,135 @@ if part siblings; then
 # docs and ledger, the gate's state, git's shared folder, the throwaway trees in $TMPDIR. The rules are read as Claude Code reads
 # them: a Read or Edit rule as a gitignore pattern (its permissions page: * within one segment, ** across), the sandbox's by
 # Claude Code 2.1.318's own source (* is [^/]*, ** is .*, a deny covers its path and all under it, a link resolved).
-python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "a sibling worktree's closed files are open to this session (F4890, F4891, F4892)"
-import functools, json, os, re, sys
+python3 -I - "$here/../.claude/settings.json" "$here/machine_rules.py" "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)" <<'PY' || fail "a sibling worktree's closed files are open to this session (F4890, F4891, F4892)"
+import functools, glob, json, os, re, runpy, subprocess, sys, tempfile
 
-MAIN = "~/Server/gnoworld"
-# The next parts' worktrees (7w3, F4893's remedy a): beside the main checkout, out of the temp folder, so no part's command writes
-# there at all; the chief's alone, by --add-dir. Its twins hold the closed files against the chief's commands and every file tool,
-# by one spelling (no link on its way). The temp folder's worktrees are gone: nothing is written there for them (the sandbox half below
-# still looks, and fails on one that stands).
-NEW = "~/Server/gnoworld-wt"
+# The committed file holds the session's own tree's rules and those of no machine's folders; machine_rules.py derives this machine's
+# twins from them, which install_hooks.sh writes into every Claude profile (D13413). Claude Code adds the user's lists to the project's
+# (its settings page: lists merge instead of overriding), so both are judged together, on a layout of the test's own: a main checkout
+# under the home folder, its "-wt" folder beside it (D13415), the uid's temporary folder.
+mr = runpy.run_path(sys.argv[2])
 HOME, ROOT = os.path.expanduser("~"), "/own"  # ROOT: the session's own tree, for its relative rules, apart from every sibling
-NEW_HOME = HOME + NEW[1:]
+MAIN_HOME = HOME + "/work/gnoworld"
+MAIN, NEW, NEW_HOME = "~/work/gnoworld", "~/work/gnoworld-wt", MAIN_HOME + "-wt"
+TMPU = f"/private/tmp/claude-{os.getuid()}"
 # The instructions Claude Code reads in every folder above a session's (its memory page: CLAUDE.md and CLAUDE.local.md "from your
-# current working directory and every directory above it"; .claude/CLAUDE.md and .claude/rules by its source), closed in the folders
-# above a worktree, which the sandbox writes from the temp folder down, and above the main checkout, which the file tools reach (S4).
-ABOVE, ABOVE_MAIN = ("/private/tmp", "/private/tmp/claude-501"), ("~", "~/Server")
-# AGENTS.md too (7w3, F5323, the red pass's T7): read above a session's folder when no CLAUDE.md stands there, or when the settings ask
-# for both kinds (the memory page).
-INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules", "AGENTS.md", ".claude/AGENTS.md")
+# current working directory and every directory above it"; .claude/CLAUDE.md, .claude/rules and AGENTS.md by its source and that page),
+# closed above a worktree, which the sandbox writes from the temp folder down; above the main checkout no session writes (D13414).
+ABOVE = ("/private/tmp", TMPU)
 tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
-s = json.load(open(sys.argv[1]))
-writes, deny = s["sandbox"]["filesystem"]["denyWrite"], s["permissions"]["deny"]
-# Each once: a script run twice that added its twins again would pass the sets below (the red pass, T3).
-assert len(writes) == len(set(writes)) and len(deny) == len(set(deny)), "a rule is written twice"
-rules = [(m[1], m[2]) for r in deny if (m := re.fullmatch(r"(Read|Edit)\((.+)\)", r))]
-assert all(p.startswith(("/", "~/")) for k, p in rules), "a Read or Edit deny with no anchor, which no twin follows (R6)"
-own_writes = [w for w in writes if not w.startswith(("/", "~"))]
-# Alexis's unlock (2026-11-06, the speed plan): a worktree's harness, rules and configs are open to its session; its twins keep the
-# gate's own hooks, the guard, the secret scan, the dependency files, git's folder and the instructions alone.
+# The generator's lists as the owner chose them (Alexis's unlock, 2026-11-06: a worktree's harness, rules and configs open to its
+# session, agent-github's tools among them, F13449): a change to one is a change of who may write what, read in review.
+INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules", "AGENTS.md", ".claude/AGENTS.md")
 KEPT = {"**/.claude/skills", "**/CLAUDE.local.md", ".git/hooks", ".git/config", ".git/commondir", ".githooks/pre-commit", ".githooks/pre-push",
         ".githooks/records.sh", ".mcp.json", ".node-version", ".npmrc", ".pnpmfile.cjs", ".pnpmfile.mjs", "CLAUDE.local.md", "package.json",
         "pnpm-lock.yaml", "pnpm-workspace.yaml", "scripts/.gitleaksignore", "scripts/gitleaks-private.toml", "scripts/gitleaks.toml",
         "scripts/guard.py", "scripts/install_hooks.sh", "scripts/scan_secrets.sh", "scripts/worktree.sh"}
-twin_writes = sorted(KEPT)
-own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith("//")]
-# The twins, derived from the tree's own rules, and the folders above: nothing more is closed, nothing less.
-rule_of = lambda n: f"{n}/**" if n == ".claude/rules" else n
-want_writes = {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
-want_writes |= {f"{NEW}/*/{w}" for w in twin_writes} | {f"{NEW}/*/.git"} | {f"{NEW}/{n}" for n in INSTRUCTIONS}
-# The next parts' folder's own .claude, whole: the chief's --add-dir of it loads its skills, commands and agents (Claude Code 2.1.318's
-# loaders read an added folder's; lot 2's S2-2), and no tree lives there.
-want_writes |= {f"{NEW}/.claude"}
-# The unlock opens these in a worktree (the main checkout keeps them closed); of .githooks, the hooks that guard main stay closed.
 OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
           "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh", "/scripts/check.sh", "/scripts/check_docs.py", "/scripts/ergo.sh",
-          "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py", "/scripts/workshop.sb", "/scripts/workshop.sh"}
+          "/scripts/hidden.py", "/scripts/related.py", "/scripts/speeds.py", "/scripts/workshop.sb", "/scripts/workshop.sh", "/tools/agent-github/**"}
+assert tuple(mr["INSTRUCTIONS"]) == INSTRUCTIONS and set(mr["KEPT"]) == KEPT and set(mr["OPENED"]) == OPENED, "machine_rules.py's lists are not the owner's"
+s = json.load(open(sys.argv[1]))
+committed_writes, committed_deny = s["sandbox"]["filesystem"]["denyWrite"], s["permissions"]["deny"]
+# The committed file names no folder of one machine (D13411): its absolute entries are the home folder's credentials and instructions
+# and the temporary folder's instructions, nothing else, in every list.
+fs = s["sandbox"]["filesystem"]
+CREDENTIALS = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)", "Read(~/.local/share/gnomcp/**)",
+               "Read(~/Library/Application Support/gno/**)", "Read(~/.claude.json)"}
+named = lambda n: f"{n}/**" if n == ".claude/rules" else n
+GENERIC = CREDENTIALS | {f"Edit({a}/{named(n)})" for a in ("~", "//tmp", "//private/tmp") for n in INSTRUCTIONS}
+absolute = {r for r in committed_deny if re.fullmatch(r"\w+\((//|~).*\)", r)}
+assert absolute == GENERIC, ("the committed settings' absolute rules are not the home folder's and the temporary folder's alone", sorted(absolute - GENERIC)[:3], sorted(GENERIC - absolute)[:3])
+assert not [w for w in committed_writes if w.startswith(("/", "~"))], "the committed denyWrite names an absolute folder"
+assert set(fs.get("denyRead", [])) == {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws", "~/.local/share/gnomcp", "~/Library/Application Support/gno", "~/.claude.json"}, "denyRead changed"
+assert set(fs.get("allowWrite", [])) == {"~/.cache/gno-toolchains/onyx/gnohome", "~/.cache/gnoworld-tools", "~/.cache/go-build", "~/Library/Caches/go-build", "~/go/pkg/mod"}, "allowWrite changed"
+assert not s["permissions"].get("additionalDirectories"), "the committed settings add a working directory to every session"
+
+
+def want(main, new, tmpu):
+    """The twins as the owner's rules make them, written here apart from the generator: under the main checkout every relative rule
+    and its scripts whole; under each worktree those the unlock keeps and its .git; the worktrees' folder's and the temporary folder's
+    instructions, the latter by both spellings."""
+    rule = lambda p: p if p.startswith("~") else "/" + p
+    own = [(m[1], m[2]) for r in committed_deny if (m := re.fullmatch(r"(Read|Edit)\((/[^/].*)\)", r))]
+    kept = [(k, q) for k, q in own if q not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
+    rules_ = {f"{k}({rule(main)}{q})" for k, q in own} | {f"Edit({rule(main)}/scripts/**)"} | {f"{k}({rule(new)}/*{q})" for k, q in kept}
+    rules_ |= {f"Edit({rule(new)}/*/.git)", f"Edit({rule(new)}/.claude/**)"} | {f"Edit({rule(f)}/{named(n)})" for f in (new, tmpu, tmp(tmpu)) for n in INSTRUCTIONS}
+    writes_ = {f"{tmpu}/{n}" for n in INSTRUCTIONS} | {f"{new}/{n}" for n in INSTRUCTIONS} | {f"{new}/.claude", f"{new}/*/.git"} | {f"{new}/*/{w}" for w in KEPT}
+    return rules_, writes_
+
+
+for main_abs, home, uid, main, new in ((MAIN_HOME, HOME, os.getuid(), MAIN, NEW), ("/opt/x/gnoworld", "/h", 4242, "/opt/x/gnoworld", "/opt/x/gnoworld-wt")):
+    got, (rules_, writes_) = mr["rules"](s, main_abs, home, uid), want(main, new, f"/private/tmp/claude-{uid}")
+    assert set(got["deny"]) == rules_ and set(got["denyWrite"]) == writes_, ("machine_rules.py's twins", main_abs, sorted(rules_ ^ set(got["deny"]))[:3], sorted(writes_ ^ set(got["denyWrite"]))[:3])
+mine = mr["rules"](s, MAIN_HOME, HOME, os.getuid())
+writes, deny = committed_writes + mine["denyWrite"], committed_deny + mine["deny"]
+# Each once: a twin committed as well, or a rule written twice, would pass the checks below (the red pass, T3).
+assert len(writes) == len(set(writes)) and len(deny) == len(set(deny)), "a rule is written twice, or the committed file holds a twin"
+rules = [(m[1], m[2]) for r in deny if (m := re.fullmatch(r"(Read|Edit)\((.+)\)", r))]
+assert all(p.startswith(("/", "~/")) for k, p in rules), "a Read or Edit deny with no anchor, which no twin follows (R6)"
+own_writes = [w for w in committed_writes if not w.startswith(("/", "~"))]
+twin_writes = sorted(KEPT)
+own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith("//")]
 twin_rules = [(k, p) for k, p in own_rules if p not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
-want_rules = {f"{k}({MAIN}{p})" for k, p in own_rules}
-want_rules |= {f"{k}({NEW}/*{p})" for k, p in twin_rules} | {f"Edit({NEW}/*/.git)"}
-want_rules |= {f"Edit({MAIN}/scripts/**)"}  # 10a (F5058): the main checkout's scripts, out of every worktree session's file tools
-want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
-want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN + (NEW,) for n in INSTRUCTIONS} | {f"Edit({NEW}/.claude/**)"}
-got_writes = {w for w in writes if w.startswith(("/", "~"))}
-assert got_writes == want_writes, ("denyWrite's twins", sorted(want_writes - got_writes)[:4], sorted(got_writes - want_writes)[:4])
-credentials = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)", "Read(~/.local/share/gnomcp/**)",
-               "Read(~/Library/Application Support/gno/**)", "Read(~/.claude.json)"}  # the wiring section's
-got_rules = {f"{k}({p})" for k, p in rules if p.startswith(("//", "~/"))} - credentials
-assert got_rules == want_rules, ("the Read and Edit twins", sorted(want_rules - got_rules)[:4], sorted(got_rules - want_rules)[:4])
-# No part's command writes the next parts' folder (F5322, the red pass's T2): these settings give the sandbox no write root at it, above
-# it or in it, by allowWrite or additionalDirectories, each a write root of every sandboxed command (the sandboxing page). The chief's
-# --add-dir is its own session's, in no file.
+# No part's command writes the next parts' folder (F5322) nor a folder above the main checkout, whose instructions no rule names since
+# D13414: these settings give the sandbox no write root there, by allowWrite or additionalDirectories, each a write root of every
+# sandboxed command (the sandboxing page); the sandbox is on and lets no command out; the file tools write the session's folders alone.
 expand = lambda p: HOME + p[1:] if p == "~" or p.startswith("~/") else p if p.startswith("/") else ROOT + "/" + p
-roots = [expand(p.rstrip("/")) for p in s["sandbox"]["filesystem"].get("allowWrite", []) + s["permissions"].get("additionalDirectories", [])]
-wide = [r for r in roots if r in ("", NEW_HOME) or NEW_HOME.startswith(r + "/") or r.startswith(NEW_HOME + "/")]
-assert not wide, f"a write root reaches the next parts' worktrees, to every part's command: {wide}"
+raw = s["sandbox"]["filesystem"].get("allowWrite", []) + s["permissions"].get("additionalDirectories", [])
+assert not [p for p in raw if ".." in p.split("/")], "a write root climbs with .."
+roots = [os.path.normpath(expand(p.rstrip("/"))) for p in raw]
+above_main = os.path.dirname(MAIN_HOME)
+real_main = os.path.dirname(sys.argv[3])
+for main_home in (MAIN_HOME, real_main):
+    new_home, above = main_home + "-wt", os.path.dirname(main_home)
+    wide = [r for r in roots if r in ("/", new_home, above) or new_home.startswith(r + "/") or r.startswith(new_home + "/") or above.startswith(r + "/")]
+    assert not wide, f"a write root reaches the next parts' worktrees or a folder above the main checkout ({main_home}), to every part's command: {wide}"
+assert s["sandbox"].get("enabled") is True and s["sandbox"].get("allowUnsandboxedCommands") is False and s["permissions"].get("blockWritesOutsideWorkingDirectories") is True, \
+    "a command or a file tool can write above the main checkout, whose instructions no rule names since D13414"
 # The main checkout's local settings, which every gnoworld session reads (lot 2's S2-3), when this machine holds them: the folders they
 # add are slices' reports alone (lot 1's S1, R1: the whole .claude/tmp gave every part the chief's gate records and the briefs), none
 # reaches the next parts' folder, and they close the instructions below the main checkout's root and above the next parts' trees.
-local = os.path.join(HOME, "Server/gnoworld/.claude/settings.local.json")
+short = lambda p: "~" + p[len(HOME):] if p.startswith(HOME + "/") else "/" + p
+local = os.path.join(real_main, ".claude/settings.local.json")
 if os.path.exists(local):
     lp = json.load(open(local)).get("permissions", {})
     added = [expand(d.rstrip("/")) for d in lp.get("additionalDirectories", [])]
-    odd = [d for d in added if not re.fullmatch(re.escape(HOME + "/Server/gnoworld/.claude/tmp/") + r"slice-\d+/reports", d)]
+    odd = [d for d in added if not re.fullmatch(re.escape(real_main + "/.claude/tmp/") + r"slice-\d+/reports", d)]
     assert not odd, f"the main checkout's local settings add folders other than a slice's reports, to every session: {odd}"
-    kin = {f"Edit({MAIN}/**/{n})" for n in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", ".claude/rules/**", ".claude/skills/**")} | {f"Edit({NEW}/.claude/**)"}
+    kin = {f"Edit({short(real_main)}/**/{n})" for n in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", ".claude/rules/**", ".claude/skills/**")} | {f"Edit({short(real_main)}-wt/.claude/**)"}
     assert kin <= set(lp.get("deny", [])), ("the main checkout's local settings leave instructions open to the sessions without 7w3's rules", sorted(kin - set(lp.get("deny", []))))
 else:
     print(f"siblings: SKIPPED (no {local}: the local settings every session reads are not judged)")
+# This machine's twins in every profile (D13413), when this tree's main checkout is one of this user's, not a clone in a temporary
+# folder: a relative rule added since the last install_hooks.sh guards no other tree until it runs (the security review of D13413).
+# They are main's, which install_hooks.sh installs, not this branch's: a branch's new rule is judged once it is main's.
+temporary = {"/private/tmp", "/tmp", os.path.realpath(tempfile.gettempdir())}
+here_main = os.path.realpath(real_main)
+# The object itself, whatever a replace ref shows, as install_hooks.sh reads it; the branch, never a tag or a file named main.
+main_settings = subprocess.run(["git", "--no-replace-objects", f"--git-dir={sys.argv[3]}", "show", "refs/heads/main:.claude/settings.json"], capture_output=True, text=True)
+# The profiles machine_rules.py writes: a folder that is a link is none of them; one whose settings are no file holds no twin, said.
+profiles = []
+for q in [os.path.join(HOME, ".claude")] + sorted(glob.glob(os.path.join(glob.escape(HOME), ".claude-*"))):
+    if os.path.islink(q) or not os.path.lexists(os.path.join(q, "settings.json")):
+        continue
+    if os.path.isfile(os.path.join(q, "settings.json")):
+        profiles.append(q)
+    else:
+        print(f"siblings: {q}'s settings are no file: its twins are not judged")
+if profiles and main_settings.returncode == 0 and not any(here_main == r or here_main.startswith(r + "/") for r in temporary):
+    twins_here = mr["rules"](json.loads(main_settings.stdout), here_main, HOME, os.getuid())
+    for q in profiles:
+        try:
+            ps = json.load(open(os.path.join(q, "settings.json")))
+            held = set(ps.get("permissions", {}).get("deny", [])) | set(ps.get("sandbox", {}).get("filesystem", {}).get("denyWrite", []))
+        except (OSError, ValueError, AttributeError, TypeError):
+            print(f"siblings: {q}'s settings cannot be read as Claude Code reads them: its twins are not judged")
+            continue
+        missing = [r for r in twins_here["deny"] + twins_here["denyWrite"] if r not in held]
+        assert not missing, f"{q}'s settings lack {len(missing)} of this machine's twins of the committed rules (e.g. {missing[0]}): run install_hooks.sh (D13413)"
+else:
+    print("siblings: SKIPPED (no Claude profile, no main, or this tree's main checkout is a temporary one: the twins installed are not judged)")
 
 
 @functools.cache  # each pattern once: rebuilt, it was 0.8 s of the section's 0.9 (R5)
@@ -695,16 +744,17 @@ for tree in (f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
         assert refused(f"{tree}/{one(w)}"), f"a command can write {tree}/{w}"
     for k, p in twin_rules + [("Edit", "/.git")]:
         assert denied(k, f"{tree}{one(p)}"), f"the file tools can {k.lower()} {tree}{p}"
+assert denied("Edit", f"{MAIN_HOME}/scripts/new.py") and refused(f"{MAIN_HOME}/scripts/new.py"), "a worktree session can write the main checkout's scripts (F5058)"
 for k, p in own_rules:
-    assert denied(k, f"{HOME}/Server/gnoworld{one(p)}"), f"the file tools can {k.lower()} the main checkout's {p}"
-    assert k == "Read" or refused(f"{HOME}/Server/gnoworld{one(p)}"), f"a command can write the main checkout's {p}"
+    assert denied(k, f"{MAIN_HOME}{one(p)}"), f"the file tools can {k.lower()} the main checkout's {p}"
+    assert k == "Read" or refused(f"{MAIN_HOME}{one(p)}"), f"a command can write the main checkout's {p}"
 # An instruction file below a tree's root, at any depth, the session's own tree or a sibling's (7w3, S2-3): to commands and the file
 # tools alike, in the main checkout too. A name that only holds one of theirs stays open.
-for tree in (ROOT, f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
+for tree in (ROOT, f"{NEW_HOME}/slice-7", MAIN_HOME):
     for p in ("app/CLAUDE.md", "docs/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
               "server/src/.claude/rules/x.md", "app/.claude/skills/s/SKILL.md", "CLAUDE.md", "AGENTS.md"):
         # A sibling's rules are open since the unlock (2026-11-06), and its other instructions to the file tools alone.
-        sibling = tree not in (ROOT, f"{HOME}/Server/gnoworld")
+        sibling = tree not in (ROOT, MAIN_HOME)
         if sibling and ".claude/rules/" in p:
             continue
         assert denied("Edit", f"{tree}/{p}"), f"the file tools can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
@@ -714,13 +764,13 @@ for tree in (ROOT, f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
 for p in ("skills/s/SKILL.md", "commands/c.md", "agents/a.md", "settings.json"):
     assert refused(f"{NEW_HOME}/.claude/{p}") and denied("Edit", f"{NEW_HOME}/.claude/{p}"), f"{NEW_HOME}/.claude/{p} is open, which the chief's --add-dir loads (S2-2)"
 # The instructions above every session: to the file tools by both spellings, to commands where the sandbox would let them write.
-for p in ABOVE + tuple(HOME + a[1:] for a in ABOVE_MAIN + (NEW,)):
+for p in ABOVE + (HOME, NEW_HOME):
     for n in INSTRUCTIONS:
         path = f"{p}/{n}" + ("/x.md" if n == ".claude/rules" else "")
         for spelt in {path, tmp(path) if path.startswith("/private/tmp") else path}:
             assert denied("Edit", spelt), f"the file tools can write {spelt}, which Claude Code reads above every session in it"
         assert p not in ABOVE[1:] + (NEW_HOME,) or refused(path), f"a command can write {path}, which Claude Code reads above every worktree session"
-for p in ("/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md", f"{NEW_HOME}/csp.diff"):
+for p in (f"{TMPU}/notes.md", f"{above_main}/notes.md", f"{NEW_HOME}/csp.diff"):
     assert not refused(p) and not denied("Edit", p), f"{p} is closed, and no session reads it as instructions"
 # What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
 # gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
@@ -733,10 +783,10 @@ assert not refused(f"{NEW_HOME}/tomorrow"), "a new worktree's folder is closed"
 for p in (".git/worktrees/tomorrow/index", ".git/worktrees/tomorrow/HEAD", ".git/worktrees/tomorrow/COMMIT_EDITMSG", ".git/worktrees/tomorrow/MERGE_HEAD",
           ".git/worktrees/tomorrow/MERGE_MSG", ".git/worktrees/tomorrow/ORIG_HEAD", ".git/objects/ab/cdef", ".git/refs/heads/slice-9", ".git/packed-refs",
           ".git/info/exclude", ".git/index", ".git/logs/HEAD", ".claude/tmp/slice-7/reports/slice-7z.md"):
-    assert not refused(f"{HOME}/Server/gnoworld/{p}") and not denied("Edit", f"{HOME}/Server/gnoworld/{p}"), f"the main checkout's {p} is closed"
+    assert not refused(f"{MAIN_HOME}/{p}") and not denied("Edit", f"{MAIN_HOME}/{p}"), f"the main checkout's {p} is closed"
 for w in own_writes + ["scripts/guard.py", ".claude/settings.json", ".git"]:
-    for throwaway in ("/tmp/claude-501/tmpab12/tree-tmpab12", "/tmp/claude-501/test_hooks.ab12/r", "/private/tmp/claude-501/gnoworld-wt2/x",
-                      f"{HOME}/Server/gnoworld-wt2/x", f"{HOME}/Server/gnoworld-wtx"):
+    for throwaway in (f"{tmp(TMPU)}/tmpab12/tree-tmpab12", f"{tmp(TMPU)}/test_hooks.ab12/r", f"{TMPU}/gnoworld-wt2/x",
+                      f"{MAIN_HOME}-wt2/x", f"{MAIN_HOME}-wtx"):
         assert not refused(f"{throwaway}/{one(w)}"), f"a twin closes {throwaway}/{w}, a tree outside the worktrees' folder"
 PY
 # The sandbox itself, from this command, when it runs in Claude Code's (SANDBOX_RUNTIME=1) with this tree's own rules: a fresh file
@@ -753,11 +803,12 @@ PY
 # its root; a folder carrying one moved in is printed, a known gap. This half cannot be mutated (the sandbox's rules are the
 # session's): the static half above is what harness_mutate judges.
 if [ "$SANDBOX_RUNTIME" = 1 ]; then
-	python3 -I - "$here/.." "$t" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's or 7w3's rules or predate them; restart it once apply-7w3.sh has run (F4890, F5322)"
+	python3 -I - "$here/.." "$t" "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's or 7w3's rules or predate them; restart it once apply-7w3.sh has run (F4890, F5322)"
 import errno, os, sys, tempfile
 
 own, scratch = os.path.realpath(sys.argv[1]), sys.argv[2]
-WT, name = "/private/tmp/claude-501/gnoworld-wt", f".probe-siblings-{os.getpid()}"
+WT, name = f"/private/tmp/claude-{os.getuid()}/gnoworld-wt", f".probe-siblings-{os.getpid()}"
+MAIN = os.path.dirname(sys.argv[3])  # this checkout's main one, git's shared folder's
 
 
 def write(path, folder=False, append=False, link=None):
@@ -832,13 +883,18 @@ def instructions(path):
 tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
 others = [os.path.join(WT, d) for d in sorted(os.listdir(WT)) if os.path.isdir(os.path.join(WT, d, ".githooks"))]
 others = [d for d in others if os.path.realpath(d) != own and not os.path.basename(d).startswith("probe-siblings-")]  # S7
-secrets = os.path.expanduser("~/Server/gnoworld/deploy/secrets")
+secrets = os.path.join(MAIN, "deploy/secrets")
 if os.path.isdir(secrets):
     unread(secrets, folder=True)
 else:
     print(f"siblings: SKIPPED (no {secrets}: the main checkout's secrets are not judged)")
 for p in (WT, os.path.dirname(WT)):
     instructions(os.path.join(p, "CLAUDE.md"))
+above = os.path.realpath(os.path.dirname(MAIN))
+if above == "/private/tmp" or above.startswith("/private/tmp/") or above.startswith(os.path.realpath(tempfile.gettempdir())):
+    print(f"siblings: SKIPPED ({above}, above this checkout, is a temporary folder: what no session writes above it is not judged)")
+else:
+    instructions(os.path.join(above, "CLAUDE.md"))
 if others:
     sibling = others[0]
     os.symlink(sibling, os.path.join(scratch, "sibling"))
@@ -894,7 +950,7 @@ if fresh:
 # writes no sibling there and moves none (the sandbox refuses a path under no write root, the folder's own as any other). A session
 # that makes a folder there is the chief's, by its --add-dir: its trees are held by their twins alone, and a move out and back by
 # its own commands stays open, F4893's for it alone. A real sibling is never moved: a running session's folder would go with it.
-NEW = os.path.expanduser("~/Server/gnoworld-wt")
+NEW = MAIN + "-wt"
 if not os.path.isdir(NEW):
     print(f"siblings: SKIPPED (no {NEW}: the next parts' folder is not judged)")
 else:
@@ -906,7 +962,7 @@ else:
         planted = None
     # The chief's session is the one whose commands write the main checkout, its own project (a part's write no folder of it but git's
     # and the shared reports): only it may make a folder in NEW (the red pass's T2).
-    main = os.path.expanduser("~/Server/gnoworld")
+    main = MAIN
     try:
         os.close(os.open(os.path.join(main, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
     except PermissionError as e:
@@ -2971,7 +3027,8 @@ ran "install_hooks.sh, its branch moved"
 # which must be GitHub's; the installed command finds its code through its link. A commit without it installs no land.
 [ ! -e "$HOME/.local/share/land/repo" ] || [ "$(cat "$HOME/.local/share/land/repo")" != o/r ] || fail "install_hooks.sh installed land from a commit without it"
 git -C "$i" checkout -q -b landed main && cp "$here/land.py" "$here/agent_pr.py" "$i/scripts/"
-mkdir -p "$i/tools/agent-github" && cp "$here/../tools/agent-github/install.sh" "$i/tools/agent-github/"
+mkdir -p "$i/tools/agent-github" "$i/.claude" && cp "$here/../tools/agent-github/install.sh" "$i/tools/agent-github/" && cp "$here/machine_rules.py" "$i/scripts/" &&
+	cp "$here/../.claude/settings.json" "$i/.claude/"
 git -C "$i" add -A && in_i git commit -qm "feat: land" && git -C "$i" checkout -q main && git -C "$i" remote add origin git@github.com:o/r.git
 lh="$i/home/.local"
 (cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >/dev/null 2>&1) || fail "install_hooks.sh failed with land in its commit"
@@ -3009,6 +3066,59 @@ case :$(command -p getconf PATH): in *":$(dirname "$(command -v gitleaks)"):"*) 
 	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
 	;;
 esac
+# This machine's twins of the committed rules go into every Claude profile's user settings (D13413): this repository's checkout is
+# the main one, "$i-wt" its worktrees' folder; a copy of each settings file is kept, nothing in them is lost, and none is added twice.
+# A profile holding a twin already and other keys keeps them; one that is not JSON or is a link is left as it is, the others written.
+main_i=$(cd "$i" && pwd -P) h6="$i/home6"
+mkdir -p "$h6/.claude" "$h6/.claude-w" "$h6/.claude-bad" "$h6/.claude-link" "$h6/.claude-shape" "$h6/.claude-dir/settings.json" "$t/elsewhere-profile" &&
+	echo '{}' >"$h6/.claude-w/settings.json" && echo '{' >"$h6/.claude-bad/settings.json" && echo '{"permissions": null}' >"$h6/.claude-shape/settings.json" &&
+	echo '{}' >"$t/elsewhere-profile/settings.json" && ln -s "$t/elsewhere-profile" "$h6/.claude-folderlink"
+printf '{"permissions": {"deny": ["Read(~/.x)", "Read(/%s/.env)"]}, "sandbox": {"filesystem": {"allowWrite": ["~/.y"], "denyWrite": ["~/.z"]}}, "hooks": {"Stop": []}}\n' "$main_i" >"$h6/.claude/settings.json"
+echo '{}' >"$t/linked-settings.json" && ln -s "$t/linked-settings.json" "$h6/.claude-link/settings.json" && cp "$h6/.claude/settings.json" "$t/settings-before.json"
+(cd "$i" && HOME="$h6" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed writing this machine's rules: $(cat "$t/out")"
+grep -q "claude-bad: not JSON" "$t/out" && grep -q "claude-link: a link" "$t/out" && grep -q "claude-shape: not settings as Claude Code reads them" "$t/out" &&
+	grep -q "claude-dir: unreadable" "$t/out" && grep -q "claude-folderlink: a link" "$t/out" && [ "$(cat "$t/elsewhere-profile/settings.json")" = '{}' ] &&
+	[ "$(cat "$h6/.claude-bad/settings.json")" = '{' ] && [ "$(cat "$h6/.claude-shape/settings.json")" = '{"permissions": null}' ] && [ -L "$h6/.claude-link/settings.json" ] &&
+	[ "$(cat "$t/linked-settings.json")" = '{}' ] || fail "install_hooks.sh did not leave a profile that is not JSON, or a link, as it was: $(cat "$t/out")"
+python3 -I - "$here/machine_rules.py" "$here/../.claude/settings.json" "$main_i" "$h6" "$t/settings-before.json" <<'PY' || fail "install_hooks.sh did not write this machine's rules into every profile, or lost what a profile held"
+import filecmp, glob, json, os, runpy, sys
+mr, settings, main, home, before = runpy.run_path(sys.argv[1]), json.load(open(sys.argv[2])), sys.argv[3], sys.argv[4], sys.argv[5]
+want = mr["rules"](settings, main, home, os.getuid())
+assert want["deny"] and want["denyWrite"] and f"Read(/{main}/.env)" in want["deny"]
+for profile in (".claude", ".claude-w"):
+    s = json.load(open(f"{home}/{profile}/settings.json"))
+    deny, writes = s["permissions"]["deny"], s["sandbox"]["filesystem"]["denyWrite"]
+    assert set(want["deny"]) <= set(deny) and set(want["denyWrite"]) <= set(writes) and len(deny) == len(set(deny)), profile
+    backups = glob.glob(f"{home}/{profile}/settings.json.bak-install-hooks-*")
+    assert len(backups) == 1, (profile, backups)
+s = json.load(open(f"{home}/.claude/settings.json"))
+assert s["permissions"]["deny"][:2] == ["Read(~/.x)", f"Read(/{main}/.env)"] and s["sandbox"]["filesystem"]["allowWrite"] == ["~/.y"], s
+assert s["sandbox"]["filesystem"]["denyWrite"][0] == "~/.z" and s["hooks"] == {"Stop": []}, s
+assert filecmp.cmp(glob.glob(f"{home}/.claude/settings.json.bak-install-hooks-*")[0], before, shallow=False), "the copy kept is not the settings as they were"
+PY
+cp "$h6/.claude/settings.json" "$t/settings-after.json"
+(cd "$i" && HOME="$h6" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && [ "$(grep -c ': 0 rule(s)' "$t/out")" = 2 ] && cmp -s "$h6/.claude/settings.json" "$t/settings-after.json" &&
+	[ "$(ls "$h6/.claude" | grep -c bak-install-hooks)" = 1 ] || fail "a second install_hooks.sh changed a profile it had written: $(cat "$t/out")"
+# From a worktree, the main checkout is git's shared folder's, never the worktree; with no profile at all, nothing is made.
+git -C "$i" worktree add -q --detach "$t/wt-i" landed && h7="$i/home7" && mkdir -p "$h7/.claude" && echo '{}' >"$h7/.claude/settings.json"
+(cd "$t/wt-i" && HOME="$h7" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed from a worktree: $(cat "$t/out")"
+python3 -I - "$here/machine_rules.py" "$here/../.claude/settings.json" "$main_i" "$h7" <<'PY' || fail "install_hooks.sh from a worktree did not root this machine's rules at the main checkout"
+import json, os, runpy, sys
+mr, settings, main, home = runpy.run_path(sys.argv[1]), json.load(open(sys.argv[2])), sys.argv[3], sys.argv[4]
+assert set(mr["rules"](settings, main, home, os.getuid())["deny"]) <= set(json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"])
+PY
+git -C "$i" worktree remove --force "$t/wt-i"
+(cd "$i" && HOME="$i/home8" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && ! grep -q "install_hooks: .*claude" "$t/out" && [ ! -e "$i/home8/.claude" ] ||
+	fail "install_hooks.sh wrote a profile where none was: $(cat "$t/out")"
+# A home folder whose name holds a space is one folder, its profile written.
+h9="$i/home 9" && mkdir -p "$h9/.claude" && echo '{}' >"$h9/.claude/settings.json"
+(cd "$i" && HOME="$h9" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) && grep -q "home 9/.claude: [1-9][0-9]* rule(s)" "$t/out" ||
+	fail "install_hooks.sh did not write a profile in a home folder whose name holds a space: $(cat "$t/out")"
+# A reinstall over an installed land replaces it whole: the link, a stamped copy, no folder of the new one left (F13464's path, which
+# the owner's reinstall takes after every merge).
+(cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed reinstalling land: $(cat "$t/out")"
+[ "$(readlink "$lh/bin/land")" = "$lh/share/land/land.py" ] && head -1 "$lh/share/land/land.py" | grep -Eqx '#!/usr/bin/env -S -i LC_ALL=C (/[^ /@]+)+/python3 -I' &&
+	[ ! -e "$lh/share/land/new" ] && ! grep -q "no new land installed" "$t/out" || fail "install_hooks.sh did not replace an installed land whole: $(cat "$t/out")"
 # A reinstall that cannot install the new land keeps the old one, linked and whole (F13464: #33's install removed it first).
 cp "$lh/share/land/land.py" "$t/land_before.py"
 (cd "$i" && HOME="$i/home" alexis sh scripts/install_hooks.sh oldland >"$t/out" 2>&1) || fail "install_hooks.sh failed on a reinstall it refused: $(cat "$t/out")"
