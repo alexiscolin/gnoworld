@@ -19,21 +19,21 @@ describe("the framed planet", () => {
 
   it("is framed by the study's numbers", () => {
     expect(css).toContain("--_x: 76vi;");
-    expect(css).toContain("min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-s)) / 1.18)");
+    expect(css).toContain("min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-m)) / 1.04)");
   });
 
   it.each([
     [1728, 1080],
     [1491, 920],
     [1280, 800],
-  ])("keeps its glow a step right of the plate's content at %i by %i", (w, h) => {
-    const step = px("--space-s");
+  ])("keeps its limb a step right of the plate's content at %i by %i", (w, h) => {
+    const step = px("--space-m");
     expect(token("--page-edge")).toBe("var(--space-m)");
     expect(token("--plate-inset-end")).toBe("var(--plate-fade)");
     const contentRight = px("--space-m") + plate(w) - px("--plate-fade");
     const x = 0.76 * w;
-    const radius = Math.min(0.37 * w, 0.59 * h, (x - contentRight - step) / 1.18);
+    const radius = Math.min(0.37 * w, 0.59 * h, (x - contentRight - step) / 1.04);
     expect(radius).toBeGreaterThan(0);
-    expect(x - 1.18 * radius).toBeGreaterThanOrEqual(contentRight + step - 1e-6);
+    expect(x - 1.04 * radius).toBeGreaterThanOrEqual(contentRight + step - 1e-6);
   });
 });
