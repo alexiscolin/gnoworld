@@ -20,7 +20,7 @@ export interface FieldProps {
   placeholder?: string | undefined;
   /** Words inside the box before its value, not editable and read with the field: "nym-" before a name. */
   prefix?: string;
-  /** A box of lines has a handle to drag its height by, unless it grows on its own, as a chat's does to ten lines. */
+  /** A box of lines grows with its draft, as a chat's does to ten lines; false fixes it at its two rows, with no handle. */
   resizable?: boolean | undefined;
   /** The label is for assistive technology alone: the box says what it is for itself (a placeholder). */
   hideLabel?: boolean | undefined;
