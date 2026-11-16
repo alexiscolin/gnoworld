@@ -7591,8 +7591,7 @@ refused "a commit whose author holds a secret"
 # line to the listing; a refusal quoting a flagged line shown escaped, never as the Terminal would read it.
 lg -C "$ld/s" checkout -q -B feat main && echo k >"$ld/s/README.md" && printf 'feat: fine\n\n# ------------------------ >8 ------------------------\nCo-Authored-By: a bot <b@b>\n' >"$ld/msg"
 lg -C "$ld/s" commit -q --cleanup=verbatim -a -F "$ld/msg" && offer feat && refused "a message holding a scissors line"
-lg -C "$ld/s" checkout -q -B feat main && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')" 2>/dev/null ||
-	{ mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"; }
+lg -C "$ld/s" checkout -q -B feat main && mkdir -p "$ld/s/.github/workflows" && printf 'on: push\n' >"$ld/s/$(printf '.github/workflows/q\nworkflow files: none')"
 lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "ci: a name" && offer feat && refused "a file name holding a newline"
 lg -C "$ld/s" checkout -q -B feat main && printf 'PLANTEDTOKEN\033[8m\n' >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a flagged line" && offer feat
 out=$(landed y) && fail "land took a branch with a secret: $out"
