@@ -7,15 +7,17 @@ import { countFlights, flightOf, goInPage, gpuOf, heapOf, landed, running, shown
 // to a system aimed at, Escape going up a level, the names hidden on the way, a page's flight, one under reduced motion, and what twenty
 // leave behind. Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
 const HOME = "/?test-gpu";
-const FRAME = { width: 1728, height: 1080 };
-// Small enough for twenty flights on the gate's software GPU, wide enough for a computer's layout.
+// Small enough for a flight to end soon on the gate's software GPU (a frame advances it 50 ms at most, so a flight of seven seconds takes
+// 135 frames: 38 s at 3.5 frames a second on a 1728 by 1080 page), wide enough for a computer's layout.
 const SMALL = { width: 1000, height: 700 };
+// The page a system is aimed on: at SMALL the click on the nearest sun never starts its flight.
+const FRAME = { width: 1728, height: 1080 };
 const SLOW = { timeout: 90_000 };
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 
 test.describe.configure({ timeout: 240_000 });
 
-async function home(page: Page, size = FRAME, motion: "reduce" | "no-preference" = "no-preference") {
+async function home(page: Page, size = SMALL, motion: "reduce" | "no-preference" = "no-preference") {
   await page.setViewportSize(size);
   await page.emulateMedia({ reducedMotion: motion });
   await page.goto(HOME);
@@ -95,7 +97,7 @@ const labelsShown = async (page: Page) => (await shownLabels(page)).length;
 // Each timed read below runs in the page, a frame at a time: a flight of a second or two is over before a journey's own read comes.
 test("flies to the system aimed at, lands, and goes back up to the universe on Escape", async ({ page }) => {
   await withWorlds(page);
-  await home(page);
+  await home(page, FRAME);
   // The labels stand once the cosmos has looked: by then its systems can be aimed at.
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
   const id = await aimAtASystem(page);
@@ -171,7 +173,7 @@ test("draws its streaks while it crosses, and none at rest", async ({ page }) =>
 // Under reduced motion a flight lands in the frame it starts: no frame of travel, the rig never part of the way.
 test("under reduced motion, lands at once: no frame between", async ({ page }) => {
   await withWorlds(page);
-  await home(page, FRAME, "reduce");
+  await home(page, SMALL, "reduce");
   const between = page.evaluate(
     () =>
       new Promise<number>((resolve) => {
@@ -193,7 +195,7 @@ test("under reduced motion, lands at once: no frame between", async ({ page }) =
 });
 
 test("flies from the cosmos to a world's page, and lands as the world comes into its circle", async ({ page }) => {
-  await home(page, SMALL);
+  await home(page);
   await page.locator("a[href='/w/bubble']").first().dispatchEvent("click");
   await expect.poll(async () => (await flightOf(page)).id, SLOW).toBe("bubble");
   expect(await flightOf(page)).toMatchObject({ kind: "world", id: "bubble" });
@@ -233,7 +235,7 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
 }) => {
   test.setTimeout(600_000);
   await withWorlds(page);
-  await home(page, SMALL);
+  await home(page);
   const cdp = await page.context().newCDPSession(page);
   const heap = () => heapOf(cdp);
   const gpu = () => gpuOf(page);
