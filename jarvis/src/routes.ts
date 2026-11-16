@@ -85,7 +85,8 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
               ? catchUp
               : ask;
         if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
-        return replyOf(await asking(question, signal), log, isFixedAsk(asked.data));
+        const shared = isFixedAsk(asked.data);
+        return replyOf(await asking(shared ? { ...question, shared } : question, signal), log, shared);
       },
     },
     [JARVIS_PATHS.explain]: {
