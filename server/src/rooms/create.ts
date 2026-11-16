@@ -34,6 +34,18 @@ export const EARTH_WINDOW_INDEX = `
 CREATE INDEX earth_rooms_by_date ON earth_rooms (created_at);
 `;
 
+// The lists, the channels and the live count read the live rooms, and the archived ones by date, never every row (rooms.ts's LISTED_SQL).
+export const ROOM_LISTING_INDEXES = `
+CREATE INDEX rooms_live ON rooms (world, name) WHERE archived = 0;
+CREATE INDEX rooms_archived_by_date ON rooms (world, created_at) WHERE archived = 1;
+`;
+
+/** The public rooms made after a window start (one parameter). */
+export const ROWS_IN_WINDOW_SQL = "SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?";
+/** The public rooms live now, read from the live rooms' index. */
+export const LIVE_EARTH_SQL =
+  "SELECT count(*) AS n FROM rooms r CROSS JOIN earth_rooms e ON e.name = r.name WHERE r.world = 'earth' AND r.archived = 0";
+
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
 /** The public rooms made in the window (earthWindowStart), archived ones too: archiving frees no place, only time does (C12, D13675). */
@@ -86,8 +98,8 @@ interface Options {
 
 // The Earth's public rooms' statements: how many there are (live, and made in the window), an account's in a day, one made, a room's maker.
 const earthSql = (db: DatabaseSync) => ({
-  rows: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE created_at > ?"),
-  live: db.prepare("SELECT count(*) AS n FROM earth_rooms e JOIN rooms r ON r.name = e.name WHERE r.archived = 0"),
+  rows: db.prepare(ROWS_IN_WINDOW_SQL),
+  live: db.prepare(LIVE_EARTH_SQL),
   today: db.prepare("SELECT count(*) AS n FROM earth_rooms WHERE maker = ? AND created_at > ?"),
   made: db.prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, ?, ?)"),
   maker: db.prepare("SELECT maker FROM earth_rooms WHERE name = ?"),

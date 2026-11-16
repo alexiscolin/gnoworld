@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { ROOM_STATE } from "../rooms/create.ts";
 import { ensureRooms, ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeActivity } from "./activity.ts";
 import { activityRoutes } from "./routes.ts";
@@ -16,7 +17,7 @@ afterEach(() => {
 });
 
 const setup = () => {
-  const db = openDatabase(":memory:", [ROOM_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE]);
   opened.push(db);
   ensureRooms(db, ["earth", "bubble"], T0);
   const activity = makeActivity();
@@ -122,7 +123,7 @@ describe("GET /api/activity, rooms by role (3m)", () => {
   const visible = (room: string, who: string | undefined) =>
     room === "#bubble/crew" ? who === "member" || who === "mod" : room === "#bubble/attic" ? who === "mod" : true;
   const roleSetup = () => {
-    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     for (const name of ["#bubble/crew", "#bubble/attic"]) {
@@ -145,7 +146,7 @@ describe("GET /api/activity, rooms by role (3m)", () => {
   };
 
   it("says its answer varies with the cookie, so no cache hands a guest's answer to an account (F585)", async () => {
-    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     const app = makeApp(

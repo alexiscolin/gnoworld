@@ -188,7 +188,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     recent: recent.recent,
     last: recent.last,
     said: answers,
-    ...ownerActs(db, { send, link: () => link }, mutes),
+    ...ownerActs(db, { send, link: () => link, now }, mutes),
     stop: stopper({
       timers: [lifts, passes],
       sweep: stopSweeping,

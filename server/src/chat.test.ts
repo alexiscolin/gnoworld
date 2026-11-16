@@ -1297,6 +1297,20 @@ describe("the chat, as the server starts it", () => {
       expect(logged.filter((l) => l.includes('"unknown_room"'))).toEqual([]);
     });
 
+    // The mute sends one SAMODE a room of the world: the rooms the bot has left (past the window) are not among them.
+    it("mutes in the live and window rooms of the Earth, none in an archived room past the window", async () => {
+      const clock = { now: T0 };
+      const { peer, chat } = await linked({ worlds: worlds("earth"), moderation: OFF }, { now: () => clock.now });
+      chat.rooms.earth("g1a", "old");
+      chat.rooms.archive("earth", "old");
+      clock.now += 31 * 24 * 60 * 60_000;
+      chat.rooms.earth("g1a", "new");
+      expect(chat.roomsOf("earth")).toEqual(["#earth", "#earth/new"]);
+      expect(chat.muteKeeping("g1b", "earth")).toBe("muted");
+      await expect.poll(() => peer.lines.filter((l) => MUTE_LINE.test(l)).length).toBe(2);
+      expect(peer.lines.filter((l) => l.includes("#earth/old") && MUTE_LINE.test(l))).toEqual([]);
+    });
+
     it("raises the alert for a channel in Ergo it did not make, and for no room it made, archived or open", async () => {
       const { peer, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
       chat.rooms.create("bubble", "garden");

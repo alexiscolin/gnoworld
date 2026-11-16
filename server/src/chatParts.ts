@@ -5,7 +5,7 @@ import type { Log } from "@gnoworld/service/log";
 import type { Rooms } from "./rooms/create.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Mutes } from "./moderation/mute.ts";
-import { ensureNamed, ensureRooms, joinedRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
 import { listed, mayRead, staffOf } from "./rooms/types.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitorOf } from "./visitor.ts";
@@ -93,7 +93,7 @@ export function linkFor({
   if (ergo === undefined) return undefined;
   return ircLink({
     ...ergo,
-    rooms: () => joinedRooms(db, now()).map(({ name }) => name),
+    rooms: () => listRooms(db, now()).map(({ name }) => name),
     lastChecked: progress.last,
     hold: progress.hold,
     drained: () => queue.idle(),
@@ -121,13 +121,21 @@ export function linkFor({
 /** What an owner's hide and mute do: the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
 export const ownerActs = (
   db: DatabaseSync,
-  { send, link }: { send: (command: Command, params: readonly string[]) => boolean; link: () => Link | undefined },
+  {
+    send,
+    link,
+    now,
+  }: {
+    send: (command: Command, params: readonly string[]) => boolean;
+    link: () => Link | undefined;
+    now: () => number;
+  },
   { muteKeeping }: Pick<Mutes, "muteKeeping">,
 ) => ({
   line: lineOf(link),
   hide: (room: string, msgid: string): boolean => send("REDACT", [room, msgid, "hidden by a moderator of this world"]),
   muteKeeping,
-  roomsOf: (world: string): readonly string[] => worldRooms(db, world),
+  roomsOf: (world: string): readonly string[] => worldRooms(db, world, now()),
 });
 
 /** The chat's stop: its timers cleared, nothing more started, the link and the queue let go, the stream closed. A line left waiting is caught up at the next start. */
