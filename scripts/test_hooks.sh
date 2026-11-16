@@ -7835,6 +7835,16 @@ rm -f "$ld/race" "$ld/space"/*
 # A pull request closed or merged under that branch's name is no open one: a new one is opened.
 offer feat && rm -f "$ld/pr" && : >"$ld/prclosed" && : >"$ld/gh.log" && out=$(landed y) && grep -q "^pr create " "$ld/gh.log" || fail "land opened no pull request where none is open, a closed one there: $out"
 out=$(python3 -I "$ld/land.py" feat 2>&1) && fail "land took an argument: $out"
+# A branch that merged GitHub's main lists its own workflow and harness files, never those the merge brought (F13465: #33's land
+# named release.yml, which the merge of #30 brought, as one of its workflow files).
+lg -C "$ld/s" checkout -q -B mg main && echo g >"$ld/s/README.md" && lg -C "$ld/s" commit -qam "feat: a change before main moved"
+lg -C "$ld/s" checkout -q main && mkdir -p "$ld/s/.github/workflows" && echo 'on: push' >"$ld/s/.github/workflows/m.yml" && echo m >>"$ld/s/scripts/x.sh" &&
+	lg -C "$ld/s" add -A && lg -C "$ld/s" commit -qm "ci: main's own workflow" && lg -C "$ld/s" push -q "$ld/github/o/r.git" main
+lg -C "$ld/s" checkout -q mg && lg -C "$ld/s" merge -q --no-ff -m "Merge main into mg" main && offer mg
+out=$(landed n) || fail "land failed on a branch that merged main: $out"
+printf '%s\n' "$out" | grep -qxF "workflow files: none" && printf '%s\n' "$out" | grep -qxF "harness files touched: none" ||
+	fail "land listed files a merge of main brought as the branch's own: $out"
+rm -f "$ld/space/mg.bundle" "$ld/space/mg.md"
 fi
 
 if part ci; then
