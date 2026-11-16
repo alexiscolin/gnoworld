@@ -1172,12 +1172,12 @@ def mutants():
         ("    except ValueError:\n        return", "    except OSError:\n        return", "a profile's settings that are no JSON left as they are"),
         ('        shutil.copyfile(path, ', '        (lambda *a: None)(path, ', "a copy of a profile's settings kept before they change"),
         ("for x in wanted[key] if x not in lst]", "for x in wanted[key]]", "a twin added once to a profile"),
+        ("    except AttributeError:\n        lists = None", "    except ZeroDivisionError:\n        lists = None", "a profile's settings of the wrong shape left as they are"),
+        (' + sorted(glob.glob(os.path.join(glob.escape(home), ".claude-*")))', "", "every profile, ~/.claude-* too"),
     ):
         yield from each(mr, find, replace, "hooks", f"machine_rules.py writes {why}")
     yield from each(ih, 'main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)', "main=$(git rev-parse --show-toplevel)", "hooks",
                     "install_hooks roots this machine's twins at the main checkout, from a worktree too (D13413)")
-    yield from each(ih, '[ -z "$profiles" ] || git show "$ref:scripts/machine_rules.py"', ': || git show "$ref:scripts/machine_rules.py"', "hooks",
-                    "install_hooks writes no profile where none is (D13413)")
     # The instructions every session reads: its own tree's, to commands and to the file tools, and those of the home and temporary folders.
     for path in ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of the file tools (7z, R4, S4)")

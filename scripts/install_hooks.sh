@@ -40,9 +40,7 @@ git config pull.ff only
 # removed. A commit without it writes none.
 if git cat-file -e "$ref:scripts/machine_rules.py" 2>/dev/null; then
 	main=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)
-	profiles=
-	for p in "$HOME/.claude" "$HOME"/.claude-*; do [ -f "$p/settings.json" ] || [ -L "$p/settings.json" ] && profiles="$profiles $p"; done
-	[ -z "$profiles" ] || git show "$ref:scripts/machine_rules.py" | python3 -I - "$(git show "$ref:.claude/settings.json")" "$main" $profiles
+	git show "$ref:scripts/machine_rules.py" | python3 -I - "$(git show "$ref:.claude/settings.json")" "$main"
 fi
 # land (D13211), the owner's one command for a pull request, and agent-pr's code it reuses, from the same commit, beside the GitHub
 # repository origin names, which it lands to; a commit without it installs none. agent-github's installer, of that commit too,
