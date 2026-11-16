@@ -4,6 +4,8 @@ import { PHONE_QUERY } from "@gnoworld/core";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { fullOnPhone } from "../../fullChat.ts";
+import { rememberPath } from "../../lib/recents.ts";
+import { remembers } from "../../phoneLanding.ts";
 import { site } from "../../places.ts";
 import { useMedia } from "./useMedia.ts";
 
@@ -17,6 +19,10 @@ export function usePhoneGo(): boolean {
   useEffect(() => {
     if (to !== undefined) Promise.resolve(navigate(to, { replace: true })).catch(reportError);
   }, [to, navigate]);
+  // Where a phone opens next time (phoneLanding.ts): the worlds and the Earth it was in, whatever way it came.
+  useEffect(() => {
+    if (phone && remembers(pathname)) rememberPath(pathname);
+  }, [phone, pathname]);
   return to !== undefined;
 }
 

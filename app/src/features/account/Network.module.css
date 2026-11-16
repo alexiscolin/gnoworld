@@ -20,24 +20,9 @@
     padding-inline: 0;
   }
 
-  /* On a phone the header's row names the network: the pill keeps the name alone. */
+  /* Under 900 px the header holds no network (the account's menu does): the pill is a computer's. */
   .inPill {
     display: none;
-  }
-
-  /* A phone's finger: the name's trigger is a 44 px target. */
-  @media (width < 900px) {
-    .network button {
-      min-block-size: var(--control-m);
-      min-inline-size: var(--control-m);
-      /* a name never wraps: the row gives the network its room (shellHeader.module.css) */
-      white-space: nowrap;
-    }
-
-    /* The chip says it; the warning icon would take the room a 360 px row has not. */
-    .network .caution svg {
-      display: none;
-    }
   }
 
   @media (width >= 900px) {

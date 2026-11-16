@@ -4,11 +4,11 @@
 // come after the first screen, never with it.
 import { shortAddress, type Address } from "@gnoworld/schemas";
 import { Button, IconButton } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";
 import { onAsked } from "../../pageAsks.ts";
 import { JARVIS_ASKS, loadListener, type FirstAsk } from "../jarvis/index.ts";
-import { LoginControl, useLogin } from "../login/index.ts";
+import { adenaHere, LoginControl, useLogin } from "../login/index.ts";
 import styles from "./AccountPill.module.css";
 import { useNaming, useNamelessTold } from "./naming.ts";
 
@@ -102,15 +102,50 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
   );
 }
 
+// A phone's header holds no button for the way in: where Adena is found, it is the menu's first row (a phone's browser has none).
+const wayIn = (phone: boolean | undefined, logIn: () => void) => (phone && adenaHere() ? logIn : undefined);
+
+// The dialog that registers a name, brought once asked; `onSettled` counts a name settled, `onClose` is told false.
+function NamingDoor({
+  account,
+  universe,
+  onSettled,
+  onClose,
+}: {
+  account: Address;
+  universe: string;
+  onSettled: Dispatch<SetStateAction<number>>;
+  onClose: (naming: boolean) => void;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <PickName
+        account={account}
+        universe={universe}
+        open
+        onSettled={() => {
+          onSettled((count) => count + 1);
+        }}
+        onClose={() => {
+          onClose(false);
+        }}
+      />
+    </Suspense>
+  );
+}
+
 /** The account's menu; `network`, the network's name LoginControl draws beside the way in, or beside the pill once logged in. */
 export function AccountMenu({
   universe,
   network = null,
   guestNote,
+  phone,
 }: {
   universe: string;
   network?: ReactNode;
   guestNote?: string | undefined;
+  /** Under 900 px: the network and, where Adena is found, the way in are rows of the menu, not of the header (Opened.tsx). */
+  phone?: boolean;
 }) {
   const { login, logIn, logOut } = useLogin();
   // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
@@ -141,14 +176,16 @@ export function AccountMenu({
         address={address}
         lead={pill}
         guestNote={guestNote}
+        phone={phone}
+        onConnect={wayIn(phone, logIn)}
         onLogOut={logOut}
-        {...(pickable
-          ? {
-              onPickName: () => {
+        onPickName={
+          pickable
+            ? () => {
                 setNaming(true);
-              },
-            }
-          : {})}
+              }
+            : undefined
+        }
       />
     </Suspense>
   ) : (
@@ -166,19 +203,7 @@ export function AccountMenu({
         </span>
       )}
       {address === undefined || !naming ? null : (
-        <Suspense fallback={null}>
-          <PickName
-            account={address}
-            universe={universe}
-            open={naming}
-            onSettled={() => {
-              setAgain((count) => count + 1);
-            }}
-            onClose={() => {
-              setNaming(false);
-            }}
-          />
-        </Suspense>
+        <NamingDoor account={address} universe={universe} onSettled={setAgain} onClose={setNaming} />
       )}
       <LateDoors justIn={justIn} address={address} />
       <LoginControl login={login} logIn={logIn} network={network} />

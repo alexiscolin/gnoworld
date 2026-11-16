@@ -185,6 +185,15 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
   expectClientAsBuild("cosmos", clientLoader, loader);
 });
 
+test("a phone's home is its chat: the browser's loader redirects, the build's never does", () => {
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
+  vi.stubGlobal("localStorage", { getItem: () => "", setItem: () => undefined });
+  const request = new Request("https://gno.world/");
+  expect(clientLoader({ request })).toMatchObject({ status: 302 });
+  expect(loader({ request })).not.toBeInstanceOf(Response);
+  vi.unstubAllGlobals();
+});
+
 // The hero's big number, its line and two actions, and with no data what is true. At a system's view the screen is the system's: the hero
 // stays and names it with no actions, the list of worlds and the crumb give way, and both come back at rest.
 test("gives the screen to a system the eye rests at: its hero with no actions and no list of worlds, both back at rest", async () => {

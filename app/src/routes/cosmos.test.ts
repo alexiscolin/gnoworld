@@ -13,12 +13,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("a phone has no cosmos: its views go home before any file is read, a computer's stay", async () => {
+test("a phone has no cosmos: its views go to its chat before any file is read, a computer's stay", async () => {
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
   const gone = await clientLoader(at("/s/defrewr"));
   expect(gone).toBeInstanceOf(Response);
   expect(gone).toMatchObject({ status: 302 });
-  expect((gone as Response).headers.get("Location")).toBe("/");
+  expect((gone as Response).headers.get("Location")).toBe("/earth?chat=full");
   expect(worldsFile).not.toHaveBeenCalled();
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
   await expect(clientLoader(at("/universe"))).resolves.toBeDefined();

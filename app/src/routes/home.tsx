@@ -25,6 +25,7 @@ import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
+import { phoneAway } from "./phoneAway.ts";
 import { useFraming } from "./placeFrame.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
@@ -33,7 +34,8 @@ export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "cosmos");
 }
 export function clientLoader({ request }: { request: Request }) {
-  return site.universe(request, "cosmos");
+  // A phone has no home page: it opens into a chat (phoneAway.ts).
+  return phoneAway(site.universeAt(new URL(request.url).pathname).home.path) ?? site.universe(request, "cosmos");
 }
 
 export function meta({ loaderData, error }: MetaArgs<typeof loader>) {

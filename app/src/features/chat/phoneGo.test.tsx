@@ -3,6 +3,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { BrowserRouter, MemoryRouter, useLocation, useNavigate, useNavigationType } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { recentPaths } from "../../lib/recents.ts";
 import { canGoBack, useChatBack, usePhoneGo } from "./phoneGo.ts";
 
 let root: Root | undefined;
@@ -73,6 +74,23 @@ describe("a phone's own way to a place", () => {
       held.back?.();
     });
     expect(shown()).toBe("here /");
+  });
+
+  it("remembers the worlds and the Earth a phone is in, never a realm, for the next opening", () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+    });
+    phone(true);
+    draw(["/w/govdao"]);
+    act(() => {
+      held.go?.("/r/gno.land/r/x?chat=full");
+    });
+    act(() => {
+      held.go?.("/w/bubble?chat=full");
+    });
+    expect(recentPaths()).toEqual(["/w/bubble", "/w/govdao"]);
   });
 
   it("leaves a computer where it is", () => {

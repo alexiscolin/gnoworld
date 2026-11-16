@@ -248,12 +248,12 @@ describe("the header's Testnet, on a planted site", () => {
   });
 });
 
-// The guest's note in the menu (shellHeader.tsx's Account): a touch screen narrower than 900 px, which has no wallet and no room for
-// LoginView's words. The screen is stubbed as the query reads it, part by part, so a tablet (touch, 900 wide) differs from a phone.
+// A phone's header is one line (the logo, search, bell, menu): the network and the way in live in the account's menu, where its words
+// ("To log in, use a computer…") stand where Adena is not found. The screen is stubbed as the query reads it, part by part.
 const api = vi.hoisted(() => ({ me: vi.fn(), logout: vi.fn(), challenge: vi.fn(), verify: vi.fn() }));
 vi.mock("./lib/api/login.ts", () => ({ pageLoginApi: () => api }));
 
-describe("the header's guest note", () => {
+describe("the header's menu on a phone", () => {
   beforeAll(() => {
     popovers();
     noObservers();
@@ -261,18 +261,19 @@ describe("the header's guest note", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-  const screenOf = ({ coarse, width }: { coarse: boolean; width: number }) => {
+  const screenOf = ({ width }: { width: number }) => {
     vi.stubGlobal("reportError", vi.fn());
-    const holds = (part: string) =>
-      part === "(pointer: coarse)" ? coarse : part === "(width < 900px)" ? width < 900 : false;
     vi.stubGlobal(
       "matchMedia",
       vi.fn((query: string) => ({
-        matches: query.split(" and ").every(holds),
+        matches: query === "(max-width: 899px)" && width < 900,
         addEventListener: () => undefined,
         removeEventListener: () => undefined,
       })),
     );
+  };
+  const withAdena = () => {
+    vi.stubGlobal("adena", { AddEstablish: () => undefined, version: "1.30.0" });
   };
   // A guest's header, its menu pressed open: the menu, once drawn.
   async function guestMenu() {
@@ -291,22 +292,40 @@ describe("the header's guest note", () => {
     await settled(() => box.querySelector("[role='menu']") !== null);
     return box.querySelector("[role='menu']");
   }
+  const items = (menu: Element | null | undefined) =>
+    [...(menu?.querySelectorAll("[role^='menuitem']") ?? [])].map((each) => each.textContent);
 
-  test("a phone, touch and under 900 px, reads the words atop the menu", async () => {
-    screenOf({ coarse: true, width: 390 });
+  test("a phone with no Adena reads the words atop the menu, and no way in", async () => {
+    screenOf({ width: 390 });
     const menu = await guestMenu();
     expect(menu?.firstElementChild?.textContent).toBe(USE_A_COMPUTER);
     expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    expect(items(menu).join("|")).not.toContain("Connect Adena");
   });
 
-  test.each([
-    ["a computer", { coarse: false, width: 1280 }],
-    ["a narrow window with a mouse", { coarse: false, width: 390 }],
-    ["a tablet, touch and 900 px wide, whose header has the room", { coarse: true, width: 900 }],
-  ])("%s: no note in the menu", async (_, screen) => {
-    screenOf(screen);
+  test("a narrow window where Adena is found offers Connect Adena in the menu, with no words", async () => {
+    screenOf({ width: 390 });
+    withAdena();
+    const menu = await guestMenu();
+    expect(items(menu)[0]).toBe("Connect Adena");
+    expect(menu?.textContent).not.toContain(USE_A_COMPUTER);
+  });
+
+  test("the menu holds the network, its switch the network menu's own, the current one checked", async () => {
+    screenOf({ width: 390 });
+    const menu = await guestMenu();
+    const radios = [...(menu?.querySelectorAll("[role='menuitemradio']") ?? [])];
+    expect(radios.map((each) => each.textContent.replace("Testnet", ""))).toEqual(
+      site.universes.map((each) => `Network: ${each.name}`),
+    );
+    expect(radios.filter((each) => each.getAttribute("aria-checked") === "true")).toHaveLength(1);
+  });
+
+  test("a computer's menu has neither the words, the way in nor the network", async () => {
+    screenOf({ width: 1280 });
+    withAdena();
     const menu = await guestMenu();
     expect(menu?.textContent).not.toContain(USE_A_COMPUTER);
-    expect(menu?.getAttribute("aria-describedby")).toBeNull();
+    expect(items(menu).join("|")).not.toMatch(/Connect Adena|Network:/);
   });
 });

@@ -2,6 +2,7 @@
 // chat, and beside them how one looks at it, Space or Map (shellWays.tsx); at the right the network ("Testnet" when it is one), the search,
 // the bell and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
 // the page written at /, which must hydrate as the path's own. The bars stay over the full chat, which they open and close.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Cluster, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
@@ -11,7 +12,7 @@ import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
 import { useMedia } from "./features/chat/useMedia.ts";
-import { PHONE_NO_WALLET, USE_A_COMPUTER } from "./features/login/index.ts";
+import { adenaHere, USE_A_COMPUTER } from "./features/login/index.ts";
 import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
@@ -22,16 +23,18 @@ import styles from "./shellHeader.module.css";
 
 // The search, the bell and the account's menu.
 function Account({ universe }: { universe: UniverseView }) {
-  // A touch phone has no wallet and no room in the header for the words: a guest reads them atop the account's menu.
-  const noWallet = useMedia(PHONE_NO_WALLET);
+  // A phone's header is one line: the network and the way in are rows of the account's menu, and where Adena is not found (a phone's
+  // browser never has it) a guest reads why atop it.
+  const phone = useMedia(PHONE_QUERY);
   return (
-    <Cluster space="2xs">
+    <Cluster space="2xs" wrap={phone ? "no" : "yes"}>
       <SearchButton className="" emphasis="outline" />
       <BellSlot />
       <AccountMenu
         universe={universe.id}
-        guestNote={noWallet ? USE_A_COMPUTER : undefined}
-        network={<Network name={universe.name} testnet={universe.testnet} inPill />}
+        phone={phone}
+        guestNote={phone && !adenaHere() ? USE_A_COMPUTER : undefined}
+        network={phone ? null : <Network name={universe.name} testnet={universe.testnet} inPill />}
       />
     </Cluster>
   );
@@ -115,6 +118,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
       </div>
       <SearchPalette universe={universe} />
       <div className={styles["end"]}>
+        {/* A phone's header is one line: its menu holds the network (Account). */}
         <div className={`${styles["network"] ?? ""} ${pilled ? (styles["pilled"] ?? "") : ""}`}>
           <Network name={universe.name} testnet={universe.testnet} />
         </div>

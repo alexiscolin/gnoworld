@@ -20,12 +20,12 @@ describe("an ecosystem's page", () => {
 });
 
 describe("an ecosystem's page on a phone", () => {
-  test("its loader sends the phone to the universe's home, before reading the data", () => {
+  test("its loader sends the phone to its chat, before reading the data", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
     try {
       const sent = loader({ request: new Request("http://x/e/tokens") });
       expect(sent).toBeInstanceOf(Response);
-      expect(sent instanceof Response ? sent.headers.get("location") : undefined).toBe("/");
+      expect(sent instanceof Response ? sent.headers.get("location") : undefined).toBe("/earth?chat=full");
     } finally {
       vi.unstubAllGlobals();
     }
