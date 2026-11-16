@@ -6,8 +6,8 @@ import { useLocation, useNavigate } from "react-router";
 import universes from "../../../data/universes.json" with { type: "json" };
 import { readPage } from "../../lib/chain/rpc.ts";
 import { pageFetch } from "../../lib/query/policy.ts";
+import { knownOf } from "../../knownOf.ts";
 import { site } from "../../places.ts";
-import { knownOf } from "../realms/index.ts";
 import { raisePill } from "../../topPill.tsx";
 import { switchTo } from "./networkSwitch.ts";
 
