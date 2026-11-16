@@ -3,8 +3,7 @@
 import { REALM_PREFIX } from "../chain/realm.ts";
 
 const VERSION_DIRECTORY = /^v\d+$/;
-const VERSION_SUFFIX = /_?v\d+$/;
-const TRAILING_DIGITS = /\d+$/;
+const VERSION_SUFFIX = /_v\d+$/;
 
 /** The realm's own name, lowercase: its last segment, or the one before a `/v1` directory. */
 export function nameOf(path: string): string {
@@ -17,12 +16,12 @@ export function realmName(path: string): { namespace: string; name: string } {
   return { namespace: path.slice(REALM_PREFIX.length).split("/")[0] ?? "", name: nameOf(path) };
 }
 
-/** The path without its version: a `/vN` directory, a `_vN` suffix, then a number the name ends with; a name of digits alone stays. */
+/** The path without its version: a `/vN` directory or a `_vN` suffix; digits a name ends with (`gov2`, `grc20`) are its own. */
 export function familyOf(path: string): string {
   const at = path.lastIndexOf("/");
   const head = path.slice(0, at);
   const name = path.slice(at + 1);
   if (VERSION_DIRECTORY.test(name)) return head;
-  const stem = name.replace(VERSION_SUFFIX, "").replace(TRAILING_DIGITS, "");
+  const stem = name.replace(VERSION_SUFFIX, "");
   return stem === "" ? path : `${head}/${stem}`;
 }
