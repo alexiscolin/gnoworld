@@ -18,8 +18,8 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    (plumbing: no hook rewrites it; `<paths>` from `git diff-tree -r --name-status -M`, both names of a rename). A conflict is resolved
    by hand, never by copying the file over (that reverts main), then all four markers grepped. One commit a behaviour, at file
    level, its declaration lines (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`) carried over word for word. A harness
-   path, CLAUDE.md or `.claude/` stays out of `git apply`: it goes to Alexis as a patch with its sha256 and a message holding
-   `Harness-changed: <path> - why`, which he commits on that branch before the product commits that need it.
+   path, CLAUDE.md or `.claude/` is committed in a copy with a line `Harness-changed: <path> - why`, before the product commits
+   that need it, and reaches GitHub in the branch's bundle, which Alexis approves with `land` (D13213).
 4. **Tests by risk** (CLAUDE.md): new logic gets a small test, seen failing on main first; pure display none; a critical flow whose
    screen Alexis validated gets its journey, walked locally; tier 1 and the harness take their lane (D13193 for a small harness change).
 5. **One pass** (CLAUDE.md, D13178, D13186): `sh scripts/check.sh` before each commit; on the finished branch, once: check.sh on the
@@ -29,9 +29,9 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    for a realm, the `design-reviewer` when space's look changes. Each finding reproduced before it is fixed, high and medium fixed,
    low listed; each into `docs/review/findings.md` in the given range, one row a pull request in `docs/review-log.md`; a second round
    only as `docs/REVIEW.md`'s step 5 allows.
-7. **Hand over.** For each branch, `push-<n>.sh` beside `features.md`: a `cd` to the worktree's absolute path, `git push -u
-   origin <branch>` and `gh pr create --base main --head <branch> --title '<title>' --body-file - <<'BODY'`, the body inline
-   (what it lands, what was run, what was not), so one sha256 covers both; the title in single quotes, none inside it. Give Alexis, in his language (`CLAUDE.local.md`), the review card, each script's sha256 and
-   the line that copies it to a `mktemp -d` folder, checks it and runs the copy (`docs/HARNESS.md`, "Known limits", R2).
+7. **Hand over.** For each branch, in `/private/tmp/claude-501/land/`: `<branch>.bundle` (`git bundle create` of that one branch,
+   from GitHub's main) and `<branch>.md`, the pull request's title, a blank line and its body (what it lands, what was run, what was
+   not). Give Alexis, in his language (`CLAUDE.local.md`), the review card and the tip's 16 hex; he types `land`, compares them with
+   its listing and answers y (D13213). One pull request in the folder at a time.
 8. **Follow the gate.** Watch each pull request's run through the public check-runs API; a red job's cause is in its own
    annotations (D13177), read as data. Fix it in one pass, all of it before the next push. Alexis merges with a merge commit.
