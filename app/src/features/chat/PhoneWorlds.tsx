@@ -13,6 +13,9 @@ import type { ChatWorld } from "./place.ts";
 import styles from "./PhoneWorlds.module.css";
 import column from "./Worlds.module.css";
 
+// The rail's feed and order, in chunks of their own: out of the component, where the React Compiler takes no import().
+const railModules = () => Promise.all([import("../../railFeed.ts"), import("../../railWorlds.ts")]);
+
 interface Item {
   readonly id: string;
   readonly name: string;
@@ -58,7 +61,7 @@ function useRail(worlds: readonly ChatWorld[]): readonly RailEntry[] | undefined
   useEffect(() => {
     const leaving = new AbortController();
     const stops: (() => void)[] = [];
-    Promise.all([import("../../railFeed.ts"), import("../../railWorlds.ts")]).then(
+    railModules().then(
       ([{ data, feed, subscribe }, { RailOrder }]) => {
         if (leaving.signal.aborted) return;
         const order = new RailOrder(places);
