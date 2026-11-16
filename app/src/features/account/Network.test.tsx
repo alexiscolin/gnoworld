@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
 import { PillHost } from "../../topPill.tsx";
@@ -26,6 +26,17 @@ beforeEach(() => {
 });
 
 const Where = () => <output data-at="">{useLocation().pathname}</output>;
+const Go = () => {
+  const navigate = useNavigate();
+  return (
+    <i
+      data-go=""
+      onClick={() => {
+        void navigate("/w/bubble");
+      }}
+    />
+  );
+};
 const at = () => document.querySelector("[data-at]")?.textContent;
 const calling = <T extends Element>(find: () => T | null | undefined) => {
   const one = find();
@@ -46,6 +57,7 @@ async function draw(path: string, inPill = false) {
         inPill={inPill}
       />
       <Where />
+      <Go />
       <PillHost />
     </MemoryRouter>,
   );
@@ -89,6 +101,22 @@ describe("the network control", () => {
     expect(chain.readPage).toHaveBeenCalledTimes(1);
     expect(chain.readPage.mock.calls[0]?.[0]).toBe("https://rpc.gno.land:443");
     expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
+  });
+
+  it("lets a read that settles late change nothing once the reader has gone elsewhere", async () => {
+    let settle: (value: typeof found) => void = () => undefined;
+    chain.readPage.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+    await draw("/r/gov/dao");
+    await choose("gno.land");
+    act(() => {
+      document.querySelector<HTMLElement>("[data-go]")?.click();
+    });
+    await settled(() => at() === "/w/bubble");
+    settle(found);
+    await settled(() => true);
+    expect(at()).toBe("/w/bubble");
+    expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
+    expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
   });
 
   it("keeps a realm the other chain holds but draws no page for (no Render): the chain says it exists", async () => {
