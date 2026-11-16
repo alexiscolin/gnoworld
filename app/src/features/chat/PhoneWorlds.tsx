@@ -94,59 +94,85 @@ function useRail(worlds: WorldsProps["worlds"]): readonly RailEntry[] | undefine
 
 export function PhoneWorlds(props: WorldsProps) {
   const rowRef = useRef<HTMLElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const { worlds, current } = props;
   const items = rowOf(props, useRail(worlds));
   const here = hereOf(worlds, current);
+  // The row's attributes tell whether more lies before (data-from) and after (data-to) what is in view: the fades and the cue follow.
+  // Read from the layout on a scroll and on a resize, and again as worlds come (the count), never held in state.
+  const count = items.length;
+  useEffect(() => {
+    const box = scrollerRef.current;
+    const host = rowRef.current;
+    if (box === null || host === null) return;
+    const read = () => {
+      const left = Math.abs(box.scrollLeft);
+      host.dataset["from"] = String(left > 1);
+      host.dataset["to"] = String(left + box.clientWidth < box.scrollWidth - 1);
+    };
+    read();
+    box.addEventListener("scroll", read, { passive: true });
+    const watching = new ResizeObserver(read);
+    watching.observe(box);
+    return () => {
+      box.removeEventListener("scroll", read);
+      watching.disconnect();
+    };
+  }, [count]);
   useEffect(() => {
     // Sideways only: the page itself never moves. The row's own scroll-behavior (CSS) is auto under reduced motion.
     rowRef.current?.querySelector("[aria-current]")?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, []);
+  }, [here]);
   return (
     <nav ref={rowRef} aria-label="Worlds" className={styles["row"]}>
-      <ul className={styles["list"]}>
-        {items.map((item) => (
-          <li key={item.id}>
-            <RouterLink
-              href={item.href}
-              aria-label={item.unseen > 0 ? `${item.name}, ${String(item.unseen)} unseen` : undefined}
-              aria-current={item.id === here ? "page" : undefined}
-              className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
-            >
-              <span className={styles["disc"]}>
-                <span className={column["planet"]}>
-                  <WorldPlanet
-                    world={item.seed === true ? "" : item.id}
-                    fallback=""
-                    name={item.name}
-                    kind={item.seed === true ? "signal" : "world"}
-                    decorative
-                  />
+      <div ref={scrollerRef} data-scroller="" className={styles["scroller"]}>
+        <ul className={styles["list"]}>
+          {items.map((item) => (
+            <li key={item.id}>
+              <RouterLink
+                href={item.href}
+                aria-label={item.unseen > 0 ? `${item.name}, ${String(item.unseen)} unseen` : undefined}
+                aria-current={item.id === here ? "page" : undefined}
+                className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
+              >
+                <span className={styles["disc"]}>
+                  <span className={column["planet"]}>
+                    <WorldPlanet
+                      world={item.seed === true ? "" : item.id}
+                      fallback=""
+                      name={item.name}
+                      kind={item.seed === true ? "signal" : "world"}
+                      decorative
+                    />
+                  </span>
+                  <span aria-hidden="true">
+                    <UnreadPill count={item.unseen} />
+                  </span>
                 </span>
-                <span aria-hidden="true">
-                  <UnreadPill count={item.unseen} />
-                </span>
-              </span>
-              <span className={`${styles["name"] ?? ""} label truncate`}>{item.name}</span>
-            </RouterLink>
-          </li>
-        ))}
-        <li>
-          <button
-            type="button"
-            className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
-            }}
-          >
-            <span className={`${styles["disc"] ?? ""} ${styles["all"] ?? ""} grid-center`}>
-              <Icon name="orbits" size="l" />
-            </span>
-            <span className={`${styles["name"] ?? ""} label`}>
-              All<span className="visually-hidden"> places</span>
-            </span>
-          </button>
-        </li>
-      </ul>
+                <span className={`${styles["name"] ?? ""} label truncate`}>{item.name}</span>
+              </RouterLink>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <span aria-hidden="true" className={styles["cue"]}>
+        <Icon name="arrow" size="s" />
+      </span>
+
+      <button
+        type="button"
+        className={`${column["world"] ?? ""} ${styles["link"] ?? ""} ${styles["pinned"] ?? ""} no-edge`}
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
+        }}
+      >
+        <span className={`${styles["disc"] ?? ""} ${styles["all"] ?? ""} grid-center`}>
+          <Icon name="orbits" size="l" />
+        </span>
+        <span className={`${styles["name"] ?? ""} label`}>
+          All<span className="visually-hidden"> places</span>
+        </span>
+      </button>
     </nav>
   );
 }

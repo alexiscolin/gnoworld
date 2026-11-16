@@ -116,7 +116,7 @@ describe("PhoneWorlds", () => {
     await tell({ worlds: [world("games/go"), world("art/hall")], signals: SIGNALS });
     const names = all(box, "li").map((item) => item.textContent.trim());
     expect(names.slice(0, 3)).toEqual(["Earth", "Bubble", "GovDAO"]);
-    expect(names.at(-1)).toBe("All places");
+    expect(all(box, "button").at(-1)?.textContent).toBe("All places");
     expect(names.filter((name) => name === "Earth" || name === "Bubble")).toHaveLength(2);
     expect(names.length).toBeGreaterThan(4);
     expect(all(box, "a").map((link) => link.getAttribute("aria-current"))).toContain("page");
@@ -135,5 +135,36 @@ describe("PhoneWorlds", () => {
     window.removeEventListener(SEARCH, heard);
     expect(button?.textContent).toContain("All");
     expect(heard).toHaveBeenCalledOnce();
+  });
+
+  it("keeps All pinned outside the scrolling list, from the start", () => {
+    const nav = one(mount("earth"), 'nav[aria-label="Worlds"]');
+    const button = all(nav, "button").at(-1);
+    expect(button?.closest("ul")).toBeNull();
+    expect(all(nav, "a").every((link) => link.closest("button") === null)).toBe(true);
+  });
+
+  it("says the row scrolls: more at the end at first, more at the start once scrolled, neither at the end of it", () => {
+    const nav = one(mount("earth"), 'nav[aria-label="Worlds"]');
+    const scroller = one(nav, "[data-scroller]");
+    const measure = (left: number) => {
+      Object.defineProperty(scroller, "clientWidth", { configurable: true, value: 300 });
+      Object.defineProperty(scroller, "scrollWidth", { configurable: true, value: 600 });
+      scroller.scrollLeft = left;
+      act(() => {
+        scroller.dispatchEvent(new Event("scroll"));
+      });
+      return [nav.dataset["from"] === "true", nav.dataset["to"] === "true"];
+    };
+    expect(measure(0)).toEqual([false, true]);
+    expect(measure(100)).toEqual([true, true]);
+    expect(measure(300)).toEqual([true, false]);
+  });
+
+  it("changes the world in view with the current prop, its link the full chat of the world tapped", () => {
+    const box = mount("bubble");
+    const link = one(box, 'a[href="/w/govdao?chat=full"]');
+    expect(link.getAttribute("aria-current")).toBeNull();
+    expect(one(box, 'a[aria-current="page"]').getAttribute("href")).toBe("/w/bubble?chat=full");
   });
 });
