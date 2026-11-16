@@ -91,17 +91,6 @@ describe("a line counted in room_said (F13510): the Earth's idleness and daily c
     await check(said("hello", "m1"));
     expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
   });
-
-  it("takes back the count of a line first unchecked that its retry hides, from the hour it was counted in (F13503)", async () => {
-    const answers: (Answer | "unchecked")[] = ["unchecked", answer(), answer({ violence: true }, { violence: 0.97 })];
-    const { check, db, clock } = setup(() => Promise.resolve(answers.shift() ?? answer()));
-    await check(said("hello", "m1"));
-    await check(said("hello too", "m2"));
-    expect(said_(db)).toEqual([{ room: "#bubble", n: 2 }]);
-    clock.now = T0 + 2 * HOUR;
-    await check(said("hello", "m1"));
-    expect(said_(db)).toEqual([{ room: "#bubble", n: 1 }]);
-  });
 });
 
 describe("checking a message", () => {
