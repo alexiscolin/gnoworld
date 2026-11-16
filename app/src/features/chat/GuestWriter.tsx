@@ -8,7 +8,6 @@ import { useId, useRef, useState, type SubmitEvent } from "react";
 import { pageGuestApi, type Refused } from "../../lib/api/guest.ts";
 import { askFor } from "../../pageAsks.ts";
 import { useComputerNeeded } from "./LogInToWrite.tsx";
-import { USE_A_COMPUTER } from "../login/index.ts";
 import { MessageBox } from "./MessageBox.tsx";
 import { useMedia } from "./useMedia.ts";
 import { roomLabel } from "./names.ts";
@@ -163,25 +162,34 @@ export function GuestWriter({ room }: { room: string }) {
             {problem}
           </p>
         )}
-        <Cluster justify="between" className={styles["way"]}>
-          <span className="meta">
-            {guest.off
-              ? "Guests cannot speak here."
-              : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${computer ? USE_A_COMPUTER : ADENA_GIVES}`}
-          </span>
-          {computer ? null : (
-            <Button
-              size="s"
-              icon="key"
-              onClick={() => {
-                askFor("log-in");
-              }}
-            >
-              Connect Adena
-            </Button>
-          )}
-        </Cluster>
+        <GuestLine off={guest.off} name={guest.name} computer={computer} />
       </Stack>
     </form>
+  );
+}
+
+/** The line under a guest's box: who speaks and what Adena gives, with Connect Adena. A phone without Adena draws none: its placeholder
+ * says it speaks as a guest, the menu how to log in. */
+function GuestLine({ off, name, computer }: { off: boolean; name: string | undefined; computer: boolean }) {
+  if (computer && !off) return null;
+  return (
+    <Cluster justify="between" className={styles["way"]}>
+      <span className="meta">
+        {off
+          ? "Guests cannot speak here."
+          : `${name === undefined ? "You speak as a guest." : `You speak as ${name}.`} ${ADENA_GIVES}`}
+      </span>
+      {computer ? null : (
+        <Button
+          size="s"
+          icon="key"
+          onClick={() => {
+            askFor("log-in");
+          }}
+        >
+          Connect Adena
+        </Button>
+      )}
+    </Cluster>
   );
 }

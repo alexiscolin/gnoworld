@@ -63,11 +63,12 @@ describe("a guest's composer", () => {
     const connect = (room: HTMLElement) =>
       [...room.querySelectorAll("button")].find((b) => b.textContent === "Connect Adena");
 
-    it("without Adena, says to use a computer and offers no Connect Adena", () => {
+    it("without Adena, draws no line under its box and no Connect Adena: its placeholder says it speaks as a guest, the menu how to log in", () => {
       phone();
       const view = mount(<GuestWriter room="#games" />);
       expect(connect(view)).toBeUndefined();
-      expect(view.textContent).toContain("To log in, use a computer");
+      expect(view.textContent).not.toContain("use a computer");
+      expect(view.textContent).not.toContain("You speak as");
     });
 
     it("says in its placeholder that it speaks as a guest", () => {
