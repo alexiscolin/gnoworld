@@ -112,17 +112,27 @@
     display: none;
   }
 
-  /* Send: IconButton's solid, round, at the foot's end; its arrow points up, as the video's does. */
+  /* Send: a round button with an arrow up, on the cream fill, at the foot's end. */
   .send {
     /* layout: the foot's row, its last column */
     grid-area: 3 / 2;
     /* layout: a step from the box's edge and from the words beside it */
     margin: var(--space-3xs) var(--space-2xs) var(--space-2xs) 0;
+    inline-size: var(--control-s);
+    border: 0;
+    background: var(--color-primary);
+    color: var(--color-ink);
+    cursor: pointer;
   }
 
   .send svg {
-    /* layout: the arrow points up; the icon's own points along the text */
+    /* layout: the arrow points up, as the video's does; the icon's own points along the text */
     rotate: -90deg;
+  }
+
+  .send:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
   }
 }
 

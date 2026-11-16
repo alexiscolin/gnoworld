@@ -45,6 +45,3 @@ export const Sizes: Story = {
     </Cluster>
   ),
 };
-
-// The composer's Send: Button's solid look, round, in a form it submits.
-export const Solid: Story = { args: { solid: true, type: "submit", icon: "arrow", label: "Send", size: "s" } };
