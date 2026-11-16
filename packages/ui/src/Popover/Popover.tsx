@@ -15,6 +15,7 @@ import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
 import { Trigger } from "./Trigger.tsx";
+import soon from "../ComingSoon/ComingSoon.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -189,7 +190,7 @@ export function Menu({
               type="button"
               role="menuitem"
               tabIndex={-1}
-              className={["tint", "full-start", styles["item"]].join(" ")}
+              className={["tint", "full-start", styles["item"], "soon" in item ? soon["soon"] : undefined].join(" ")}
               {...("soon" in item
                 ? { "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
                 : {

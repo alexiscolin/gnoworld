@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Anchor } from "../link.tsx";
-import { Tooltip } from "../Tooltip/Tooltip.tsx";
+import { Soon } from "../ComingSoon/ComingSoon.tsx";
 import styles from "./NavItem.module.css";
 
 interface Shared {
@@ -71,11 +71,9 @@ function Main({
   };
   if (soon === true)
     return (
-      <Tooltip label="Coming soon">
-        <button type="button" {...look} aria-disabled="true" aria-label={`${label}, coming soon`}>
-          {face}
-        </button>
-      </Tooltip>
+      <Soon name={label} className={look.className}>
+        {face}
+      </Soon>
     );
   return href === undefined ? (
     <button type="button" {...look} onClick={onClick}>

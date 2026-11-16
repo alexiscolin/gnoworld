@@ -52,12 +52,7 @@
     color: var(--color-danger);
   }
 
-  /* An act yet to come: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
-  .item[aria-disabled="true"] {
-    opacity: var(--opacity-disabled);
-    cursor: not-allowed;
-  }
-
+  /* An act yet to come: ComingSoon's greyed look, its "Soon" at the row's end, no fill under the pointer. */
   .item[aria-disabled="true"]:is(:hover, :focus-visible) {
     background: none;
   }

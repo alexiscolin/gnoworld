@@ -34,14 +34,9 @@
     background: var(--color-fill);
   }
 
-  /* What is yet to come: greyed, refusing the pointer's promise of an act, no fill under it (as ComingSoon). */
+  /* What is yet to come: no fill under it; ComingSoon greys it and refuses the pointer's promise of an act. */
   .item[data-soon] {
-    opacity: var(--opacity-disabled);
     background: none;
-  }
-
-  .item[data-soon] .main {
-    cursor: not-allowed;
   }
 
   .item[data-unread] .main {
