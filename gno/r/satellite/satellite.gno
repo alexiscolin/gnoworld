@@ -32,7 +32,8 @@ const (
 
 // Strings, not structs: storage is billed per object (A1:801-804).
 var (
-	rentals  avl.Tree // world -> "payer start days price until text", until the rental is closed
+	rentals  avl.Tree // world -> "payer start days price text", until the rental is closed
+	holds    avl.Tree // world -> the unix second until which a takedown keeps it unrented, outside the record the payer may close
 	payers   avl.Tree // payer -> its rentals' worlds, space-separated: three live at most
 	held     int      // ugnot paid for rentals not closed, which a takedown may refund
 	price    = startPrice
@@ -45,42 +46,49 @@ func init(cur realm) {
 	owner = cur.Previous().Address()
 }
 
-// A rental, decoded from its string; never stored as a struct. until is 0, or,
-// once taken down, the end it was paid for.
+// A rental, decoded from its string; never stored as a struct.
 type rental struct {
-	payer                     address
-	start, days, price, until int
-	text                      string
+	payer              address
+	start, days, price int
+	text               string
 }
 
 // encode is a rental as stored; the text, which may hold spaces, comes last.
 func (r rental) encode() string {
-	return r.payer.String() + " " + strconv.Itoa(r.start) + " " + strconv.Itoa(r.days) + " " + strconv.Itoa(r.price) + " " +
-		strconv.Itoa(r.until) + " " + r.text
+	return r.payer.String() + " " + strconv.Itoa(r.start) + " " + strconv.Itoa(r.days) + " " + strconv.Itoa(r.price) + " " + r.text
 }
 
 func (r rental) end() int            { return r.start + r.days*day }
 func (r rental) paid() int           { return r.days * r.price }
 func (r rental) liveAt(now int) bool { return now < r.end() }
 
-// heldFrom reports whether the rental may not be closed by by at now: by anyone
-// while it is live; once taken down, by all but its payer until the end it was
-// paid for, so the one taking it down cannot free its bytes first and take its
-// payer's storage deposit. No rental holds a world from anyone.
-func (r rental) heldFrom(by address, now int) bool {
-	return r.liveAt(now) || now < r.until && by != r.payer
+// heldFrom reports whether the rental may not be closed by by at now, hold being
+// its world's hold (see holdOf): by anyone while it is live; once taken down, by
+// all but its payer until the end it was paid for, so the one taking it down
+// cannot free its bytes first and take its payer's storage deposit. The hold
+// is read, never kept in the record, so closing the record cannot lift it.
+func (r rental) heldFrom(by address, now, hold int) bool {
+	return r.liveAt(now) || now < hold && by != r.payer
+}
+
+// holdOf is the unix second until which a takedown keeps the world unrented, 0
+// for none. It outlives the rental's record: Close and Rent of another world
+// remove the record, never the hold.
+func holdOf(world string) int {
+	v, _ := holds.Get(world).(string)
+	n, _ := strconv.Atoi(v) // no hold: "" reads as 0
+	return n
 }
 
 func clock() int { return int(time.Now().Unix()) }
 
 func decode(v string) (r rental) {
-	f := strings.SplitN(v, " ", 6)
+	f := strings.SplitN(v, " ", 5)
 	r.payer = address(f[0])
 	r.start, _ = strconv.Atoi(f[1])
 	r.days, _ = strconv.Atoi(f[2])
 	r.price, _ = strconv.Atoi(f[3])
-	r.until, _ = strconv.Atoi(f[4])
-	r.text = f[5]
+	r.text = f[4]
 	return r
 }
 
@@ -97,6 +105,12 @@ func get(world string) (rental, bool) {
 func liveRental(world string, now int) (rental, bool) {
 	r, _ := get(world)
 	return r, r.liveAt(now)
+}
+
+// taken reports whether world is live or held; no if-init, so mutate.py can drop a branch.
+func taken(world string, now int) bool {
+	_, live := liveRental(world, now)
+	return live || now < holdOf(world)
 }
 
 func worldsOf(payer address) []string {
@@ -138,7 +152,7 @@ func Rent(cur realm, world, text string, days int) {
 	now := clock()
 	payer := cur.Previous().Address()
 	// A world taken down stays empty until its paid end, its payer included.
-	if r, _ := get(world); r.liveAt(now) || now < r.until {
+	if taken(world, now) {
 		panic("this world has a satellite")
 	}
 	live, ended := countLive(payer, now)
@@ -158,6 +172,7 @@ func Rent(cur realm, world, text string, days int) {
 	if r, ok := get(world); ok {
 		closeEnded(world, r)
 	}
+	holds.Remove(world) // passed, as Rent got here
 	r := rental{payer: payer, start: now, days: days, price: price, text: text}
 	rentals.Set(world, r.encode())
 	setWorlds(payer, append(worldsOf(payer), world))
@@ -194,10 +209,15 @@ func Close(cur realm, world string) {
 	if !ok {
 		panic("no rental on this world")
 	}
-	if r.heldFrom(cur.Previous().Address(), clock()) {
+	now := clock()
+	hold := holdOf(world)
+	if r.heldFrom(cur.Previous().Address(), now, hold) {
 		panic("this world's rental has not ended")
 	}
 	closeEnded(world, r)
+	if now >= hold {
+		holds.Remove(world) // a passed hold is no use; one still running stays
+	}
 }
 
 // closeEnded deletes an ended rental: its payment leaves the held total, and the
@@ -219,10 +239,11 @@ func closeEnded(world string, r rental) {
 // Takedown ends a live satellite now, after the report it answers, and refunds
 // its payer the whole days not yet begun, at the price that rental paid; the
 // day under way counts as begun, so a rental's last day refunds nothing.
-// The rental stays, ended, for the days begun: until the end it was paid for, no
-// one rents its world, its payer included, and only its payer may close it,
-// and so get its storage deposit back, never the one taking it down; then
-// anyone, as for any ended rental. The owner or the operator only.
+// The rental stays, ended, for the days begun, and its world's hold, kept apart
+// from it, runs to the end it was paid for: until then no one rents the world,
+// its payer included, even if the payer closes the record or rents another
+// world, and only its payer may close the record, and so get its storage deposit
+// back, never the one taking it down; then anyone, as for any ended rental. The owner or the operator only.
 func Takedown(cur realm, world, report string) {
 	by := cur.Previous().Address()
 	if by != owner && by != operator {
@@ -239,7 +260,7 @@ func Takedown(cur realm, world, report string) {
 	begun := (now-r.start)/day + 1
 	refund := (r.days - begun) * r.price
 	held -= refund
-	r.until = r.end()
+	holds.Set(world, strconv.Itoa(r.end()))
 	r.start, r.days = now-begun*day, begun // it ends now
 	rentals.Set(world, r.encode())
 	banker.NewBanker(banker.BankerTypeRealmSend, cur).SendCoins(cur.Address(), r.payer, coins(refund))
