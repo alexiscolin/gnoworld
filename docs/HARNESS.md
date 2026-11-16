@@ -119,7 +119,7 @@ shows its output and ends on `check.sh: FAILED at <lane>:<step>`; a pass ends on
 | Lane | Steps | For a change of |
 |---|---|---|
 | lint | the harness's floor (`check_docs.py`, every `scripts/*.py` parsing, `sh -n` on each changed shell script, every `scripts/*.sh` and `.githooks/*` on a whole run), then Prettier (`--ignore-unknown`) and ESLint (`--no-warn-ignored`), each handed the change's files that exist, after `--` | the floor at every run; Prettier and ESLint for any file but prose and the realms |
-| types | `tsc`, incremental: the worktree's `.claude/tmp/tsc` | the TypeScript's sources and what they read: `app/src`, `app/tests`, `app/data`, `app/lab`, `app/public`, `server/src`, `jarvis/src`, `link-reader/src`, `packages/*/src` |
+| types | `tsc`, incremental: the worktree's `.claude/tmp/tsc` | the TypeScript's sources and what they read: `app/src`, `app/tests`, `app/data`, `app/public`, `server/src`, `jarvis/src`, `link-reader/src`, `packages/*/src` |
 | tests | Ergo's build, then Vitest's `related` command on the paths `scripts/related.py` gives, the `timing` tests left out | a tier-1 path (docs/REVIEW.md's rows, `scripts/speeds.py --tier1`, any doubt tier 1) of the same areas, or of `deploy/`, whose files some tests read from disk (`server/src/prices/prices.test.ts`); every other change's tests run on GitHub's unit job when TypeScript or its config changed (node, ui, compiled, the `timing` ones apart), else at night (a change of shared code runs some 450 test files, 100 s) |
 | gno | `gno lint` and `gno test` on `gno/...` | `gno/` |
 
@@ -135,7 +135,7 @@ that writes or changes one runs that spec itself before committing (`node app/no
 app/playwright.config.ts <spec>`).
 
 **GitHub's gate** (a pull request, a push on `main`, a run by hand): what the change calls for, by the base commit's own detector
-(`scripts/ci_changes.sh`, which runs `scripts/speeds.py --tier1` from the base), in jobs of 15 minutes at most but `deploy-stack`'s 40: the types; the lint
+(`scripts/ci_changes.sh`, which runs `scripts/speeds.py --tier1` from the base), in jobs of 15 minutes at most but `deploy-stack`'s 40 and `risk`'s 120 (D13206): the types; the lint
 (Prettier, ESLint, knip, jscpd, the CSS and comments rules, `check_docs.py`, every script parsing, the audit, gitleaks over the change by
 the base's rules); zizmor; Vitest in three shards with one retry; core's tests in Chromium and, for a change of the design system or the harness, the stories, never their pictures; the
 critical journeys; the build, the first screen's budget and nginx (`scripts/check_nginx.py`, for an app change alone), which a commit's gate does not build; gno, its mutants (`scripts/mutate.py`) and

@@ -55,7 +55,7 @@ nothing about a person.
   from that release.
 - An independent audit found two blocking issues, both fixed and covered by tests
   (appendix).
-- The hub realm (§8) and the client are not built yet.
+- The hub realm (§8) is not built; the phase-0 client is, but for slices 4b, 4d and 12 (the backlog).
 
 ## Context
 
@@ -158,7 +158,7 @@ Read on 2026-10-14:
 
 ### A reference for the navigation
 
-Dmitriy Dintsen published a design concept for Bubble Rumble on 2026-10-11 (X, 55 s). It
+Dmitriy Dintsen's design concept for Bubble Rumble (2026-10-11, a 55 s video) is the reference for the navigation. It
 already pairs a cosmos of bubbles with a `bubble | world` toggle that flies to an Earth
 with a global chat. Reviewed frame by frame on 2026-10-14, it shows:
 
@@ -1149,8 +1149,7 @@ cd ~/Server/gnoworld
   - `r/sys/namereg/v0`, `r/sys/users`;
   - `r/g1leu8d2vsplhehcfkjg50mwgdpxdkt8tztu95wr/bubble`;
   - `r/samcrew/memba_dao_channels_v2`, `r/samcrew/escrow_v4`, `r/samcrew/memba_feed_v1`.
-- Dmitriy Dintsen, Bubble Rumble design concept, X, 2026-10-11:
-  https://x.com/DmitriyDintsen/status/2109320428892176603
+- Dmitriy Dintsen, *Bubble Rumble*, design concept, a 55 s video, 2026-10-11 (reviewed frame by frame on 2026-10-14)
 - Prior study (private): gno.world on-chain feasibility, 2026-10-13
 
 ## Appendix: independent audit

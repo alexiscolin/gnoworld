@@ -1,5 +1,7 @@
 # Slice 9: calls and the chain in rooms
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Approved by Alexis question by question on 2026-11-05 (section 9); nothing is built. Sources: backlog row 9 and "From the video's audit" ("first words"), ADR-0001 §10 and §11, ADR-0002 §1 ("Your name and face") and §4, `docs/design/coherence.md` (decision 8: transactions are call cards in the thread), `docs/design/video-screens.md`, the frames 9 to 15, 20 to 35, 90 to 97 and 108 to 114, `@adena-wallet/sdk` 0.1.1's types as installed (`bin/index.d.ts:556-681`). Slices 7 and 8 run at the same time on the Mac Studio; section 7 names what 9 shares with them.
 
 ## 1. Done when

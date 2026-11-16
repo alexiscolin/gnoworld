@@ -2,7 +2,7 @@
 
 ## Setup
 
-The README's "Install" lists what to install. `pnpm install` runs no script. The git hooks
+The README's "Run it locally" lists what to install. `pnpm install` runs no script. The git hooks
 (no attribution lines, no secret, no non-ASCII path; from Claude Code's sandbox no harness file, and Prettier and check_docs on
 what is staged; in your own shell nothing of the working tree runs) live in `.git/hooks`, where
 no merge, checkout or sandboxed command writes, so no branch brings its own. Install

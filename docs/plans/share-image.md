@@ -1,5 +1,7 @@
 # A shared link's image (D13934)
 
+**Status:** not built. Since this draft, link previews wrote `link-reader/src/picture.ts`'s decoder and encoder: it is no stub.
+
 Draft of 2026-11-11, for Alexis's approval; nothing is built. Written by a planning agent (read-only), saved by the chief.
 
 Sources read: D13934 and the 2026-10-17 row (Open Graph images left to later); `CLAUDE.md`, `docs/ARCHITECTURE.md` ("Search and pages" promises

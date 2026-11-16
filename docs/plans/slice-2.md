@@ -1,5 +1,7 @@
 # Slice 2: the design system
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Draft, for Alexis's approval. Read first: DESIGN-SYSTEM.md, ADR-0001 §7, ADR-0002 §9 and its last
 note (no style change without Alexis). Deferred here: 1b-2's icons and pictures, F177, F212.
 

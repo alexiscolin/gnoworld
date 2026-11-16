@@ -1,5 +1,7 @@
 # Slice 8: discovery on the device
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written.
+
 Draft of 2026-11-04, for Alexis's approval (nothing is built). Sources: backlog row 8 and "From the video's audit", ADR-0002 §1 (Menu and settings, Passport, "You charted it", Daily expedition, Quests, "Go explore", Follow, Share, Events), §3 (never the total), §9; frames 1, 6, 86, 93, 95 read. Radical mode (decisions, 2026-11-04): parts write no test while they build; one hardening branch writes them all before main.
 
 ## 1. Done when

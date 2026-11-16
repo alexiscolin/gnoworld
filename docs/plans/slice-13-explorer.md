@@ -1,5 +1,7 @@
 # Slice 13, the explorer additions: five additions and their data (D13023)
 
+**Status:** built and in `main` (the backlog); the plan below is kept as it was written, but for the card's new name (D13209).
+
 Draft of 2026-11-12, for the chief and Alexis (nothing is built). Findings and decisions of this plan take F13xxx and D13xxx from the range the chief hands it. Sources read: D13023, D567, D13020 and D13022 (`docs/decisions.md`), `docs/plans/slice-realm-plate.md`, `docs/REVIEW.md`'s tiers, the worlds job (`server/src/worlds/`), `packages/chain/src/{asks,indexer,tx}.ts`, the chat's person card (`app/src/features/chat/PersonCard.tsx`) and chain card (`ChainCard.tsx`), `app/src/features/search/`, `packages/ui/src/{ActivityChart,Sparkline,Figures}/`. Every number below was run on 2026-11-12 against onyx-1's indexer (`https://indexer.onyx.testnets.gno.land/graphql/query`, POSTed from the sandbox) or through gnomcp (`gno_status`, `gno_account`, `gno_eval`, `gno_read`); what was not run is named in section 9.
 
 ## 1. Done when
@@ -151,7 +153,7 @@ The card is the one place a call's arguments show; the chat card itself keeps it
 **Weight on the first screen:** none (the palette is already a chunk opened by the key or the click; the index is built when it opens).
 
 ### 4.5 One line of network health on the home (value medium, risk low)
-**What it shows, where.** One `Row`-sized line under the hero's count, in the hero's small type, like `LatestOnX`: "Onyx today: N transactions · M accounts" (the words; the figures are the pass's) with a `Sparkline from="zero"` of the transactions of the last 14 UTC days (`fills`, the proposal's 92/84 rule), and a `title` with the day's date and the tip's age when the tip is old ("last block 12 min ago"). When the tip is older than 10 minutes (a halted chain) it says so instead of "today". Nothing else: no fees, no chart, no link.
+**What it shows, where.** One `Row`-sized line under the hero's count, in the hero's small type, like `LatestOnGnoland`: "Onyx today: N transactions · M accounts" (the words; the figures are the pass's) with a `Sparkline from="zero"` of the transactions of the last 14 UTC days (`fills`, the proposal's 92/84 rule), and a `title` with the day's date and the tip's age when the tip is old ("last block 12 min ago"). When the tip is older than 10 minutes (a halted chain) it says so instead of "today". Nothing else: no fees, no chart, no link.
 
 **Where each number comes from.** The job's pass, from the indexer, over the UTC day (`blockDays.ts`'s `daysOf`, F13xxx-3): the transactions of each day (P10: one row each, a page of 1,000 covers six days at the current rate) and the accounts that sent them: the first signer of each message, `MsgCall.caller`, `MsgRun.caller`, `MsgAddPackage.creator`, `BankMsgSend.from_address`. The cross-check, run by the job's test and the probe of section 9: the day's count must equal the difference of `total_txs` across the day's boundary blocks (P9 shows the pair, 10,453 to 10,753). Today so far, from the first block of the UTC day (bisection), 14 days kept.
 
@@ -169,7 +171,7 @@ The card is the one place a call's arguments show; the chat card itself keeps it
 
 **Review.** `security-reviewer` (new server route), `reviewer`; red pass.
 
-**Weight on the first screen:** none. The line is its own lazy component mounted after the hero's first paint (`requestIdleCallback`-after-load, the home's existing deferral for `LatestOnX`; confirm which) and its request is made after load; the home chunk grows by its import only, measured against `budgets.spec.ts` before merging.
+**Weight on the first screen:** none. The line is its own lazy component mounted after the hero's first paint (`requestIdleCallback`-after-load, the home's existing deferral for `LatestOnGnoland`; confirm which) and its request is made after load; the home chunk grows by its import only, measured against `budgets.spec.ts` before merging.
 
 ## 5. The load these add (every request an hour at most)
 | Addition | Indexer | RPC | Who asks | At most an hour |
