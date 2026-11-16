@@ -26,10 +26,10 @@ const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBa
 const NOBODY = <p className={["meta", styles["typing"]].join(" ")} />;
 
 /** What a chat says in its room's place when the place has no room yet, a visitor's and an account's alike. */
-export const NoRoomYet = () => (
-  <p role="status" className={styles["lead"]}>
-    {NO_ROOM_YET}
-  </p>
+export const NoRoomYet = ({ failed }: { failed?: ReactNode }) => (
+  <div role={failed === undefined ? "status" : undefined} className={styles["lead"]}>
+    {failed ?? NO_ROOM_YET}
+  </div>
 );
 const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).Typists }), {
   waiting: NOBODY,
