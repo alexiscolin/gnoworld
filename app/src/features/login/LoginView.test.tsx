@@ -68,7 +68,7 @@ describe("LoginView", () => {
   it("offers one pill, Connect Adena, to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
     const html = view();
     expect(buttons(html)).toEqual(["Connect Adena"]);
-    expect(said(html)).toContain("To log in, use a computer; once logged in you can write from here.");
+    expect(said(html)).toContain("Log in on a computer; then write from here.");
     expect(said(html)).not.toContain("To speak");
   });
 
@@ -131,7 +131,7 @@ describe("LoginView", () => {
     const out = view({ network });
     expect(out).not.toMatch(/<button[^>]*>(?:(?!<\/button>).)*<button/);
     expect(out.match(/>Onyx<\/button>/g)).toHaveLength(2);
-    expect(out).toMatch(/use a computer; once logged in you can write from here\.<button[^>]*>Onyx<\/button><\/span>/);
+    expect(out).toMatch(/Log in on a computer; then write from here\.<\/span><button[^>]*>Onyx<\/button><\/span>/);
     expect(view({ network, session: { kind: "unknown" } })).not.toContain("Onyx");
     expect(view({ network, session: { kind: "in", address: ADDRESS } })).not.toContain("Onyx");
   });

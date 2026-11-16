@@ -69,6 +69,15 @@
     transition: color calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
+  /* A phone's finger: an option is a control high, its word centred. */
+  @media (width < 900px) {
+    .option {
+      display: grid;
+      place-items: center;
+      min-block-size: var(--control-m);
+    }
+  }
+
   .option:hover {
     --_ink: var(--color-text);
   }

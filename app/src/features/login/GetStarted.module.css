@@ -8,4 +8,12 @@
     padding-inline-start: var(--space-m);
     font: var(--font-reading);
   }
+
+  /* A phone reads at the body size: 14 px, over the reading's 13. */
+  @media (width < 900px) {
+    .steps,
+    .further {
+      font: var(--font-body);
+    }
+  }
 }

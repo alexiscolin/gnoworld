@@ -48,7 +48,7 @@ export function LoginView({ session, step, problem, onLogIn, network = null }: L
         </span>
       </span>
       <span className={styles["phone"]}>
-        To log in, use a computer; once logged in you can write from here.
+        <span className={styles["words"]}>Log in on a computer; then write from here.</span>
         {network}
       </span>
       {status}

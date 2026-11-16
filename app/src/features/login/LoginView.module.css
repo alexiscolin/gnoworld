@@ -17,4 +17,11 @@
       display: none;
     }
   }
+
+  /* A phone's header holds its 44 px controls on one row: the words are the Get started dialog's and the guest composer's there. */
+  @media (width < 900px) {
+    .words {
+      display: none;
+    }
+  }
 }

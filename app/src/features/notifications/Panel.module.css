@@ -41,6 +41,15 @@
     color: var(--color-text);
   }
 
+  /* A phone's finger: the link-look button is a 44 px row, its words centred on it. */
+  @media (width < 900px) {
+    .markAll {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--control-m);
+    }
+  }
+
   .title {
     font: var(--font-title-s);
   }

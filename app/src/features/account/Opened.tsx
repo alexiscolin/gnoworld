@@ -58,6 +58,7 @@ export function Opened({
       ? [
           {
             label: "Release a key",
+            icon: "key" as const,
             onSelect: () => {
               open("release");
             },
