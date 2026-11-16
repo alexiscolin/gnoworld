@@ -118,4 +118,18 @@ describe("IconButton", () => {
       /@container \(inline-size < 18rem\) \{\s*\.anchor\[data-drops\] \{\s*display: none;\s*\}/,
     );
   });
+
+  it("draws solid where asked, as Button's solid look, and is outline by default", () => {
+    const { rerender } = render(<IconButton icon="arrow" label="Send" />);
+    expect(screen.getByRole("button").dataset["emphasis"]).toBe("outline");
+    rerender(<IconButton icon="arrow" label="Send" solid />);
+    expect(screen.getByRole("button").dataset["emphasis"]).toBe("solid");
+  });
+
+  it("is a button of type button unless it is told it submits", () => {
+    const { rerender } = render(<IconButton icon="arrow" label="Send" />);
+    expect(screen.getByRole("button").getAttribute("type")).toBe("button");
+    rerender(<IconButton icon="arrow" label="Send" type="submit" />);
+    expect(screen.getByRole("button").getAttribute("type")).toBe("submit");
+  });
 });
