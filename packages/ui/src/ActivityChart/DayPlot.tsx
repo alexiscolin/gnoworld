@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { grouped } from "../format.ts";
-import { BAR_MIN, DATE_GAP, LEFT, plotOf, tickWord } from "./dayPlot.ts";
+import { BAR_MIN, LEFT, dateShown, plotOf, tickWord } from "./dayPlot.ts";
 import styles from "./DayChart.module.css";
 
 const DOT = 1.4;
@@ -44,7 +44,7 @@ function DateWord({
       </text>
     );
   }
-  if (at % every !== 0 || w - x < DATE_GAP) return null;
+  if (!dateShown({ at, every, x, w })) return null;
   return (
     <text className={styles["tk"]} x={x} y={h - 4} textAnchor={at === 0 ? "start" : "middle"}>
       {word}

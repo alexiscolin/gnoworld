@@ -30,6 +30,10 @@ function logTicks(peak: number) {
   return top < peak ? [...ticks, top * 10] : ticks;
 }
 
+/** Whether slot `at`'s date shows: one in `every`, a date's room from the axis' end, and past the first date (which runs right from `LEFT`) by a date and a half. */
+export const dateShown = ({ at, every, x, w }: { at: number; every: number; x: number; w: number }) =>
+  at % every === 0 && w - x >= DATE_GAP && (at === 0 || x - LEFT >= DATE_GAP * 1.5);
+
 export const tickWord = (n: number) => (n >= 1000 ? `${String(n / 1000)}k` : String(n));
 
 export interface Plot {
