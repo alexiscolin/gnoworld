@@ -46,7 +46,16 @@ function useRoomsAsked(phone: boolean, key: string, open: (at: string) => void) 
 function Control({ unread, phone, onOpen }: { unread: number; phone: boolean; onOpen: () => void }) {
   if (phone)
     return (
-      <IconButton icon="hash" label="Rooms" size="s" emphasis="plain" count={unread} countTone="new" onClick={onOpen} />
+      <IconButton
+        icon="hash"
+        label="Rooms"
+        size="s"
+        emphasis="plain"
+        count={unread}
+        countNoun="unread"
+        countTone="new"
+        onClick={onOpen}
+      />
     );
   return (
     <div>

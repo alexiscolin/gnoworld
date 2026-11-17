@@ -189,7 +189,7 @@ for (const size of SIZES) {
       await page.goto("/w/bubble?room=games&chat=full");
       await hydrated(page);
       await expect(lines(page)).toHaveCount(2);
-      await expect(field(page)).toHaveAttribute("placeholder", "Message #games as a guest");
+      await expect(field(page)).toHaveAttribute("placeholder", "#games as a guest");
       // It only approximates the on-screen keyboard (headless has none): the visible viewport at 60 % of its height.
       await page.setViewportSize({ width: size.width, height: Math.round(size.height * 0.6) });
       const send = page.getByRole("button", { name: "Send" });
@@ -248,7 +248,6 @@ for (const size of SIZES) {
       await hydrated(page);
       await expect(page).toHaveURL(/\/r\/demo\/dao\?.*chat=full/);
       await page.getByRole("textbox", { name: /^Message #/ }).fill("a draft");
-      await page.getByRole("textbox", { name: /^Message #/ }).blur();
       await openPageSheet(page);
       const sheet = pageSheet(page);
       await expect(page).toHaveURL(/sheet=page/);
@@ -256,7 +255,7 @@ for (const size of SIZES) {
         sheet.locator("section[data-look='plate']").getByRole("heading", { name: "DAO", exact: true }),
       ).toBeVisible();
       await expect(sheet.getByText("Read its page").first()).toBeVisible();
-      await expect(sheet.getByText("Try a function")).toBeVisible();
+      await expect(sheet.getByRole("button", { name: "Try a function" })).toBeVisible();
       // Info's parts at the sheet's foot.
       await expect(sheet.getByRole("button", { name: "Credits", exact: true })).toBeAttached();
       await fits(page, size.width);

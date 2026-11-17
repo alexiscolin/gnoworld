@@ -67,6 +67,11 @@ describe("IconButton", () => {
     expect(countOf(screen.getByRole("button", { name: `Notifications, ${said}` }))).toBe(shown);
   });
 
+  it("says what the count counts after it, in its name only", () => {
+    render(<IconButton icon="hash" label="Rooms" count={3} countNoun="unread" />);
+    expect(countOf(screen.getByRole("button", { name: "Rooms, 3 unread" }))).toBe("3");
+  });
+
   it.each([0, -1, Number.NaN])("shows no count for %s, and its name is its label alone", (count) => {
     render(<IconButton icon="bell" label="Notifications" count={count} />);
     expect(screen.getByRole("button", { name: "Notifications" }).textContent).toBe("");

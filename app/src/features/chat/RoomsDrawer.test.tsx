@@ -49,7 +49,7 @@ describe("the rooms' drawer", () => {
   });
 
   it("says the unseen count in the control's name", () => {
-    expect(button(draw(3), "Rooms, 3")).toBeDefined();
+    expect(button(draw(3), "Rooms, 3 unread")).toBeDefined();
     expect(button(draw(0), "Rooms")).toBeDefined();
   });
 

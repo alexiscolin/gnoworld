@@ -30,6 +30,8 @@
     .welcome {
       inset-inline: 0;
       inset-block-end: 0;
+      /* raw: over the full chat (3, ChatScreen.module.css) a phone lands in, which the card covers at its foot */
+      z-index: 4;
       inline-size: auto;
       /* raw: the sheet leaves the top 30% of the screen visible; no token holds a share of the screen */
       max-block-size: 70dvb;

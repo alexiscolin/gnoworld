@@ -107,6 +107,10 @@ export function PhoneBand({
           className={styles["press"]}
           aria-label={`${place.name}: info and its page`}
           aria-describedby={metaId}
+          // A press must not blur a chat field: the blur unfolds the band and moves the layout between the press and the click.
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
           onClick={onInfo}
         />
         <Stack space="3xs" className={styles["text"]}>
