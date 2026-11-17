@@ -325,7 +325,13 @@ describe("loadConfig", () => {
   it.each([
     ["OPENAI_API_KEY_FILE", { MODERATION: "on" }],
     // On or off, nothing else: a typo would otherwise leave the chat unchecked.
-    ...["ON", "yes", "", "1", "true", " on", "on "].map((value) => ["MODERATION", { MODERATION: value }] as const),
+    ["MODERATION", { MODERATION: "ON" }],
+    ["MODERATION", { MODERATION: "yes" }],
+    ["MODERATION", { MODERATION: "" }],
+    ["MODERATION", { MODERATION: "1" }],
+    ["MODERATION", { MODERATION: "true" }],
+    ["MODERATION", { MODERATION: " on" }],
+    ["MODERATION", { MODERATION: "on " }],
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: "/nonexistent/gnoworld-openai" }],
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: file("openai-empty", "") }],
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: file("openai-short", "sk-tiny-secret\n") }],
