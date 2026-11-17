@@ -2,7 +2,8 @@
 import { ADDRESS_BODY } from "@gnoworld/core";
 import { PERSON_CAPS, type PersonCardData } from "@gnoworld/schemas/indexer";
 import { shortAddress } from "@gnoworld/schemas";
-import { amountText } from "../../lib/chainText.ts";
+import { compact } from "@gnoworld/ui";
+import { amountNumber, amountText } from "../../lib/chainText.ts";
 import { dayKey } from "../../lib/days.ts";
 
 const DAY_MS = 86_400_000;
@@ -30,9 +31,7 @@ export function middle(text: string, max: number): string {
 export function figureOf(amount: string, decimals: number): string {
   const text = amountText(amount, decimals);
   if (text.length <= 10) return text;
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumSignificantDigits: 3 }).format(
-    Number(amount) / 10 ** decimals,
-  );
+  return compact(amountNumber(amount, decimals));
 }
 
 /** The calls of the last 30 UTC days ending on `now`'s, oldest first, a day with none counting 0. */

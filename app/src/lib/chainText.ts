@@ -17,6 +17,9 @@ export const short = (address: string): string => {
 
 const withCommas = (digits: string): string => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
+/** An amount of `decimals` places as a number, for a figure: exact to 2^53 units, near past them (amountText keeps it exact). */
+export const amountNumber = (amount: string, decimals: number): number => Number(amount) / 10 ** decimals;
+
 /** An amount of `decimals` places as the reader writes it: grouped, its fraction without trailing zeros. */
 export function amountText(amount: string, decimals: number): string {
   const base = 10n ** BigInt(decimals);
