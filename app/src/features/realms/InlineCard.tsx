@@ -79,7 +79,7 @@ function OpenCard({ card, place, level, title }: { card: CallCardState; place: C
           askFor("log-in");
         },
       }}
-      network={{ name, chainId }}
+      network={{ name, chainId, rpc }}
       fee={feeText(fees)}
       onEdit={(index, text) => {
         callsActions.edit(id, index, text);
