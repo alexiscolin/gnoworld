@@ -431,13 +431,13 @@
 
     .controls {
       /* layout: the last glyph on E, as the logo's ink sits on S (the 44 px target hangs out by the glyph's side room) */
-      margin-inline-end: calc((var(--icon-l) - var(--control-m)) / 2);
+      margin-inline-end: calc((var(--phone-icon) - var(--control-m)) / 2);
     }
 
-    /* The search, the bell and the menu: the large icon (--icon-l) in their 44 px targets, still plain. */
+    /* The search, the bell and the menu: a phone's header icon in their 44 px targets, still plain. */
     .controls button > svg {
-      inline-size: var(--icon-l);
-      block-size: var(--icon-l);
+      inline-size: var(--phone-icon);
+      block-size: var(--phone-icon);
     }
   }
 

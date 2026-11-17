@@ -209,6 +209,8 @@
        height and the row of worlds'; the composer's budget counts both. */
     --phone-band: 0px;
     --phone-worlds: 0px;
+    /* A phone header's icons: larger than --icon-l, in their 44 px targets (Alexis: bigger header icons). */
+    --phone-icon: 24px;
     /* How far the composer's box goes out past its column's inset, and the inset of its words from its edge; the dock sets both (app's QuickActions.module.css). */
     --box-bleed: 0px;
     --box-in: var(--space-s);
