@@ -33,4 +33,14 @@ describe("a skeleton", () => {
     expect(turned.root?.angleTo(rest.root ?? new Quaternion())).toBeCloseTo(0.3, 6);
     expect(turned.spin).toBeCloseTo(-(10 + 2) * SPIN, 9);
   });
+
+  // A colony is no sphere: a sphere's meridians and parallels would cross its wheels and stand round it, where a planet's opaque disc
+  // covers them as it comes in over them (F13788).
+  it("draws no skeleton for gnosh's colony", () => {
+    const bones = new Bones();
+    bones.begin();
+    bones.show({ ...(planet as object), index: 3, id: "gnosh-ai" } as never, { at, seconds: 10, opacity: 1 });
+    bones.end();
+    expect(bones.group.children).toEqual([]);
+  });
 });
