@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { logger } from "./log.ts";
+import { failureOf, logger } from "./log.ts";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -121,5 +121,65 @@ describe("logger", () => {
         expect(Line.parse(JSON.parse(lines[0] ?? ""))).toMatchObject({ event, route });
       }),
     );
+  });
+});
+
+// A crash must be findable from its log line, while a message may quote what a request sent: the frames go, the message never.
+describe("failureOf", () => {
+  it("gives an Error's name and its stack's frames, never its message, a message shaped like a frame included", () => {
+    const thrown = new TypeError("quotes planted-token-5f2b\n    at planted (body.ts:1:1)");
+    const { error, stack } = failureOf(thrown);
+    expect(error).toBe("TypeError");
+    expect(stack).toMatch(/^at .*log\.test\.ts:\d+/);
+    expect(stack).not.toContain("planted");
+  });
+
+  it("gives an Error whose name changed after its making the new name, and still never its message", () => {
+    const thrown = new Error("planted-token-5f2b");
+    thrown.name = "string";
+    expect(failureOf(thrown)).toMatchObject({ error: "string" });
+    expect(failureOf(thrown).stack).toMatch(/^at /);
+    expect(failureOf(thrown).stack).not.toContain("planted");
+  });
+
+  it("skips a message of several lines whole, frames forged at its end and an empty last line included", () => {
+    const forged = "planted\n    at planted (a.ts:1:1)\n    at planted (b.ts:2:2)\n    at planted (c.ts:3:3)\n";
+    for (const message of [forged, "", "\n"]) {
+      const { stack } = failureOf(new Error(message));
+      expect(stack).toMatch(/^at .*log\.test\.ts/);
+      expect(stack).not.toContain("planted");
+    }
+  });
+
+  it("gives an Error with no stack, or one that is no text, its name alone", () => {
+    const bare = new Error("planted");
+    bare.stack = undefined;
+    expect(failureOf(bare)).toEqual({ error: "Error" });
+    const odd = new Error("planted");
+    Object.defineProperty(odd, "stack", { value: 42 });
+    expect(failureOf(odd)).toEqual({ error: "Error" });
+  });
+
+  it("names an Error whose name is no plain word Error, so a name never carries a line or a frame", () => {
+    const thrown = new Error("x");
+    thrown.name = "Type\n    at planted (a.ts:1:1)";
+    expect(failureOf(thrown).error).toBe("Error");
+    expect(failureOf(thrown).stack ?? "").not.toContain("planted");
+  });
+
+  it("gives a thrown value that is no Error its type alone", () => {
+    expect(failureOf("planted-token-5f2b")).toEqual({ error: "string" });
+    expect(failureOf(undefined)).toEqual({ error: "undefined" });
+    expect(failureOf({ stack: "at planted" })).toEqual({ error: "object" });
+  });
+
+  it("is written as fields of the line, the frames on one line of JSON", () => {
+    const { log, lines } = capture();
+    log("failed", { status: 500, ...failureOf(new RangeError("planted-token-5f2b")) });
+    expect(lines).toHaveLength(1);
+    const line = z.looseObject({ error: z.string(), stack: z.string() }).parse(JSON.parse(lines[0] ?? ""));
+    expect(line.error).toBe("RangeError");
+    expect(line.stack).toMatch(/^at .*log\.test\.ts/);
+    expect(lines[0]).not.toContain("planted");
   });
 });

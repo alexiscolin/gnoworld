@@ -351,7 +351,7 @@ describe("jarvis's HTTP face: what it answers", () => {
     expect([server.headersTimeout, server.requestTimeout, server.keepAliveTimeout]).toEqual([5_000, 10_000, 5_000]);
   });
 
-  it("answers a handler that throws as internal, logging the error's name and never its message", async () => {
+  it("answers a handler that throws as internal, logging the error's name and frames, never its message", async () => {
     const { url, events, raw } = await served({
       "/echo": { POST: () => Promise.reject(new TypeError("a-message-that-quotes-the-body")) },
     });
@@ -362,6 +362,7 @@ describe("jarvis's HTTP face: what it answers", () => {
       method: "POST",
       status: 500,
       error: "TypeError",
+      stack: expect.stringMatching(/^at .*http\.test\.ts:\d+/) as unknown,
     });
     expect(raw()).not.toContain("a-message-that-quotes-the-body");
   });

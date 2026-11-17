@@ -4,7 +4,7 @@
 // channel comes back, and a member taken off the file is put out. Read whole in review: a wrong command
 // here opens a room or hands out power.
 import { NICK, type Command } from "../irc/lines.ts";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import type { Desired } from "./types.ts";
 
 /** A room in Ergo: its flags, its invite list by account, and who is in it with their prefixes. */
@@ -108,7 +108,7 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
       try {
         await one(room);
       } catch (error) {
-        log("room_unreconciled", { room, error: error instanceof Error ? error.name : "unknown" });
+        log("room_unreconciled", { room, ...failureOf(error) });
       }
     }
   };

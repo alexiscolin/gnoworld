@@ -1,7 +1,7 @@
 // The check's queue: fair per account, so one account's flood holds another's line
 // back by one at most, and an account holds a share of it only; four checks at once; capped, a line past
 // the cap left unchecked with the alert. Its oldest line's age is logged every 30 s, the alert past 2 min.
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 
 export interface Queue<T> {
   push: (item: T) => boolean;
@@ -57,9 +57,9 @@ export function makeQueue<T extends { account: string }>(options: Options<T>): Q
         pump();
         settle();
       };
-      // A check that fails frees its place: its name goes to the log, never the line.
+      // A check that fails frees its place: its name and frames go to the log, never the line.
       const failed = (error: unknown): void => {
-        log(`${prefix}_failed`, { error: error instanceof Error ? error.name : "unknown" });
+        log(`${prefix}_failed`, failureOf(error));
         done();
       };
       run(next.item).then(done, failed);

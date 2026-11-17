@@ -90,10 +90,10 @@ describe("the server's app", () => {
   });
 
   it.each([
-    ["an error", new TypeError(`failed on ${TOKEN}`), "TypeError"],
+    ["an error", new TypeError(`failed on ${TOKEN}\n    at ${TOKEN} (forged.ts:1:1)`), "TypeError"],
     ["a string", `failed on ${TOKEN}`, "string"],
   ])(
-    "answers %s thrown with a generic 500, and logs it without what the request carried",
+    "answers %s thrown with a generic 500, and logs its name and frames without what the request carried",
     async (_, thrown: unknown, name) => {
       const { app, lines } = setup();
       app.post("/fails/:id", () => {
@@ -112,7 +112,8 @@ describe("the server's app", () => {
       expect(logged).toContain('"event":"failed"');
       expect(logged).toContain(`"error":"${name}"`);
       expect(logged).toContain('"route":"/fails/:id"');
-      for (const planted of [TOKEN, TICKET, SIGNATURE, ADDRESS, "failed on", "at "]) {
+      expect(logged).toMatch(/"stack":"at [^"]*app\.(?:test\.)?ts:\d+/);
+      for (const planted of [TOKEN, TICKET, SIGNATURE, ADDRESS, "failed on"]) {
         expect(logged).not.toContain(planted);
       }
     },
