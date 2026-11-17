@@ -1462,6 +1462,10 @@ def mutants():
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
     yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
     yield from each("scripts/audit.py", '''sys.exit(f"audit: no readable answer from npm's advisory database: {e}")''', "answer = {}", "hooks", "audit fails without an answer")
+    yield from each("scripts/audit.py", "today <= until", "True", "hooks", "the waiver ends on its date")
+    yield from each("scripts/audit.py", "str(advisory.get(\"url\")).endswith(ghsa)", "True", "hooks", "the waiver lets one advisory through")
+    yield from each("scripts/audit.py", "name == package and", "", "hooks", "the waiver holds for one package")
+    yield from each("scripts/audit.py", "tuple(map(int, m.groups())) <= top", "True", "hooks", "the waiver holds up to one version")
     # GitHub judges main: each promise of the two workflows and the two scripts, switched off.
     ci = ".github/workflows/gate.yml"
     # gate-ok's last step, its rights, and the script that writes the annotations.
