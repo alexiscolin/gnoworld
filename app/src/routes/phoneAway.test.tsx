@@ -10,19 +10,20 @@ let root: Root | undefined;
 let host: HTMLElement;
 
 function Probe() {
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
   return (
     <>
       <PhoneAway home="/" />
       <p>
         {pathname}
         {search}
+        {hash}
       </p>
     </>
   );
 }
 
-const draw = (phone: boolean, recent = "") => {
+const draw = (phone: boolean, recent = "", at = "/") => {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: phone && query === "(max-width: 899px)",
     addEventListener: () => undefined,
@@ -32,7 +33,7 @@ const draw = (phone: boolean, recent = "") => {
   root = createRoot(host);
   act(() => {
     root?.render(
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={[at]}>
         <Probe />
       </MemoryRouter>,
     );
@@ -56,6 +57,14 @@ it("takes a phone that hydrated on the home to its landing chat, by a replace", 
   draw(true, "/w/bubble");
   await vi.waitFor(() => {
     expect(host.textContent).toBe("/w/bubble?chat=full");
+  });
+});
+
+// A palette opened while the landing's code came (#search, usePaletteHistory.ts) goes with the phone, never closed under the finger.
+it("keeps what the address's hash opened on the way", async () => {
+  draw(true, "/w/bubble", "/#search");
+  await vi.waitFor(() => {
+    expect(host.textContent).toBe("/w/bubble?chat=full#search");
   });
 });
 
