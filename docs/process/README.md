@@ -1,6 +1,6 @@
 # The process journal
 
-How gnoworld gets built, kept for the record. The decisions that shape the product are in [../DECISIONS.md](../DECISIONS.md);
+How gnoworld gets built, kept for the record. The decisions that shape the product are in [../KEY-DECISIONS.md](../KEY-DECISIONS.md);
 what follows is the working journal behind them, written for the people building gnoworld and the agents helping them. Git's
 history keeps every earlier version.
 

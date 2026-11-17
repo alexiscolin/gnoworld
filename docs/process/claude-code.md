@@ -74,3 +74,30 @@ most (`docs/HARNESS.md`, "Who does what").
 
 The order of work is in [plans/backlog.md](plans/backlog.md), with the
 concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.
+
+## The workshop on the owner's network
+
+The workshop's dev servers, with hot reload, are opened from another computer or a phone over Tailscale. `scripts/workshop.sh` and `app/lab.config.ts` also start a lab server that has no page to serve (`app/lab/` does not exist).
+
+**Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
+Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
+each started by its function `start` and put on the tailnet by `share`: the app's (`react-router dev`) on 127.0.0.1:5198 and the
+lab's (`vite --config lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when
+the `tailnet-preview` skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`;
+without it, the local addresses. It stops only processes it started itself (their pids and ports in `.claude/tmp/workshop.pid`):
+a port held by anything else is said, never taken. Ctrl+C stops all three, the servers and the backend (below), and takes them
+off the tailnet, and so does any of them that stops; a second `pnpm workshop` in the same checkout replaces the first, the
+backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
+`tailnet-preview.sh down workshop-app` and `down workshop-lab`.
+
+
+Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
+the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
+which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
+which. On the other computer or the phone, open the https ones:
+- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
+  the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
+- **`workshop-lab`:** the second name the script puts on the tailnet; with `app/lab/` gone, no page answers there.
+
+The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
+cannot reach the clipboard there; select the list instead.

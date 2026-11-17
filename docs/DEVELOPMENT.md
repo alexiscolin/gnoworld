@@ -39,7 +39,7 @@ turns off fast-forward merges in this clone, so a merge always makes a commit, w
 stays a fast-forward, `pull.ff only`). A commit runs the secret scan, and from Claude Code's sandbox Prettier on the staged files and
 the docs check, a harness file refused; `sh scripts/check.sh` is what you run before committing code. The gate needs the Node `.node-version` pins (first on PATH, as any version
 manager puts it there, or in nvm's default folder; with nvm, `nvm use` picks it, since `.nvmrc` links to `.node-version`), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
-The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten of the 109 on an app change, the nightly run 41): `node app/node_modules/@playwright/test/cli.js install chromium`
+The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten of the 110 on an app change, the nightly run 41): `node app/node_modules/@playwright/test/cli.js install chromium`
 (the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
 
@@ -107,33 +107,14 @@ Anthropic key is the owner's own for tests.
 
 ## The workshop
 
-Design is tried here before it lands: the app's screens on Vite's dev server, with hot reload,
-opened from the MacBook or a phone over Tailscale. `scripts/workshop.sh` and `app/lab.config.ts` also start a lab server that has no page to serve (`app/lab/` does not exist). No
-gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
-pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
-fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
+Design is tried here before it lands: `pnpm workshop`, in your own terminal (the sandbox cannot stop a server it did not start),
+serves the app's dev server with hot reload on 127.0.0.1:5198 and the backend below. It stops only the processes it started, and
+Ctrl+C stops them all. No gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the
+gate and one review, with pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or
+harness file) takes the fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`. How the
+owner opens it from another device over a private network is in [process/claude-code.md](process/claude-code.md).
 
-**Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
-Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
-each started by its function `start` and put on the tailnet by `share`: the app's (`react-router dev`) on 127.0.0.1:5198 and the
-lab's (`vite --config lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when
-the `tailnet-preview` skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`;
-without it, the local addresses. It stops only processes it started itself (their pids and ports in `.claude/tmp/workshop.pid`):
-a port held by anything else is said, never taken. Ctrl+C stops all three, the servers and the backend (below), and takes them
-off the tailnet, and so does any of them that stops; a second `pnpm workshop` in the same checkout replaces the first, the
-backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
-`tailnet-preview.sh down workshop-app` and `down workshop-lab`.
-
-
-Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
-the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
-which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
-which. On the MacBook or the phone, open the https ones:
-- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
-  the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
-- **`workshop-lab`:** the second name the script puts on the tailnet; with `app/lab/` gone, no page answers there.
-
-**The backend**, started once the app's server is on the tailnet :
+**The backend**, started with the app's server:
 the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
 by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for Ergo and its WebSocket
 (`WORKSHOP_API_PORT`, `WORKSHOP_IRC_PORT`, `WORKSHOP_WS_PORT`), allowing the app's local address and its tailnet links as
@@ -166,8 +147,6 @@ accounts an hour, so the crowd's wallets log in again.
 (`server/src/testing/jarvisStandin.ts`: the same paths and schemas, prepared answers chosen by the question's words, no model, no key, no
 network) and give the server `JARVIS=on`, its address and a key file; without the variable Jarvis stays off. Never set in the journeys.
 
-The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
-cannot reach the clipboard there; select the list instead.
 
 
 ## The stack

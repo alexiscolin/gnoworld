@@ -4,7 +4,7 @@
 
 gnoworld is a social, on-chain, graphical hub for [gno.land](https://gno.land). Each project on
 the chain is a world: a planet you can fly to in a 3D universe, with the Earth at its center and
-a live count of who is here.
+a live count of who is here. It is an alternative version of gno.world: a social app for gno.land, not a game.
 
 **Try the beta:** <https://621cf596-5ae9-49bc-895a-17d45e55a6cd.pub.instances.scw.cloud>
 
@@ -17,7 +17,7 @@ security-critical code gets its own review. [docs/harness.png](docs/harness.png)
 ## Status
 
 - **On chain, nothing is deployed yet.** The app reads gno.land (onyx-1 and gnoland-1) and writes
-  nothing of its own: the calls a visitor signs in Adena go to other realms.
+  nothing of its own: the calls a visitor signs in Adena, or runs with gnokey, go to other realms.
 - **The satellite realm** ([`gno/r/satellite/`](gno/README.md)) is written and tested locally, not
   deployed. Its path, `gno.land/r/gnoworld/satellite`, cannot be registered: gno.land's open name
   registrar (`r/sys/namereg/v0`) takes only names shaped `nym-<5 to 13 letters><3 digits>`, and refuses
@@ -40,8 +40,10 @@ security-critical code gets its own review. [docs/harness.png](docs/harness.png)
 - Opens any realm's page to read what it does, see its calls and, for token worlds, its holders
   and transfers.
 - Asks Jarvis, the assistant, what a realm does. Jarvis explains in plain words and prepares the
-  calls, which the visitor signs in the Adena wallet. Jarvis never signs for anyone.
-- Logs in with Adena, links accounts, and collects stamps and challenges on a passport.
+  calls, which the visitor signs in the Adena wallet or runs with gnokey. Jarvis never signs for anyone.
+- Logs in with the Adena wallet or, on a computer without it, with gnokey (the server's text signed offline, the file
+  gnokey prints pasted back); links accounts; collects stamps and challenges on a passport.
+- On a computer, copies a call card's `gnokey maketx call` command to run it by hand.
 - Owners of a world's namespace moderate its rooms: hide, mute and pin.
 
 ## Run it locally
@@ -91,7 +93,7 @@ Hosting and running the whole stack: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Documentation
 
-- The decisions that shape the product: [docs/DECISIONS.md](docs/DECISIONS.md)
+- The decisions that shape the product: [docs/KEY-DECISIONS.md](docs/KEY-DECISIONS.md)
 - Design: [ADR-0001](adr/0001-gnoworld.md), and the scope of the prototype,
   [ADR-0002](adr/0002-validated-prototype.md)
 - Code layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
