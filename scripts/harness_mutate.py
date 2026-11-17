@@ -354,7 +354,7 @@ def mutants():
     # The worker's packages, refused by name: a scoped one and node: too, and its catches still read.
     yield from each(APP, 'regex: "^[^.]"', 'regex: "^[a-z]"', "probe", "eslint the worker imports no package, scoped or node: (G2)")
     yield from each(APP, "...SWALLOWED, ", "", "probe", "eslint the worker's catches are read")
-    yield from each("lint/shared.config.ts", "[callee.object.object.type='MetaProperty'] > CallExpression", "[callee.object.object.type='MetaProperty'] > NewExpression", "probe", "eslint refuses a call given to import.meta.hot's dispose")
+    yield from each("lint/shared.config.ts", ":matches(CallExpression, NewExpression, ChainExpression,", ":matches(NewExpression, ChainExpression,", "probe", "eslint refuses a call given to import.meta.hot's dispose")
     yield from each(APP, "...reaching(REACHES.filter(", "...reaching([].filter(", "probe", "eslint the worker's folder keeps fetch and caches only (F395)")
     yield from each(APP, "{ts,tsx}", "ts", "probe", "eslint reads a feature's screens")
     yield from each(APP, "`./${feature}`,", "`./nowhere`,", "probe", "eslint a feature imports its own files")

@@ -29,9 +29,10 @@ export const SWALLOWED = [
     message: "A .catch that only logs swallows the error.",
   },
   {
-    // A production build has no `import.meta.hot`: `hot?.dispose(f())` skips its whole call there, f() with it.
+    // A production build has no `import.meta.hot`: `hot?.dispose(f())` skips its whole call there, f() with it; so does any of
+    // its methods, whatever shape the call takes (f?.(), await f(), f() ?? g, f() as T).
     selector:
-      "CallExpression[callee.property.name='dispose'][callee.object.property.name='hot'][callee.object.object.type='MetaProperty'] > CallExpression",
+      "CallExpression[callee.object.property.name='hot'][callee.object.object.type='MetaProperty'] > :matches(CallExpression, NewExpression, ChainExpression, AwaitExpression, TSAsExpression, TSNonNullExpression, LogicalExpression, ConditionalExpression)",
     message:
       "A production build has no import.meta.hot, so hot?.dispose(f()) never calls f(): make it first (const stop = f()), then pass stop.",
   },
