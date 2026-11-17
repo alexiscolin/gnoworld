@@ -100,6 +100,8 @@ const File = z.strictObject({
   memo: z.unknown(),
   signatures: z.array(Entry).length(1),
 });
+/** A pasted file as a body carries it: what `verifyCliProof` reads, 4 KiB at most. */
+export const CliFile = z.string().refine((text) => Buffer.byteLength(text) <= MAX_FILE);
 const Key = z.strictObject({ "@type": z.literal("/tm.PubKeySecp256k1"), value: z.string() });
 
 // Bytes of a base64 string only if it is the canonical spelling: Node's decoder skips what is not base64.

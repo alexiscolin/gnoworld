@@ -23,7 +23,7 @@ CREATE INDEX links_by_identity ON links (identity);
 
 export type LinkKind = "adena" | "cli";
 // What the account proves with: Adena's signature, or the file the command-line tool wrote.
-type LinkProof = { kind: "adena"; proof: Proof } | { kind: "cli"; file: string };
+export type LinkProof = { kind: "adena"; proof: Proof } | { kind: "cli"; file: string };
 export interface Verifiers {
   adena: Verify;
   cli: (file: string, expected: Expected) => Promise<boolean>;
@@ -36,9 +36,10 @@ export interface Links extends Release {
   startLink: (
     request: Fresh & { by: Address; kind: LinkKind; subject: Address; host: string },
   ) => Challenge | "stale" | "pending" | "members" | "full" | "self" | "text";
-  // The code spent first, then the proof; the refusals about the address come only after it passes.
+  // The code spent first, then both proofs, the address's and `by`'s own of the same text (the wallet audit's medium 1:
+  // a relayed session alone links nothing); the refusals about the address come only after they pass.
   finishLink: (
-    request: Fresh & LinkProof & { nonce: string; by: Address; address: Address; host: string },
+    request: Fresh & LinkProof & { nonce: string; by: Address; address: Address; host: string; byProof: LinkProof },
   ) => Promise<{ members: Address[] } | "stale" | "nonce" | "proof" | "linked" | "members">;
   unlink: (request: Fresh & { by: Address; address: Address }) => { members: Address[] } | "stale" | "none";
   identityOf: (address: Address) => Address[];
@@ -93,7 +94,8 @@ function statements(db: DatabaseSync) {
   return {
     purge: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     pending: db.prepare("SELECT count(*) AS n FROM nonces WHERE owner = ? AND kind IS NOT NULL"),
-    pendingAll: db.prepare("SELECT count(*) AS n FROM nonces WHERE kind IS NOT NULL"),
+    // A link's code has its owner: the command line's login's nonces (kind cli, no owner) are the login's cap's.
+    pendingAll: db.prepare("SELECT count(*) AS n FROM nonces WHERE kind IS NOT NULL AND owner IS NOT NULL"),
     add: db.prepare(
       "INSERT INTO nonces (nonce, chain, host, text, owner, subject, kind, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     ),
@@ -150,8 +152,9 @@ export function makeLinks(db: DatabaseSync, { now, chainId, verifiers, linkCap =
       if (identityOf(by).length >= seats) return "members";
       const nonce = randomBytes(16).toString("base64url");
       const text = linkText({ by, subject, others: others(by, subject), host, chain: chainId, nonce });
-      // The command line signs the text as a memo in JSON the chain re-encodes: only text both encode the same way.
-      if (kind === "cli" && !cliSafe(text)) return "text";
+      // The command line signs the text as a memo in JSON the chain re-encodes: only text both encode the same way. Whatever
+      // B's kind, A may sign by the command line.
+      if (!cliSafe(text)) return "text";
       sql.add.run(nonce, chainId, stored(host), text, by, subject, kind, at + ttl);
       return { nonce, text, expiresAt: new Date(at + ttl).toISOString() };
     },
@@ -163,12 +166,13 @@ export function makeLinks(db: DatabaseSync, { now, chainId, verifiers, linkCap =
       const spent = sql.spend.get(nonce, kind, by, address, stored(host), now());
       if (spent === undefined) return "nonce";
       const { chain, text } = Spent.parse(spent);
-      const expected = { signer: address, chainId: chain, data: text };
-      const passed =
-        request.kind === "cli"
-          ? await verifies(verifier.cli ?? none, request.file, expected)
-          : await verifies(verifier.adena ?? none, request.proof, expected);
-      if (!passed) return "proof";
+      const proves = (proof: LinkProof, signer: Address) => {
+        const expected = { signer, chainId: chain, data: text };
+        return proof.kind === "cli"
+          ? verifies(verifier.cli ?? none, proof.file, expected)
+          : verifies(verifier.adena ?? none, proof.proof, expected);
+      };
+      if (!(await proves(request, address)) || !(await proves(request.byProof, by))) return "proof";
       // The proof passed: the identities are read now, not at the start, and written in one transaction.
       return transaction(db, () => {
         if (sql.row.get(address) !== undefined) return "linked";
@@ -180,7 +184,7 @@ export function makeLinks(db: DatabaseSync, { now, chainId, verifiers, linkCap =
         const identity = mine === undefined ? randomUUID() : Member.parse(mine).identity;
         if (mine === undefined) {
           sql.addIdentity.run(identity, at);
-          sql.addLink.run(by, identity, "adena", at, identity);
+          sql.addLink.run(by, identity, request.byProof.kind, at, identity);
         }
         if (sql.addLink.run(address, identity, kind, at, identity).changes === 0) return "members";
         return { members: membersOf(identity) };

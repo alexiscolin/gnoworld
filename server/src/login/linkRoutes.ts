@@ -10,8 +10,8 @@ import { z } from "zod";
 import { baseRefusals, guard, json, refuserOf, tokenOf, type Guarded, type Refusals } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { visitor48Of, visitorOf } from "../visitor.ts";
-import { cliVerify } from "./cliProof.ts";
-import { FRESH_MS, makeLinks, type Links } from "./links.ts";
+import { CliFile, cliVerify } from "./cliProof.ts";
+import { FRESH_MS, makeLinks, type LinkProof, type Links } from "./links.ts";
 
 export interface LinkRoutesOptions {
   links: Links;
@@ -29,17 +29,17 @@ export interface LinkRoutesOptions {
   now: () => number;
 }
 
-const FILE_MAX = 4096;
 const Challenge = z.strictObject({ kind: z.enum(["adena", "cli"]), address: Address });
 const Unlink = z.strictObject({ address: Address });
-const File = z.string().refine((text) => Buffer.byteLength(text) <= FILE_MAX);
+// The session's account signs the same text too (the wallet audit's medium 1): Adena's proof, or its key's file.
+const By = z.union([z.strictObject({ proof: Proof }), z.strictObject({ file: CliFile })]);
 const Verify = z.union([
-  z.strictObject({ nonce: Nonce, address: Address, proof: Proof }),
-  z.strictObject({ nonce: Nonce, address: Address, file: File }),
+  z.strictObject({ nonce: Nonce, address: Address, proof: Proof, by: By }),
+  z.strictObject({ nonce: Nonce, address: Address, file: CliFile, by: By }),
 ]);
 // The release asks for an address and finishes with a file alone: no session says who asks.
 const ReleaseChallenge = z.strictObject({ address: Address });
-const ReleaseVerify = z.strictObject({ nonce: Nonce, address: Address, file: File });
+const ReleaseVerify = z.strictObject({ nonce: Nonce, address: Address, file: CliFile });
 
 // The word and status of each cause: a code that is no good (unknown, expired, used, another session's) is 404, which depends on the code alone; a proof
 // that does not verify is 400, which depends on the signature alone; only once the proof has passed does a key already linked elsewhere say 403.
@@ -75,6 +75,9 @@ const about = (who: Address, address?: Address) => ({
   account: who,
   ...(address === undefined ? {} : { subject: address }),
 });
+
+const proofOf = (sent: { proof: Proof } | { file: string }): LinkProof =>
+  "proof" in sent ? { kind: "adena", proof: sent.proof } : { kind: "cli", file: sent.file };
 
 // A code issued: its nonce, the memo to sign and the command line's block to copy.
 const codeAnswer = (c: Context, made: { nonce: string; text: string; expiresAt: string }, block: string) =>
@@ -177,8 +180,10 @@ export function linkRoutes(options: LinkRoutesOptions): Hono<Guarded> {
     const made = links.startLink({ by: asked.who, kind, subject: address, host: c.get("host"), signedAt: asked.at });
     if (typeof made === "string") return refuse(c, made === "stale" ? "session" : made, about(asked.who, address));
     issued.take(asked.visitor, now());
-    if (kind === "adena") return c.json({ ...made, chainId });
-    return codeAnswer(c, made, block(address, made.text));
+    const byBlock = block(asked.who, made.text);
+    if (kind === "adena") return c.json({ ...made, chainId, byBlock });
+    const { nonce, text: memo, expiresAt } = made;
+    return c.json({ nonce, memo, block: block(address, memo), byBlock, expiresAt, chainId });
   });
 
   app.post("/verify", async (c) => {
@@ -189,11 +194,8 @@ export function linkRoutes(options: LinkRoutesOptions): Hono<Guarded> {
     const stale = fresh(c, asked);
     if (stale !== undefined) return stale;
     const { nonce, address } = body.data;
-    const proof =
-      "proof" in body.data
-        ? ({ kind: "adena", proof: body.data.proof } as const)
-        : ({ kind: "cli", file: body.data.file } as const);
-    const request = { ...proof, nonce, by: asked.who, address, host: c.get("host"), signedAt: asked.at };
+    const [proof, byProof] = [proofOf(body.data), proofOf(body.data.by)];
+    const request = { ...proof, nonce, by: asked.who, address, byProof, host: c.get("host"), signedAt: asked.at };
     const done = await links.finishLink(request);
     if (typeof done === "string") return refuse(c, done === "stale" ? "session" : done, about(asked.who, address));
     log("link_made", { ...about(asked.who, address), kind: proof.kind });
