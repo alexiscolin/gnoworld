@@ -6,6 +6,30 @@ gnoworld is a social, on-chain, graphical hub for [gno.land](https://gno.land). 
 the chain is a world: a planet you can fly to in a 3D universe, with the Earth at its center and
 a live count of who is here.
 
+**Try the beta:** <https://621cf596-5ae9-49bc-895a-17d45e55a6cd.pub.instances.scw.cloud>
+
+## How it is built
+
+gnoworld is built by Alexis Colin with Claude Code, under a test-first harness: the failing tests
+come before the code, every guard of the gate is proven by a planted bypass it must catch, and the
+security-critical code gets its own review. [docs/harness.png](docs/harness.png) shows how.
+
+## Status
+
+- **On chain, nothing is deployed yet.** The app reads gno.land (onyx-1 and gnoland-1) and writes
+  nothing of its own: the calls a visitor signs in Adena go to other realms.
+- **The satellite realm** ([`gno/r/satellite/`](gno/README.md)) is written and tested locally, not
+  deployed. Its path, `gno.land/r/gnoworld/satellite`, cannot be registered: gno.land's open name
+  registrar (`r/sys/namereg/v0`) takes only names shaped `nym-<5 to 13 letters><3 digits>` and refuses
+  stems that start with `gno`; any other name needs a GovDAO vote. The realm moves to its deployer's
+  address namespace (`gno.land/r/<address>/...`) at its first deploy.
+- **The seal realm** (`r/seal`, [ADR-0001](adr/0001-gnoworld.md) §3), audited and fixed, is out of
+  the tree until it is needed; its last version is at commit `e44037b8` (`git show
+  e44037b8:gno/r/seal/seal.gno`).
+- **Next**, by ADR-0001's rollout: phase 1 puts the social state on chain (a hubs realm, sessions and
+  a sponsor for writes without a wallet popup, profiles on `r/sys/users` names); phase 2 brings
+  private rooms encrypted with MLS, and seals; phase 3 is mainnet, after an external audit.
+
 ## What a visitor sees and does
 
 - Flies through the universe and opens a world to see what it is, who is there and what it does.
@@ -34,7 +58,7 @@ Other commands:
 
 | Command | What it does |
 |---|---|
-| `pnpm workshop` | The app with the chat and a local backend running ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
+| `pnpm workshop` | The app with the chat and a local backend running; macOS only, as it runs each process under the system's `sandbox-exec` ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
 | `docker compose -f deploy/compose.yaml up -d --build` | The whole stack on a Docker host, its secrets first ([docs/OPERATIONS.md](docs/OPERATIONS.md)) |
 | `./scripts/check.sh` | The commit gate, on what a change touches: format, lint, types, related tests, realms |
 | `pnpm run test` | The unit tests |
@@ -74,6 +98,10 @@ Hosting and running the whole stack: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 - Settings, secrets and switches: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 - Reviews and quality gates: [docs/REVIEW.md](docs/REVIEW.md), [docs/HARNESS.md](docs/HARNESS.md)
 - Plans and what comes next: [docs/plans/backlog.md](docs/plans/backlog.md)
+
+## License
+
+[Apache-2.0](LICENSE).
 
 Planet textures are from [Solar System Scope](https://www.solarsystemscope.com/textures/),
 CC BY 4.0. The app lists them under Credits.

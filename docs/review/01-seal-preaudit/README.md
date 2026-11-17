@@ -13,7 +13,8 @@
 
 ## Rules
 
-- 45 minutes at most. Read neither `gno/r/seal/seal.gno` (the fixed version) nor the ADR's appendix before you have finished.
+- 45 minutes at most. Read neither the fixed version (`git show e44037b8:gno/r/seal/seal.gno`; the realm is out of the tree now)
+  nor the ADR's appendix before you have finished.
 - If you have already read decisions 2 and 3 of the ADR, you know some of the answers. Then look mostly for the others, and check that you can point to the exact line.
 - Follow the order of [`docs/REVIEW.md`](../../REVIEW.md): intent, tests, boundaries, errors, state, security and costs, readability.
 - For each `issue:`, write the scenario: who calls what, with which arguments, and what they get.

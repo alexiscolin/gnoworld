@@ -11,7 +11,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ Ergo over WebSocket .................. rooms, history, presence (IRCv3)
   ├─ gno.land RPC ......................... free reads: vm/qrender, vm/qeval, vm/qfile, vm/qpaths
   ├─ markets.json ......................... prices, written every 5 minutes by the server's timer
-  ├─ indexer.gno.land (graphql-ws) ........ chain events, live
+  ├─ indexer.gno.land (GraphQL, HTTP) ..... a realm's facts; the server polls it once a block, no subscription
   ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)
   ├─ server (TypeScript on Node) ......... login for Ergo and linked accounts, moderation (the bot's and the owners'), search, link cards,
   │                                        the activity API, signals, prices, the worlds' rollup (people, tokens, network, calls),
@@ -39,8 +39,8 @@ and the deployment live in one repository, with one lockfile and one gate:
 - a change that spans the client and the server lands in one commit, tested together;
 - the admin console (`admin/`, not built yet) will stay in the monorepo; it is hidden on the network, never by splitting the repo
   (ADR-0002 §6);
-- the repository is private, but nothing relies on that: no secret ever lives in the code,
-  and every protection holds as if the code were public.
+- the repository is public: no secret ever lives in the code, and every protection holds with the code in
+  plain view.
 
 ```
 app/                         the web client

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Proposed. Amended by [ADR-0002](0002-validated-prototype.md): §7 (levels and navigation rules, mobile included), §10 (the generated face is a nebula), §12 (routing and rendering), §13 (pieces and hosting), "Ideas to place" and the rollout (phase 0 gains calls signed by users, Jarvis, plain DMs and satellites); it answers part of question 5 (moderation of public rooms) |
+| Status | Accepted: phase 0 is built on it (the backlog), nothing of it is on chain yet. Amended by [ADR-0002](0002-validated-prototype.md): §7 (levels and navigation rules, mobile included), §10 (the generated face is a nebula), §12 (routing and rendering), §13 (pieces and hosting), "Ideas to place" and the rollout (phase 0 gains calls signed by users, Jarvis, plain DMs and satellites); it answers part of question 5 (moderation of public rooms) |
 | Date | 2026-10-14 |
 | Author | Alexis Colin |
 | Verified against | `gnoland-1` (mainnet, `v1.5.1`, height 786,583) and `onyx-1` (`v1.5.1-rc.1`, height 385,528), both at commit `07e44776c`; source read at tag `v1.5.1`. Mainnet realms and names read on 2026-10-14 (gnoscope index height 789,357). |
@@ -801,7 +801,9 @@ What the numbers say:
 - **Interpreted code costs far more than native calls.** Building seven 32-byte strings per
   call cost more than two ed25519 verifications. Constants are folded before execution, so
   lookup tables belong in `const`.
-- **Storage is billed per object, not per byte.** Storing the record as an encoded string
+- **Storage is billed per byte, and every object brings bytes of its own.** The deposit is the
+  bytes stored times the chain's storage price (100 ugnot a byte on onyx-1 and gnoland-1), and
+  each live object adds its metadata to those bytes. Storing the record as an encoded string
   instead of a struct saved 873 B (−28%). This matches the ~780 B per live object that
   `r/moul/agents/relay/v0` reports.
 - **Kept seals stay a paid extra.** The default seal never touches storage.
