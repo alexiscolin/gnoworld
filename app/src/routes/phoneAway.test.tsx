@@ -3,19 +3,22 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { phoneAway, usePhoneAway } from "./phoneAway.ts";
+import PhoneAway from "./PhoneAway.tsx";
+import { phoneAway } from "./phoneAway.ts";
 
 let root: Root | undefined;
 let host: HTMLElement;
 
 function Probe() {
-  const away = usePhoneAway("/");
   const { pathname, search } = useLocation();
   return (
-    <p>
-      {away ? "away" : "here"} {pathname}
-      {search}
-    </p>
+    <>
+      <PhoneAway home="/" />
+      <p>
+        {pathname}
+        {search}
+      </p>
+    </>
   );
 }
 
@@ -52,13 +55,8 @@ afterEach(() => {
 it("takes a phone that hydrated on the home to its landing chat, by a replace", async () => {
   draw(true, "/w/bubble");
   await vi.waitFor(() => {
-    expect(host.textContent).toBe("away /w/bubble?chat=full");
+    expect(host.textContent).toBe("/w/bubble?chat=full");
   });
-});
-
-it("leaves a computer on the home", () => {
-  draw(false);
-  expect(host.textContent).toBe("here /");
 });
 
 const asWindow = (phone: boolean, recent = "") => {

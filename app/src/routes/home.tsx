@@ -1,6 +1,6 @@
 // A universe's cosmos: the home for the default one (/), its own page for another (/net/<id>/).
 import { PHONE_QUERY } from "@gnoworld/core";
-import { Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { type MetaArgs, useLoaderData, useLocation } from "react-router";
 import { cosmosAt, isHome } from "../cosmosAt.ts";
 import { isMissing, RouteError } from "../features/errors/index.ts";
@@ -25,8 +25,10 @@ import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
-import { phoneAway, usePhoneAway } from "./phoneAway.ts";
+import { phoneAway } from "./phoneAway.ts";
 import { useFraming } from "./placeFrame.tsx";
+
+const PhoneAway = lazy(() => import("./PhoneAway.tsx"));
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
 // case is checked.
@@ -100,7 +102,13 @@ const systemTitle = (id: string): string => (isHome(id) ? "gno.land" : nameOf(id
 // A phone has no home page: the pre-rendered one hydrates without the client loader's redirect, so it goes on here and draws nothing.
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
-  return usePhoneAway(universe.home.path) ? null : <HomePage universe={universe} />;
+  return useMedia(PHONE_QUERY) ? (
+    <Suspense fallback={null}>
+      <PhoneAway home={universe.home.path} />
+    </Suspense>
+  ) : (
+    <HomePage universe={universe} />
+  );
 }
 
 function HomePage({ universe }: { universe: UniverseView }) {
