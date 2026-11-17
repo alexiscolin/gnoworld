@@ -18,6 +18,10 @@
     padding: var(--space-2xs) calc(var(--space-s) + env(safe-area-inset-right)) var(--space-2xs)
       calc(var(--space-s) + env(safe-area-inset-left));
     border-block-end: var(--line-width) solid var(--color-line);
+    /* Its height is --phone-band's, eased, so a fold slides rather than jumps; the parts it drops are clipped as it goes. */
+    box-sizing: border-box;
+    block-size: var(--phone-band);
+    transition: block-size calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
   .band[data-earth] {
@@ -89,7 +93,9 @@
     inline-size: var(--_disc-box);
     block-size: var(--_disc-box);
     overflow: clip;
-    transition: scale calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+    transition:
+      scale calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      translate calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
   .still {
@@ -189,8 +195,14 @@
       --phone-band: 0px;
     }
 
+    /* It folds to nothing, then goes from sight and from the keyboard's way. */
     :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus:not(dialog *)) .band {
-      display: none;
+      padding-block: 0;
+      border-block-end-width: 0;
+      visibility: hidden;
+      transition:
+        block-size calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+        visibility calc(var(--motion-base) * var(--motion-scale));
     }
   }
 

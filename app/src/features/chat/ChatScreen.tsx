@@ -146,11 +146,11 @@ function closeChat(place: ChatPlace, navigate: ReturnType<typeof useNavigate>) {
 }
 
 // The screen's fade-in (ChatScreen.module.css) is its first draw's: a screen taken to another page's dock (fullHost.tsx) is drawn again by
-// the browser, and its fade would play once more over the room it holds.
+// the browser, and its fade would play once more over the room it holds. Marked, not stripped: a phone's screen eases its top.
 function arrived({ currentTarget, target }: SyntheticEvent<HTMLElement>) {
   if (currentTarget !== target) return;
   currentTarget.style.animation = "none";
-  currentTarget.style.transition = "none";
+  currentTarget.dataset["arrived"] = "";
 }
 
 // The screen's box: whether the chat docks, is full, and whether its layout has measured itself (true till it has, so no panel is drawn
