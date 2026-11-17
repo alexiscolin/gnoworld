@@ -89,10 +89,11 @@ export class Maps {
   }
 
   /** The Earth is gone to (the home, its page): its full size and relief are asked with its first maps, not once it is held near, which a
-   * dive found them missing and swapped them in. Where it is only warmed (the galaxy, another world) they wait: 3.2 MB, and their bitmaps. */
+   * dive found them missing and swapped them in. Where it is only warmed (the galaxy, another world) they wait: 3.2 MB, and their bitmaps.
+   * Its first maps are the page's own, as the planet it brings close. */
   earthAhead(): void {
     this.#ahead = true;
-    this.earth(false);
+    this.earth(true);
     this.#askFull();
   }
 

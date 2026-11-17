@@ -6,7 +6,11 @@ import type { Held } from "./held.ts";
 import type { Maps } from "./maps.ts";
 
 /** One frame's step of `held`'s upgrade to the Earth's full maps (none yet, or `flying`: nothing to do). */
-export function upgradeStep(held: Held, maps: Maps, renderer: WebGLRenderer, flying: boolean): void {
+export function upgradeStep(
+  held: Held,
+  { maps, renderer }: { maps: Maps; renderer: WebGLRenderer },
+  flying: boolean,
+): void {
   const full = maps.fullEarth();
   if (full === undefined || held.upgraded || flying) return;
   held.pending ??= [full.clouds, full.night, full.day];

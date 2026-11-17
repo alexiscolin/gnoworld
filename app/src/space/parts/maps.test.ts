@@ -94,6 +94,26 @@ describe("the Earth's full-size maps", () => {
     ).toEqual([1, 1]);
   });
 
+  it("come at once where the Earth's first maps came before it was gone to (the galaxy warmed it)", async () => {
+    vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
+    [earth.full, earth.relief] = [0, 0];
+    const maps = new Maps("/");
+    maps.earth(false);
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    maps.earthAhead();
+    await new Promise((done) => setTimeout(done, 20));
+    expect([earth.full, earth.relief]).toEqual([1, 1]);
+  });
+
+  it("count the Earth's first maps as the page's own where nothing asked them yet: another world's wait (a slow link)", () => {
+    loads.asked.length = 0;
+    const maps = new Maps("/");
+    maps.earthAhead();
+    maps.setOf(["venus"], false);
+    expect(named("venus")).toBeUndefined();
+  });
+
   it("are not asked where the Earth is only warmed (the galaxy, another world's page): 3.2 MB and their decoded bitmaps for nothing", async () => {
     expect(
       await asked((maps) => {

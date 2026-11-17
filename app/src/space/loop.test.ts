@@ -177,6 +177,29 @@ describe("loop", () => {
     for (const gap of gaps) expect(gap).toBeCloseTo(1000 / 30, 5);
   });
 
+  it.each(["pointerdown", "wheel", "keydown", "touchstart"])(
+    "answers a %s after an ambient frame at the next frame, not past the ambient gap",
+    (type) => {
+      const l = make();
+      l.state.need = "ambient";
+      l.frame(1000);
+      l.frame(1010);
+      expect(l.log.steps).toHaveLength(1);
+      l.page.dispatchEvent(new Event(type));
+      l.frame(1017);
+      expect(l.log.steps).toHaveLength(2);
+    },
+  );
+
+  it("keeps the ambient gap through a pointer's move: moving the mouse over the turning galaxy brings no 60 Hz back", () => {
+    const l = make();
+    l.state.need = "ambient";
+    l.frame(1000);
+    l.page.dispatchEvent(new Event("pointermove"));
+    l.frame(1017);
+    expect(l.log.steps).toHaveLength(1);
+  });
+
   it("asks a draw as the page shows again, a context comes back or its marks change", () => {
     const l = make();
     l.page.dispatchEvent(new Event("visibilitychange"));

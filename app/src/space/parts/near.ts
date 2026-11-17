@@ -52,10 +52,8 @@ export class Near {
   #shadowed = -1;
   // Whether a map went to the GPU this frame: the Earth's full maps wait for a frame that sent none.
   #sent = false;
-  // The frame's delta, and whether motion is reduced: a planet then comes in at once.
-  #fade = { delta: 0, still: true };
-  // Whether a flight runs: the Earth's full maps wait for its end.
-  #flying = false;
+  // The frame's delta, whether motion is reduced (a planet then comes in at once) and whether a flight runs (the Earth's maps wait).
+  #fade: { delta: number; still: boolean; flying?: boolean } = { delta: 0, still: true };
 
   /** Whether a planet is still coming in from its skeleton: the scene must go on drawing, or the fade stops where it stands. */
   arriving = false;
@@ -113,7 +111,6 @@ export class Near {
     },
   ): void {
     this.#fade = view;
-    this.#flying = view.flying ?? false;
     this.#page = view.page ?? this.#page;
     this.#seconds = seconds;
     this.#alone = view.alone;
@@ -177,7 +174,7 @@ export class Near {
     if (held?.shown === true) {
       this.#drawnOnce.add(planet.index);
       this.#place(planet, held.drawn, this.#seconds);
-      if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device.maps, this.#device.renderer, this.#flying);
+      if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device, this.#fade.flying === true);
       const share = step(held, this.#fade);
       held.drawn.setArrive(share);
       this.#coming(planet, held, share);
@@ -240,8 +237,7 @@ export class Near {
     // With a page's planet shown, the other worlds' maps wait for the page's own (Maps).
     const page = this.#alone < 0 || this.#alone === planet.index;
     const made = drawnOf(planet, this.#device.maps, { sphere: SPHERE, page });
-    if (made === undefined) return;
-    this.#held.set(planet.index, holdOf(made, planet, this.#device));
+    if (made !== undefined) this.#held.set(planet.index, holdOf(made, planet, this.#device));
   }
 
   // Past the kept number, the planets not wanted go, least recently made first.

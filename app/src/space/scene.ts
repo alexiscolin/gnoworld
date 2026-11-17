@@ -10,7 +10,7 @@ import { enterHit, wireHands } from "./hands.ts";
 import { labelOf, Labels } from "./labels.ts";
 import { layoutOf, type Planet, type System, type Universe } from "./layout.ts";
 import { hitOf } from "./pick.ts";
-import { bringsEarth, planetAt, sameAs, systemAt, type Place } from "./place.ts";
+import { planetAt, sameAs, systemAt, type Place } from "./place.ts";
 import { createRenderer } from "./renderer.ts";
 import { REACH, Rig, type Goal } from "./rig/rig.ts";
 import { chatHides } from "./motion.ts";
@@ -124,8 +124,7 @@ export class Space {
     const universe = this.universe;
     if (universe === undefined || this.#there(place)) return waitedOn(this);
     [this.place, this.neared, this.keep.unheard] = [place, false, false];
-    this.stage.near?.warm.place({ planet: this.planet, system: this.system, universe, eye: this.rig.eye });
-    if (bringsEarth(place)) this.stage.maps.earthAhead();
+    this.stage.near?.warm.place({ place, universe, eye: this.rig.eye });
     this.stage.effects.scan.play(undefined);
     const goal = this.#goalOf(place, universe);
     if (goal === undefined) return false;
