@@ -309,7 +309,7 @@ function holdTimers() {
     waiting = waiting.filter(({ set, args }) => stillHeld(set, args));
     for (const { go } of going) go();
   };
-  // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (later.ts, the bell's watch). A frame and
+  // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (afterLoad.ts, the bell's watch). A frame and
   // a shorter timer run, as React's own that shows a boundary's content once its code came. Not the 2,500 ms of useSpace.ts's
   // FIRST_SCREEN_MS: the gate's browsers draw no space, so that wait is how the chat of a page that holds space is let in.
   Reflect.set(window, "__letShortGo", () => {

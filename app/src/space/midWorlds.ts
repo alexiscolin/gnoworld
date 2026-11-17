@@ -5,7 +5,7 @@ import type { Seen } from "./see.ts";
 import { iconNode } from "@gnoworld/ui";
 import { scaleOf } from "./boosts.ts";
 import { latch } from "./vista.ts";
-import { afterDwell } from "../intent.ts";
+import { afterDwell } from "../afterDwell.ts";
 import styles from "./labels.module.css";
 
 const MID_PX = 12;

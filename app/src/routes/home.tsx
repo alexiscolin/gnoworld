@@ -21,7 +21,7 @@ import {
   useWorldsCount,
 } from "../features/universe/index.ts";
 import { nameOf } from "../placeName.ts";
-import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
+import { failedPageMeta, homeMeta, missingUniverseMeta } from "../pageMeta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";

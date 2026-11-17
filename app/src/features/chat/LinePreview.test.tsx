@@ -5,8 +5,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // mount.tsx also sets the act environment and the popover stand-in for the whole file.
 import { modals, settled } from "../../../tests/mount.tsx";
-// The page's slots filled as the shell fills them (plugs.ts).
-import "../../plugs.ts";
+// The page's slots filled as the shell fills them (featurePlugs.ts).
+import "../../featurePlugs.ts";
 import { LineView, type LineViewProps } from "./LineView.tsx";
 
 // A page's preview under a line: a line whose link points at a realm's home on the default universe's gnoweb
@@ -149,7 +149,7 @@ describe("a page's preview under a line", () => {
   it("asks the site's own file once a page, however many lines link, and never the address a line holds", async () => {
     // A page of its own: the file is read once a page, so this one loads its modules afresh, its slots filled again.
     vi.resetModules();
-    await import("../../plugs.ts");
+    await import("../../featurePlugs.ts");
     const { LineView: fresh } = await import("./LineView.tsx");
     const { host } = drawn(
       ["a", "b", "c"].map((id) => ({

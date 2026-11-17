@@ -7,7 +7,7 @@ import { all, click, mount, one } from "../../../tests/mount.tsx";
 import { tellJarvisHere, type JarvisHere } from "../../jarvisHere.ts";
 import type { Result } from "../../lib/api/http.ts";
 import type { Language } from "../../lib/language.ts";
-import { wantTranslation } from "../../translating.ts";
+import { wantTranslation } from "../../roomTranslations.ts";
 import { LineActions } from "./LineActions.tsx";
 import { BARE_ROW, LineView, type LineViewProps } from "./LineView.tsx";
 import { TranslationHalt } from "./TranslationHalt.tsx";

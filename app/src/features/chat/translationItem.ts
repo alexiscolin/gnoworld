@@ -1,7 +1,7 @@
 // A line's translation as the reader reads it, and the More menu's fold of it: offered where one is drawn under the line.
 import type { MenuItems } from "./menuItems.ts";
 import { useJarvisHere } from "../../jarvisHere.ts";
-import { foldTranslation, useTranslation } from "../../translating.ts";
+import { foldTranslation, useTranslation } from "../../roomTranslations.ts";
 
 /** Line `id`'s translation in `room`, in the reader's language (English where the device names none), with where Jarvis is asked from. */
 export function useLineTranslation(room: string | undefined, id: string) {

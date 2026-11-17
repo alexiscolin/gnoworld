@@ -13,7 +13,7 @@ import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
-import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
+import { earthMeta, failedPageMeta, missingUniverseMeta } from "../pageMeta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";

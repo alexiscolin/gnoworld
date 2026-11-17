@@ -10,7 +10,7 @@ import { GoExplore } from "./GoExplore.tsx";
 import { Network } from "./Network.tsx";
 import styles from "./Hero.module.css";
 import { Lenses } from "../../Lenses.tsx";
-import { useSwapped } from "../../swapped.ts";
+import { useSwapped } from "../../useSwapped.ts";
 import { fullChatHref, leaveDock } from "../../fullChat.ts";
 
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.

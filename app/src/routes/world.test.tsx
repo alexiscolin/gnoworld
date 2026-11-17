@@ -13,7 +13,7 @@ import { callsIn } from "../features/chat/chainEntries.ts";
 import { ChainCallsContext, ChainPlaceContext } from "../features/chat/chainThread.ts";
 import { useVerdicts } from "../features/chat/useVerdicts.ts";
 import { useAppStore } from "../storeContext.tsx";
-import { failedWorldMeta, worldMeta } from "../meta.ts";
+import { failedWorldMeta, worldMeta } from "../pageMeta.ts";
 import { site } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 

@@ -1,6 +1,6 @@
 import { ShaderChunk, ShaderLib } from "three";
 import { describe, expect, it } from "vitest";
-import { glslSpaces, stripChunk as stripWith, stripGlsl } from "./glsl.ts";
+import { glslSpaces, stripChunk as stripWith, stripGlsl } from "./stripGlsl.ts";
 import { AIR_FRAGMENT, AIR_VERTEX } from "./space/planet/airShader.ts";
 import { FIELD, LOOKUP, SEAMS } from "./space/planet/chunks.ts";
 import { DETAIL, FORMS, NOISE } from "./space/planet/generatedParts.ts";

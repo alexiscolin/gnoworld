@@ -2,7 +2,7 @@ import { renameSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
-import { glslSpaces } from "./src/glsl.ts";
+import { glslSpaces } from "./src/stripGlsl.ts";
 import { parsed, workshopHosts, workshopServer } from "./vite.config.ts";
 
 // The realism page (lab/realism.html), built beside the site for the journeys and on its own for looking at, and served by the workshop's
@@ -27,7 +27,7 @@ export default defineConfig({
   define: { "import.meta.env.GNOWORLD_TUNING": JSON.stringify("1") },
   base: "./",
   publicDir: "../public",
-  // The shaders the journeys walk here are stripped as the site's are (src/glsl.ts).
+  // The shaders the journeys walk here are stripped as the site's are (src/stripGlsl.ts).
   plugins: [glslSpaces(parsed), ...(folder === undefined ? [] : [asIndex])],
   build: {
     outDir: folder ?? (built === undefined ? "../build/client/lab" : join(built, "client", "lab")),

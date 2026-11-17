@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stampOf } from "./stamp.ts";
+import { stampOf } from "./stampOf.ts";
 
 // When a file was read, as the home writes it (the block's line, the posts): a clock time, a date before today, and no time at all for one
 // too far ahead of ours.

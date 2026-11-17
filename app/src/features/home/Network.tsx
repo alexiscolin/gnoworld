@@ -1,6 +1,6 @@
 // The slot of the network's line: its chunk and its request come once the page has loaded and the browser rests, never with the first screen.
 import { lazy, Suspense } from "react";
-import { useAfterLoad } from "../../later.ts";
+import { useAfterLoad } from "../../afterLoad.ts";
 
 const NetworkLine = lazy(() => import("./NetworkLine.tsx"));
 

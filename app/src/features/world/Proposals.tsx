@@ -13,7 +13,7 @@ import { proposalsOptions } from "../../lib/query/proposalsQuery.ts";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { ReadFailed } from "../realms/index.ts";
-import { pinnedOf } from "../../pinned.ts";
+import { pinnedOf } from "../../pinnedCalls.ts";
 import type { PinnedBarProps, PinnedFormsProps } from "./Pinned.tsx";
 import { ringOf, type Ring } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { BACK_HOME, alertOf, render } from "../../tests/render.tsx";
-import { notFoundMeta } from "../meta.ts";
+import { notFoundMeta } from "../pageMeta.ts";
 import { clientLoader, ErrorBoundary, meta } from "./notFound.tsx";
 
 describe("a path no route matches", () => {

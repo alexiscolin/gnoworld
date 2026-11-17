@@ -75,7 +75,7 @@ app/                         the web client
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen; `routes/plate/` builds a place's plate (hero, talk bar,
                              figures, calls, who calls, what it can do, tokens, around it) from one model for the Earth, a hub and a realm
-    meta.ts                  each page's title, description, canonical and Open Graph tags
+    pageMeta.ts                  each page's title, description, canonical and Open Graph tags
     lib/                     the boundaries: Ergo client, the realm reads around `@gnoworld/chain` (`lib/chain`,
                              with evalCall's checks), the server's routes (`lib/api`), Adena (`lib/adena`), what the device keeps
                              (`lib/keep`, `lib/drafts`: the browser's `localStorage`, each field through its schema); they parse with
@@ -156,7 +156,7 @@ Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`:
 | `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
 | `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `space` directly: the canvas is mounted by the universe feature |
-| the files loose in `app/src` (`meta.ts`, `knownOf.ts`, `csp.ts`, the build's data checks) | any folder above | No wall of their own: lint's zones name `sw`, `features`, `routes`, `lib`, `store` and `space` as targets, so a loose file is checked only by the rules every file has, and a folder reaches one as it reaches any |
+| the files loose in `app/src` (`pageMeta.ts`, `realmKnown.ts`, `csp.ts`, the build's data checks) | any folder above | No wall of their own: lint's zones name `sw`, `features`, `routes`, `lib`, `store` and `space` as targets, so a loose file is checked only by the rules every file has, and a folder reaches one as it reaches any |
 
 This is ADR-0001 §12's split: a bug is either in the space or in the interface, and
 the store is where they meet.

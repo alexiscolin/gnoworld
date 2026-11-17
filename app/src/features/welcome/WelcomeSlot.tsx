@@ -5,7 +5,7 @@ import { PHONE_QUERY } from "@gnoworld/core";
 import { useLocation } from "react-router";
 import { asksFull, holdsChat } from "../../fullChat.ts";
 import { useMedia } from "../chat/index.ts";
-import { useAfterLoad } from "../../later.ts";
+import { useAfterLoad } from "../../afterLoad.ts";
 import { site } from "../../places.ts";
 import { useApp } from "../../storeContext.tsx";
 import { unseen } from "./seen.ts";

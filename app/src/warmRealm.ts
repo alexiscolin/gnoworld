@@ -1,4 +1,4 @@
-// What a plate is given ahead of the click, in a chunk of its own: asked by plateWarm.ts once the page's space has drawn, or at a link's
+// What a plate is given ahead of the click, in a chunk of its own: asked by warmView.ts once the page's space has drawn, or at a link's
 // intent. Every read here is the page's own, kept (lib/query): the plate finds the answer asked, or the answer already come.
 import { hubWorldOf, PHONE_QUERY } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";

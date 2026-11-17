@@ -9,7 +9,7 @@ import {
   missingUniverseMeta,
   notFoundMeta,
   worldMeta,
-} from "./meta.ts";
+} from "./pageMeta.ts";
 import { site, siteOf, type UniverseView } from "./places.ts";
 import { FIXTURE } from "./placesFixture.ts";
 

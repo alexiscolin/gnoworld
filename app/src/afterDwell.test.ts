@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { afterDwell, HOVER_MS } from "./intent.ts";
+import { afterDwell, HOVER_MS } from "./afterDwell.ts";
 
 // The reader's intent: a pointer that rests on a link asks ahead, on a fast link alone; one that left, or a dwell called off, asks nothing.
 const link = (matching: boolean) => {

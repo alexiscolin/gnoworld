@@ -2,7 +2,7 @@
 // "New version available" (ADR-0001 §12): the worker's update waits for this click.
 import { Flash } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
-import { useAfterLoad } from "../../later.ts";
+import { useAfterLoad } from "../../afterLoad.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
 // The worker's code, asked once the page has rested, apart from the first screen's (budgets.spec.ts).

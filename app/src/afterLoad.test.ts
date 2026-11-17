@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { afterLoad, restsFor } from "./later.ts";
+import { afterLoad, restsFor } from "./afterLoad.ts";
 
 beforeEach(() => {
   vi.useFakeTimers();

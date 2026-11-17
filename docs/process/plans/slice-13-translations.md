@@ -2,7 +2,7 @@
 
 A line's translation is made once on the server, kept by line and language for as long as the line lives, and sent with the line.
 
-Read first: today each reader's page asks `POST /api/jarvis/translate` one line every 2.5 s (`app/src/translating.ts`); the door reads the text from
+Read first: today each reader's page asks `POST /api/jarvis/translate` one line every 2.5 s (`app/src/roomTranslations.ts`); the door reads the text from
 `server/src/door/lines.ts` (last 30 lines of a public room, in memory, so a restart loses them: 404, D194); jarvis caches by the text's hash for a day
 (`jarvis/src/translate.ts`). Lines reach the page from Ergo's WebSocket, never through the server; what the server sends a page per line rides the
 verdicts' SSE stream (`server/src/stream/stream.ts`: a ring of 64 events a room, replayed by id) and `GET /api/cards` for older lines
@@ -14,7 +14,7 @@ verdicts' SSE stream (`server/src/stream/stream.ts`: a ring of 64 events a room,
 - A page opening a room draws the stored translations of its lines with no ask per line: the stream's replay for the recent, one batch
   `GET /api/translations?room&ids&language` for the rest; a line with none stored is made on that first ask, once for all readers.
 - A server restart loses no translation; a line taken (REDACT), edited or hidden loses its translations at once.
-- `app/src/translating.ts`' per-reader pace, the door's translate route and the translation use of `door/lines.ts` (`line`) are deleted, no copy kept.
+- `app/src/roomTranslations.ts`' per-reader pace, the door's translate route and the translation use of `door/lines.ts` (`line`) are deleted, no copy kept.
 - No line shows a translation of another's text; none for a members room.
 
 ## Out of scope
@@ -58,14 +58,14 @@ First limit: jarvis's translation budget, then the model's concurrency (4 making
 Create: `packages/schemas/src/translations.ts`; `server/src/translations/{store,flow,routes}.ts` (+ tests); `app/src/lib/api/translations.ts`;
 `app/src/lib/stream/translationFeed.ts`. Change: `server/src/migrations.ts` (append `TRANSLATION_TABLES`, never edit one; `migrations.test.ts` hash),
 `server/src/chat.ts` (pass hook after `passed`, as `thenCards`), `server/src/stream/{stream,query}.ts` (event, `language` parameter, language set),
-`server/src/door/{mount,translate,lines}.ts` (delete the route and `line`), `app/src/translating.ts` (replaced), `app/src/features/chat/LineTranslation.tsx`
+`server/src/door/{mount,translate,lines}.ts` (delete the route and `line`), `app/src/roomTranslations.ts` (replaced), `app/src/features/chat/LineTranslation.tsx`
 and `translationItem.ts` (read the store). Tier 1 (docs/REVIEW.md): none of the table's paths by name; `server/src/door/` is treated as tier 1 by
 D13067 and is not in the table (Alexis to add it), so the door deletions get the red pass and the `security-reviewer`; `server/src/limit.ts`,
 `guard.ts`, `config.ts` are read, not changed (breaker uses `limiter` as is). Everything else tier 2; no tier 3.
 
 ## Branches
 One branch `translations`, one agent, two lots in order: T1 server (failing tests, store, flow, routes, stream, deletion of the door route); T2 page
-(feed, store reads, deleting `translating.ts`). T2 waits on T1. Nothing runs beside it except the unread branch (disjoint files but `chat.ts`: merge unread first).
+(feed, store reads, deleting `roomTranslations.ts`). T2 waits on T1. Nothing runs beside it except the unread branch (disjoint files but `chat.ts`: merge unread first).
 
 ## Dependencies
 None. No new package tonight.

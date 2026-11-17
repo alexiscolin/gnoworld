@@ -9,7 +9,7 @@ import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
 import { tellJarvisHere } from "../../jarvisHere.ts";
-import { translationLines, translationNow } from "../../translating.ts";
+import { translationLines, translationNow } from "../../roomTranslations.ts";
 import { cardsIn } from "./cardsIn.ts";
 import { useVerdicts, type Shown } from "./useVerdicts.ts";
 
@@ -53,7 +53,7 @@ vi.mock(import("./linked.ts"), async (original) => {
   await chunk.gate;
   return original();
 });
-vi.mock(import("../../translating.ts"), async (original) => {
+vi.mock(import("../../roomTranslations.ts"), async (original) => {
   const real = await original();
   return { ...real, translationLines: vi.fn(real.translationLines) };
 });

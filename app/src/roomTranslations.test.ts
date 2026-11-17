@@ -15,7 +15,7 @@ const HELLO = { msgid: "a1", status: "translated", text: "Bonjour", from: "en" }
 
 async function fresh() {
   vi.resetModules();
-  return import("./translating.ts");
+  return import("./roomTranslations.ts");
 }
 type T = Awaited<ReturnType<typeof fresh>>;
 const want = (t: T, id: string, ask: Ask) => t.wantTranslation({ room: "#bubble", id, language: "fr" }, ask);

@@ -85,7 +85,7 @@ export const toCallable = (read: ChainRead<Listing[]>): ChainRead<Callables> =>
     : read;
 
 /** A realm's exported functions as a query: the one read the function lists and the call forms of a view share, kept and asked ahead
- * (warm.ts). A list that did not come whole is no answer: it throws, with the failed read for the view to say. */
+ * (warmRealm.ts). A list that did not come whole is no answer: it throws, with the failed read for the view to say. */
 export const realmFunctions = (rpc: string, realm: string, options?: ReadOptions) =>
   queryOptions({
     queryKey: keys.functions(rpc, realm),

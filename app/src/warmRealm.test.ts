@@ -29,7 +29,7 @@ describe("the idle batch", () => {
     });
     const fetched = vi.fn(() => Promise.reject(new Error("no network")));
     vi.stubGlobal("fetch", fetched);
-    const { warmBatch } = await import("./warm.ts");
+    const { warmBatch } = await import("./warmRealm.ts");
     await warmBatch({ kind: "universe", id: "onyx" }, new AbortController().signal);
     await vi.dynamicImportSettled();
     expect(loads.plates).toBe(0);
@@ -45,7 +45,7 @@ describe("the idle batch", () => {
     vi.stubGlobal("fetch", () => Promise.reject(new Error("no network")));
     vi.resetModules();
     loads.plates = 0;
-    const { warmBatch } = await import("./warm.ts");
+    const { warmBatch } = await import("./warmRealm.ts");
     await warmBatch({ kind: "world", id: "x" }, new AbortController().signal);
     await vi.dynamicImportSettled();
     expect(loads.plates).toBe(asked);

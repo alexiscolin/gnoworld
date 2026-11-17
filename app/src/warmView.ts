@@ -1,12 +1,12 @@
-// What a plate is given ahead of the click (preloaded while the animation plays, from the moment a planet's link is hovered, and cached). Two small doors here, which the first screen holds; what they bring is in warm.ts, a chunk of its own,
+// What a plate is given ahead of the click (preloaded while the animation plays, from the moment a planet's link is hovered, and cached). Two small doors here, which the first screen holds; what they bring is in warmRealm.ts, a chunk of its own,
 // asked only when one of them fires:
 //  - the view's: once the page's space has drawn its first frame, and the browser is idle, the plate's code and the rollup files of the worlds in view;
 //  - the reader's intent: a pointer resting on a link to a realm (150 ms), its focus, a press or a touch, whatever the device: the realm's reads.
 // Never at first paint (the scene's chunk delayed the loader by seconds when preloaded then, preloads.ts), never under Save-Data.
-import { afterDwell } from "./intent.ts";
+import { afterDwell } from "./afterDwell.ts";
 import { savesData } from "./lib/saveData.ts";
 
-const warm = () => import("./warm.ts");
+const warm = () => import("./warmRealm.ts");
 const report = (error: unknown) => {
   reportError(error);
 };
@@ -57,7 +57,7 @@ function listen(): void {
       })
       .catch(report);
   };
-  // A pointer that left within the delay, or a slow link, asks nothing (intent.ts).
+  // A pointer that left within the delay, or a slow link, asks nothing (afterDwell.ts).
   const intent = (link: HTMLAnchorElement | undefined) => {
     pending();
     pending =

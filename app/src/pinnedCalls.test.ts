@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { pinnedOf } from "./pinned.ts";
+import { pinnedOf } from "./pinnedCalls.ts";
 import { realmView } from "./places.ts";
 
 // A world's pinned actions, each with the realm view of its own realm in the world's universe, where the chat's link and

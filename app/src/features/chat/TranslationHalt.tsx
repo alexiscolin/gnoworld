@@ -1,5 +1,5 @@
 // The one muted line a room says when translating stopped: the day's budget is spent, or Jarvis is off; never one under each line.
-import { useTranslationHalt } from "../../translating.ts";
+import { useTranslationHalt } from "../../roomTranslations.ts";
 import styles from "./RoomView.module.css";
 
 const WHY = {

@@ -6,7 +6,7 @@ import { lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
 import { useLocation } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
-import { afterLoad } from "../../later.ts";
+import { afterLoad } from "../../afterLoad.ts";
 import { opensPalette, SEARCH_HASH } from "./chord.ts";
 
 const loadDialog = () => import("./SearchDialog.tsx");

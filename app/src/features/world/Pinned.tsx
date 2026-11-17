@@ -4,7 +4,7 @@
 // card's id holds the bar's, the call and its view, so a card opened in one world never shows under another's pill.
 import { PHONE_QUERY } from "@gnoworld/core";
 import type { ReadOptions } from "@gnoworld/chain/read";
-import { pinnedOf, type PinnedCall, type PinnedRow } from "../../pinned.ts";
+import { pinnedOf, type PinnedCall, type PinnedRow } from "../../pinnedCalls.ts";
 import { useMedia } from "../chat/index.ts";
 import { realmAt } from "../../realmAt.ts";
 import { ActionForm, InlineCard } from "../realms/index.ts";

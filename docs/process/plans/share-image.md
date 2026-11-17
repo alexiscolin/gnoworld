@@ -6,7 +6,7 @@ Draft of 2026-11-11, for Alexis's approval; nothing is built. Written by a plann
 
 Sources read: D13934 and the 2026-10-17 row (Open Graph images left to later); `CLAUDE.md`, `docs/ARCHITECTURE.md` ("Search and pages" promises
 "a build step renders one Open Graph image per world"; nothing does it yet), `docs/REVIEW.md`, `docs/DESIGN-SYSTEM.md` (not needed beyond
-the tokens); `app/src/meta.ts`, `app/react-router.config.ts`, `app/src/prerender.ts`, `app/src/routes.ts`, `app/src/routes/world.tsx` and
+the tokens); `app/src/pageMeta.ts`, `app/react-router.config.ts`, `app/src/prerender.ts`, `app/src/routes.ts`, `app/src/routes/world.tsx` and
 its test, `app/src/features/share/ShareSheet.tsx` and `link.ts`, `app/src/space/portraits.ts` and `thumbs.ts`, `app/src/lib/worldPictures.ts`,
 `app/tests/tools/planetPictures.spec.ts`, `packages/core/src/planet/{look,recipe,palette}.ts`, `packages/ui/src/Planet/Planet.tsx`,
 `server/src/app.ts`, `limit.ts`, `worlds/group.ts`, `packages/schemas/src/worlds.ts`, `deploy/web/nginx.conf`, `deploy/web/Dockerfile`,
@@ -21,7 +21,7 @@ synthetic stand-in, run in a scratch folder, nothing in the repository).
    (`routes/world.tsx`'s loader reads the data files alone); they live in the cosmos and as `/r/<realm>` client routes (no page written,
    `realmMeta` is `noindex`). So "automatic for every new world" has two halves, and only one is the picture: (i) the picture of any
    world id, from its seed; (ii) a link that says "use this picture" in the HTML a crawler reads. For a hub world (data file) (ii) is
-   `meta.ts` at build. For a chain world there is no page to put the tag in. Q1 below.
+   `pageMeta.ts` at build. For a chain world there is no page to put the tag in. Q1 below.
 2. **The demo is behind a password** (`nginx.conf`: `auth_basic`, `X-Robots-Tag: noindex`). No unfurler can fetch anything there: the
    feature can be built and tested on the demo but only seen working on a public host. `test.sh` can prove the route's headers and bytes,
    not a real Facebook or Slack card. I did not verify what a public host's nginx would be (ops names it, `OPERATIONS.md`).
@@ -49,7 +49,7 @@ synthetic stand-in, run in a scratch folder, nothing in the repository).
 - A world born after the deploy has its picture with no build and no human step: its id appears in `worlds.json`, and its picture URL
   answers 200 at once (and its tag appears wherever a page can carry one, Q1).
 - No request for an image ever makes more than one render per id per cache life, whatever is asked.
-- The first screen's bytes are unchanged; `meta.ts` carries strings only.
+- The first screen's bytes are unchanged; `pageMeta.ts` carries strings only.
 
 ## 2. The ways, compared
 
@@ -129,7 +129,7 @@ first and logs the second at load (to verify on the real `worlds.json`).
 
 ## 4. The meta tags, per page
 
-`meta.ts` gets one optional field and one pure function; strings only, nothing to the first screen. `pageMeta` takes `image?: {url, alt}`
+`pageMeta.ts` gets one optional field and one pure function; strings only, nothing to the first screen. `pageMeta` takes `image?: {url, alt}`
 and, when present, adds `og:image`, `og:image:width` (1200), `og:image:height` (630), `og:image:alt`, `twitter:image`,
 `twitter:image:alt`, switches `twitter:card` to `summary_large_image`, and adds `"image"` to the JSON-LD (React Router's JSON-LD escaping
 already covers `<`, `>`, `&`). With no image it is unchanged. The image's URL is `ORIGIN + path`, never from data.
@@ -161,7 +161,7 @@ the first merge and Alexis decides on (2) after he has seen the picture (Q1). Th
 1. **Test-first: the renderer** (`server/src/share/`, tier 2; it reads core's tier-1 files and changes none).
 2. **The route and its caches** (server).
 3. **The glyph atlas tool and the two fixed pictures** (a one-off tool beside `app/tests/tools/`, outputs committed).
-4. **`meta.ts` and `world.test.tsx`** (app): the test that pinned "no og:image" changes first, in its own commit, then the tags.
+4. **`pageMeta.ts` and `world.test.tsx`** (app): the test that pinned "no og:image" changes first, in its own commit, then the tags.
 5. **`nginx.conf` and `deploy/web/Dockerfile`**: the `share` path in the cache map, the static files in the web image. Tier 1
    (`deploy/`): the `security-reviewer` and a `test.sh` run by Alexis from the reviewed commit ("Run test.sh from the commit you
    reviewed"); `nginx.conf` is the only tier-1 file the plan touches.
@@ -200,7 +200,7 @@ Route:
 - the response headers: `image/png`, `nosniff`, the cache line; no `Set-Cookie`; GET only, `POST` is refused by the existing guard;
 - the world list changing (`worlds.json` rewritten with a new world) makes that world answerable with no restart;
 - the cache's byte cap: filling it past the cap evicts the oldest, never the one being served.
-`meta.ts` (the unit tests beside `world.test.tsx`): the tags above, exactly; a page with no image is byte-identical to today's; the
+`pageMeta.ts` (the unit tests beside `world.test.tsx`): the tags above, exactly; a page with no image is byte-identical to today's; the
 JSON-LD carries `image`; a hostile world name in the data (`"`, `<`, `&`) stays text in every tag (the existing JSON-LD test pattern).
 Journey: none (CLAUDE.md: a journey only for a critical flow). `deploy/test.sh` (Alexis): `GET /share/home.<hash>.png` is 200
 `image/png` with `immutable`; `/api/share/w/<known>.png` is 200 with the headers; an unknown is 404; with no basic-auth the demo
@@ -211,8 +211,8 @@ Alexis asks. A hand-written mutant is not needed: StrykerJS runs on `server/src/
 
 ## 7. Weights
 
-- First screen: unchanged. `meta.ts` adds strings in the pre-rendered HTML (about 400 B of tags a page, not JavaScript, so the
-  150 KB budget is unaffected; the HTML is gzip-compressed by nginx); `meta.ts` itself is in the route modules' chunk already, so a
+- First screen: unchanged. `pageMeta.ts` adds strings in the pre-rendered HTML (about 400 B of tags a page, not JavaScript, so the
+  150 KB budget is unaffected; the HTML is gzip-compressed by nginx); `pageMeta.ts` itself is in the route modules' chunk already, so a
   few hundred bytes of code: below the 256 B margin only if the part holds it; measure in the card (`Lowered-floor:` if over).
 - Server: the renderer and atlas about 25 KB on disk; memory: the LRU's cap (32 MB of the 512 MB limit; it shares the limit with
   everything else: the cap is checked against the memory the server uses at rest, to measure) and the in-flight map (a few entries).
@@ -258,7 +258,7 @@ with the scene on 24 random worlds and retouches in the workshop (CLAUDE.md: the
 | Cache poisoning | one id's picture served for another | key = id + look version, ETag the same; an `ETag` never from the request | ETag test |
 | Cost of a slow render | the login blocked | the 150 ms budget; a worker if over | the bench |
 | A crawler's strangeness | a card cached stale for days | a conservative `max-age`; the unfurlers keep their own; a recipe change renames the cache key and the ETag, and the tag's URL has no version: a stale card on a platform persists until it refetches (cannot be fixed by us; to say in the card) | none |
-| The tag's URL | an attacker's host | built from `ORIGIN` and a known id, never from data | the `meta.ts` test |
+| The tag's URL | an attacker's host | built from `ORIGIN` and a known id, never from data | the `pageMeta.ts` test |
 
 ## 11. What Alexis decides
 

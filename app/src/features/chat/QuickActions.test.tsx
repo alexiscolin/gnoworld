@@ -14,7 +14,7 @@ import {
   openedUnsigned,
   pinnedVote,
 } from "../../../tests/callFixtures.ts";
-import type { PinnedRow } from "../../pinned.ts";
+import type { PinnedRow } from "../../pinnedCalls.ts";
 import { PinnedBar } from "../world/Pinned.tsx";
 import { Dock } from "./Dock.tsx";
 import { QuickActions } from "./QuickActions.tsx";

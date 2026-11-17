@@ -1,10 +1,10 @@
-// A line's translation: asked while its row is on screen (translating.ts), and drawn under its own words, which stay as they are, over
+// A line's translation: asked while its row is on screen (roomTranslations.ts), and drawn under its own words, which stay as they are, over
 // one muted label; the line's More menu folds it away.
 import { markdown, type Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
 import type { JarvisHere } from "../../jarvisHere.ts";
 import { languageName, type Language } from "../../lib/language.ts";
-import { wantTranslation } from "../../translating.ts";
+import { wantTranslation } from "../../roomTranslations.ts";
 import { LineText } from "./LineText.tsx";
 import { useLineTranslation } from "./translationItem.ts";
 import styles from "./RoomView.module.css";

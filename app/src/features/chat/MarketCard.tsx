@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { MarketsRead } from "../../lib/api/markets.ts";
 import { isUnread, queryClient } from "../../lib/query/client.ts";
-import { stampOf } from "../../stamp.ts";
+import { stampOf } from "../../stampOf.ts";
 import { directionOf, dollars, rangeOf, tenthsOf } from "./marketFormat.ts";
 import styles from "./MarketCard.module.css";
 import { marketsOptions } from "./marketQueries.ts";

@@ -7,7 +7,7 @@ import { lazyCards } from "../../lib/stream/lazyCards.ts";
 import { lazyChain } from "../../lib/stream/lazyChain.ts";
 import { translationFeed } from "../../lib/stream/translationFeed.ts";
 import type { Language } from "../../lib/language.ts";
-import { translationLines, translationsTold } from "../../translating.ts";
+import { translationLines, translationsTold } from "../../roomTranslations.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";

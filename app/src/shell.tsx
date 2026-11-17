@@ -2,8 +2,8 @@
 // document around it; apart, so a test can render it without the router's document components.
 import { Center } from "@gnoworld/ui";
 import { useEffect, type ReactNode } from "react";
-import "./plugs.ts";
-import { useDrawnPath } from "./drawnPath.ts";
+import "./featurePlugs.ts";
+import { useDrawnPath } from "./useDrawnPath.ts";
 import { DeviceViews } from "./features/account/index.ts";
 import { DockedChatHost, FullChatHost } from "./features/chat/index.ts";
 import { useSettingsApplied } from "./features/settings/applied.ts";

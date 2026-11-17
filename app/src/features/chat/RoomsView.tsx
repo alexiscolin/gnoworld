@@ -8,7 +8,7 @@ import { Avatar, Button, Cluster, EmptyState, IconButton, NavItem, Row, Stack } 
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
 import { dmHref, hrefProp, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
-import { noticeDone } from "../../told.ts";
+import { noticeDone } from "../../noticeDone.ts";
 import { badged } from "./unread.ts";
 import { RoomsList, RoomsNav } from "./RoomsList.tsx";
 import { Folding } from "./Folding.tsx";

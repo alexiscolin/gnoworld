@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, defineConfig, parseSync, type Plugin } from "vite";
-import { glslSpaces } from "./src/glsl.ts";
+import { glslSpaces } from "./src/stripGlsl.ts";
 import { precached } from "./src/sw/precache.ts";
 import { workshopDataFiles } from "./tests/e2e/workshopData.mjs";
 
@@ -139,7 +139,7 @@ export const workshopData = (dir: string | undefined): Plugin[] =>
         },
       ];
 
-/** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
+/** A built chunk parsed, for the shaders' spaces to go (src/stripGlsl.ts); the lab's build takes it too. */
 export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.

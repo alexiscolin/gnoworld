@@ -2,7 +2,7 @@
 // space/thumbs.ts's late chunk; the thumb wears its drawn disc till the picture comes, and for good where the page saves data or draws no WebGL.
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createStore } from "zustand/vanilla";
-import { restsFor } from "./later.ts";
+import { restsFor } from "./afterLoad.ts";
 import { savesData } from "./lib/saveData.ts";
 import { pictureOf } from "./lib/worldPictures.ts";
 

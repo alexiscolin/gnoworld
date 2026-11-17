@@ -10,7 +10,7 @@ import { useKnown } from "../features/realms/known.ts";
 import { useWorldsFile } from "../worldsFile.ts";
 import { PlaceFrame } from "./placeFrame.tsx";
 import { RealmPage } from "./realmPage.tsx";
-import { realmMeta } from "../meta.ts";
+import { realmMeta } from "../pageMeta.ts";
 import { site } from "../places.ts";
 import { realmAt } from "../realmAt.ts";
 

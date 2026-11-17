@@ -5,7 +5,7 @@ import { realmName } from "@gnoworld/core";
 import { Icon, type IconName } from "@gnoworld/ui";
 import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { useDrawnPath } from "./drawnPath.ts";
+import { useDrawnPath } from "./useDrawnPath.ts";
 import { isHome, systemOfPage, systemPath, trimmed } from "./cosmosAt.ts";
 import { asksFull, fullChatHref, holdsChat, leaveDock } from "./fullChat.ts";
 import { useViewKeys } from "./features/universe/viewKeys.ts";
