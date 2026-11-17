@@ -80,8 +80,7 @@ func worldPage(world string) string {
 		"\n\nUntil " + date(r.end()) + ", paid by " + r.payer.String() + ".\n"
 }
 
-// date writes unix seconds in UTC, to the minute. UnixMilli, not Unix(sec, 0):
-// the mutation check's shift of that 0 nanosecond would change nothing a test can see.
+// date writes unix seconds in UTC, to the minute.
 func date(sec int) string {
 	return time.UnixMilli(int64(sec)*1000).UTC().Format("2006-01-02 15:04") + " UTC"
 }

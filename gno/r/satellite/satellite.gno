@@ -30,7 +30,7 @@ const (
 	blank      = 0x2800      // the Braille blank: a symbol that shows nothing
 )
 
-// Strings, not structs: storage is billed per object (A1:801-804).
+// Strings, not structs: storage is billed per byte, and each object adds bytes of its own (ADR-0001, "Ideas to place").
 var (
 	rentals  avl.Tree // world -> "payer start days price text", until the rental is closed
 	holds    avl.Tree // world -> the unix second until which a takedown keeps it unrented, outside the record the payer may close
@@ -62,11 +62,11 @@ func (r rental) end() int            { return r.start + r.days*day }
 func (r rental) paid() int           { return r.days * r.price }
 func (r rental) liveAt(now int) bool { return now < r.end() }
 
-// heldFrom reports whether the rental may not be closed by by at now, hold being
-// its world's hold (see holdOf): by anyone while it is live; once taken down, by
-// all but its payer until the end it was paid for, so the one taking it down
-// cannot free its bytes first and take its payer's storage deposit. The hold
-// is read, never kept in the record, so closing the record cannot lift it.
+// heldFrom reports whether by may not close the rental at now, given its world's
+// hold (see holdOf). Nobody may while it is live. Once taken down, only its payer
+// may until the end it was paid for, so whoever took it down cannot free its
+// bytes first and take its payer's storage deposit. The hold is read, never kept
+// in the record, so closing the record cannot lift it.
 func (r rental) heldFrom(by address, now, hold int) bool {
 	return r.liveAt(now) || now < hold && by != r.payer
 }
@@ -107,7 +107,7 @@ func liveRental(world string, now int) (rental, bool) {
 	return r, r.liveAt(now)
 }
 
-// taken reports whether world is live or held; no if-init, so mutate.py can drop a branch.
+// taken reports whether world is live or held.
 func taken(world string, now int) bool {
 	_, live := liveRental(world, now)
 	return live || now < holdOf(world)
