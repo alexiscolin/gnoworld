@@ -20,7 +20,9 @@ test.describe("on a computer's screen", () => {
 
   // The scene comes after a page's text, and the colony's code after the scene, which asks it once the colony is wanted near (the home
   // system's worlds are made ahead): never with a first screen.
-  test("asks the colony's code after the scene's on the home and the Earth, never with their first screen", async ({ page }) => {
+  test("asks the colony's code after the scene's on the home and the Earth, never with their first screen", async ({
+    page,
+  }) => {
     for (const [path, drawn] of [
       ["/?test-gpu", "[data-arrival='drawn']"],
       ["/earth?test-gpu", "[data-earth='drawn']"],
@@ -43,7 +45,9 @@ test.describe("on a computer's screen", () => {
   });
 
   // A planet's page frames it larger than the window; the colony's page stands it whole beside the plate, as the preview has it.
-  test("stands the colony whole in its page's circle, not framed larger than the window as a planet is", async ({ page }) => {
+  test("stands the colony whole in its page's circle, not framed larger than the window as a planet is", async ({
+    page,
+  }) => {
     await visit(page, "/w/bubble");
     await expect(page.locator("[data-globe]")).toHaveAttribute("data-framing", "imposing");
     await visit(page, "/w/gnosh-ai?test-gpu");

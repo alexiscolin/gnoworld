@@ -27,7 +27,8 @@ export function placed(
   geo.translate(...at);
   if (uv !== undefined) {
     const uvs = geo.getAttribute("uv");
-    for (let index = 0; index < uvs.count; index += 1) uvs.setXY(index, uvs.getX(index) * uv[0], uvs.getY(index) * uv[1]);
+    for (let index = 0; index < uvs.count; index += 1)
+      uvs.setXY(index, uvs.getX(index) * uv[0], uvs.getY(index) * uv[1]);
   }
   return geo.index === null ? geo : geo.toNonIndexed();
 }
@@ -38,9 +39,16 @@ export const cylinder = (radius: number, height: number, sides = 24): CylinderGe
 
 /** A point on a ring's tube (`ring` its centre's radius, `tube` the tube's, `y` its height): `round` along the ring, `up` round the tube from
  * its outer side (pi/2 its top). */
-export function onTube({ ring, tube, y = 0 }: { ring: number; tube: number; y?: number }, round: number, up: number): Spot {
+export function onTube(
+  { ring, tube, y = 0 }: { ring: number; tube: number; y?: number },
+  round: number,
+  up: number,
+): Spot {
   const out: V3 = [Math.cos(round) * Math.cos(up), Math.sin(up), Math.sin(round) * Math.cos(up)];
-  return { at: [Math.cos(round) * ring + out[0] * tube, y + out[1] * tube, Math.sin(round) * ring + out[2] * tube], out };
+  return {
+    at: [Math.cos(round) * ring + out[0] * tube, y + out[1] * tube, Math.sin(round) * ring + out[2] * tube],
+    out,
+  };
 }
 
 /** A thin tube from `from` to `to`: a strut, or a lit lane. */
@@ -52,7 +60,19 @@ export function strut(from: V3, to: V3, radius = 0.012): BufferGeometry {
 }
 
 /** A ring round the spine, `radius` wide at height `y`, its tube `tube` thick, leaned `lean` off the spine. */
-export function ringOf({ radius, y, tube, lean = 0, sides = 160 }: { radius: number; y: number; tube: number; lean?: number; sides?: number }) {
+export function ringOf({
+  radius,
+  y,
+  tube,
+  lean = 0,
+  sides = 160,
+}: {
+  radius: number;
+  y: number;
+  tube: number;
+  lean?: number;
+  sides?: number;
+}) {
   const ring = new TorusGeometry(radius, tube, Math.max(6, Math.round(sides / 10)), sides);
   ring.rotateX(Math.PI / 2 + lean);
   return placed(ring, { at: [0, y, 0] });

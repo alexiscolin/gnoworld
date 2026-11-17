@@ -26,7 +26,10 @@ export const roomLabel = (room: string): string => {
   const { world, name } = partsOf(room);
   // A realm's room, and a world named by a long id, end in ten hex of the path or the id (core's realmRoom): the label is the name alone.
   // A world named by its owner's address, a namespace of one, says it short, as a sender's.
-  const label = (name ?? (world === EARTH || SHOWN_STATIONS.includes(world) ? "general" : world)).replace(/-[0-9a-f]{10}$/, "");
+  const label = (name ?? (world === EARTH || SHOWN_STATIONS.includes(world) ? "general" : world)).replace(
+    /-[0-9a-f]{10}$/,
+    "",
+  );
   return `#${isAccount(label) ? shortAddress(label) : label}`;
 };
 

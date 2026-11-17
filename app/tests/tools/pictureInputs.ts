@@ -28,7 +28,9 @@ export function worldIds(): string[] {
 
 // gnosh's colony is drawn by its own code, no seed's maps (D13740).
 const COLONY = [
-  ...["crown.ts", "hull.ts", "colony.ts", "materials.ts", "shapes.ts", "gnoshColony.ts"].map((name) => here(`../../src/space/colony/${name}`)),
+  ...["crown.ts", "hull.ts", "colony.ts", "materials.ts", "shapes.ts", "gnoshColony.ts"].map((name) =>
+    here(`../../src/space/colony/${name}`),
+  ),
   here("../../src/space/stationWorlds.ts"),
 ];
 
@@ -44,7 +46,10 @@ export function inputsOf(id: string): string[] {
 
 /** A hash of what the world's look is made from: its seed, class and palette, and its files (inputsOf). */
 export function inputsHash(id: string): string {
-  const parts = [id === EARTH ? id : JSON.stringify(worldOf(id)), ...inputsOf(id).map((file) => sha(readFileSync(file)))];
+  const parts = [
+    id === EARTH ? id : JSON.stringify(worldOf(id)),
+    ...inputsOf(id).map((file) => sha(readFileSync(file))),
+  ];
   return sha(new TextEncoder().encode(parts.join("|"))).slice(0, 8);
 }
 

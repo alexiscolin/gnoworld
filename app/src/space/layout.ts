@@ -160,7 +160,10 @@ function orbitsOf(id: string, home: boolean, kept: Kept): { orbits: number[]; re
 // A planet's radius by its use, on a log scale: an unused world small, the busiest the largest, each a fifth larger or smaller by its
 // id so no two stand alike; the Earth's own size.
 const radiusOf = (world: Held[number]) =>
-  GROW * (world.id === EARTH ? SIZE.earth : (colonySizeOf(world.id) ?? sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16))));
+  GROW *
+  (world.id === EARTH
+    ? SIZE.earth
+    : (colonySizeOf(world.id) ?? sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16))));
 
 // The planets of `system`: the file's `worlds`, then the `asked` ones the file lacks, on orbits past them.
 function addPlanets(system: System, kept: Kept, planets: Planet[]): void {

@@ -1,7 +1,10 @@
-import { Mesh, MeshStandardMaterial, PerspectiveCamera, Raycaster, Vector3, type Object3D } from "three";
+import { Euler, Mesh, MeshStandardMaterial, PerspectiveCamera, Raycaster, Vector3, type Object3D } from "three";
 import { describe, expect, it } from "vitest";
-import { colonyOf, FAR_RADII } from "./colony.ts";
-import { ANCHORS, ROOM_ANCHORS } from "./crown.ts";
+import { colonyOf, FAR_RADII, type Colony } from "./colony.ts";
+import { ANCHORS } from "./crown.ts";
+
+// The rooms' own points, the first of the hull's.
+const ROOM_ANCHORS = ANCHORS.filter(({ room }) => room !== undefined);
 import { hullMaps, SIZE } from "./hull.ts";
 
 const meshesOf = (root: Object3D): Mesh[] => {
@@ -47,7 +50,9 @@ describe("gnosh's colony, the offset crown (D13740)", () => {
     for (const at of [0, 1]) {
       colony.anchorAt(at, point, normal);
       expect(colony.blocks(point, point.clone().addScaledVector(normal, 10)), `anchor ${String(at)} seen`).toBe(false);
-      expect(colony.blocks(point, point.clone().addScaledVector(normal, -10)), `anchor ${String(at)} behind`).toBe(true);
+      expect(colony.blocks(point, point.clone().addScaledVector(normal, -10)), `anchor ${String(at)} behind`).toBe(
+        true,
+      );
     }
   });
 
@@ -109,7 +114,7 @@ describe("gnosh's colony, the offset crown (D13740)", () => {
       material.onBeforeCompile(shader as never, undefined as never);
       expect(shader.fragmentShader).toContain("#include <emissivemap_fragment>");
       expect(shader.fragmentShader).toMatch(
-        /totalEmissiveRadiance \*= smoothstep\([^;]*dot\(normal, directionalLights\[0\]\.direction\)\)/,
+        /totalEmissiveRadiance \*= 1\.0 - smoothstep\(-0\.3, 0\.25, dot\(normal, directionalLights\[0\]\.direction\)\)/,
       );
       expect(material.customProgramCacheKey()).toBe("colony-night");
     }
@@ -125,6 +130,8 @@ describe("the colony's hull, drawn in the code", () => {
     expect(one.normalMap.image.data).toEqual(two.normalMap.image.data);
     expect(one.map.image.data).toEqual(two.map.image.data);
     expect(hullMaps(4).map.image.data).not.toEqual(one.map.image.data);
+    // Drawn once a seed: a second hull of it wraps the first's bytes, so a colony made again costs no drawing.
+    expect(two.map.image.data).toBe(one.map.image.data);
   });
 
   it("gives its normals unit length, so its plates' seams catch the light as metal does", () => {
@@ -156,7 +163,7 @@ describe("the colony framed close on its page", () => {
 
   // Its page stands it beside the plate, not larger than the window (placeFrame.tsx); wider than its sphere, it stands smaller there,
   // whole (the preview's), and eases there and back: nothing jumps.
-  it("stands at 0.7 of its size framed close, easing there and back, and tells its hull's share", async () => {
+  it("stands at 0.6 of its size framed close, easing there and back, and tells its hull's share", async () => {
     const { ColonyBody } = await import("./gnoshColony.ts");
     const body = new ColonyBody(look);
     body.setClose(1);
@@ -164,9 +171,56 @@ describe("the colony framed close on its page", () => {
     expect(first).toBeLessThan(1);
     expect(first).toBeGreaterThan(0.9);
     for (let frame = 0; frame < 200; frame += 1) body.setClose(1);
-    expect(body.hull.scale).toBeCloseTo(0.7, 2);
+    expect(body.hull.scale).toBeCloseTo(0.6, 2);
     for (let frame = 0; frame < 200; frame += 1) body.setClose(0);
     expect(body.hull.scale).toBeCloseTo(1, 2);
+    body.dispose();
+  });
+});
+
+// What the ground turns a sign by (earth/ground.ts) and what Near turns the colony's group by (parts/near.ts) and the colony its spine by
+// (gnoshColony.ts's setTime) are the same turn: a sign stands where the drawn hull's point is.
+describe("the colony's signs on its hull as drawn", () => {
+  it("stands a sign on the drawn colony's own point, its axis, its turn on its spine and the Earth's kept day alike", async () => {
+    const [{ ColonyBody }, { EarthGround }, { SPIN }, { COLONY_AXIS }, { placeOf }] = await Promise.all([
+      import("./gnoshColony.ts"),
+      import("../earth/ground.ts"),
+      import("../planet/surfaceShader.ts"),
+      import("../stationWorlds.ts"),
+      import("../layout.ts"),
+    ]);
+    const system = { place: { x: 0, y: 0, z: 0 }, across: { x: 1, y: 0, z: 0 }, along: { x: 0, y: 0, z: 1 } };
+    const planet = { index: 0, id: "gnosh-ai", system, orbit: 3, phase: 0.4, speed: 0, radius: 2, use: 0 } as never;
+    const seconds = 7.3;
+    const body = new ColonyBody({ lean: COLONY_AXIS.lean, tilt: COLONY_AXIS.tilt } as never);
+    const centre = placeOf(planet, seconds, { x: 0, y: 0, z: 0 });
+    body.group.position.set(centre.x, centre.y, centre.z);
+    body.group.scale.setScalar(2);
+    body.group.quaternion.setFromEuler(new Euler(COLONY_AXIS.lean, 0, COLONY_AXIS.tilt));
+    body.setTime(seconds);
+    body.group.updateMatrixWorld(true);
+    const ground = new EarthGround(
+      () => COLONY_AXIS,
+      () => true,
+    );
+    ground.hull = body.hull;
+    const projected: Vector3[] = [];
+    const seen = {
+      eye: { x: 0, y: 30, z: 30 },
+      project: (at: { x: number; y: number; z: number }, out: { x: number; y: number }) => {
+        projected.push(new Vector3(at.x, at.y, at.z));
+        [out.x, out.y] = [0, 0];
+        return true;
+      },
+    };
+    // #general's spot: its point's normal as a latitude and a longitude (colonyRooms.ts).
+    ground.setMarks([{ lat: (0.9 * 180) / Math.PI, lon: (-0.55 * 180) / Math.PI, place: () => undefined }]);
+    ground.place(planet, { seconds, step: 0.1 }, seen);
+    const [point, normal] = [new Vector3(), new Vector3()];
+    (body.hull as Colony).anchorAt(0, point, normal);
+    const stood = projected.at(-1) ?? new Vector3(NaN, NaN, NaN);
+    for (const axis of ["x", "y", "z"] as const) expect(stood[axis], axis).toBeCloseTo(point[axis], 6);
+    expect(SPIN).toBeGreaterThan(0);
     body.dispose();
   });
 });

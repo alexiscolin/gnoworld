@@ -171,7 +171,9 @@ function build(source: Source) {
   };
   const everyWorld = listed("world", source.hubs);
   // A station's page stays routable (everyWorld), but is offered as a place only while the switch is on, or when it is shown whatever it says.
-  const worlds = everyWorld.filter(({ kind, slug }) => STATIONS_SHOWN || kind !== "station" || SHOWN_STATIONS.includes(slug));
+  const worlds = everyWorld.filter(
+    ({ kind, slug }) => STATIONS_SHOWN || kind !== "station" || SHOWN_STATIONS.includes(slug),
+  );
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {

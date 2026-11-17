@@ -11,10 +11,10 @@ import { colonyOf, type Colony } from "./colony.ts";
 // raw: the sun's light on the hull, as the planets' (planet.ts), and how far up its light stands, in the colony's radii
 const SUN = 3.2;
 const LIGHT_AT = 6;
-// raw: the shadows' box round the colony, in its radii (its spine reaches 1.3), and their map's side
-const SHADOW = { box: 1.7, map: 2048 } as const;
+// raw: the shadows' box round the colony, in its radii (its mirror petals reach 1.76), and their map's side
+const SHADOW = { box: 1.8, map: 1024 } as const;
 // raw: its size framed close on its page, a share of its sphere's (the preview's), and the share of the way it eases there each frame
-const PAGE = 0.7;
+const PAGE = 0.6;
 const EASE = 0.06;
 // What a world does that the colony has no part for.
 const none = (): void => undefined;
@@ -50,6 +50,8 @@ export class ColonyBody implements Drawn {
     // The light stands sunward of the colony, in its group's frame: the group is turned by the view, the sun is not.
     this.#back.copy(this.group.quaternion).invert();
     this.#lamp.position.copy(direction).applyQuaternion(this.#back).multiplyScalar(LIGHT_AT);
+    // Far, its light level casts nothing: its shadows are drawn again only near.
+    this.#lamp.shadow.autoUpdate = this.#colony.lod.getCurrentLevel() === 0;
     const size = this.group.scale.x;
     if (size === this.#size) return;
     this.#size = size;

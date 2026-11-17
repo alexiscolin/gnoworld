@@ -371,6 +371,8 @@ describe("a colony's marks", () => {
     const still = { seconds: -kept() / SPIN, step: 0.1 };
     ground.place(planet("gnosh-ai"), still, seen);
     expect(hull.anchorFor).toHaveBeenCalledOnce();
+    // One sight line a mark a frame: none for the aim's probe, which tries thousands of turns.
+    expect(hull.blocks).toHaveBeenCalledOnce();
     // The planet stands on its orbit of 1 at phase 0, at x 1; the hull point stands 0.8 out toward the eye, which sees it at x 1, y 0.
     expect(placed.at(-1)).toEqual([1, 0, true]);
     hull.blocks.mockReturnValue(true);

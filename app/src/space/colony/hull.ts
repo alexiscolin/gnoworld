@@ -1,5 +1,6 @@
 // The colony's hull, drawn in the code at 512 px (D13741): plates of uneven widths in rows, their seams, a few raised boxes, each plate its
 // own shade and roughness; a glazed band for the habitat, its windows lit behind the glass. No file, no dependency, the same for a seed.
+import { Draws } from "@gnoworld/core";
 import { DataTexture, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace } from "three";
 
 /** Each map's side, in texels. */
@@ -23,17 +24,6 @@ interface Layers {
   readonly albedo: Uint8Array;
   readonly rough: Uint8Array;
   readonly height: Float32Array;
-}
-
-// A stream of numbers from `seed`, the same each time (mulberry32).
-function streamOf(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(state ^ (state >>> 15), state | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 // The texel `x`, `y` of a map wrapped round both ways.
@@ -82,7 +72,11 @@ function boxesOf(layers: Layers, next: () => number): void {
 
 // The band `from` to `to` (shares of the height) glazed: dark smooth glass between mullions, and behind it the windows' light, some
 // stretches dark, a few cold.
-function glaze(layers: Layers, glow: Uint8Array, { band, next }: { band: readonly [number, number]; next: () => number }): void {
+function glaze(
+  layers: Layers,
+  glow: Uint8Array,
+  { band, next }: { band: readonly [number, number]; next: () => number },
+): void {
   const rows = { top: Math.round(band[0] * SIZE), bottom: Math.round(band[1] * SIZE) };
   for (let x = 0; x < SIZE; x += 1) {
     const mullion = x % 8 === 0;
@@ -114,7 +108,10 @@ function normalsOf(height: Float32Array): Uint8Array {
       const dx = ((height[at(x + 1, y)] ?? 0) - (height[at(x - 1, y)] ?? 0)) * STEEP;
       const dy = ((height[at(x, y + 1)] ?? 0) - (height[at(x, y - 1)] ?? 0)) * STEEP;
       const length = Math.hypot(dx, dy, 1);
-      data.set([((-dx / length) * 0.5 + 0.5) * 255, ((dy / length) * 0.5 + 0.5) * 255, ((1 / length) * 0.5 + 0.5) * 255, 255], at(x, y) * 4);
+      data.set(
+        [((-dx / length) * 0.5 + 0.5) * 255, ((dy / length) * 0.5 + 0.5) * 255, ((1 / length) * 0.5 + 0.5) * 255, 255],
+        at(x, y) * 4,
+      );
     }
   return data;
 }
@@ -131,18 +128,42 @@ function textureOf(data: Uint8Array, colour: boolean): DataTexture {
   return texture;
 }
 
-/** The hull's maps for `seed`; with `band`, the share of its height glazed, its windows' light too. */
+/** The hull's maps for `seed`; with `band`, the share of its height glazed, its windows' light too. Its bytes are drawn once a seed and
+ * band, each call new textures round them, which its colony frees. */
 export function hullMaps(seed: number, band?: readonly [number, number]): HullMaps {
-  const next = streamOf(seed);
-  const layers = { albedo: new Uint8Array(SIZE * SIZE * 4), rough: new Uint8Array(SIZE * SIZE * 4), height: new Float32Array(SIZE * SIZE) };
-  for (let row = 0; row < ROWS; row += 1) rowOf(layers, { top: (row * SIZE) / ROWS, bottom: ((row + 1) * SIZE) / ROWS }, next);
+  const key = `${String(seed)}:${band?.join(",") ?? ""}`;
+  const bytes = (DRAWN[key] ??= drawn(seed, band));
+  return {
+    map: textureOf(bytes.albedo, true),
+    normalMap: textureOf(bytes.normals, false),
+    roughnessMap: textureOf(bytes.rough, false),
+    ...(bytes.glow === undefined ? {} : { emissiveMap: textureOf(bytes.glow, true) }),
+  };
+}
+
+// The bytes of each hull drawn, by seed and band: the same for the same, kept for the page's life (two hulls, a few megabytes).
+const DRAWN: Record<string, Bytes> = {};
+
+interface Bytes {
+  readonly albedo: Uint8Array;
+  readonly normals: Uint8Array;
+  readonly rough: Uint8Array;
+  readonly glow?: Uint8Array | undefined;
+}
+
+function drawn(seed: number, band?: readonly [number, number]): Bytes {
+  // A stream of numbers from `seed`, the same each time (core's, mulberry32).
+  const draws = new Draws(seed);
+  const next = () => draws.unit();
+  const layers = {
+    albedo: new Uint8Array(SIZE * SIZE * 4),
+    rough: new Uint8Array(SIZE * SIZE * 4),
+    height: new Float32Array(SIZE * SIZE),
+  };
+  for (let row = 0; row < ROWS; row += 1)
+    rowOf(layers, { top: (row * SIZE) / ROWS, bottom: ((row + 1) * SIZE) / ROWS }, next);
   boxesOf(layers, next);
   const glow = band === undefined ? undefined : new Uint8Array(SIZE * SIZE * 4);
   if (glow !== undefined && band !== undefined) glaze(layers, glow, { band, next });
-  return {
-    map: textureOf(layers.albedo, true),
-    normalMap: textureOf(normalsOf(layers.height), false),
-    roughnessMap: textureOf(layers.rough, false),
-    ...(glow === undefined ? {} : { emissiveMap: textureOf(glow, true) }),
-  };
+  return { albedo: layers.albedo, normals: normalsOf(layers.height), rough: layers.rough, glow };
 }

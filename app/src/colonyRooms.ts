@@ -1,5 +1,7 @@
 // gnosh's colony's rooms on its hull, as the Earth's side rooms on its ground (data/earthRooms.json): each by the direction of its hull's
 // normal at its room's point (space/colony/crown.ts's ROOM_ANCHORS), so the ground stands its pin there and nowhere else (D13745).
+import { SHOWN_STATIONS } from "@gnoworld/core";
+
 const DEGREE = 180 / Math.PI;
 
 /** The colony's rooms and where each is pinned, in degrees: the main room on the wheel, #help across it, #showcase on the hub. */
@@ -10,4 +12,4 @@ export const COLONY_ROOMS: readonly { readonly room: string; readonly lat: numbe
 ];
 
 /** The rooms pinned on the world `id`: the colony's; none on a planet. */
-export const roomsOn = (id: string): typeof COLONY_ROOMS => (id === "gnosh-ai" ? COLONY_ROOMS : []);
+export const roomsOn = (id: string): typeof COLONY_ROOMS => (SHOWN_STATIONS.includes(id) ? COLONY_ROOMS : []);

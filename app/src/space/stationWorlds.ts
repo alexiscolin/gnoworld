@@ -11,7 +11,13 @@ export const COLONY_PHASE = 2.2 - 1.7;
  * 2.2, read from far; none for a world. */
 export const colonySizeOf = (id: string): number | undefined => (SHOWN_STATIONS.includes(id) ? 0.9 * 2.2 : undefined);
 
-/** A colony's axis, its own and not its seed's: its spine leaned toward the eye, its wheels seen round, never edge on. */
-export const COLONY_AXIS: Axis = { lean: 0.95, tilt: 0.3 };
+/** A colony's axis, its own and not its seed's: its spine about 55 degrees off the eye of the system's view, of its page and of its
+ * picture (measured: the system's eye looks along -z, its page's along 0.86, -0.19, 0.47), so its wheels are seen at three quarters in
+ * each, never edge on. */
+export const COLONY_AXIS: Axis = { lean: 1.34, tilt: 0.96 };
 
-export const STATION_WORLDS: readonly CosmosWorld[] = SHOWN_STATIONS.map((id) => ({ id, namespace: "gnoland", realms: [] }));
+export const STATION_WORLDS: readonly CosmosWorld[] = SHOWN_STATIONS.map((id) => ({
+  id,
+  namespace: "gnoland",
+  realms: [],
+}));

@@ -3,7 +3,10 @@ import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { COLONY_ROOMS, roomsOn } from "./colonyRooms.ts";
 import { colonyOf } from "./space/colony/colony.ts";
-import { ROOM_ANCHORS } from "./space/colony/crown.ts";
+import { ANCHORS } from "./space/colony/crown.ts";
+
+// The rooms' own points, the first of the hull's.
+const ROOM_ANCHORS = ANCHORS.filter(({ room }) => room !== undefined);
 
 const DEGREE = Math.PI / 180;
 
@@ -15,7 +18,8 @@ describe("gnosh's colony's rooms on its hull", () => {
     for (const [index, { lat, lon }] of COLONY_ROOMS.entries()) {
       colony.anchorFor(new Vector3(...groundDirection({ latitude: lat * DEGREE, longitude: lon * DEGREE })), at, out);
       const wanted = ROOM_ANCHORS[index]?.out ?? [];
-      for (const [axis, value] of out.toArray().entries()) expect(value, COLONY_ROOMS[index]?.room).toBeCloseTo(wanted[axis] ?? NaN, 9);
+      for (const [axis, value] of out.toArray().entries())
+        expect(value, COLONY_ROOMS[index]?.room).toBeCloseTo(wanted[axis] ?? NaN, 9);
     }
   });
 

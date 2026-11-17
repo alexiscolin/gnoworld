@@ -43,7 +43,10 @@ describe("worldPictures", () => {
   it("makes the colony's picture from the colony's code and the portraits', and from no planet's map", () => {
     const files = inputsOf("gnosh-ai");
     for (const name of ["crown.ts", "hull.ts", "colony.ts", "materials.ts", "shapes.ts"])
-      expect(files.some((file) => file.endsWith(`/space/colony/${name}`)), name).toBe(true);
+      expect(
+        files.some((file) => file.endsWith(`/space/colony/${name}`)),
+        name,
+      ).toBe(true);
     expect(files.some((file) => file.endsWith("/space/portraits.ts"))).toBe(true);
     expect(files.some((file) => file.includes("/public/"))).toBe(false);
   });

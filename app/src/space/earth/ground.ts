@@ -128,17 +128,22 @@ export class EarthGround {
   }
 
   // Where `ground` stands on screen, left in `#on`, the world turned by `angle`; whether the eye sees it clear of the limb and on screen.
-  // On a colony the point is its hull's nearest the spot, taken once a hull, and hidden too where the colony stands before it.
+  // Whether `held`'s point, `angle` turned, is seen: on screen, facing the eye, and no colony before it (a sight line a mark a frame, none in
+  // the aim's probe, which tries thousands of turns).
+  #seen(held: Held, angle: number, seen: Eye): boolean {
+    return this.#stands(held, angle, seen) && this.hull?.blocks(this.#point, seen.eye) !== true;
+  }
+
+  // On a colony the point is its hull's nearest the spot, taken once a hull, at the share of the radius it stands at.
   #stands(held: Held, angle: number, seen: Eye): boolean {
     const { eye } = seen;
     const hull = takeHull(held, this.hull);
     const normal = this.#normalOf(hull === undefined ? held.ground : held.out, angle, this.#normal);
-    const point =
-      hull === undefined ? this.#point.copy(normal) : this.#normalOf(held.at, angle, this.#point);
+    const point = hull === undefined ? this.#point.copy(normal) : this.#normalOf(held.at, angle, this.#point);
     point.multiplyScalar(this.#radius * (hull?.scale ?? 1)).add(this.#centre);
     const away = Math.hypot(eye.x - point.x, eye.y - point.y, eye.z - point.z) || 1;
     this.#cosine = (normal.x * (eye.x - point.x) + normal.y * (eye.y - point.y) + normal.z * (eye.z - point.z)) / away;
-    return seen.project(point, this.#on) && this.#cosine > CLEAR && !hull?.blocks(point, eye);
+    return seen.project(point, this.#on) && this.#cosine > CLEAR;
   }
 
   // Whether the bubble `mark` stands, as `#on` has it, where it can be read; `well`, also facing the eye and clear of the window's foot.
@@ -175,13 +180,11 @@ export class EarthGround {
     this.#radius = earth.radius;
     // The newest bubble is the last: whether it stands where none can read it, past the limb, under the dock, the plate or the header.
     this.#newest = this.#held.findLast(({ mark }) => mark.keep !== undefined);
-    const held = this.#newest;
-    this.#hidden =
-      held !== undefined &&
-      !(this.#stands(held, seconds * SPIN + this.lead + kept(), seen) && this.#readable(held.mark, true));
+    const [held, turn] = [this.#newest, seconds * SPIN + kept()];
+    this.#hidden = held !== undefined && !(this.#seen(held, turn + this.lead, seen) && this.#readable(held.mark, true));
     this.#turn(seen, seconds, step);
     for (const held of this.#held) {
-      const front = this.#stands(held, seconds * SPIN + this.lead + kept(), seen);
+      const front = this.#seen(held, turn + this.lead, seen);
       held.mark.place(this.#on.x, this.#on.y, front);
       if (this.#calm.tell(held.mark)) held.mark.calm?.();
     }

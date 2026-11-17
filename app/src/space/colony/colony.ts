@@ -97,7 +97,9 @@ export function colonyOf(): Colony {
       sight.ray.set(sight.from, sight.way.normalize());
       sight.hits.length = 0;
       sight.ray.intersectObject(far, true, sight.hits);
-      return sight.hits.some((hit) => hit.distance < distance - OWN * reach());
+      // The hits come nearest first: the nearest alone says whether something stands before the point.
+      const [nearest] = sight.hits;
+      return nearest !== undefined && nearest.distance < distance - OWN * reach();
     },
     dispose: () => {
       for (const level of [near, far])

@@ -19,13 +19,13 @@ const LANE = 2.4;
 const SKY = { width: 64, height: 32 } as const;
 
 /** Lights `material`'s glow on its night side alone: full where its face turns from the sun, none where it faces it. */
-export function nightLit(material: MeshStandardMaterial): MeshStandardMaterial {
+function nightLit(material: MeshStandardMaterial): MeshStandardMaterial {
   material.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <emissivemap_fragment>",
       `#include <emissivemap_fragment>
 #if NUM_DIR_LIGHTS > 0
-  totalEmissiveRadiance *= smoothstep(0.25, -0.3, dot(normal, directionalLights[0].direction));
+  totalEmissiveRadiance *= 1.0 - smoothstep(-0.3, 0.25, dot(normal, directionalLights[0].direction));
 #endif`,
     );
   };
@@ -39,7 +39,7 @@ function skyOf(): DataTexture {
   for (let y = 0; y < SKY.height; y += 1) {
     const band = Math.exp(-(((y / SKY.height - 0.5) * 6) ** 2));
     for (let x = 0; x < SKY.width; x += 1)
-      data.set([6 + band * 40, 8 + band * 42, 14 + band * 52, 255], (y * SKY.width + x) * 4);
+      data.set([6 + band * 36, 7 + band * 37, 9 + band * 40, 255], (y * SKY.width + x) * 4);
   }
   const sky = new DataTexture(data, SKY.width, SKY.height);
   sky.mapping = EquirectangularReflectionMapping;
@@ -56,15 +56,55 @@ export function finishesOf(): { finishes: Readonly<Record<Finish, Material>>; di
   const finishes: Record<Finish, MeshStandardMaterial> = {
     hull: new MeshStandardMaterial({ ...seen, ...hull, metalness: 0.3, roughness: 1 }),
     habitat: nightLit(
-      new MeshStandardMaterial({ ...seen, ...habitat, metalness: 0.3, roughness: 1, emissive: 0xffffff, emissiveIntensity: GLOW }),
+      new MeshStandardMaterial({
+        ...seen,
+        ...habitat,
+        metalness: 0.3,
+        roughness: 1,
+        emissive: 0xffffff,
+        emissiveIntensity: GLOW,
+      }),
     ),
     dark: new MeshStandardMaterial({ ...seen, color: 0x3b3f47, metalness: 0.7, roughness: 0.45 }),
-    mirror: new MeshStandardMaterial({ ...seen, color: 0xc4cfdd, metalness: 0.9, roughness: 0.2, envMapIntensity: 3 }),
-    radiator: new MeshStandardMaterial({ ...seen, color: 0xe9e9e4, metalness: 0.05, roughness: 0.75, normalMap: hull.normalMap }),
-    lane: new MeshStandardMaterial({ color: 0x000000, emissive: 0xbfeaff, emissiveIntensity: LANE, roughness: 1, metalness: 0 }),
-    gold: new MeshStandardMaterial({ ...seen, color: 0xc8994a, metalness: 0.85, roughness: 0.32, normalMap: hull.normalMap }),
+    mirror: new MeshStandardMaterial({
+      ...seen,
+      color: 0x9aa0aa,
+      metalness: 0.95,
+      roughness: 0.3,
+      envMapIntensity: 1.4,
+    }),
+    radiator: new MeshStandardMaterial({
+      ...seen,
+      color: 0xe9e9e4,
+      metalness: 0.05,
+      roughness: 0.75,
+      normalMap: hull.normalMap,
+    }),
+    lane: new MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0xbfeaff,
+      emissiveIntensity: LANE,
+      roughness: 1,
+      metalness: 0,
+    }),
+    gold: new MeshStandardMaterial({
+      ...seen,
+      color: 0xc8994a,
+      metalness: 0.85,
+      roughness: 0.32,
+      normalMap: hull.normalMap,
+    }),
   };
-  const maps = [hull.map, hull.normalMap, hull.roughnessMap, habitat.map, habitat.normalMap, habitat.roughnessMap, habitat.emissiveMap, sky];
+  const maps = [
+    hull.map,
+    hull.normalMap,
+    hull.roughnessMap,
+    habitat.map,
+    habitat.normalMap,
+    habitat.roughnessMap,
+    habitat.emissiveMap,
+    sky,
+  ];
   return {
     finishes,
     dispose: () => {
