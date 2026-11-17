@@ -135,6 +135,12 @@
     display: block;
   }
 
+  /* At rest, as ChatScreen.module.css reserves it while the band's code comes: all the band's heights in this one sheet, so its order
+     decides between them, never the order the chunks load in. */
+  :root:has(.band) {
+    --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) * 3 + var(--line-width));
+  }
+
   :root:has(.band[data-folded]) {
     --phone-band: calc(var(--space-2xs) + var(--control-m) * 2 + var(--space-3xs) + var(--line-width));
   }

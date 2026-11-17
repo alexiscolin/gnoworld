@@ -140,7 +140,7 @@
 
     /* The band's place while its code comes (ChatTop.tsx): its height at rest (PhoneBand.module.css: a step, the place's 88 px, the rooms' row, a few
        pixels and the rule), so the conversation does not move down as it arrives; one row on a short window. */
-    :root:has(.topWaiting, [data-phone-band]) {
+    :root:has(.topWaiting) {
       --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) * 3 + var(--line-width));
     }
 
