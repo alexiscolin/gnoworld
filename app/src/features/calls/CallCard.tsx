@@ -14,14 +14,11 @@ import { problemsOf } from "./problems.ts";
 import { depositText, networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
-// Whether Adena's object is in the page, without reading it: the card touches no wallet before a signature (D254). With none, the
-// command line's way leads (PR #41's UX review).
-const adenaInPage = (): boolean => "adena" in globalThis;
-// Sign in Adena leads where Adena is; elsewhere it is the second way, after the command.
-const signLook = (): "solid" | "outline" => (adenaInPage() ? "solid" : "outline");
-
+// Sign in Adena leads where Adena's object is in the page, read without touching it (D254); elsewhere it is the second way,
+// after the command line's (PR #41's UX review).
+const signLook = (): "solid" | "outline" => ("adena" in globalThis ? "solid" : "outline");
 // The command line's way, a computer's alone and folded while Adena is here: loaded after the card, off the plates' budgets.
-const CommandLine = lazy(async () => ({ default: (await import("./CommandLine.tsx")).CommandLine }));
+const CommandLine = lazy(() => import("./CommandLine.tsx"));
 
 export interface CallCardProps {
   card: Card_;
@@ -205,7 +202,7 @@ export function CallCard({
         <CallStatus card={card} />
         {preview ? (
           <Suspense fallback={null}>
-            <CommandLine card={card} network={network} as={login?.as} open={!adenaInPage()} />
+            <CommandLine card={card} network={network} as={login?.as} />
           </Suspense>
         ) : null}
         {preview ? <p className="meta coarse-only">To sign, use a computer.</p> : null}

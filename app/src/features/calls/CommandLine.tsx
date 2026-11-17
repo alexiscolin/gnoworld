@@ -44,21 +44,20 @@ function command(card: CallCard, network: { chainId: string; rpc: string }, as: 
   );
 }
 
-/** The card's command, signed by `as` when an account is logged in; open from the start when `open` (no Adena in the page). */
-export function CommandLine({
+/** The card's command, signed by `as` when an account is logged in; open from the start with no Adena in the page, read without
+ * touching its object (D254). */
+export default function CommandLine({
   card,
   network,
   as,
-  open,
 }: {
   card: CallCard;
   network: { chainId: string; rpc: string };
   as: Address | undefined;
-  open: boolean;
 }) {
   return (
     <div className="fine-only">
-      <Disclosure title="Or run it with gnokey" size="s" open={open}>
+      <Disclosure title="Or run it with gnokey" size="s" open={!("adena" in globalThis)}>
         {command(card, network, as)}
       </Disclosure>
     </div>
