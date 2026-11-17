@@ -50,6 +50,8 @@ describe("GnokeyLogin", () => {
     typeInto(one(box, "input"), ADDRESS);
     click(button(box, "Get a code"));
     await settled(() => box.textContent.includes(CODE.block));
+    // The server keeps a login's code five minutes: the clock says so (the review's low 3).
+    expect(box.textContent).toContain("The code works once, for 5:00 more");
     typeInto(one(box, "textarea"), FILE);
     click(button(box, "Log in"));
     await settled(() => onLoggedIn.mock.calls.length > 0);

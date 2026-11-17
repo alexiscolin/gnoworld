@@ -25,7 +25,7 @@ const proofOf = (address: string) => ({
   },
   signature: { pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A".repeat(44) }, signature: "A".repeat(88) },
 });
-const adena = vi.hoisted(() => ({ asked: [] as Login[] }));
+const adena = vi.hoisted(() => ({ asked: [] as Login[], wait: Promise.resolve() }));
 
 vi.mock(import("../../lib/adena/adena.ts"), async () => {
   const { Address: Parsed } = await import("@gnoworld/schemas");
@@ -37,9 +37,10 @@ vi.mock(import("../../lib/adena/adena.ts"), async () => {
         address: Parsed.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
         chainId: "onyx-1",
       }),
-    signLogin: (_: unknown, login: Login) => {
+    signLogin: async (_: unknown, login: Login) => {
       adena.asked.push(login);
-      return Promise.resolve({ ok: true, proof: proofOf(login.address) });
+      await adena.wait;
+      return { ok: true, proof: proofOf(login.address) };
     },
   };
 });
@@ -93,6 +94,7 @@ beforeAll(modals);
 beforeEach(() => {
   vi.stubGlobal("reportError", vi.fn());
   adena.asked = [];
+  adena.wait = Promise.resolve();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -155,6 +157,29 @@ describe("the Command line tab", () => {
     typeInto(areas(box)[1], FILE("a"));
     click(button(box, "Link"));
     await settled(() => held.codes === 2 && box.textContent.includes("code 2"));
+    typeInto(areas(box)[0], FILE("b"));
+    expect(disabled(button(box, "Link"))).toBe(true);
+  });
+
+  it("never counts A's proof of a code a new one replaced while Adena was still open (the review's low 1)", async () => {
+    const { box } = await ready();
+    let answer: () => void = () => undefined;
+    adena.wait = new Promise((resolve) => {
+      answer = resolve;
+    });
+    click(button(box, "Sign in Adena"));
+    await settled(() => adena.asked.length === 1);
+    // The address edited back to itself: the code goes, Get a code brings a new one.
+    typeInto(box.querySelector("input") ?? undefined, "");
+    typeInto(box.querySelector("input") ?? undefined, B);
+    click(button(box, "Get a code"));
+    await settled(() => box.textContent.includes("code 2"));
+    act(() => {
+      answer();
+    });
+    await act(async () => {
+      await adena.wait;
+    });
     typeInto(areas(box)[0], FILE("b"));
     expect(disabled(button(box, "Link"))).toBe(true);
   });

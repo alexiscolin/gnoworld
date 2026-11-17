@@ -95,22 +95,15 @@ export function CommandFlow({
 }) {
   const [typed, setTyped] = useState("");
   const [file, setFile] = useState("");
-  const [by, setBy] = useState<ByProof | undefined>(undefined);
+  // The logged-in account's own proof, with the text it signed: a proof of a code a new one replaced never counts.
+  const [signed, setSigned] = useState<{ text: string; by: ByProof } | undefined>(undefined);
   const [step, setStep] = useState<Step>({ at: "idle" });
   const [said, setSaid] = useState("");
   const parsed = Address.safeParse(typed.trim());
   const ready = step.at === "ready" ? step : undefined;
-  // A new code is a new text: a proof of the last one goes with it.
-  const say: Say = {
-    flow,
-    step: setStep,
-    said: setSaid,
-    file: (text) => {
-      setFile(text);
-      setBy(undefined);
-    },
-  };
+  const say: Say = { flow, step: setStep, said: setSaid, file: setFile };
   const mine = asMeOf(me, ready);
+  const by = proofOf(mine, signed);
   const get = (why = "") => {
     if (parsed.success) ask(parsed.data, why, say).catch(reportError);
   };
@@ -129,7 +122,16 @@ export function CommandFlow({
         }}
       />
       {ready === undefined ? null : <Block block={ready.code.block} file={file} onFile={setFile} onCopied={setSaid} />}
-      {mine === undefined ? null : <AsMe key={mine.code.text} me={mine.me} code={mine.code} onBy={setBy} />}
+      {mine === undefined ? null : (
+        <AsMe
+          key={mine.code.text}
+          me={mine.me}
+          code={mine.code}
+          onBy={(next) => {
+            setSigned(next === undefined ? undefined : { text: mine.code.text, by: next });
+          }}
+        />
+      )}
       <p role="status" className="meta">
         {said}
       </p>
@@ -165,8 +167,10 @@ function asMeOf(me: Address | undefined, ready: { code: Code } | undefined) {
   const { memo: text, byBlock, chainId } = ready.code;
   return byBlock === undefined || chainId === undefined ? undefined : { me, code: { text, byBlock, chainId } };
 }
-// A link waits for the logged-in account's own proof.
+// A link waits for the logged-in account's own proof, of this code's text.
 const unsigned = (mine: unknown, by: ByProof | undefined): boolean => mine !== undefined && by === undefined;
+const proofOf = (mine: { code: { text: string } } | undefined, signed: { text: string; by: ByProof } | undefined) =>
+  mine !== undefined && signed?.text === mine.code.text ? signed.by : undefined;
 
 const LINK_FLOW: Flow = {
   kind: "link",

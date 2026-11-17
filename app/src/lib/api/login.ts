@@ -8,6 +8,8 @@ export type { Fetcher, Result } from "./http.ts";
 
 /** The most the server reads of a pasted file, in bytes (server/src/login/cliProof.ts). */
 export const FILE_MAX_BYTES = 4096;
+/** Whether a pasted file is more than the server reads: never sent. */
+export const tooBig = (file: string): boolean => new TextEncoder().encode(file).length > FILE_MAX_BYTES;
 /** A command-line code: the login's (D13880), a link's and a release's (links.ts); the block is the server's, shown as it came. */
 export const CliChallenge = z.object({
   nonce: Nonce,
@@ -34,7 +36,7 @@ export function loginApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     cliChallenge: (address: Address) => send({ path: "cli/challenge", body: { address }, schema: CliChallenge }),
     /** The file the command-line tool wrote, as it was pasted: at most 4 KiB, which the server reads. */
     verifyFile: async (request: { nonce: string; address: Address; file: string }): Promise<Result<Me>> =>
-      new TextEncoder().encode(request.file).length > FILE_MAX_BYTES
+      tooBig(request.file)
         ? { ok: false, reason: "refused" }
         : named(await send({ path: "cli/verify", body: request, schema: Me }), request.address),
     /** A ticket for one connection to Ergo. */

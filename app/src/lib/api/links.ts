@@ -6,12 +6,11 @@ import { jsonOf } from "@gnoworld/core";
 import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 import { pageFetch } from "../query/policy.ts";
-import { CliChallenge, FILE_MAX_BYTES } from "./login.ts";
+import { CliChallenge, tooBig } from "./login.ts";
 
 export { type Fetcher, type Result } from "./http.ts";
 export { FILE_MAX_BYTES, type CliChallenge } from "./login.ts";
 
-const tooBig = (file: string): boolean => new TextEncoder().encode(file).length > FILE_MAX_BYTES;
 const Signed = z.object({ signatures: z.array(z.unknown()).check(z.length(1)) });
 
 /** Whether a pasted text could be the tool's signed file: at most 4 KiB, one JSON object with exactly one signature. Checked before a code is spent. */
