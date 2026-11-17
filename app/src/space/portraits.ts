@@ -13,7 +13,7 @@ import type { Planet } from "./planet/planet.ts";
 const MAP_WIDTH = 512;
 /** The most portraits drawn in one of the scene's frames. */
 const PER_FRAME = 4;
-/** Where the star stands for every portrait: up and to the left, a little toward the eye, as the design's rail lights its planets. */
+/** Where the star stands for every portrait: up and to the left, a little toward the eye, as frame 4's rail lights its planets. */
 const SUN = new Vector3(-0.55, 0.3, 0.78).normalize();
 const EARTH = "earth";
 const ANISOTROPY = 4;
