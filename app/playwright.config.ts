@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL: SITE,
-    // ponytail: in Claude Code's sandbox, one process, since the sandbox refuses Chromium's Mach
+    // ceiling: in Claude Code's sandbox, one process, since the sandbox refuses Chromium's Mach
     // port for its children; everywhere else, Chromium as it ships. Benches run outside it.
     launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
   },

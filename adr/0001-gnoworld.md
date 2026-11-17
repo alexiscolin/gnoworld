@@ -513,7 +513,7 @@ list as the truth.
 There is one adapter per hub kind. Phase 1 ships open hubs and the BUBBLE balance;
 DAO adapters come in phase 2.
 
-`ponytail:` adapters are pinned to a realm version (`escrow_v4`, `memba_dao_channels_v2`).
+`ceiling:` adapters are pinned to a realm version (`escrow_v4`, `memba_dao_channels_v2`).
 A new version means a new adapter.
 
 ### 9. Rooms
@@ -690,7 +690,7 @@ The relay's store is SQLite: one file, through the pure-Go `modernc.org/sqlite`.
 inspected with `sqlite3` and backed up by copying the file. It never holds plaintext or
 history.
 
-`ponytail:` one relay instance holds thousands of connections. Several instances would move
+`ceiling:` one relay instance holds thousands of connections. Several instances would move
 SQLite to Postgres and join the instances through NATS or Redis pub/sub.
 
 Hosting at 0 € for phase 0:
