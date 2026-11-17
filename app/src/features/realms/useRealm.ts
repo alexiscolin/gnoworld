@@ -51,7 +51,7 @@ async function load({ rpc, realm, origin }: RealmSource, options: ReadOptions): 
 }
 
 /** A realm's page and height as a query: kept by its chain, realm and origin, so a view seen again draws it at once and reads it again quietly,
- * and a link's hover or the flight asks it ahead (warm.ts). A page that failed is no answer: it throws, and the last good one stays. */
+ * and a link's hover or the flight asks it ahead (warmRealm.ts). A page that failed is no answer: it throws, and the last good one stays. */
 export const realmPageQuery = ({ rpc, realm, origin }: RealmSource, options?: ReadOptions) =>
   queryOptions({
     queryKey: keys.page(rpc, realm, origin),

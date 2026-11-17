@@ -82,7 +82,7 @@ const keepable = (ask: JarvisQuestion, called: Called): boolean =>
     called.answer.keep === true &&
     called.answer.version === EXPLAIN_VERSION);
 
-// A fixed ask's answer is served to everyone who asks the same, built from anyone's lines: its flights alone (D13508). Taken off
+// A fixed ask's answer is served to everyone who asks the same, built from anyone's lines: its flights alone. Taken off
 // where the call ends, so the asker, the readers who join it and every later one, kept or served, get the same.
 const shared = (ask: JarvisQuestion, called: Called): Called =>
   called.ok && called.answer.status === "answered" && isFixedAsk(ask)

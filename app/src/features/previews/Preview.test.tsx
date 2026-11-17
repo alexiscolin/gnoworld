@@ -3,8 +3,8 @@ import type { Previews } from "@gnoworld/schemas/indexer";
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
-// The page's slots filled as the shell fills them: the realm page's drawing comes through one (plugs.ts).
-import "../../plugs.ts";
+// The page's slots filled as the shell fills them: the realm page's drawing comes through one (featurePlugs.ts).
+import "../../featurePlugs.ts";
 import { slot } from "../../slots.tsx";
 import { drawing } from "../chat/index.ts";
 import { Preview } from "./Preview.tsx";

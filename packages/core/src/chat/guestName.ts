@@ -54,7 +54,7 @@ antelope armadillo baboon barnacle buffalo bulldog butterfly caribou cassowary c
 const BASE32 = "abcdefghijklmnopqrstuvwxyz234567";
 const word = (list: readonly string[], n: number): string => list[n % list.length] ?? "";
 
-// ponytail: a 16-bit draw over 200 words is off by 0.3% at most between two words; widen the draw if names ever matter to fairness.
+// ceiling: a 16-bit draw over 200 words is off by 0.3% at most between two words; widen the draw if names ever matter to fairness.
 export function guestName(random: Uint8Array): string {
   if (random.length < GUEST_NAME_BYTES) throw new RangeError(`a guest's name takes ${String(GUEST_NAME_BYTES)} bytes`);
   const view = new DataView(random.buffer, random.byteOffset, random.byteLength);

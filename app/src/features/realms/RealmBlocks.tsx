@@ -149,7 +149,7 @@ function columns(block: Extract<PageBlock, { type: "columns" }>, on: Drawn): Rea
 function list(block: Extract<PageBlock, { type: "list" }>, on: Drawn): ReactNode {
   const items = on.budget.fit(block.items, weigh);
   if (items.length === 0) return undefined;
-  // Drawn here, not by the chat's block, which has no action: a `$help` link in a bullet is a button too (F13526).
+  // Drawn here, not by the chat's block, which has no action: a `$help` link in a bullet is a button too.
   return createElement(
     block.ordered ? "ol" : "ul",
     block.ordered && block.start !== 1 ? { start: block.start } : null,

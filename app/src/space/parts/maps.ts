@@ -1,7 +1,7 @@
 // The generated worlds' maps, shared by every world that names them and kept once loaded (a world's look names a few of a small
 // library), and the Earth's own. A map that fails is asked again after two seconds.
 import type { Texture, WebGLRenderer } from "three";
-import { afterLoad } from "../../later.ts";
+import { afterLoad } from "../../afterLoad.ts";
 import { fastLink, savesData } from "../../lib/saveData.ts";
 import type { MapSet, Planet } from "../planet/planet.ts";
 import { freeMap, loadMap, mapUrl, type MapLoad } from "../planet/maps.ts";

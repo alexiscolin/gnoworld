@@ -36,7 +36,7 @@ function Action({
   options,
   onFly,
 }: Pick<AnswerCardProps, "id" | "chain" | "options" | "onFly"> & { button: AnswerButton }) {
-  // The check ran on the chain the button carries (D13508): on another network the card never opens, and the person is told.
+  // The check ran on the chain the button carries: on another network the card never opens, and the person is told.
   if (button.type === "action" && button.chainId !== chain.chainId)
     return (
       <p className="meta">{`"${button.label}" was checked on ${button.chainId}: it runs there, not on ${chain.chainId}.`}</p>

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { type MetaArgs } from "react-router";
 import { BACK_HOME, routeError, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
-import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
+import { failedPageMeta, homeMeta, missingUniverseMeta } from "../pageMeta.ts";
 import { site } from "../places.ts";
 import Home, { clientLoader, ErrorBoundary, loader, meta } from "./home.tsx";
 

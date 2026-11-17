@@ -1,4 +1,4 @@
-// The command a call card prints for the command-line tool (D13880): the same MsgCall as Adena's, to copy and run by hand;
+// The command a call card prints for the command-line tool: the same MsgCall as Adena's, to copy and run by hand;
 // the page never runs it and never watches for it. Flags from gno v1.5.0: keyscli/call.go (pkgpath, func, args, max-deposit),
 // keys/client/maketx.go (gas-fee, gas-wanted, broadcast, chainid), keys/client/root.go (remote).
 import { hasHidden } from "@gnoworld/core";

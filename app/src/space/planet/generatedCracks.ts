@@ -3,7 +3,7 @@
 
 // A crack along cells' seams, bent then broken: its core, 1 to 0, and its width in pixels, faded out whole under a pixel. Grooves: a lane
 // along each seam of large cells, fine dark grooves along it (15 steps a cell), gone before 4 px apart. Veins: two nets of cracks, orange
-// to cream, over a dark maroon ember, as frame 4's Music, the fine net only in the main one's halo: no asterisks inside a cell.
+// to cream, over a dark maroon ember, as the design's Music, the fine net only in the main one's halo: no asterisks inside a cell.
 export const CRACKS = /* glsl */ `
 vec2 crackAt(vec3 p, float frequency, vec2 width, float pixel) {
   vec3 q = p * frequency + 0.4 * field(p * 2.3 + offset) + 0.16 * field(p * 19.0 + offset.zxy);

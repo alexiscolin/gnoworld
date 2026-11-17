@@ -56,7 +56,7 @@ const refusals = {
 } as const satisfies Record<string, readonly [ApiError["error"], Status]>;
 type Refuse = (c: Context, cause: keyof typeof refusals) => Response;
 
-// The command line's login (D13880): the login's limits, nonce store, cookie and refusal, a signed file for its proof.
+// The command line's login: the login's limits, nonce store, cookie and refusal, a signed file for its proof.
 function cliRoutes(
   login: Login,
   block: (address: Address, memo: string) => string,

@@ -7,7 +7,7 @@ import { firstGraphemes } from "../markdown/graphemes.ts";
 /** The most graphemes of a name. */
 export const NAME_MOST = 24;
 
-/** The page's rail, at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (frame 4: x 1,585
+/** The page's rail, at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (x 1,585
  * at 1,728 px). The rail takes its width from it. */
 export const RAIL = { from: 900, footprint: 143 } as const;
 
@@ -23,7 +23,7 @@ export interface Signals {
   readonly rise?: number;
   readonly use?: number;
   readonly uncharted?: boolean;
-  /** The world's next event within the day, as its chip says it ("AMA in 11 h", frames 4 and 6). */
+  /** The world's next event within the day, as its chip says it ("AMA in 11 h"). */
   readonly event?: string;
   /** A person the reader follows who is in one of its rooms, as its chip says it ("noor is here"). */
   readonly person?: string;

@@ -1,4 +1,4 @@
-// The bell panel's parts (frames 86, 87): its head, the worlds to filter by, and a line, its mark mint while unread.
+// The bell panel's parts: its head, the worlds to filter by, and a line, its mark mint while unread.
 import { Button, Chip, Cluster, Icon, IconButton, Row } from "@gnoworld/ui";
 import { whenOf, type Item } from "./feed.ts";
 import { hrefProp } from "../chat/index.ts";

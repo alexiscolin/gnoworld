@@ -12,7 +12,7 @@ export interface BreadcrumbProps {
 }
 
 /** Where the page sits in the site: a labelled trail of links ending on the current page, which is no link. It is drawn as the
- * video's kicker: the one label style, a dot in the world's colour, the steps apart by a chevron. */
+ * design's kicker: the one label style, a dot in the world's colour, the steps apart by a chevron. */
 export function Breadcrumb({ label, items }: BreadcrumbProps) {
   if (items.length === 0) return null;
   const last = items.length - 1;

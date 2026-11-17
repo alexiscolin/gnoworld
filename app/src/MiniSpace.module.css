@@ -7,7 +7,7 @@
     block-size: 100%;
   }
 
-  /* layout: both fill the box, the names over the canvas, neither taking a pointer: a wheel over the box scrolls the column it stands in */
+  /* Both fill the box, names over the canvas, neither taking a pointer: a wheel over the box scrolls the column it stands in */
   .canvas,
   .labels {
     position: absolute;
@@ -30,7 +30,7 @@
     overflow: hidden;
   }
 
-  /* layout: the scene's pill turns on its own pointer events; here a name is only read */
+  /* The scene's pill sets its own pointer events; here a name is only read */
   .labels button[type] {
     pointer-events: none;
   }

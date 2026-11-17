@@ -1,4 +1,4 @@
-// The header's Connect, once pressed (D13881): the burger menu's own component and look, two ways in. Its code comes with the first
+// The header's Connect, once pressed: the burger menu's own component and look, two ways in. Its code comes with the first
 // press, never with the first screen, as the device's menu does (account/Opened.tsx).
 import { Menu } from "@gnoworld/ui";
 import type { ReactNode } from "react";

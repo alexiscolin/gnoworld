@@ -1,4 +1,4 @@
-/* A plate's links out: the label's capitals in the text's colour, the arrow kept with its words in one row (frames 40, 93). The air over
+/* A plate's links out: the label's capitals in the text's colour, the arrow kept with its words in one row. The air over
    them is the plate's section step (Panel.module.css), or their card's stack's. */
 @layer components {
   a.out {
@@ -21,7 +21,6 @@
 
     /* A row of them that wraps leaves no lone link on a row far from the rest. */
     :has(> li > a.out) {
-      /* layout: the wrapped rows a step apart */
       row-gap: var(--space-2xs);
     }
   }

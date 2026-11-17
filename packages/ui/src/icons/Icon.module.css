@@ -1,6 +1,5 @@
 @layer components {
   .icon {
-    /* layout: an icon keeps its size beside the words of a row */
     flex: none;
     inline-size: var(--_size);
     block-size: var(--_size);

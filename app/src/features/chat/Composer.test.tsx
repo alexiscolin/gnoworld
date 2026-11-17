@@ -6,9 +6,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, markup, noMedia, one } from "../../../tests/mount.tsx";
 import { Composer, typingOf } from "./Composer.tsx";
-import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./said.ts";
-import { tooFast } from "./pace.ts";
-import { refusalAfter } from "./composerHooks.ts";
+import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./composer/draftHint.ts";
+import { tooFast } from "./connection/pace.ts";
+import { refusalAfter } from "./composer/composerHooks.ts";
 import { acting, FIELD, inPage } from "../../../tests/composer.tsx";
 
 const ROOM = "#bubble/games";

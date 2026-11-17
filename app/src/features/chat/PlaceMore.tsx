@@ -1,4 +1,4 @@
-// The info panel's second figure and its links out (the video's frame 56): how many countries those here declared (none declared
+// The info panel's second figure and its links out: how many countries those here declared (none declared
 // draws none), and the place on gnoweb and the explorer.
 import type { Line } from "@gnoworld/core";
 import { Cluster, Icon } from "@gnoworld/ui";

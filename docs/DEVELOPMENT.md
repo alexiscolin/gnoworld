@@ -1,5 +1,20 @@
 # Development
 
+## Start here
+
+1. **Install** git, Python 3, Go 1.26, Node 24.22.0 (`.node-version`; with nvm, `nvm install`) and pnpm 12.14.0, then
+   `pnpm install`, which runs no package's script.
+2. **Run** `pnpm dev`: the app with hot reload, no Docker and no secret. The chat needs a backend: `pnpm workshop` starts one
+   with the app, on macOS only ("The workshop", below).
+3. **Test** with `pnpm run test` (the unit tests), `pnpm run typecheck` and `pnpm run lint`.
+4. **Check** before a commit with `sh scripts/check.sh`, the commit gate on what the change touches. It also needs gitleaks, a gno
+   toolchain ("Toolchain"), Ergo (`sh scripts/ergo.sh` builds it) and, for the journeys, Playwright's Chromium.
+5. **Install the git hooks** once, from `main` ("Setup"). The installer also writes outside the repository: rules into every
+   Claude Code profile's user settings (`~/.claude` and its siblings) and the `land` command into `~/.local/bin`.
+
+Working with Claude Code (its sandbox, the worktrees, the coordinating session and its parts, `land`):
+[process/claude-code.md](process/claude-code.md).
+
 ## Setup
 
 The README's "Run it locally" lists what to install. `pnpm install` runs no script. The git hooks
@@ -14,62 +29,19 @@ git --no-replace-objects show main:scripts/install_hooks.sh | sh
 ```
 
 It also writes this machine's twins of the project's rules (the main checkout's, the worktrees' and the temporary folder's
-paths, `scripts/machine_rules.py`) into every Claude profile's user settings, a copy of each file kept beside it (D13413). It
-installs `land` too (D13213) when python3, git, gh and gitleaks are on your PATH outside your home and temporary folders and
-every Claude profile already keeps their folders from its sessions, which `tools/agent-github/install.sh` writes (D13412);
+paths, `scripts/machine_rules.py`) into every Claude profile's user settings, a copy of each file kept beside it. It
+installs `land` too when python3, git, gh and gitleaks are on your PATH outside your home and temporary folders and
+every Claude profile already keeps their folders from its sessions, which `tools/agent-github/install.sh` writes;
 otherwise it says why, installs the hooks alone, and keeps the land already installed.
 
-A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` takes no push, and pre-push refuses one. A session's
-branch reaches GitHub through `land`, the owner's one command (D13211, D13213; `docs/HARNESS.md`, "A change, from plan to merge"). The install
+A branch reaches `main` as a pull request, merged on GitHub: `main` takes no push, and pre-push refuses one. The install
 turns off fast-forward merges in this clone, so a merge always makes a commit, which pre-merge-commit checks (`merge.ff false`; a pull
 stays a fast-forward, `pull.ff only`). A commit runs the secret scan, and from Claude Code's sandbox Prettier on the staged files and
-the docs check, a harness file refused (D241, D13173); `sh scripts/check.sh` is what you run before committing code. The gate needs the Node `.node-version` pins (first on PATH, as any version
-manager puts it there, or in nvm's default folder, D13416; with nvm, `nvm use` picks it, since `.nvmrc` links to `.node-version`), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
-The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten on an app change, the night 41 of the 109): `node app/node_modules/@playwright/test/cli.js install chromium`
+the docs check, a harness file refused; `sh scripts/check.sh` is what you run before committing code. The gate needs the Node `.node-version` pins (first on PATH, as any version
+manager puts it there, or in nvm's default folder; with nvm, `nvm use` picks it, since `.nvmrc` links to `.node-version`), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
+The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten of the 110 on an app change, the nightly run 41): `node app/node_modules/@playwright/test/cli.js install chromium`
 (the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
-Start Claude Code in this folder, so it reads the project's settings, hooks and sandbox, and
-accept the folder's trust prompt. The project's plugins are enabled for everyone but each
-person installs them once:
-
-```bash
-claude plugin install typescript-lsp@claude-plugins-official --scope project
-claude plugin install context7@claude-plugins-official --scope project
-claude plugin install gnomcp@gnoverse --scope project   # its marketplace is declared in .claude/settings.json
-```
-
-## A branch's worktree
-
-Each branch works in a worktree of its own, made from the root of a checkout whose packages are
-installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
-`sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
-the worktrees' folder, `<main checkout>-wt` beside the main checkout in your home (made once, in your shell, D13415), where no session's shell writes but its own
-folder (its file tools still can), which it may also be given in full.
-Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
-outside the sandbox and must touch no other, and a base whose harness,
-`CLAUDE.md` or package files are not its tree's. No part's session writes a sibling there, moves
-one or plants one; the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
-what"). It makes the branch, links the main tree's
-installed packages one by one (one store), and copies each workspace's `node_modules` with its
-relative links and a `.bin` of its own, through no link it did not make. Hand-made
-links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook`.
-`sh scripts/worktree.sh remove <name>`, from another tree,
-removes a worktree of that root that holds no change, staged file or untracked file (git's own
-check: its ignored files go with it, never what a link in it leads to) with its record, and keeps
-its branch. It prunes no other record, which a session can point at nothing: `git worktree prune`
-is run in your shell. In Claude Code it runs outside the sandbox: write the call alone, from the
-checkout's root, with plain words (a bare `<name>`); the guard refuses any other form (a `cd`, a
-`$(...)`, a `~`, an assignment, a redirect or another command in the call).
-A branch with an upstream is deleted in your shell: in a session `git branch -D` cannot write
-`.git/config`, so it deletes the branch but keeps its `branch.<name>` section, which a new branch
-of that name would inherit. A branch `worktree.sh` made has no such section.
-After a merge that changes the lockfile, install in the main checkout
-(`pnpm install --frozen-lockfile`, with `.node-version`'s Node first on the PATH).
-
-A session writes its own worktree only: never another session's, by any tool, nor runs a command
-that writes there. So a merge into a part's branch that changes the harness is the owner's, in
-the owner's terminal: the part's own sandbox refuses those files, and the chief writing them for it
-from its own session would write another session's worktree.
 
 ## Toolchain
 
@@ -110,19 +82,19 @@ The step passes on the real binary with no warning (the build's table is sized).
 
 ## The gate and the harness
 
-`./scripts/check.sh` is the commit gate (D13168): Prettier and ESLint on the change's files, the types, the unit tests related to a
+`./scripts/check.sh` is the commit gate: Prettier and ESLint on the change's files, the types, the unit tests related to a
 tier-1 change (HARNESS.md, "The related tests") and gno, on what the change touches; on a tree with no change, every tool and every test
 of the commit's projects (node, ui, compiled) but the `timing` ones, which is a part's last check before its report. GitHub's gate
 (`.github/workflows/gate.yml`) judges each pull request by what it calls for, and the night (`nightly.yml`) runs the slow, display and `timing`
 tests, the journeys of its list, StrykerJS and the harness's mutants. By hand, as no gate runs them: the benches (`python3 -I scripts/bench.py`),
 the pictures and the flash's pixel test (`node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts
 app/tests/stories/behaviours.spec.ts` on the Mac). Design still being tried lives in the workshop (this file's "The workshop") and
-lands later, in one tested batch (REVIEW.md, "Keep it cheap"). At a turn's end the Stop hook only reaps stray processes (D13173).
+lands later, in one tested batch (REVIEW.md, "Keep it cheap"). At a turn's end the Stop hook only reaps stray processes.
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 
 To mutate only your own files with StrykerJS, from the repository root and on the pinned Node (the
-`PATH` check.sh sets: `.node-version`'s Node, from the PATH or nvm's default folder, D13416): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
+`PATH` check.sh sets: `.node-version`'s Node, from the PATH or nvm's default folder): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
 value. It replaces the config's `mutate` list (its log says `Found 2 of 935 file(s)`), keeps the
 incremental file whole and takes no `--`. Two forms fail: `pnpm run mutate -- --mutate a.ts` hands
 StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every later token reaches
@@ -135,40 +107,14 @@ Anthropic key is the owner's own for tests.
 
 ## The workshop
 
-Design is tried here before it lands: the app's screens on Vite's dev server, with hot reload,
-opened from the MacBook or a phone over Tailscale. `scripts/workshop.sh` and `app/lab.config.ts` also start a lab server that has no page to serve (`app/lab/` does not exist). No
-gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
-pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
-fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
+Design is tried here before it lands: `pnpm workshop`, in your own terminal (the sandbox cannot stop a server it did not start),
+serves the app's dev server with hot reload on 127.0.0.1:5198 and the backend below. It stops only the processes it started, and
+Ctrl+C stops them all. No gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the
+gate and one review, with pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or
+harness file) takes the fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`. How the
+owner opens it from another device over a private network is in [process/claude-code.md](process/claude-code.md).
 
-**Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
-Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
-each started by its function `start` and put on the tailnet by `share`: the app's (`react-router dev`) on 127.0.0.1:5198 and the
-lab's (`vite --config lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when
-the `tailnet-preview` skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`;
-without it, the local addresses. It stops only processes it started itself (their pids and ports in `.claude/tmp/workshop.pid`):
-a port held by anything else is said, never taken. Ctrl+C stops all three, the servers and the backend (below), and takes them
-off the tailnet, and so does any of them that stops; a second `pnpm workshop` in the same checkout replaces the first, the
-backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
-`tailnet-preview.sh down workshop-app` and `down workshop-lab`.
-
-**The ping-pong:** while your own `pnpm workshop` serves a checkout, each retouch of Claude's shows live in a
-couple of minutes; no gate runs at a turn's end, and a commit takes seconds (the secret scan, Prettier, the docs check); the
-gate, the tests and the review come once the batch is accepted. The code the workshop runs is outside Claude's sandbox, under a profile of its
-own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
-no keychain, no other app and no Unix socket but the system's. It cannot hold where that code listens, and its outbound network
-stays open (HARNESS.md's known limits): the servers listen on 127.0.0.1 because their configs say so, and macOS's
-firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends.
-
-Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
-the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
-which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
-which. On the MacBook or the phone, open the https ones:
-- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
-  the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
-- **`workshop-lab`:** the second name the script puts on the tailnet; with `app/lab/` gone, no page answers there.
-
-**The backend**, started once the app's server is on the tailnet :
+**The backend**, started with the app's server:
 the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
 by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for Ergo and its WebSocket
 (`WORKSHOP_API_PORT`, `WORKSHOP_IRC_PORT`, `WORKSHOP_WS_PORT`), allowing the app's local address and its tailnet links as
@@ -201,12 +147,7 @@ accounts an hour, so the crowd's wallets log in again.
 (`server/src/testing/jarvisStandin.ts`: the same paths and schemas, prepared answers chosen by the question's words, no model, no key, no
 network) and give the server `JARVIS=on`, its address and a key file; without the variable Jarvis stays off. Never set in the journeys.
 
-The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
-cannot reach the clipboard there; select the list instead.
 
-**Landing a batch (« pose »):** when the owner says « pose » and names the commits validated, `/pose <commits>`
-(`.claude/commands/pose.md`) lands them alone: tests by risk, the gate's jobs run once, one review a pull request, pull requests of
-about 600 product lines, and a one-line push script each for the owner (D13192).
 
 ## The stack
 
@@ -241,7 +182,7 @@ development or test-GPU build only; a production build holds no trace of it.
   never skips. `memory.test.ts` runs the real codecs at their cap in a child with the image's flags and reads the peak resident memory,
   which must stay under the container's 256 MiB. What needs Docker (the reader's isolation, its way out, its guard rules) is
   `deploy/test-links.sh`, which `deploy/test.sh` sources: GitHub's deploy-stack job runs `deploy/test.sh` on a change to `deploy/` or to what the
-  images build from, the reader and what it fetches included (D13180, D13203); its last line names its failed checks, which the job's
+  images build from, the reader and what it fetches included; its last line names its failed checks, which the job's
   annotation shows with no login. It needs the network for its controls (`example.com.`).
 
 ## Jarvis's evals
@@ -257,11 +198,3 @@ leaves it out, as promptfoo's binary resolves only where `evals/` is installed; 
 cases to jarvis's wire. `run.sh` runs the branch's own code with the key, in your shell: run it on a commit you have
 read.
 
-## Slices
-
-One slice is worked at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
-plans it and cuts it into branches, each run in a session and a worktree of its own, two at once at
-most (`docs/HARNESS.md`, "Who does what").
-
-The order of work is in [plans/backlog.md](plans/backlog.md), with the
-concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.

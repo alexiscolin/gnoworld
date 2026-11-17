@@ -1,9 +1,9 @@
-// Jarvis's loop (ADR-0002 §5, "Harness"): one question to an answer through our own small loop, not the SDK's tool
-// runner, as every call must pass our checks first. The system prompt is frozen per version and cached; the question
-// and the room's lines go in as untrusted blocks under the question's one tag; each turn reserves, calls and
-// settles the model (model.ts), then each tool call passes the allowlist and the tag's check, eight a turn at most, runs
-// with the question's words and own cards, its result cut and wrapped. It stops at the answer, with its cards,
-// the turn cap, max_tokens, a refusal, an error, an unasked stop, the budget, or its asker gone.
+// Jarvis's loop (ADR-0002 §5, "Harness") takes one question to an answer. It is our own small loop, not the SDK's tool runner,
+// because every call must pass our checks first. The system prompt is frozen for each version and cached. The question and the
+// room's lines go in as untrusted blocks under the question's single tag. Each turn reserves budget, calls the model and settles
+// the cost (model.ts); then each tool call, at most eight a turn, must pass the allowlist and the tag's check, runs with the
+// question's words and cards, and has its result cut short and wrapped. The loop stops at an answer (with its cards), the turn
+// cap, max_tokens, a refusal, an error, a stop nobody asked for, an empty budget, or when the asker has gone.
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
@@ -21,7 +21,8 @@ import { resultsOf, type Runs } from "./toolRun.ts";
 import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
-/** A question: its words, its room's lines, each a text, what the server read for it by source, and a `finds`: the function a read of its realm's code must hold for the answer to be kept. */
+/** A question. It has its words, the lines of its room (each a text), and what the server read for it, by source.
+ * It may also have `finds`: a function that the read of the realm's code must contain for the answer to be kept. */
 export interface Question {
   readonly text: string;
   readonly room: readonly string[];
@@ -30,8 +31,9 @@ export interface Question {
   /** A fixed ask, whose answer is shared: its cards carry flights alone. */
   readonly shared?: boolean | undefined;
 }
-/** How a question ended: its answer and its cards, or why there is none. `cost` is what the budget settled for the
- * question's turns, in millionths of a dollar, on every end that spent; `invalid` and `gone` carry none, and `spent` only when earlier turns spent. */
+/** How a question ended: with an answer and its cards, or with the reason there is no answer. `cost` is what the budget
+ * settled for the question's turns, in millionths of a dollar, on every ending that spent money. `invalid` and `gone`
+ * carry no cost, and `spent` carries one only when earlier turns spent money. */
 export type Result =
   | {
       readonly kind: "answer";
@@ -56,14 +58,14 @@ export interface Parts {
   readonly caps: JarvisConfig["caps"];
   readonly skills: { readonly index: readonly { name: string; description: string }[]; readonly digest: string };
   readonly tools: { readonly allowlist: Allowlist<Definition>; readonly run: Runs };
-  // The system prompt of a loop with one job, such as a realm's digest, in place of the concierge's.
+  // The system prompt for a loop that has one job, such as a realm's digest. It replaces the concierge's prompt.
   readonly system?: string | undefined;
-  // The tag's random source, node:crypto's by default; a tool's time, 30 s by default; the wait between attempts.
+  // The random source for the tag (node:crypto's by default), the time limit for a tool (30 s by default), and the wait between attempts.
   readonly random?: ((size: number) => Uint8Array) | undefined;
   readonly toolTimeoutMs?: number | undefined;
   readonly wait?: Wait | undefined;
 }
-// A question as it runs: its words, its cards, its blocks, its trace, its conversation, its count of the model's answers.
+// A question while it runs: its words, cards, blocks, trace and conversation, and a count of the model's answers.
 export interface Run {
   readonly parts: Parts;
   readonly question: string;
@@ -72,27 +74,27 @@ export interface Run {
   readonly blocks: Untrusted;
   readonly trace: Trace;
   readonly messages: Anthropic.MessageParam[];
-  // A tool's name when it is one of the loop's tools, else none.
+  // Returns the tool's name if it is one of the loop's tools, and undefined otherwise.
   readonly named: (name: string) => string | undefined;
-  // The question's: fired once its asker left.
+  // The question's own signal, which fires once its asker has left.
   readonly signal: AbortSignal;
   readonly reads: Reads;
-  // What the budget settled for this question's attempts, in nano-dollars.
+  // What the budget has settled for this question's attempts so far, in nano-dollars.
   readonly paid: { nano: number };
   turns: number;
 }
 
-/** The SHA-256 of texts, each framed by its length in bytes, so no two lists of parts give one hash. */
+/** The SHA-256 of a list of texts. Each text is prefixed with its length in bytes, so two different lists never give the same hash. */
 export function hashParts(parts: readonly string[]): string {
   const hash = createHash("sha256");
   for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
   return hash.digest("hex");
 }
 
-/** The loop for these parts, and its prompt's version: the SHA-256 of its system prompt, skills and tools. */
+/** Makes the loop for these parts. Its prompt's version is the SHA-256 of its system prompt, skills and tools. */
 export function makeLoop(parts: Parts) {
   const system = parts.system ?? systemOf(parts.skills.index);
-  // The concierge's loop, not a one-job loop with its own system prompt, is the one that may decline.
+  // Only the concierge's loop may decline. A one-job loop with its own system prompt may not.
   const offered =
     parts.system === undefined ? [...parts.tools.allowlist.offered(), DECLINE] : parts.tools.allowlist.offered();
   const version = hashParts([system, parts.skills.digest, JSON.stringify(offered)]);
@@ -146,8 +148,9 @@ async function ask(parts: Parts, prompt: Prompt, asked: { question: Question; si
 }
 
 const invalid = (): Result => ({ kind: "invalid" });
-// A character that draws something (core's isBlank), and no more code points than the cap: a text of more than twice as
-// many code units has more.
+// A question must have at least one character that draws something (see isBlank in core), and no more code points than the cap.
+// A text with more than twice as many code units as the cap must have more code points than the cap, so the length check
+// can return early.
 const askable = (text: string, cap: number) =>
   text.length <= 2 * cap && Array.from(text).length <= cap && !isBlank(text);
 
@@ -155,7 +158,7 @@ async function converse(run: Run, prompt: Prompt): Promise<Result> {
   const { parts, trace } = run;
   const attempts = { ...parts, retries: parts.caps.retries, trace, signal: run.signal, paid: run.paid };
   for (;;) {
-    // callModel asks nothing once the asker left: it answers gone.
+    // Once the asker has left, callModel makes no request and answers "gone".
     const called = await callModel(attempts, requestOf(parts, prompt, run.messages));
     if (!called.ok) return unanswered(run.paid, called.reason);
     run.turns += 1;
@@ -166,8 +169,8 @@ async function converse(run: Run, prompt: Prompt): Promise<Result> {
   }
 }
 
-// How the question ends on this answer, with what it cost, or none: a decline ends it before the turn cap, the other
-// calls of its turn and any text.
+// Returns how the question ends on this answer, along with what it cost, or undefined if it does not end. A decline
+// ends the question before the turn cap is checked, and it ignores the turn's other calls and any text.
 function endOf(run: Run, answer: Anthropic.Message): Result | undefined {
   const { parts, kept, paid } = run;
   const cost = millionths(paid.nano);
@@ -177,8 +180,9 @@ function endOf(run: Run, answer: Anthropic.Message): Result | undefined {
   return stop === undefined ? undefined : { ...stop, cost };
 }
 
-// Tools and system render first and are the same bytes each turn: one breakpoint on the system prompt caches both,
-// and the request's own asks the turns that follow cached (the claude-api skill, shared/prompt-caching.md).
+// The tools and the system prompt come first in the request and are the same bytes on every turn. One cache breakpoint
+// on the system prompt caches both. The request's own cache setting also makes the following turns use the cache
+// (the claude-api skill, shared/prompt-caching.md).
 const requestOf = (
   parts: Parts,
   { system, offered }: Prompt,
@@ -190,6 +194,6 @@ const requestOf = (
   tools: offered,
   messages: [...messages],
   cache_control: { type: "ephemeral" },
-  // Thinking counts toward max_tokens; at low effort the model thinks little on a plain question.
+  // Thinking counts toward max_tokens. At low effort the model thinks only a little about a plain question.
   output_config: { effort: "low" },
 });

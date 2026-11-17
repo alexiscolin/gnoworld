@@ -1,4 +1,4 @@
-// The full chat in the address (?chat=full): read by the chat (features/chat/full.ts), by space (useSpace draws the chat at once), and here
+// The full chat in the address (?chat=full): read by the chat (features/chat/dock/fullState.ts), by space (useSpace draws the chat at once), and here
 // before React draws, so a page opened full shows the chat's cover from its first paint and space never starts behind it.
 import { PHONE_QUERY } from "@gnoworld/core";
 
@@ -14,11 +14,11 @@ const CHAT_PAGE = /^(?:\/net\/[^/]+)?\/(?:earth\/?$|w\/|r\/)/;
 /** Whether the page at `path` holds a chat: a world's, a realm's or the Earth's, the header's World (places.ts). */
 export const holdsChat = (path: string): boolean => CHAT_PAGE.test(path);
 
-/** The move between the dock and the full chat, one clock for the chat's grow (features/chat/fullMove.ts) and the page's ghost, which
+/** The move between the dock and the full chat, one clock for the chat's grow (features/chat/dock/useFullMove.ts) and the page's ghost, which
  * dissolves in place under it (features/universe/rise.ts): the curve is space's flights' own, a cubic in and out. */
 export const FULL_MOVE = { duration: 0.9, ease: "power2.inOut" } as const;
 
-// The dock's box as the chat goes full, which the full chat grows out of (features/chat/fullMove.ts), or where the control that opened it from
+// The dock's box as the chat goes full, which the full chat grows out of (features/chat/dock/useFullMove.ts), or where the control that opened it from
 // a page with no dock (the galaxy, a system) stood: the chat grows out of it, and shrinks back into it where it goes back to that page.
 let dock: DOMRect | undefined;
 let origin: DOMRect | undefined;

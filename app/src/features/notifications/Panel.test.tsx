@@ -29,7 +29,7 @@ const data = vi.hoisted(() => {
     news: [{ id: "n1", title: "A word from the team", date: today, link: "https://gno.land/news" }],
   };
 });
-vi.mock("../../lateData.ts", () => data);
+vi.mock("../../eventsAndNews.ts", () => data);
 
 beforeAll(() => {
   popovers();

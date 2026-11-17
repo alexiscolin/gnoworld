@@ -1,5 +1,5 @@
 // The login's place in the header: one pill, Connect, the step a login is at, and why the last login stopped; pressed, Connect opens
-// its menu of two ways in, Adena and the command line (D13881). Logged in, the account's pill and its menu take the address and the way
+// its menu of two ways in, Adena and the command line. Logged in, the account's pill and its menu take the address and the way
 // out (AccountMenu.tsx). Under 900 px the header holds none of it: the way in is a row of the account's menu where Adena is found, else
 // the menu says to use a computer.
 import { Button, Cluster, Icon } from "@gnoworld/ui";

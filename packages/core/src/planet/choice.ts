@@ -80,7 +80,7 @@ export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor
   return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
 }
 
-/** The class of a world by its id: GovDAO is drawn by hand, sandy as Venus (frames 4 and 16); every other world, Bubble
+/** The class of a world by its id: GovDAO is drawn by hand, sandy as Venus; every other world, Bubble
  * included, reads its seed. */
 export function worldAnchor(id: string, seed: Uint8Array, nature: Nature | null = null): Anchor {
   if (id === "gov/dao") return "cloud deck";

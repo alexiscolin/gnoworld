@@ -7,17 +7,13 @@
   /* A phone's list: the count centred on its row's line, whole at the card's end. */
   @media (width < 900px) {
     .note {
-      /* layout: the count centred on the row's line, never shrunk or cut */
       display: inline-flex;
-      /* layout: centred on that line */
       align-items: center;
-      /* layout: it keeps its size */
       flex: none;
     }
 
     /* Row's trail has no align of its own: the count's box is centred on the 44 px row. */
     span:has(> .note) {
-      /* layout: centred on the row */
       align-self: center;
     }
   }

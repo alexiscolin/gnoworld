@@ -13,7 +13,6 @@
 
   /* The name and its count over the track, across the two columns the face leaves. */
   .body {
-    /* layout: across the two columns the face leaves */
     grid-column: span 2;
   }
 

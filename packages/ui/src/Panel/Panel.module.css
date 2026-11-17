@@ -1,6 +1,6 @@
 /* The panel: a surface with a line and rounded corners; floating, a shadow over the scene; the plate, the world's tinted dot
    grid at the left of its frame, which fades into space over its last 64 px. On a wide screen the plate is fixed at the left,
-   98 px from the top (under the header's 96) and 24 from the left and the bottom, inside one outline (frames 20, 37, 90). */
+   98 px from the top (under the header's 96) and 24 from the left and the bottom, inside one outline. */
 @layer components {
   .panel {
     --_fill: var(--color-surface);
@@ -109,7 +109,6 @@
   /* raw: under the plate's breakpoint the plate is a block of the page: the bottom nav and the "View in space" pill stand over its last lines */
   @media (width < 1280px) {
     .panel[data-look="plate"] {
-      /* layout: room under its last line for them */
       padding-block-end: var(--space-2xl);
     }
   }
@@ -119,7 +118,7 @@
     .panel[data-look="plate"] {
       border: 0;
       border-radius: 0;
-      /* layout: out to the screen's edges, past the page column's gutter (shell.tsx's Center, its default step) */
+      /* Out to the screen's edges, past the page column's gutter (shell.tsx's Center, its default step) */
       margin-inline: calc(-1 * var(--space-s));
     }
 
@@ -137,7 +136,7 @@
     --font-label: 500 0.65625rem/1 var(--family-mono);
     --color-text-muted: color-mix(in oklab, var(--color-text) 45%, transparent);
 
-    /* raw: the caption's ink stands at x 49 to 59 and ends 55 px over the plate's foot (frame 20) */
+    /* raw: the caption's ink stands at x 49 to 59 and ends 55 px over the plate's foot */
     inset-inline-start: 24px;
     /* raw: the prototype's and the frames' own value */
     inset-block-end: 54px;
@@ -171,7 +170,7 @@
       --color-surface: var(--color-plate);
     }
 
-    /* Alone over the scene, no plate beside it (frame 143): round at every corner, on the night's own fill. */
+    /* Alone over the scene, no plate beside it: round at every corner, on the night's own fill. */
     .dock[data-alone] {
       border-radius: var(--radius-l);
       background: var(--color-surface);

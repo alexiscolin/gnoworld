@@ -7,7 +7,7 @@ import styles from "./ComingSoon.module.css";
 export interface ComingSoonProps {
   /** What it will be: assistive technology reads "<name>, coming soon". A face of your own says the same words, as the name must hold what is seen. */
   name: string;
-  /** Its face as a control, as the video draws it: an icon, words, or both. */
+  /** Its face as a control, as the design draws it: an icon, words, or both. */
   icon?: IconName;
   /** The words on its face; none draws the icon alone, square. */
   words?: string;
@@ -16,7 +16,7 @@ export interface ComingSoonProps {
   children?: ReactNode;
 }
 
-/** What is not built yet, shown where the video draws it: greyed, inert, "Coming soon" under the pointer and the focus, and said so to
+/** What is not built yet, shown where the design draws it: greyed, inert, "Coming soon" under the pointer and the focus, and said so to
  * a screen reader. It stays focusable, so the keyboard finds it too; a click does nothing. */
 export function ComingSoon(props: ComingSoonProps) {
   return <Soon {...props} />;

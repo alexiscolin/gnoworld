@@ -1,4 +1,4 @@
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import type { RecentLines } from "../door/lines.ts";
 import { lineOf, type Link, type Said } from "../irc/link.ts";
 import { guarded } from "./guard.ts";
@@ -54,7 +54,7 @@ export function indexing(search: Search | undefined, log: Log, { recent, link }:
           asking = asking
             .then(() => search.reconcile(room, fetch))
             .catch((error: unknown) => {
-              log("search_unreconciled", { room, error: error instanceof Error ? error.name : "unknown" });
+              log("search_unreconciled", { room, ...failureOf(error) });
             });
         },
       },

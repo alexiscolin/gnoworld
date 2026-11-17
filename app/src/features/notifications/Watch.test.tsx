@@ -13,7 +13,7 @@ const data = vi.hoisted(() => ({
   events: [] as { id: string; title: string; start: string; link: string; world?: string }[],
   news: [] as { id: string; title: string; date: string; link: string }[],
 }));
-vi.mock("../../lateData.ts", () => ({
+vi.mock("../../eventsAndNews.ts", () => ({
   get events() {
     return data.events;
   },

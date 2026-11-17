@@ -2,7 +2,7 @@
 // and answered from memory at GET /api/network, never per request. A pass reads the transactions above the height it kept (the first,
 // from the first block of the day 13 days back, found by bisection), a page of 1,000 at a time, at most 20 pages and 4 MB; each is one
 // transaction and one account (its first message's sender), dated by its block (blockDays.ts). The addresses are counted and kept as long as
-// the days shown, nothing serves them. ponytail: a block of 1,000 transactions or more counts its first 1,000 only, the pass moves past
+// the days shown, nothing serves them. ceiling: a block of 1,000 transactions or more counts its first 1,000 only, the pass moves past
 // the rest; a multisig's other signers are not counted.
 import { blockTimes, tipAsk, txsAbove } from "@gnoworld/chain/asks";
 import { isAddress } from "@gnoworld/core";

@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { jsonOf } from "@gnoworld/core";
 import { ASK_WAIT_S, JARVIS_KEY_HEADER, type ApiError } from "@gnoworld/schemas";
 import { isJsonType, readBody, serverOptions } from "@gnoworld/service/http";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import type { Secret } from "@gnoworld/service/settings";
 
 /** What a handler answers: a status, and the body written as JSON. */
@@ -100,8 +100,8 @@ async function handle(
       : refused("unauthenticated", 401, { close: true });
   } catch (error) {
     if (left.signal.aborted) return;
-    // Its name alone: a message may quote what the request sent.
-    options.log("jarvis_failed", { ...named, status: 500, error: error instanceof Error ? error.name : typeof error });
+    // Its name and frames alone: a message may quote what the request sent.
+    options.log("jarvis_failed", { ...named, status: 500, ...failureOf(error) });
     reply = refusal("internal", 500);
   } finally {
     clearTimeout(timer);

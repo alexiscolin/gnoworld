@@ -17,7 +17,7 @@ export function limiter({ max, windowMs, keys }: { max: number; windowMs: number
       let window = windows.get(key);
       if (window === undefined || now - window.start >= windowMs) {
         window = { start: now, count: 0 };
-        // ponytail: past the cap, the key whose window started first goes and starts over if it comes
+        // ceiling: past the cap, the key whose window started first goes and starts over if it comes
         // back; the cap is set far above the visitors one window sees.
         remember(windows, [key, window], keys);
       }

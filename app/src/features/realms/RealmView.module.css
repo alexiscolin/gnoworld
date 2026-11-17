@@ -18,7 +18,7 @@
     display: block;
     /* raw: the last 32 px fade into the card, the same length as the app's scroll rows */
     block-size: 2rem;
-    /* layout: the strip lies over the foot of the page, taking no room */
+    /* The strip lies over the foot of the page, taking no room */
     margin-block-start: -2rem;
     background: linear-gradient(to bottom, transparent, var(--color-card));
     pointer-events: none;
@@ -82,17 +82,15 @@
   }
 
   .window article > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
-    /* layout: the proposal puts every title one 16 px step under what comes before, no air of its own (RealmBlocks gives the chat's) */
+    /* The proposal puts every title one 16 px step under what comes before, no air of its own (RealmBlocks gives the chat's) */
     margin-block-start: 0;
   }
 
   .window article :is(ul, ol) {
-    /* layout: the proposal's lists sit in the page's 16 px step like any block */
     margin-block: 0;
   }
 
   .window article :is(li + li, aside p + p) {
-    /* layout: a hair between the items of a list, which the page's flow does not space */
     margin-block-start: var(--space-2xs);
   }
 

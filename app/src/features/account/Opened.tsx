@@ -31,7 +31,7 @@ function waysIn(
 // A network's row among the account's own, so it reads as the network and not as a place.
 const named = (item: MenuItem): MenuItem => ("soon" in item ? item : { ...item, label: `Network: ${item.label}` });
 
-// An account's last acts: the name to pick, then the way out (frame 17: one pill in the header).
+// An account's last acts: the name to pick, then the way out (one pill in the header).
 const ownRows = (account: boolean, onPickName: (() => void) | undefined, onLogOut: () => void): MenuItem[] =>
   account
     ? [

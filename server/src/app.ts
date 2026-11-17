@@ -9,7 +9,7 @@ import { bodyLimit } from "hono/body-limit";
 import { routePath } from "hono/route";
 import { secureHeaders } from "hono/secure-headers";
 import { serverOptions, TIMEOUTS } from "@gnoworld/service/http";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 
 export const BODY_LIMIT = 16 * 1024;
 
@@ -28,8 +28,8 @@ export function makeApp(log: Log, ready: () => boolean): Hono {
       log("aborted", { method: c.req.method, route: routePath(c, -1) });
       return refuse(c, "internal", 500);
     }
-    // The name only: a message may quote what the request sent.
-    log("failed", { method: c.req.method, route: routePath(c, -1), status: 500, error: error.name });
+    // The name and frames only: a message may quote what the request sent.
+    log("failed", { method: c.req.method, route: routePath(c, -1), status: 500, ...failureOf(error) });
     return refuse(c, "internal", 500);
   });
   return app;

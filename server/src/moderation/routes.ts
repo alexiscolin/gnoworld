@@ -61,7 +61,7 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
   const { line, hide, mute, roomsOf, mayModerate, judge, identityOf, spared, session, origins, proxy, log, now } =
     options;
   const requests = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
-  // The lookups follow the ids, not the requests: 60 a minute is what 30 requests of 2 ids cost (F13547, F13555).
+  // The lookups follow the ids, not the requests: 60 a minute is what 30 requests of 2 ids cost.
   const ids = limiter({ max: 60, windowMs: 60_000, keys: 100_000 });
   const refuse = refuserOf(log, "moderation_refused", refusals);
   // A POST's account, body and right: the guard has run; the session, the body, the right and the limit come in that order.

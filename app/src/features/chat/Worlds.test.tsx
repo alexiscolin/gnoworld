@@ -7,7 +7,7 @@ import { all, button, click, modals, mount as draw, one, settled } from "../../.
 import { pictureOf } from "../../lib/worldPictures.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { inRailOrder, Worlds } from "./Worlds.tsx";
-import { WorldRows } from "./WorldRows.tsx";
+import { WorldRows } from "./phone/WorldRows.tsx";
 
 // The full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
 const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };

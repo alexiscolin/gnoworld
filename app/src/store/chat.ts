@@ -173,7 +173,7 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
           return;
         }
         const id = concerns(message);
-        // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
+        // ceiling: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
         // rooms shared alone (one QUIT at 100 rooms of 2,500: about 0.22 ms, so 1,000 about 0.22 s);
         // indexing a nick's rooms in the store would avoid it.
         const now = Date.now();

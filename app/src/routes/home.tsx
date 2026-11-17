@@ -6,7 +6,7 @@ import { cosmosAt, isHome } from "../cosmosAt.ts";
 import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Hero, usePeople, Worlds, type People } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useMedia } from "../features/chat/useMedia.ts";
+import { useMedia } from "../features/chat/dock/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { returning, RETURN_AFTER, riseChrome } from "../features/universe/rise.ts";
 import { useMapView } from "../mapView.ts";
@@ -21,7 +21,7 @@ import {
   useWorldsCount,
 } from "../features/universe/index.ts";
 import { nameOf } from "../placeName.ts";
-import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
+import { failedPageMeta, homeMeta, missingUniverseMeta } from "../pageMeta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";

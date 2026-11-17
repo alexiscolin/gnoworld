@@ -1,9 +1,7 @@
 /* The list: at the small control's height, beside the chips it is chosen among, on the resting fill. */
 @layer components {
   .wrap {
-    /* layout: the arrow stands over the list's end */
     position: relative;
-    /* layout: as wide as the list */
     display: inline-flex;
     /* raw: the list never makes its place wider, whatever its longest row; not a bare 100%, which a Field's rule has too */
     max-inline-size: min(100%, 100vi);
@@ -22,7 +20,7 @@
   }
 
   .wrap > .select {
-    /* layout: a long row is cut by the list's own edge, never pushing its place wider */
+    /* A long row is cut by the list's own edge, never pushing its place wider */
     min-inline-size: 0;
   }
 
@@ -40,7 +38,6 @@
 
     /* A row that wraps stretches the place: the list fills it, so its arrow stays at its own end. */
     .wrap > .select {
-      /* layout: the list fills the wrapped row's place */
       flex: 1;
     }
   }

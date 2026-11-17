@@ -8,7 +8,7 @@ import { useNavigate } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
 import { groundOn } from "../../earthGround.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { useFull } from "./full.ts";
+import { useFull } from "./dock/fullState.ts";
 import { usePlanetShown } from "./planetShown.ts";
 import styles from "./PlaceView.module.css";
 

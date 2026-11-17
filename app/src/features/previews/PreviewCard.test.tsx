@@ -2,7 +2,7 @@
 import { act } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { all, click, modals, mount, one } from "../../../tests/mount.tsx";
-import "../../plugs.ts";
+import "../../featurePlugs.ts";
 import { slot } from "../../slots.tsx";
 import { drawing } from "../chat/index.ts";
 import { PreviewCard, type PreviewCardProps } from "./PreviewCard.tsx";
@@ -11,7 +11,7 @@ import { PreviewCard, type PreviewCardProps } from "./PreviewCard.tsx";
 // chat line (frames 104, 107). The capture is drawn small as a picture of the page, never a part of it a reader can use; Open large
 // shows it at size, with when it was captured and the way to the page as it is now.
 const via = await drawing();
-// The realm page's drawing as the page gets it, through its slot (plugs.ts).
+// The realm page's drawing as the page gets it, through its slot (featurePlugs.ts).
 const Blocks = await (slot("pageDrawing") ?? (() => Promise.reject(new Error("no drawing plugged"))))();
 const GNOWEB = "https://onyx.testnets.gno.land";
 const CAPTURE = {
@@ -126,7 +126,7 @@ describe("PreviewCard", () => {
     expect(dialog.querySelector("script, img, iframe, form")).toBeNull();
   });
 
-  // Under a line, the card sits in the room's list, whose arrows move between lines (lineFocus.ts): a key in the open capture is its own.
+  // Under a line, the card sits in the room's list, whose arrows move between lines (useLineFocus.ts): a key in the open capture is its own.
   it("keeps the keys pressed in the open capture from the list it sits in", () => {
     const list = vi.fn();
     const box = mount(

@@ -1,4 +1,4 @@
-// The command-line way to link a key, to release one or to log in (D13880): the address, the block the server composed (shown as it came,
+// The command-line way to link a key, to release one or to log in: the address, the block the server composed (shown as it came,
 // never built here), the file the tool wrote pasted back. A code lives its flow's time, once; a refusal brings a new code at once.
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { Disclosure, Stack } from "@gnoworld/ui";

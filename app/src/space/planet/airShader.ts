@@ -1,6 +1,6 @@
 // The air: light scattered along each ray through a shell, not a painted rim, so a world lit from behind wears a thin ring of light and a
 // sunset along its terminator. Eight steps a pixel, in the world's own radii, over the whole disc: the shell's front covers it, so a close world pays for all of it.
-// A glowing world's air takes light from its own glow (`selfLight`, its level): its edge in its air's cream all round, as frame 4's Music.
+// A glowing world's air takes light from its own glow (`selfLight`, its level): its edge in its air's cream all round, as the design's Music.
 // Framed close on a page (`close`), its lit limb is pushed into a bright crescent toward the sun.
 import { FARAWAY } from "./chunks.ts";
 import { PLATE_CLEAR } from "./plateMask.ts";
@@ -140,7 +140,7 @@ void main() {
     float band = smoothstep(-0.003, 0.002, over) * (1.0 - smoothstep(rimThickness * 0.42, rimThickness * 0.62, over));
     float haze = smoothstep(-0.075, 0.0, over) * (1.0 - smoothstep(-0.002, 0.003, over));
     light = mix(light, mix(vec3(0.16, 0.22, 0.33), own * 0.4, warm) * dot(light, vec3(0.34)), 0.42);
-    // Framed close, the band thins to a fine line of light (D482): the glare at the sun's side carries the limb, not a flat ring.
+    // Framed close, the band thins to a fine line of light: the glare at the sun's side carries the limb, not a flat ring.
     light += (mix(vec3(0.6, 0.78, 1.0), own, warm) * line * 0.5 + mix(vec3(0.47, 0.62, 0.82), own, warm) * band * mix(0.5, 0.12, close) + mix(vec3(0.02, 0.035, 0.06), own * 0.1, warm) * haze) * limb * lit;
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);

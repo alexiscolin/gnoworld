@@ -1,0 +1,41 @@
+/* A poll as the design draw it: a bar an answer, 36 px high, filled to its share in a dark mint, the share at
+   its end, the reader's own edged in mint. */
+@layer components {
+  .bar {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-content: center;
+    inline-size: 100%;
+    /* raw: the design's bar, 36 px high */
+    block-size: 36px;
+    padding-inline: var(--space-s);
+    overflow: hidden;
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-s);
+    background: transparent;
+  }
+
+  .bar[aria-pressed="true"] {
+    border-color: var(--color-mine-line);
+  }
+
+  .fill {
+    --_share: 0%;
+
+    position: absolute;
+    inset: 0 auto 0 0;
+    inline-size: var(--_share);
+    background: var(--color-mine-soft);
+  }
+
+  .answer {
+    position: relative;
+    justify-self: start;
+  }
+
+  .share {
+    position: relative;
+    font-variant-numeric: tabular-nums;
+  }
+}

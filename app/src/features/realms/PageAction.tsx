@@ -1,4 +1,4 @@
-// A `$help` link of the realm's own page as an action (D13502, core's withActions): a button that opens the call card prefilled with the
+// A `$help` link of the realm's own page as an action (core's withActions): a button that opens the call card prefilled with the
 // link's arguments, once `vm/qfuncs` lists the function and every argument names one of its parameters; until then, and for any other, its
 // words alone. The card is drawn apart from the paragraph (ActionCard), with the page's forms. No coins ever come from a link.
 import { prefill, type HelpArg } from "@gnoworld/core";

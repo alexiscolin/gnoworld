@@ -58,7 +58,7 @@ const CLIMB: readonly (readonly [Stage, number])[] = [
 ];
 const GROWTH = 0.6;
 const LEVEL: Span = [0.35, 1];
-// A seed is a small heart in a glow, frame 4's "Uncharted signal"; a week's most climb fills its span, for what a seed has become is its matter.
+// A seed is a small heart in a glow, the design's "Uncharted signal"; a week's most climb fills its span, for what a seed has become is its matter.
 const SEED_SIZE: Span = [0.22, 0.34];
 const SEED_CLIMB = 5;
 const SEED_SIGNAL: Span = [0.45, 1];

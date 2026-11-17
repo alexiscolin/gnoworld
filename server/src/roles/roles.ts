@@ -157,7 +157,7 @@ export interface Roles {
   >;
 }
 
-// ponytail: read at start, so a change waits for a restart.
+// ceiling: read at start, so a change waits for a restart.
 export function loadRoles(path: string): Roles {
   let text: string;
   try {

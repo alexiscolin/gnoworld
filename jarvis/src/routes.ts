@@ -130,7 +130,7 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
   };
 }
 
-// A fixed ask's answer is shared by everyone who asks the same, so it keeps its flights alone (D13508).
+// A fixed ask's answer is shared by everyone who asks the same, so it keeps its flights alone.
 function replyOf(result: Result, log: Log, shared: boolean): Reply {
   if (result.kind === "answer") {
     const markdown = cut(result.text, log);
@@ -158,7 +158,7 @@ function replyOf(result: Result, log: Log, shared: boolean): Reply {
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none
 // or when its lines before it draw nothing.
 function cut(text: string, log: Log): string {
-  // ponytail: every answer read whole once, its length bounded by the model's output tokens (16,000 at most).
+  // ceiling: every answer read whole once, its length bounded by the model's output tokens (16,000 at most).
   const points = Array.from(text);
   if (points.length <= DOOR_CAPS.answer) return text;
   log("jarvis_answer_cut");

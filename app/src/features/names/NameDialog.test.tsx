@@ -7,7 +7,7 @@ import { NameDialog, type NameDialogProps } from "./NameDialog.tsx";
 import { NYM_PREFIX } from "./nym.ts";
 
 // "Pick a name and a face", the person's nebula as the face (ADR-0002 section 1, decision 7 of
-// docs/design/coherence.md). The dialog holds no state of the chain: its `phase` is the card's course, and a name shows as
+// docs/process/design/coherence.md). The dialog holds no state of the chain: its `phase` is the card's course, and a name shows as
 // registered only in the phase `done`.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ONYX = { name: "Onyx", chainId: "onyx-1", real: false };

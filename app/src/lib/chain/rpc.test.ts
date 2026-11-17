@@ -911,7 +911,10 @@ describe("readUser, the one expression with an address in it", () => {
 
   it.each([
     ["IsDeleted", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").IsDeleted()`],
-    ["Name", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").Name()`],
+    [
+      "Name",
+      `gno.land/r/sys/users.func() string { d := ResolveAddress(address("${ADDRESS}")); if d == nil { return "" }; return d.Name() }()`,
+    ],
   ] as const)("sends %s as one fixed expression and no other", async (call, expression) => {
     const fetcher = answering(queryEnvelope({ data: "null" }));
     await readUser(RPC_OK, { account: ADDRESS, call }, options(fetcher));

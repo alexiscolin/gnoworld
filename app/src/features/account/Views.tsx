@@ -7,7 +7,7 @@ import { PassportView } from "../passport/index.ts";
 import { SettingsView } from "../settings/index.ts";
 import { useDeviceView, type DeviceView } from "../../deviceViews.ts";
 
-// The release of a command-line key and the command line's login (D13880) have their own chunk, asked when one is opened.
+// The release of a command-line key and the command line's login have their own chunk, asked when one is opened.
 const ReleaseDialog = lazy(async () => ({ default: (await import("../settings/index.ts")).ReleaseDialog }));
 const KeyLogin = lazy(async () => ({ default: (await import("../settings/index.ts")).GnokeyLoginDialog }));
 

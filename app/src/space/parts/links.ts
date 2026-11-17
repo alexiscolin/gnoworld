@@ -9,7 +9,7 @@ import { ORBIT_COLOUR, ORBIT_GAIN } from "./marks.ts";
 import { ADDITIVE } from "../additive.ts";
 import { Strip } from "./strip.ts";
 
-// ponytail: a place draws this many links at most; a kit of hundreds of copies importing each other shows its first ones. Raise it
+// ceiling: a place draws this many links at most; a kit of hundreds of copies importing each other shows its first ones. Raise it
 // with the buffer's size if a real system needs more.
 const MOST = 2048;
 // raw: a world's own links over a system's faint ones, which share the orbits' strength

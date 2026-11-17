@@ -11,7 +11,7 @@ import { pageFetch } from "../../lib/query/policy.ts";
 
 type Facts = ChainRead<RealmFactsValue>;
 
-/** The facts of `realm` at `indexer` as a query (warm.ts asks them ahead); a read that failed is no answer, and the last good one stays. */
+/** The facts of `realm` at `indexer` as a query (warmRealm.ts asks them ahead); a read that failed is no answer, and the last good one stays. */
 export const realmFacts = (indexer: string, realm: string, options?: ReadOptions) =>
   queryOptions({
     queryKey: keys.facts(indexer, realm),

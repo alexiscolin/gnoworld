@@ -14,19 +14,19 @@ const head = "# Satellites\n\nEach world has one satellite slot, rented by the d
 const howTo = "To rent one, call `Rent` with a world's id, a text of 1 to 40 characters and 1, 3 or 7 days, " +
 	"sending exactly the price times the days, in ugnot.\n\n## Live satellites\n\n"
 
-// open is the home page's top at the deploy price, renting open.
+// open is the top of the home page at the deploy price, with renting open.
 const open = head + "2000000 ugnot a day. Renting is open.\n\n" + howTo
 
 const prev, next = "\n[Previous page](?page=", "\n[Next page](?page="
 
-// line is a live satellite on the home page; its world and text are escaped once.
+// line is the home-page line of a live satellite. Its world and text are escaped once.
 func line(world, text, until string) string {
 	return "- **" + sanitize.InlineText(world) + "**: " + sanitize.InlineText(text) + ", until " + until + " UTC\n"
 }
 
-// plain is the home page's line of a world rented one day at t0 with the text
-// "t" + its id: letters only, which need no escaping (sanitize is costly, and
-// the mutation check runs every test once a mutant).
+// plain is the home-page line of a world rented for one day at t0 with the text
+// "t" + its id. It uses letters only, which need no escaping, because sanitize is
+// costly and the mutation check runs every test once for each mutant.
 func plain(world string) string {
 	return "- **" + world + "**: t" + world + ", until 2027-01-16 08:00 UTC\n"
 }
@@ -53,7 +53,7 @@ func TestRenderHome(cur realm, t *testing.T) {
 	uassert.False(t, strings.Contains(Render(""), "[x]("))
 }
 
-// An ended rental not yet closed is not shown.
+// An ended rental that is not closed yet is not shown.
 func TestRenderShowsLiveSatellitesOnly(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -83,15 +83,16 @@ func TestRenderWorld(cur realm, t *testing.T) {
 	uassert.Equal(t, "No satellite over this world.\n", Render("az09-z"))
 	uassert.Equal(t, "No satellite over this world.\n", Render("venus"))
 
-	// A world's id runs to forty bytes.
+	// A world's id may be up to forty bytes long.
 	long := strings.Repeat("ab-", 13) + "a"
 	pay(p0)
 	Rent(cross(cur), long, "hello", 1)
 	uassert.True(t, strings.HasPrefix(Render(long), "# Satellite over "+sanitize.InlineText(long)+"\n\nhello\n\n"), Render(long))
 }
 
-// Render strips bidi and zero-width characters from whatever text is stored,
-// planted here past Rent's checks. Built from code points: never raw in a source.
+// Render strips bidi and zero-width characters from whatever text is stored. The text
+// is planted here by skipping Rent's checks. It is built from code points and never
+// written raw in the source.
 func TestRenderStripsBidi(t *testing.T) {
 	fresh()
 	text := "ab" + string(rune(0x202e)) + "cd" + string(rune(0x200b)) + "ef" + string(rune(0x2066))
@@ -100,20 +101,20 @@ func TestRenderStripsBidi(t *testing.T) {
 	uassert.True(t, strings.Contains(Render(""), "**: abcdef, until"), Render(""))
 }
 
-// Render's path comes from anyone: it is never echoed.
+// Anyone can choose Render's path, and Render never repeats it in the output.
 func TestRenderUnknownPathIsAFixedLine(t *testing.T) {
 	fresh()
 	for _, p := range []string{
 		"<script>alert(1)</script>", "a\nb", "Mars", "mars/x", "mars?page=2", strings.Repeat("a", 41),
 		"?page=", "?page=x", "?page=0", "?page=-1", "?page=2", "?page=1&x=2", "?Page=1", "page=1", "?page=99999999999999999999",
-		"?page=+1", "?page=01", "?page=1 ", "?page= 1", // one spelling a page
+		"?page=+1", "?page=01", "?page=1 ", "?page= 1", // each of these is a different spelling of one page number
 	} {
 		uassert.Equal(t, "No such page.\n", Render(p), p)
 	}
 }
 
-// Ten rentals a page, in the worlds' order, the links after them: a page's
-// edges at nine, ten and eleven rentals, then twenty and twenty-one.
+// Each page holds ten rentals, in the worlds' order, and the links come after them.
+// This checks the page edges at nine, ten and eleven rentals, then at twenty and twenty-one.
 func TestRenderPages(cur realm, t *testing.T) {
 	fresh()
 	ws := worlds(21)
@@ -122,7 +123,7 @@ func TestRenderPages(cur realm, t *testing.T) {
 		lines[i] = plain(w)
 	}
 	page := func(from, to int) string { return open + strings.Join(lines[from:to], "") }
-	uassert.Equal(t, open+"None on this page.\n", Render("?page=1")) // the first page is there with none
+	uassert.Equal(t, open+"None on this page.\n", Render("?page=1")) // the first page exists even when there are no rentals
 	who := []address{alice, bob, carol, adm, mod, self, chain.PackageAddress("gno.land/r/test/dave")}
 	for i, w := range ws {
 		testing.SetRealm(testing.NewUserRealm(who[i/3]))
@@ -132,7 +133,7 @@ func TestRenderPages(cur realm, t *testing.T) {
 		case 9:
 			uassert.Equal(t, page(0, 9), Render(""))
 			uassert.Equal(t, "No such page.\n", Render("?page=2"))
-		case 10: // a full page, and none after it: no link leads past it
+		case 10: // a full page with nothing after it, so no link leads past it
 			uassert.Equal(t, page(0, 10), Render(""))
 			uassert.Equal(t, "No such page.\n", Render("?page=2"))
 		case 11:

@@ -3,7 +3,7 @@
 @layer components {
   .flash {
     inset: var(--space-m) 0 auto;
-    /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
+    /* The top layer places a popover in the middle; the flash goes to the top, centred */
     margin: 0 auto;
     inline-size: fit-content;
     /* The page's gutter on both sides, never edge to edge on a phone. */
@@ -46,7 +46,7 @@
     }
   }
 
-  /* An arrival's banner: the top centre's slot (tokens.css, --banner-top), over the scene (frames 23, 93), in the page and not
+  /* An arrival's banner: the top centre's slot (tokens.css, --banner-top), over the scene, in the page and not
      the top layer, so a dialog's layer covers it (the search drawer at 390 px); above the dock and the full chat's 3. */
   .flash[data-banner] {
     position: fixed;
@@ -62,7 +62,7 @@
   }
 
   /* While a flash shows, what the keyboard reaches scrolls clear of it (WCAG 2.4.11). */
-  /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller. */
+  /* ceiling: a one-line pill's room; one that wraps on a narrow screen is taller. */
   :root:has(.flash:popover-open, .flash[data-banner]) {
     scroll-padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
   }

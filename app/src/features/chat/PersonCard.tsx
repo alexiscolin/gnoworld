@@ -1,6 +1,6 @@
-// A person's card, opened from their name on a line (the video's frame 76), built as the passport is: their face, name and the country they
+// A person's card, opened from their name on a line, built as the passport is: their face, name and the country they
 // declare, what the reader can do with them in one row of buttons, and for an account what the server knows (PersonBody). Not drawn: the
-// video's help count, roles and "Fly to", which have no source yet.
+// design's help count, roles and "Fly to", which have no source yet.
 import { Avatar, Button, Cluster, Dialog, IconButton, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -8,8 +8,8 @@ import { canCopy, copyAddress } from "../../lib/copy.ts";
 import { site } from "../../places.ts";
 import { useShownName } from "../names/index.ts";
 import { countryName } from "./Country.tsx";
-import { asksFull } from "./full.ts";
-import { dmParams, isAccount, shortAddress } from "./names.ts";
+import { asksFull } from "./dock/fullState.ts";
+import { dmParams, isAccount, shortAddress } from "./rooms/names.ts";
 import { PersonBody } from "./PersonBody.tsx";
 import styles from "./PersonCard.module.css";
 

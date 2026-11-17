@@ -3,11 +3,8 @@
   .step {
     --_ink: var(--color-text-muted);
 
-    /* layout: the icon before its words, at the first line's top */
     display: flex;
-    /* layout: the icon and its words */
     gap: var(--space-2xs);
-    /* layout: the icon at the first line's top when the words wrap */
     align-items: flex-start;
     color: var(--_ink);
     font: var(--font-meta);

@@ -1,0 +1,7 @@
+/* New room as a drawer's full-width button. */
+@layer components {
+  .wide {
+    /* A grid item stretches, so the button takes the list's width */
+    display: grid;
+  }
+}

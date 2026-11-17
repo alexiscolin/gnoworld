@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	pageSize = 10 // rentals a home page reads; it shows the live ones
+	pageSize = 10 // the number of rentals that one home page reads; it shows only the live ones
 	noPage   = "No such page.\n"
 	noWorld  = "No satellite over this world.\n"
 )
 
 // Render serves "" and "?page=n" (the price, how to rent, and the live
-// satellites), and a world's id (its live satellite). Its path comes from
-// anyone: any other is a fixed line, never echoed, and every text is escaped.
+// satellites), and a world's id (that world's live satellite). Anyone can choose
+// the path, so any other path gets a fixed line that never repeats the path,
+// and every text is escaped.
 func Render(path string) string {
 	if path == "" {
 		return home(1)
@@ -34,8 +35,8 @@ func Render(path string) string {
 	return noPage
 }
 
-// home is page n of the rentals, in the worlds' order: an ended rental not yet
-// closed keeps its place in the page but is not shown.
+// home is page n of the rentals, in the worlds' order. An ended rental that is not
+// closed yet keeps its place on the page but is not shown.
 func home(n int) string {
 	var b strings.Builder
 	b.WriteString("# Satellites\n\nEach world has one satellite slot, rented by the day.\n\nPrice: " + strconv.Itoa(price) + " ugnot a day. ")
@@ -66,7 +67,7 @@ func home(n int) string {
 	return b.String()
 }
 
-// pages is how many home pages the rentals fill: the first is there with none.
+// pages is how many home pages the rentals fill. The first page exists even when there are no rentals.
 func pages() int {
 	return (rentals.Size() + pageSize - 1) / pageSize
 }
@@ -80,8 +81,7 @@ func worldPage(world string) string {
 		"\n\nUntil " + date(r.end()) + ", paid by " + r.payer.String() + ".\n"
 }
 
-// date writes unix seconds in UTC, to the minute. UnixMilli, not Unix(sec, 0):
-// the mutation check's shift of that 0 nanosecond would change nothing a test can see.
+// date writes unix seconds in UTC, to the minute.
 func date(sec int) string {
 	return time.UnixMilli(int64(sec)*1000).UTC().Format("2006-01-02 15:04") + " UTC"
 }

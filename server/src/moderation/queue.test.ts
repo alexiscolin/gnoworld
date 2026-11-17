@@ -203,7 +203,7 @@ describe("the check's queue, its green pass (3i)", () => {
     ]);
   });
 
-  it("logs a failed check by its error's name, or unknown when it is no Error", async () => {
+  it("logs a failed check by its error's name and frames, or its type when it is no Error", async () => {
     const lines: string[] = [];
     // An error's shape, but no Error: what a library may reject with.
     const failures: Error[] = [new TypeError("x"), { name: "Fake", message: "no Error instance" }];
@@ -218,7 +218,8 @@ describe("the check's queue, its green pass (3i)", () => {
     const errors = lines
       .filter((line) => line.includes("moderation_failed"))
       .map((line) => /"error":"(\w+)"/.exec(line)?.[1]);
-    expect(errors).toEqual(["TypeError", "unknown"]);
+    expect(errors).toEqual(["TypeError", "object"]);
+    expect(lines.filter((line) => line.includes('"stack":"at '))).toHaveLength(1);
   });
 
   it("names the account a full share refuses, by its hash", () => {

@@ -39,7 +39,7 @@ export function readEval(
 }
 
 /** The typed text of one of the two calls on r/sys/users's record of `account` (evalCall.ts builds the expression).
- * `IsDeleted` answers for a missing record, which `Name` would panic on. Nothing is asked for what is no address. */
+ * Both answer for a missing record (`Name` with an empty name). Nothing is asked for what is no address. */
 export function readUser(
   rpc: string,
   { account, call }: { account: string; call: "IsDeleted" | "Name" },
@@ -85,7 +85,7 @@ export const toCallable = (read: ChainRead<Listing[]>): ChainRead<Callables> =>
     : read;
 
 /** A realm's exported functions as a query: the one read the function lists and the call forms of a view share, kept and asked ahead
- * (warm.ts). A list that did not come whole is no answer: it throws, with the failed read for the view to say. */
+ * (warmRealm.ts). A list that did not come whole is no answer: it throws, with the failed read for the view to say. */
 export const realmFunctions = (rpc: string, realm: string, options?: ReadOptions) =>
   queryOptions({
     queryKey: keys.functions(rpc, realm),

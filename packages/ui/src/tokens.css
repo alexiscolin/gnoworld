@@ -26,7 +26,7 @@
     --color-space: var(--p-space);
     --color-text: var(--p-text);
     --color-text-muted: var(--p-muted);
-    /* A placeholder, dimmer than muted as frame 10's, at 4.5:1 or more on a field over night, space or a card. */
+    /* A placeholder, dimmer than muted as the design's, at 4.5:1 or more on a field over night, space or a card. */
     --color-text-faint: color-mix(in oklab, var(--p-muted) 80%, transparent);
     --color-primary: var(--p-cream);
     --color-ink: var(--p-space);
@@ -45,7 +45,7 @@
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
     --color-new-line: color-mix(in oklab, var(--p-coral) 60%, transparent);
     /* The world's own colour on its plate: a cool blue by default. At 16 % over the
-       night it gives the frames' navy, #182033 sampled in frame 37 (amber at 16 % read brown). */
+       night it gives the frames' navy, #182033 sampled from the design (amber at 16 % read brown). */
     --world: var(--p-dusk);
     /* A link's ink on a page that sets one (a realm's page in its plate); the words' own ink otherwise. */
     --color-link: currentcolor;
@@ -153,7 +153,7 @@
     --dialog-wide: 760px;
     --popover-w: 300px;
     --popover-wide: 440px;
-    /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90): 808 px at the video's 1728, narrowing with the window to 608 px (38rem): the plate's content is then wider than the 37.5rem where its blocks take their narrow layout, so a window from 1280 up never gets it. */
+    /* The plate of a world's page on a wide screen, its fade included: 808 px at the design's 1728, narrowing with the window to 608 px (38rem): the plate's content is then wider than the 37.5rem where its blocks take their narrow layout, so a window from 1280 up never gets it. */
     --plate-w: clamp(608px, 46.76vi, 808px);
     /* The plate's inner step, the step between its zones and the day chart's height; a narrow plate sets the first two smaller. */
     --plate-pad: var(--space-m);
@@ -184,11 +184,11 @@
     --chat-item: 38px;
     --chat-item-gap: 6px;
     --chat-worlds: 82px;
-    /* The rooms' column wide enough for its search field and a room's whole name; the video's was 158 px. */
+    /* The rooms' column wide enough for its search field and a room's whole name; the design's was 158 px. */
     --chat-rooms: 232px;
-    /* The info panel as wide as the dock; the video's was 300 px. */
+    /* The info panel as wide as the dock; the design's was 300 px. */
     --chat-info: var(--chat-dock);
-    /* Wider than the video's 360 px, its words and its box larger. */
+    /* Wider than the design's 360 px, its words and its box larger. */
     --chat-dock: 420px;
     /* The dock under 1400 px. */
     --chat-dock-s: 380px;
@@ -199,9 +199,9 @@
     --banner-end: 0px;
     /* The column of a room's times at the lines' end, which a line's bar keeps clear: "20:40" in 10 px mono and a step. */
     --chat-times: 40px;
-    /* The inset of the info panel and of the thread's panel, which takes its place: the video's 20 px (the prototype's #chatSide padding). */
+    /* The inset of the info panel and of the thread's panel, which takes its place: the design's 20 px (the prototype's #chatSide padding). */
     --chat-panel-inset: 20px;
-    /* The inset of what the chat draws, set by the screen it is in: the video's 32 px; 24 in its dock, a phone's gutter. */
+    /* The inset of what the chat draws, set by the screen it is in: the design's 32 px; 24 in its dock, a phone's gutter. */
     --chat-inset: var(--space-l);
     /* A phone's full chat is as tall as the visual viewport (so the on-screen keyboard never covers the composer) and starts where it
        does: viewport.ts sets both on the screen; the dynamic viewport's height and no offset elsewhere. */
@@ -227,7 +227,7 @@
     /* The shell header's height a phone's full chat starts below (shellHeader.module.css sets it under 900 px); none from 900 px. */
     --shell-head: 0px;
     --banner-top: calc(var(--banner-under) + var(--space-s));
-    /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it (frames 4, 20, 26). */
+    /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it. */
     --dock-top: 98px;
     /* The page's side on a computer, one line for the header's ends, the rail, the dock, the plate and their outline. */
     --page-edge: var(--space-m);

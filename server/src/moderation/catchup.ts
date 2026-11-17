@@ -44,7 +44,7 @@ export function makeProgress(db: DatabaseSync): Progress {
     ),
   };
   // Each room's lines not yet behind the mark, in the order heard: whether each is settled, and its time.
-  // ponytail: the order heard, not Ergo's: a live line heard before a page of older history moves the mark
+  // ceiling: the order heard, not Ergo's: a live line heard before a page of older history moves the mark
   // past that page's lines while they wait, lost if the process dies then. Order by Ergo's time if it matters.
   const open = new Map<string, Map<string, Entry>>();
   // The time each room is held at, and the mark a hold kept back, written once it lets go or moves on.

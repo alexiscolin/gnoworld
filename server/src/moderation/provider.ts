@@ -50,7 +50,7 @@ export function moderationClient({
   send = netSend,
 }: Options): (input: ModerationInput) => Promise<Answer | "unchecked"> {
   const byCategory = <T extends z.ZodType>(value: (category: Category) => T) =>
-    // Not strict (D13505): a category OpenAI adds is ignored and alerted (below), never every answer unchecked.
+    // Not strict: a category OpenAI adds is ignored and alerted (below), never every answer unchecked.
     z.object(Object.fromEntries(CATEGORIES.map((category) => [category, value(category)])) as Record<Category, T>);
   // The description lets illicit's two flags be null: read as not flagged.
   const nullable = new Set<Category>(["illicit", "illicit/violent"]);

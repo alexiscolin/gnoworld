@@ -59,7 +59,7 @@ void main() {
   float t;
   vec3 swirled = at;
   if (banded > 0.5) {
-    // Jets: each band slides one way, the next the other. ponytail: they shear without end, past an hour into finer streaks.
+    // Jets: each band slides one way, the next the other. ceiling: they shear without end, past an hour into finer streaks.
     float jet = cloudTime * 0.004 * shape.drift * sin(at.y * max(shape.bands, 2.0) * 1.5708);
     vec3 flowing = vec3(at.x * cos(jet) - at.z * sin(jet), at.y, at.x * sin(jet) + at.z * cos(jet));
     swirled = shape.storms > 0.0 ? stormed(flowing) : flowing;

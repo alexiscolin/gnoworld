@@ -3,9 +3,7 @@
 @layer components {
   .avatar {
     position: relative;
-    /* layout: a bot's icon sits in the middle of the disc */
     display: inline-grid;
-    /* layout: a bot's icon sits in the middle of the disc */
     place-items: center;
     inline-size: var(--avatar-m);
     aspect-ratio: 1;

@@ -1,4 +1,4 @@
-// The rail (frames 4 and 16; ADR-0002 §1's rail and §10): the Earth and the worlds of the moment down the right edge, each its planet and
+// The rail (ADR-0002 §1's rail and §10): the Earth and the worlds of the moment down the right edge, each its planet and
 // its name, 25 at most, the column scrolling to its end, "See all" under it; one stop in the tab order, the arrows among the worlds; each
 // planet its real one once drawn (WorldPlanet), ui's disc till then. Where it stands, the page's plain list of worlds steps aside for it.
 import { Button } from "@gnoworld/ui";
@@ -10,12 +10,12 @@ import { SEARCH } from "../../space/openEvent.ts";
 import { useApp } from "../../storeContext.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
 import { worldsFollowedIn } from "../follow/index.ts";
-import { afterDwell } from "../../intent.ts";
+import { afterDwell } from "../../afterDwell.ts";
 import { dock } from "./railDock.ts";
 import { warmWorld } from "./space.ts";
 import { data, feed, subscribe } from "../../railFeed.ts";
 import { keptRail, RailOrder, type RailEntry } from "../../railWorlds.ts";
-import { useSwapped } from "../../swapped.ts";
+import { useSwapped } from "../../useSwapped.ts";
 import { sameKind } from "./useSpace.ts";
 import { inSystem, useResting } from "./views.ts";
 import { useLens, useLit, withEarth } from "../../lenses.ts";

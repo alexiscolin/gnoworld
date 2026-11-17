@@ -1,5 +1,5 @@
 // A shared place's link: the site's origin and the page's path, nothing else: no name, no address, no token.
-import { ORIGIN } from "../../meta.ts";
+import { ORIGIN } from "../../pageMeta.ts";
 
 /** A place to share: what it is called, and its page's path on this site. */
 export interface SharedPlace {

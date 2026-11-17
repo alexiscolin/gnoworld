@@ -2,7 +2,7 @@
    invalid, coral. */
 @layer components {
   /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
-  /* The strong line at rest and under the pointer, frame 10's edge. */
+  /* The strong line at rest and under the pointer, the design's edge. */
   .box,
   .frame {
     --_line: var(--color-line-strong);
@@ -90,9 +90,7 @@
 
   /* With a prefix the frame is the one box; the input inside is bare, and the ring is the frame's, around the prefix too. */
   .frame {
-    /* layout: the prefix and the input share the one frame */
     display: flex;
-    /* layout: the prefix sits level with the input's text */
     align-items: center;
     padding-inline-start: var(--space-s);
   }
@@ -103,7 +101,6 @@
   }
 
   .frame .box {
-    /* layout: the input takes what the prefix leaves */
     flex: 1;
     min-inline-size: 0;
 

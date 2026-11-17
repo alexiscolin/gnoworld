@@ -3,7 +3,7 @@ import { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "@gnoworld/core";
 import { act } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { all, modals, one } from "../../../tests/mount.tsx";
-import { ORIGIN } from "../../meta.ts";
+import { ORIGIN } from "../../pageMeta.ts";
 import { linkOf } from "./link.ts";
 import { openShare } from "./ShareSheet.tsx";
 

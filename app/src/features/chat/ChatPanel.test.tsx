@@ -21,8 +21,8 @@ interface Fake extends Ergo {
   line: (text: string) => void;
 }
 const connections = vi.hoisted(() => ({ made: [] as unknown[] }));
-vi.mock("./pageLink.ts", async () => {
-  const { chatLink } = await vi.importActual<typeof import("./link.ts")>("./link.ts");
+vi.mock("./connection/pageLink.ts", async () => {
+  const { chatLink } = await vi.importActual<typeof import("./connection/link.ts")>("./connection/link.ts");
   return {
     dropLink: () => undefined,
     takeLink: (store: Parameters<typeof chatLink>[0]["store"]) =>

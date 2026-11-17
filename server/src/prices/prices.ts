@@ -70,7 +70,7 @@ function tokenOf(symbol: (typeof MARKET_SYMBOLS)[number], coin: unknown): Market
   return usd > 0 ? { symbol, usd, change24h: finite(change) ? change : null } : undefined;
 }
 
-// The tokens that have a price, in the video's order.
+// The tokens that have a price, in the design's order.
 function tokensOf(answer: unknown): Markets["tokens"] {
   if (!isRecord(answer)) throw new Failure("shape");
   const tokens = MARKET_SYMBOLS.flatMap((symbol) => tokenOf(symbol, answer[IDS[symbol]]) ?? []);

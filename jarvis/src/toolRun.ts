@@ -15,7 +15,7 @@ export const TOOL_MS = 30_000;
 // A call run with its question's words and cards, seen through the call's own time.
 export type Runs = (call: Allowed, asked: Asked) => Promise<Ran>;
 
-// ponytail: a turn's calls run at once, eight at most, each bounded by its time; the model writes at most what
+// ceiling: a turn's calls run at once, eight at most, each bounded by its time; the model writes at most what
 // max_tokens holds.
 export async function resultsOf(
   run: Run,

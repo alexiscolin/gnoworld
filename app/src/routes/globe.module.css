@@ -2,15 +2,12 @@
    what is around it. The page lays it out only once space is on: until then the plate stands whole and no room is kept. */
 @layer components {
   .globe {
-    /* layout: what stands round the planet (the proposal's ring) is placed from its box */
     position: relative;
     display: none;
-    /* raw: the ring reaches 1.106 radii of the globe (frame 39), and keeps a step of space from the window's edge */
+    /* raw: the ring reaches 1.106 radii of the globe, and keeps a step of space from the window's edge */
     inline-size: min(calc((100vi - 2 * var(--space-s)) / 1.106), 56vb);
     aspect-ratio: 1;
-    /* layout: over the plate, clear of the header */
     margin-block: var(--space-xl) var(--space-l);
-    /* layout: centred in the page, over the plate */
     margin-inline: auto;
     pointer-events: none;
   }
@@ -35,7 +32,7 @@
     }
   }
 
-  /* Beside the plate, between its words and the dock (frame 39): the ring keeps 28 px off each, and the globe stands 16 px over the frame's
+  /* Beside the plate, between its words and the dock: the ring keeps 28 px off each, and the globe stands 16 px over the frame's
      middle, which leaves the pill's row under it. The window's height caps it. */
   @media (width >= 1280px) {
     .globe,
@@ -56,7 +53,7 @@
       --_radius: calc(var(--_reach) / 1.106);
     }
 
-    /* A world's circle is its busiest planet, frame 104's Bubble: its ring, 1.143 radii, comes a small step short of
+    /* A world's circle is its busiest planet, the design's Bubble: its ring, 1.143 radii, comes a small step short of
        the plate's words and the dock, never under them, and the window's height caps it as the Earth's; a quieter world fills less (fit.ts). */
     .globe[data-world] {
       /* raw: the world's ring reaches 1.143 radii */
@@ -66,7 +63,7 @@
     }
 
     /* Close, larger than the window, lit at three quarters: the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
-       height capping it past 16:10; drawn 24 to 55 px left of that centre (D13735). Cropped by the window's edges, its limb reaches a little
+       height capping it past 16:10; drawn 24 to 55 px left of that centre. Cropped by the window's edges, its limb reaches a little
        over the plate's content, in front of it, and the dock stands over it as dark glass. */
     .globe[data-framing],
     .globe[data-framing] + * {
@@ -78,7 +75,7 @@
          drawn 1.04 radii out (measured), would stand a step (--space-m) right of the plate's content edge */
       --_radius: min(37vi, 59vb, (var(--_study-x) - var(--_start) - var(--space-m)) / 1.04);
       /* raw: Alexis's 55 px left of the study's centre from 1440 px up, the same size; below, less, down to 24 px at 1280, where the disc
-         stops at the content's edge and the plate's controls end there: letters may pass under it, never a control (D13735) */
+         stops at the content's edge and the plate's controls end there: letters may pass under it, never a control */
       --_x: calc(var(--_study-x) - clamp(24px, 24px + (100vi - 1280px) * 31 / 448, 55px));
     }
 
@@ -87,7 +84,6 @@
       inset-block-start: calc(var(--_middle) - var(--_radius));
       inset-inline-start: calc(var(--_x) - var(--_radius));
       inline-size: calc(2 * var(--_radius));
-      /* layout: fixed in the free area, it keeps no margin of its own */
       margin: 0;
     }
 
@@ -98,7 +94,7 @@
       --plate-ground: var(--color-plate-scene);
     }
 
-    /* The framed planet stands in front of the plate (D13735): the plate is hidden inside 1.03 radii and comes back by 1.07, across the
+    /* The framed planet stands in front of the plate: the plate is hidden inside 1.03 radii and comes back by 1.07, across the
        glow's falloff round the drawn limb (1.04), in the plate's own box (from the page's edge, under the dock's top). A mask only hides:
        the plate's controls under it still take clicks and keys. */
     .globe[data-framing]:is([data-earth="drawn"], [data-world="drawn"]) + * {

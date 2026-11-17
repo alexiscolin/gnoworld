@@ -18,7 +18,7 @@ import { chatFigures, countriesWidget, hourWidgets, roomsWidget, statusOf } from
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
-// Frame 40's three links out: the universe's gnoweb, its explorer and the docs.
+// The three links out: the universe's gnoweb, its explorer and the docs.
 function earthLinks(universe: string) {
   const chain = universes.find((each) => each.id === universe);
   return [
@@ -37,7 +37,7 @@ function useEarthPlate(universe: UniverseView): PlateModel {
   return {
     // The title is the route's; the line comes after the status, as a realm's does (the proposal's phone).
     lede: { sentence: EARTH.description, status: statusOf(here, "Quiet") },
-    // Frame 40: the Earth's plate says hi in its general room, and follows and shares as a world's does.
+    // The Earth's plate says hi in its general room, and follows and shares as a world's does.
     actions: {
       place: { name: "Earth", path: universe.earth.canonical },
       follow: stampKey(universe.id, EARTH_ID),

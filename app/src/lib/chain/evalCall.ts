@@ -2,7 +2,7 @@
 // packages/core/src/chain/evalName.ts; the server's door has its own). The chain runs ANY expression it is sent, so the
 // defence is here: one `<realm>.<Name>(<literals>)`, its arguments written by core's readArgs alone, one of r/sys/users's
 // two calls on a proved address, or nothing. Each pattern is built inside its function (typescript.md).
-import { isExportedName, readArgs, type Param } from "@gnoworld/core";
+import { evalNameOf, isExportedName, readArgs, type Param } from "@gnoworld/core";
 import { Address, isRealmPath } from "@gnoworld/schemas";
 
 /** A read's parameters (vm/qfuncs's) and the texts typed for them, in order; none for a read that takes nothing. */
@@ -23,10 +23,12 @@ export function evalCall(realm: string, name: string, read: Read = {}): string |
   return new TextEncoder().encode(call).length <= 3072 ? call : null;
 }
 
-/** The data `vm/qeval` is asked for one of r/sys/users's two calls on the record of `account`, or null: the address goes in only
- * once the schema proved it, and `call` picks one of two whole strings, whatever it holds at run time. */
+/** The data `vm/qeval` is asked for one of r/sys/users's two reads of the record of `account`, or null: the address goes in only
+ * once the schema proved it, and `call` picks one of two whole expressions, whatever it holds at run time; the name's is core's. */
 export function userCall(account: string, call: "IsDeleted" | "Name"): string | null {
   const proved = Address.safeParse(account);
   if (!proved.success) return null;
-  return `gno.land/r/sys/users.ResolveAddress("${proved.data}").${call === "Name" ? "Name()" : "IsDeleted()"}`;
+  return call === "Name"
+    ? evalNameOf(proved.data)
+    : `gno.land/r/sys/users.ResolveAddress("${proved.data}").IsDeleted()`;
 }

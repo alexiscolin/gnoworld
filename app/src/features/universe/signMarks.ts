@@ -4,13 +4,13 @@ import { useEffect, type RefObject } from "react";
 import type { GroundMark } from "../../space/earth/ground.ts";
 import { calmed } from "../../earthSignsCalm.ts";
 
-/** The sheet's own width, frame 47's. */
+/** The sheet's own width, the design's. */
 const BUBBLE_WIDTH = 258;
 const BUBBLE_GAP = 6;
-// The bubble's place over its point, as frame 47's.
+// The bubble's place over its point, as the design's.
 const BUBBLE_RISE = 62;
 const EDGE = 8;
-/** How far the golden ring reaches, in the globe's radii (frame 39). */
+/** How far the golden ring reaches, in the globe's radii. */
 const RING = 1.106;
 /** A little left of the ring's middle, as the frames have the counts. */
 const COUNTS_LEFT = 48;

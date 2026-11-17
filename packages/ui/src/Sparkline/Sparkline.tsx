@@ -4,7 +4,7 @@ import styles from "./Sparkline.module.css";
 export interface SparklineProps {
   /** Oldest first, the last one now: a price's day, read between its lowest and its highest. A value that is no finite number is left out. */
   values: readonly number[];
-  /** Which way it went, which colours it: up in mint, down in coral, flat in the muted grey (frame 6's markets row). */
+  /** Which way it went, which colours it: up in mint, down in coral, flat in the muted grey (the design's markets row). */
   tone: "up" | "down" | "flat";
   /** Where the line's height starts: between its lowest and its highest (a price), or from nothing to its highest (a count). */
   from?: "range" | "zero";

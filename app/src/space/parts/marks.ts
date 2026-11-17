@@ -1,5 +1,5 @@
 // What the demo draws over the universe for the place the camera is at: the orbits of the system it is in, faint, and on a
-// page the plate's fill, behind the planet, as the video's frame 20 (the planet stands over the plate's right side); a planet framed
+// page the plate's fill, behind the planet, as the design (the planet stands over the plate's right side); a planet framed
 // close wears one orbit.
 import { damp } from "@gnoworld/core";
 import {

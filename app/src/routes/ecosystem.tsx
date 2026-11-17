@@ -4,7 +4,7 @@
 import { Breadcrumb } from "@gnoworld/ui";
 import { useLocation, type MetaArgs } from "react-router";
 import { ErrorView, isMissing, RouteError, useWhere } from "../features/errors/index.ts";
-import { ecosystemMeta, failedPageMeta } from "../meta.ts";
+import { ecosystemMeta, failedPageMeta } from "../pageMeta.ts";
 import { site } from "../places.ts";
 import { phoneAway } from "./phoneAway.ts";
 

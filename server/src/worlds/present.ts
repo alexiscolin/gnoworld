@@ -156,7 +156,7 @@ export function startPresent(options: Options): Present {
   const hereIn = (names: readonly string[], at: number): number | undefined => nicksOf(read, names, at)?.size;
   // A world's messages an hour now: its open rooms' pace; the plate adds the guests'.
   const perHourIn = (names: readonly string[], at: number): number => hourOf(rates, names, at);
-  // ponytail: each history writes its whole file at once, about 44 ms for 500 worlds of 14 days (5.7 MB): two every five minutes.
+  // ceiling: each history writes its whole file at once, about 44 ms for 500 worlds of 14 days (5.7 MB): two every five minutes.
   const record = (adding = true): void => {
     const at = now();
     const counted = sampled(worlds(), at, { here: hereIn, perHour: perHourIn });

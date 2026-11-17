@@ -2,11 +2,11 @@
 // so a page that holds no chat (the home) carries none of it.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatProps } from "./Chat.tsx";
-import { DockCover } from "./DockCover.tsx";
-import { useChatAlone } from "./full.ts";
-import { chatHeld, heard, hold, Pending, putSeat, seatOf } from "./fullHost.tsx";
-import { usePhoneGo } from "./phoneGo.ts";
-import { restoreScrolls, scrollsOf } from "./stillScreen.ts";
+import { DockCover } from "./dock/DockCover.tsx";
+import { useChatAlone } from "./dock/fullState.ts";
+import { chatHeld, heard, hold, Pending, putSeat, seatOf } from "./dock/FullChatHost.tsx";
+import { usePhoneGo } from "./phone/phoneGo.ts";
+import { restoreScrolls, scrollsOf } from "./dock/stillScreen.ts";
 
 // The pages that hold a chat now, docked or full: the one leaving and the one coming are told in the same commit.
 let holders = 0;

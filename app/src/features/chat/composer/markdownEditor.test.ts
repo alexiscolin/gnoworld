@@ -148,6 +148,13 @@ describe("the composer's Markdown, to the editor and back", () => {
     }
   });
 
+  // fast-check's counterexample: bare, a `*` that starts a line with a space after it opens a list for the reader.
+  it("keeps an escaped star that starts a line, a space after it, as text", () => {
+    for (const md of ["\\* *", "\\* a", "a\n\n\\* b", "\\*a", "> * a", "- * a"]) {
+      expect(markdown(through(md)), JSON.stringify(md)).toEqual(markdown(md));
+    }
+  });
+
   // The room's reader, not the text, is what must not change: the tree of the draft and of what the editor gives back.
   it("leaves the room's reading of a draft as it was, on drafts of marks and blocks mixed", () => {
     // A failed property prints its shrunk counterexample and its seed, which `fc.assert` takes back to replay it.
