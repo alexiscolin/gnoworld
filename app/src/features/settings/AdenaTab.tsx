@@ -12,7 +12,7 @@ import { Linked, Stale } from "./LinkStates.tsx";
 import { AsMe } from "./AsMe.tsx";
 import { LINKED_ELSEWHERE, linkProblem, notSigned } from "./linkWords.ts";
 import { useSignInAgain } from "./useSignInAgain.ts";
-import styles from "./Settings.module.css";
+import code from "../../CodeBlock.module.css";
 
 interface Ready {
   at: "ready";
@@ -137,9 +137,7 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
       {ready === undefined ? null : (
         <Stack space="2xs">
           <span className="label">Adena will sign this text, for {shortAddress(ready.address)}</span>
-          <blockquote className={[styles["block"], "fill-box", "data-text"].join(" ")}>
-            {ready.challenge.text}
-          </blockquote>
+          <blockquote className={[code["block"], "fill-box", "data-text"].join(" ")}>{ready.challenge.text}</blockquote>
         </Stack>
       )}
       {ready?.proof === undefined ? null : (

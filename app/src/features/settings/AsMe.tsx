@@ -8,6 +8,7 @@ import { reportedOr } from "../../lib/reported.ts";
 import { WORDS } from "../errors/index.ts";
 import { sayProblem } from "../login/index.ts";
 import { Block } from "./CommandParts.tsx";
+import styles from "./Settings.module.css";
 
 const wallet = () => reportedOr(import("../../lib/adena/adena.ts"), undefined);
 
@@ -49,31 +50,37 @@ export function AsMe({
     }
   };
   return (
-    <Stack space="2xs">
-      <span className="label">Sign the same text as {shortAddress(me)} too, the account you are logged in as</span>
-      <Cluster>
-        <Button
-          busy={busy}
-          onClick={() => {
-            sign().catch(reportError);
+    <div className={styles["clear"]}>
+      <Stack space="2xs">
+        <span className="label">Your own signature</span>
+        <p>
+          Sign the same text as {shortAddress(me)} too, the account you are logged in as: in Adena switched back to it,
+          or with its own key below.
+        </p>
+        <Cluster>
+          <Button
+            busy={busy}
+            onClick={() => {
+              sign().catch(reportError);
+            }}
+          >
+            Sign in Adena
+          </Button>
+        </Cluster>
+        <Block
+          block={code.byBlock}
+          file={file}
+          whose="your own key's"
+          paste="Or paste what your own key's command shows"
+          onFile={(next) => {
+            setFile(next);
+            onBy(fileShape(next) ? { file: next } : undefined);
           }}
-        >
-          Sign in Adena
-        </Button>
-      </Cluster>
-      <Block
-        block={code.byBlock}
-        file={file}
-        paste="Or paste what your own key's command shows"
-        onFile={(next) => {
-          setFile(next);
-          onBy(fileShape(next) ? { file: next } : undefined);
-        }}
-        onCopied={setSaid}
-      />
-      <p role="status" className="meta">
-        {said}
-      </p>
-    </Stack>
+        />
+        <p role="status" className="meta">
+          {said}
+        </p>
+      </Stack>
+    </div>
   );
 }

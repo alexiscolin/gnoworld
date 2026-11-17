@@ -1,50 +1,29 @@
 // The pieces of the command-line flow that only draw: the block to copy and the box to paste into, the button, the code's clock, the address box.
 import { Button, Field, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent } from "react";
-import { canCopy, copyText } from "../../lib/copy.ts";
+import { CodeBlock } from "../../CodeBlock.tsx";
 import { clock, useCountdown } from "./useCountdown.ts";
-import styles from "./Settings.module.css";
 
 const PLACEHOLDER = '{"msg":[…],"fee":…,"signatures":[{"pub_key":…,"signature":…}],"memo":"…"}';
 
-// The block to copy and the box to paste into, named `paste`.
+// The block to copy and the box to paste into: `whose` key the block's KEY names, the box named `paste`.
 export function Block({
   block,
   file,
   onFile,
-  onCopied,
+  whose = "your key's",
   paste = "Paste what it shows",
 }: {
   block: string;
   file: string;
   onFile: (file: string) => void;
-  onCopied: (words: string) => void;
+  whose?: string;
   paste?: string;
 }) {
   return (
     <Stack space="2xs">
-      <span className="meta">Copy, run in your terminal (KEY is your key's name); nothing is sent</span>
-      <div className={styles["code"]}>
-        <pre className={[styles["block"], "fill-box", "data-text"].join(" ")} data-scroll="">
-          {block}
-        </pre>
-        {canCopy() ? (
-          <span className={styles["copy"]}>
-            <Button
-              size="s"
-              onClick={() => {
-                copyText(block)
-                  .then((copied) => {
-                    onCopied(copied ? "Copied" : "Could not copy the block");
-                  })
-                  .catch(reportError);
-              }}
-            >
-              Copy
-            </Button>
-          </span>
-        ) : null}
-      </div>
+      <span className="meta">{`Copy, run in your terminal (KEY is ${whose} name); nothing is sent`}</span>
+      <CodeBlock text={block} />
       <Field kind="lines" label={paste} value={file} onChange={onFile} placeholder={PLACEHOLDER} />
     </Stack>
   );

@@ -4,8 +4,10 @@
   .dialog {
     --_w: var(--dialog-w);
 
-    /* The top layer inherits from where the dialog sits in the page: a centred empty state would centre its words. */
+    /* The top layer inherits from where the dialog sits in the page: a centred empty state would centre its words, and the
+       header's no-wrap (900 px and up) would run Get started's steps past the edge. */
     text-align: start;
+    white-space: normal;
     --appear-time: var(--motion-base);
     --appear-grow: 0.98;
     --appear-from: 0 var(--space-2xs);

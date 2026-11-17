@@ -121,7 +121,7 @@ export function CommandFlow({
           setStep({ at: "idle" });
         }}
       />
-      {ready === undefined ? null : <Block block={ready.code.block} file={file} onFile={setFile} onCopied={setSaid} />}
+      {ready === undefined ? null : <Block block={ready.code.block} file={file} onFile={setFile} />}
       {mine === undefined ? null : (
         <AsMe
           key={mine.code.text}

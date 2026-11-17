@@ -2,6 +2,7 @@
 // for an argument a terminal would run as a new line or draw unlike its bytes, and the card says which.
 import { callFields } from "@gnoworld/core";
 import { Disclosure } from "@gnoworld/ui";
+import { CodeBlock } from "../../CodeBlock.tsx";
 import { gnokeyCall } from "../../lib/adena/gnokey.ts";
 import type { CallCard } from "../../lib/calls.ts";
 
@@ -20,7 +21,7 @@ export function CommandLine({ card, network }: { card: CallCard; network: { chai
   return (
     <div className="fine-only">
       <Disclosure title="Or run it with gnokey" size="s">
-        <p className="fill-box data-text">{made.command}</p>
+        <CodeBlock text={made.command} />
       </Disclosure>
     </div>
   );
