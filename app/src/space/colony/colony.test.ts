@@ -124,18 +124,21 @@ describe("gnosh's colony, the offset crown (D13740)", () => {
 describe("the colony's hull, drawn in the code", () => {
   it("is drawn at 512 px (D13741): its plates, their normals and their roughness, the same for the same seed", () => {
     expect(SIZE).toBe(512);
-    const [one, two] = [hullMaps(3), hullMaps(3)];
+    // The seeds the colony draws (materials.ts), kept once drawn: a seed drawn anew is slow under the coverage's counters.
+    const [one, two] = [hullMaps(11), hullMaps(11)];
     for (const map of [one.map, one.normalMap, one.roughnessMap])
       expect([map.image.width, map.image.height]).toEqual([SIZE, SIZE]);
-    expect(one.normalMap.image.data).toEqual(two.normalMap.image.data);
-    expect(one.map.image.data).toEqual(two.map.image.data);
-    expect(hullMaps(4).map.image.data).not.toEqual(one.map.image.data);
+    // A megabyte a map: compared as bytes, natively, not element by element.
+    const bytes = (data: ArrayBufferView | null) => Buffer.from(data?.buffer ?? new ArrayBuffer(0));
+    expect(bytes(one.normalMap.image.data).equals(bytes(two.normalMap.image.data))).toBe(true);
+    expect(bytes(one.map.image.data).equals(bytes(two.map.image.data))).toBe(true);
+    expect(bytes(hullMaps(23, [0.62, 0.8]).map.image.data).equals(bytes(one.map.image.data))).toBe(false);
     // Drawn once a seed: a second hull of it wraps the first's bytes, so a colony made again costs no drawing.
     expect(two.map.image.data).toBe(one.map.image.data);
   });
 
   it("gives its normals unit length, so its plates' seams catch the light as metal does", () => {
-    const data = hullMaps(5).normalMap.image.data ?? new Uint8Array();
+    const data = hullMaps(11).normalMap.image.data ?? new Uint8Array();
     expect(data.length).toBe(4 * SIZE * SIZE);
     for (let at = 0; at < data.length; at += 4 * 997) {
       const [x, y, z] = [data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0].map((byte) => (byte / 255) * 2 - 1);
@@ -144,7 +147,7 @@ describe("the colony's hull, drawn in the code", () => {
   });
 
   it("glazes a band of the habitat, its windows lit behind it, and nothing outside the band", () => {
-    const { emissiveMap } = hullMaps(7, [0.25, 0.5]);
+    const { emissiveMap } = hullMaps(23, [0.62, 0.8]);
     const { width, height } = emissiveMap?.image ?? { width: 0, height: 0 };
     const data = emissiveMap?.image.data ?? new Uint8Array();
     const lit = (row: number) => {
@@ -152,9 +155,9 @@ describe("the colony's hull, drawn in the code", () => {
       for (let x = 0; x < width; x += 1) sum += data[(row * width + x) * 4] ?? 0;
       return sum;
     };
-    expect(lit(Math.round(height * 0.1))).toBe(0);
-    expect(lit(Math.round(height * 0.375))).toBeGreaterThan(0);
-    expect(lit(Math.round(height * 0.8))).toBe(0);
+    expect(lit(Math.round(height * 0.3))).toBe(0);
+    expect(lit(Math.round(height * 0.71))).toBeGreaterThan(0);
+    expect(lit(Math.round(height * 0.95))).toBe(0);
   });
 });
 
