@@ -8,7 +8,8 @@ import { FollowButton } from "../follow/index.ts";
 import { sharePlace } from "../share/index.ts";
 import styles from "./Actions.module.css";
 import type { ActionsProps } from "./Actions.tsx";
-import { isSitePath, useMain } from "./actionsShared.ts";
+import { MainAction } from "./MainAction.tsx";
+import { useLeads } from "./actionsShared.ts";
 
 // In a phone's page sheet the proposals are the realm's page, which opens in its own sheet at the plate's page section (#page, where the
 // realm's Render lists them); elsewhere the realm's view.
@@ -48,17 +49,12 @@ function Second({ second }: { second: NonNullable<ActionsProps["second"]> }) {
   );
 }
 
-function Leads({
-  proposals,
-  say,
-  room,
-  lead,
-  second,
-}: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
-  const main = useMain({ room, lead, say });
+function Leads({ second, ...asked }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
+  const { main, proposals } = useLeads(asked);
+  const { room } = asked;
   const sheet = useInPageSheet();
   const words = useProposalsWords();
-  if (proposals !== undefined && isSitePath(proposals)) {
+  if (proposals !== undefined) {
     return (
       <>
         <Button href={proposalsHref(proposals, sheet)} pad="wide" emphasis="solid" icon="arrow">
@@ -70,9 +66,7 @@ function Leads({
   }
   return (
     <>
-      <Button href={main.href} pad="wide" emphasis="solid" icon={main.icon ?? "arrow"}>
-        {main.label}
-      </Button>
+      <MainAction main={main} />
       {second === undefined ? null : <Second second={second} />}
     </>
   );

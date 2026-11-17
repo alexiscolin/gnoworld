@@ -3,6 +3,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation, useNavigate, useNavigationType } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubPhone } from "../../../tests/phoneMedia.ts";
 import { landingPaths } from "../../lib/recents.ts";
 import { usePhoneGo } from "./phoneGo.ts";
 
@@ -40,13 +41,6 @@ const draw = (entries: string[], index = entries.length - 1) => {
   });
 };
 const shown = () => host.textContent;
-const phone = (matches: boolean) => {
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: matches && query === "(max-width: 899px)",
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
-};
 
 beforeEach(() => {
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
@@ -64,7 +58,7 @@ afterEach(() => {
 
 describe("a phone's own way to a place", () => {
   it("replaces a place's address with its full chat's", () => {
-    phone(true);
+    stubPhone(true);
     draw(["/", "/w/govdao"]);
     expect(shown()).toBe("here /w/govdao?chat=full");
     expect(held.type, "a replace, not a push").toBe("REPLACE");
@@ -76,7 +70,7 @@ describe("a phone's own way to a place", () => {
       getItem: (key: string) => store.get(key) ?? null,
       setItem: (key: string, value: string) => store.set(key, value),
     });
-    phone(true);
+    stubPhone(true);
     draw(["/w/govdao"]);
     act(() => {
       held.go?.("/r/gno.land/r/x?chat=full");
@@ -88,7 +82,7 @@ describe("a phone's own way to a place", () => {
   });
 
   it("leaves a computer where it is", () => {
-    phone(false);
+    stubPhone(false);
     draw(["/w/govdao"]);
     expect(shown()).toBe("here /w/govdao");
   });

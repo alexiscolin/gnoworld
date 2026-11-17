@@ -3,9 +3,9 @@ import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain
 import { indexer } from "../chain/indexerRoute.ts";
 import { ANSWERS } from "../fakeAdena.ts";
 import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
-import { accountPill, connectButton } from "./account.ts";
+import { connectAtComputer } from "./account.ts";
 import { calls, openCall, writeTab } from "./callRows.ts";
-import { expect, hydrated, type Page } from "./fixtures.ts";
+import { expect, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 import { isPhone, openPlacePage } from "./realmRoom.ts";
 
@@ -189,17 +189,7 @@ export async function openRealm(page: Page, logIn: () => Promise<void>): Promise
 }
 
 /** Logs in with the page's Adena on a computer's screen: the page's session is the cookie the server sets. */
-export async function connect(page: Page): Promise<void> {
-  // A phone's header keeps Connect in its menu and a phone opens into a chat: the login is made at a computer's width.
-  const size = page.viewportSize();
-  const narrow = size !== null && size.width < 900;
-  if (narrow) await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/");
-  await hydrated(page);
-  await connectButton(page).click();
-  await expect(accountPill(page)).toBeVisible();
-  if (narrow) await page.setViewportSize(size);
-}
+export const connect = connectAtComputer;
 
 /** Opens SetBio's card and clicks its "Sign in Adena". */
 export async function callAndSign(page: Page): Promise<void> {

@@ -42,6 +42,15 @@ function draw(proposals?: string, inSheet = false) {
   return host;
 }
 
+// A phone as wide as 375: the under-360 query does not match.
+const onPhone = (matches: boolean) => {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: matches && !query.includes("359px"),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+};
+
 describe("a world's actions", () => {
   it("draws the main action: a link to the world's chat on the page, in words that say so", () => {
     const main = draw().querySelector("a");
@@ -103,11 +112,7 @@ describe("a world's actions, with proposals", () => {
 
   // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts), at its page section (#page), where the proposals are.
   it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", async () => {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: !query.includes("359px"),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
+    onPhone(true);
     // The phone's row comes in a chunk of its own, once the window is a phone's.
     const phone = draw(PROPOSALS, true);
     await settled(() => phone.querySelector("a") !== null);
@@ -211,13 +216,13 @@ describe("a phone's actions", () => {
     );
   // The phone's row comes in a chunk of its own: its buttons are in once it has.
   const ready = (box: HTMLElement) => settled(() => (box.querySelector("[data-row]")?.childElementCount ?? 0) > 0);
-  const onPhone = (matches: boolean) => {
-    // A phone as wide as 375: the under-360 query does not match.
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: matches && !query.includes("359px"),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
+  // A realm's row: its page as the main action, Try a function beside it.
+  const withLeadAndSecond = async () => {
+    const lead = { label: "Read its page", href: "#page" };
+    const second = { label: "Try a function", href: "#try" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    await ready(box);
+    return box;
   };
 
   it("draws the second action as a named icon, which scrolls to the section its href names", async () => {
@@ -227,10 +232,7 @@ describe("a phone's actions", () => {
     const scroll = vi.fn();
     target.scrollIntoView = scroll;
     document.body.append(target);
-    const lead = { label: "Read its page", href: "#page" };
-    const second = { label: "Try a function", href: "#try" };
-    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
-    await ready(box);
+    const box = await withLeadAndSecond();
     const press = box.querySelector<HTMLElement>("button[aria-label='Try a function']");
     expect(press?.textContent).toBe("");
     act(() => {
@@ -241,11 +243,7 @@ describe("a phone's actions", () => {
   });
 
   it("shortens 'Read the proposals' under 360 px, where three icons share its line", async () => {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: !query.includes("359px"),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
+    onPhone(true);
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
     await ready(box);
     expect(rowsOf(box)[0]?.[0]).toBe("Read the proposals");
@@ -257,10 +255,7 @@ describe("a phone's actions", () => {
 
   it("sets the main actions, then Follow and Share, in one row", async () => {
     onPhone(true);
-    const lead = { label: "Read its page", href: "#page" };
-    const second = { label: "Try a function", href: "#try" };
-    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
-    await ready(box);
+    const box = await withLeadAndSecond();
     expect(rowsOf(box)).toEqual([
       ["Read its page", "Try a function", "Following", "Share"].map((n) => (n === "Following" ? "Follow" : n)),
     ]);

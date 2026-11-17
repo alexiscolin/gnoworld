@@ -3,6 +3,7 @@ import { act, type ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { all, mount as draw, one } from "../../../tests/mount.tsx";
+import { hold, notify } from "../../../tests/railFeedFake.ts";
 import { FullChatLinks } from "../../routerLink.tsx";
 import type { Known } from "../../railWorlds.ts";
 import { SEARCH } from "../../space/openEvent.ts";
@@ -16,19 +17,8 @@ const EARTH = { slug: "earth", name: "Earth", href: "/earth" };
 const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
 const GOVDAO = { slug: "govdao", name: "GovDAO", href: "/w/govdao" };
 
-// The rail's feed (railFeed.ts), told by hand: what `data` gives, and who listens.
-const feeding = vi.hoisted((): { held: Known | undefined; listeners: Set<() => void> } => ({
-  held: undefined,
-  listeners: new Set(),
-}));
-vi.mock("../../railFeed.ts", () => ({
-  subscribe: (listener: () => void) => {
-    feeding.listeners.add(listener);
-    return () => feeding.listeners.delete(listener);
-  },
-  data: () => feeding.held,
-  feed: () => undefined,
-}));
+// The rail's feed (railFeed.ts), told by hand.
+vi.mock("../../railFeed.ts", () => import("../../../tests/railFeedFake.ts"));
 const world = (id: string): CosmosWorld => ({
   id,
   namespace: id.split("/")[0] ?? id,
@@ -46,14 +36,14 @@ const SIGNALS: WorldSignals = {
   now: Date.parse("2026-11-03T12:00:00.000Z"),
 };
 async function tell(held: Known) {
-  feeding.held = held;
+  hold(held);
   await act(async () => {
-    for (const listener of feeding.listeners) listener();
+    notify();
     await new Promise((done) => setTimeout(done, 20));
   });
 }
 afterEach(() => {
-  feeding.held = undefined;
+  hold(undefined);
 });
 
 // jsdom draws no layout and has no scrollIntoView: a spy stands in, and tells which element was brought into view.
