@@ -37,9 +37,9 @@ export function failureOf(thrown: unknown): { error: string; stack?: string } {
   if (!(thrown instanceof Error)) return { error: typeof thrown };
   const error = /^\w{1,64}$/.test(thrown.name) ? thrown.name : "Error";
   if (typeof thrown.stack !== "string") return { error };
-  // V8 writes the stack on its first read, opening with the error's text (its name and message, as Error.prototype.toString gives
-  // them): those lines are skipped whole, so a frame forged in either never passes.
-  // ceiling: a name or message changed after the stack's first read shifts the count; a frame-shaped line is the worst that passes.
+  // V8 writes the stack on its first read, opening with the error's text (name and message, as Error.prototype.toString gives them),
+  // skipped whole. ceiling: a name or message changed after that first read shifts the count, and a line of the message shaped like
+  // a frame then passes; nothing here changes either once an error is made.
   const frames = thrown.stack
     .split("\n")
     .slice(Error.prototype.toString.call(thrown).split("\n").length)
