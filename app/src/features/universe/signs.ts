@@ -46,8 +46,6 @@ export interface SignsDeps {
 
 const NOTHING: Snapshot = { bubbles: [], counts: [], trends: [], pins: [] };
 const SECOND = 1000;
-// Every row of the data file is #earth/<name> (EarthRooms, packages/schemas).
-const SIDE_ROOM = "#earth/";
 const TWO_HOURS = 7_200_000;
 
 // A trend needs both hours whole: a room's window that stops short of them undercounts the hour before.
@@ -121,8 +119,9 @@ export class Signs {
     return this.#deps.places
       .filter(({ room }) => isPublicRoom(types.get(room)))
       .map(({ room, lat, lon }) => {
-        const name = room.slice(SIDE_ROOM.length);
-        return { room, label: `#${name}`, href: `?room=${name}`, lat, lon };
+        // A side room by its own name on this page; a colony's main room, its general chat, the page itself.
+        const name = room.includes("/") ? room.slice(room.indexOf("/") + 1) : undefined;
+        return { room, label: `#${name ?? "general"}`, href: name === undefined ? "?" : `?room=${name}`, lat, lon };
       });
   }
 
@@ -146,7 +145,7 @@ export class Signs {
     const { bubbles, counts, shown } = pickBubbles(placed, now, viewer, rules, this.#shown);
     this.#shown = shown;
     if (world !== undefined) {
-      this.#publish({ ...NOTHING, bubbles });
+      this.#publish({ ...NOTHING, bubbles, pins: this.#pins() });
       return;
     }
     const whole = read.filter((each) => reaches(each.room, now)).flatMap((each) => each.messages);
