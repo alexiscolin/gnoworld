@@ -26,6 +26,21 @@ describe("Chip", () => {
     expect(chip.getAttribute("type")).toBe("button");
   });
 
+  it("marks its count as new only when told, as the bell's is", () => {
+    const { container, rerender } = render(
+      <Chip count={3} onClick={vi.fn()}>
+        A
+      </Chip>,
+    );
+    expect(container.querySelector("[data-tone='new']")).toBeNull();
+    rerender(
+      <Chip count={3} countTone="new" href="/a">
+        A
+      </Chip>,
+    );
+    expect(container.querySelector("a [data-tone='new']")?.textContent).toBe("3");
+  });
+
   it("says it opens a dialog only when told", () => {
     const { rerender } = render(<Chip onClick={vi.fn()}>More</Chip>);
     expect(screen.getByRole("button").hasAttribute("aria-haspopup")).toBe(false);

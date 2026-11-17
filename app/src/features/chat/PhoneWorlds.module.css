@@ -44,8 +44,8 @@
   /* The cue: a chevron over the end's fade while more lies beyond, at the planets' middle, nudging toward it. */
   .cue {
     position: absolute;
-    inset-block-start: calc(var(--space-2xs) + var(--control-m) / 2);
-    inset-inline-end: var(--space-2xs);
+    inset-block-start: calc(var(--space-xs) + var(--control-m) / 2);
+    inset-inline-end: var(--space-s);
     translate: 0 -50%;
     /* layout: the design system's chevron points down; turned to point toward the end, either way of reading */
     rotate: calc(-90deg * var(--dir));
@@ -60,7 +60,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .row[data-to="true"] .cue {
-      animation: nudge var(--motion-ambient) var(--ease-standard) infinite;
+      animation: nudge var(--motion-ambient) var(--ease-standard) 2;
     }
   }
 
@@ -77,9 +77,9 @@
     gap: var(--space-2xs);
     /* layout: the list's own margin gone */
     margin: 0;
-    padding-block: var(--space-2xs) var(--space-3xs);
-    /* layout: the first item's box on the screen's 16 px line */
-    padding-inline: var(--space-s);
+    padding-block: var(--space-xs) var(--space-2xs);
+    /* layout: the first disc, centred in its item, on the screen's 16 px line */
+    padding-inline: calc(var(--space-s) - (var(--thumb-l) - var(--control-m)) / 2);
     list-style: none;
     inline-size: max-content;
   }
@@ -109,6 +109,12 @@
     inline-size: var(--control-m);
     block-size: var(--control-m);
     border-radius: var(--radius-pill);
+  }
+
+  /* "All" is a grid (the utility that centres its icon), so a block: centred in its item as the planets' inline discs are. */
+  .all {
+    /* layout: a block in its item, centred as the planets' inline discs are by the item's text-align */
+    margin-inline: auto;
   }
 
   /* "All": a circle in the strong line, holding its icon. */

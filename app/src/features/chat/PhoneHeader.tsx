@@ -17,13 +17,14 @@ export interface PhoneHeaderProps {
 
 export function PhoneHeader({ rooms, chips, search }: PhoneHeaderProps) {
   return (
-    <Cluster space="2xs" wrap="no" className={styles["bar"]}>
+    <Cluster space="xs" wrap="no" className={styles["bar"]}>
       <Cluster space="3xs" wrap="no" className={styles["tools"]}>
         {rooms}
         {search.onSelect === undefined ? null : (
           <IconButton icon={search.icon} label={search.label} size="s" emphasis="plain" onClick={search.onSelect} />
         )}
       </Cluster>
+      {chips === undefined || chips === null ? null : <span className={styles["rule"]} aria-hidden="true" />}
       <div className={styles["chips"]}>{chips}</div>
     </Cluster>
   );

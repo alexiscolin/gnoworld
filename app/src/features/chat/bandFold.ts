@@ -26,8 +26,10 @@ export function followLines(
     "scroll",
     ({ target }) => {
       if (!(target instanceof HTMLElement) || !target.matches('ol[aria-label="Messages"]')) return;
-      // The control in use stays where it is: no fold under a finger on the band's own chips and buttons.
-      if (screen.querySelector("[data-phone-band]")?.contains(document.activeElement)) return;
+      // The control in use stays where it is: no fold under the keyboard's focus on the band's own chips and buttons (a tapped one keeps the
+      // focus on Android, and must not hold the band open).
+      const used = document.activeElement;
+      if (screen.querySelector("[data-phone-band]")?.contains(used) && used?.matches(":focus-visible") === true) return;
       set((folded) => nextFold(folded, awayFromEnd(target)));
     },
     { capture: true, signal },

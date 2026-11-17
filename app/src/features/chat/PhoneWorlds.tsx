@@ -179,7 +179,7 @@ export function PhoneWorlds(props: WorldsProps) {
         </ul>
       </div>
       <span aria-hidden="true" className={styles["cue"]}>
-        <Icon name="chevron" size="s" />
+        <Icon name="chevron" size="m" />
       </span>
     </nav>
   );

@@ -65,6 +65,11 @@ describe("a phone's place band", () => {
     );
   });
 
+  it("says where the place is at rest without its name, and the whole kicker once folded", () => {
+    const box = draw({ place: place({ name: "World" }) });
+    expect(all(box, ".label").map((each) => each.textContent)).toEqual(["Onyx", "Onyx · World"]);
+  });
+
   it("is a region named by the place, the world's own plate, folded by its flag", () => {
     const section = one(draw(), "section");
     expect(section.getAttribute("aria-label")).toBe("Golf");

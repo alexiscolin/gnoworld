@@ -11,6 +11,12 @@ export interface ChatWorld {
   realms?: readonly string[] | undefined;
 }
 
+// The kicker's parts but the place's own name ("Onyx · Bubble" over "Bubble" says Bubble twice): where the place is. Falls back to the whole.
+export const whereOf = (kicker: string, name: string): string => {
+  const parts = kicker.split(" · ").filter((part) => part.toLowerCase() !== name.toLowerCase());
+  return parts.length === 0 ? kicker : parts.join(" · ");
+};
+
 /** What the chat's header, its column of worlds, its info panel and its pills say of a place in `universe`: `kicker` says
  * where it is; the place's own `earth` and `realms` choose its pills (Dock.tsx). */
 export const chatPlace = (

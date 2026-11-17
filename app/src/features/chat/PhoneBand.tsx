@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } fr
 import { groundOn } from "../../earthGround.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
+import { whereOf } from "./place.ts";
 import { worldOf } from "./PlaceView.tsx";
 import { askPlanet, whenIdleAndSeen } from "../../planetGate.ts";
 import styles from "./PhoneBand.module.css";
@@ -66,6 +67,21 @@ function Planet({ place }: { place: ChatPlace }) {
   );
 }
 
+// At rest where the place is, its name being the line under; folded the whole kicker, as before. One line each, cut where it is long.
+function Kickers({ place }: { place: ChatPlace }) {
+  const line = (shown: string | undefined, when: string | undefined) => (
+    <div className={`${styles["kicker"] ?? ""} ${when ?? ""} truncate`}>
+      <Kicker>{shown}</Kicker>
+    </div>
+  );
+  return (
+    <>
+      {line(whereOf(place.kicker, place.name), styles["rest"])}
+      {line(place.kicker, styles["folded"])}
+    </>
+  );
+}
+
 export function PhoneBand({
   place,
   title,
@@ -115,7 +131,7 @@ export function PhoneBand({
         />
         <Stack space="3xs" className={styles["text"]}>
           <Stack space="3xs" aria-hidden="true">
-            <Kicker>{place.kicker}</Kicker>
+            <Kickers place={place} />
             <Cluster space="2xs" wrap="no" className={styles["name"]}>
               <span className={`${styles["rest"] ?? ""} truncate`}>{place.name}</span>
               <span className={`${styles["folded"] ?? ""} truncate`}>{title}</span>

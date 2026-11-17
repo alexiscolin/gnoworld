@@ -160,7 +160,7 @@
 
     :root:has(.worlds) {
       --phone-worlds: calc(
-        var(--control-m) + var(--space-2xs) * 2 + var(--space-3xs) + var(--space-xs) + var(--line-width) +
+        var(--control-m) + var(--space-xs) + var(--space-2xs) * 2 + var(--space-xs) + var(--line-width) +
           env(safe-area-inset-bottom)
       );
     }

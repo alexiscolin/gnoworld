@@ -58,6 +58,13 @@
     font: var(--font-card-title);
   }
 
+  /* The kicker (the design system's Kicker takes no class): its box is the wrapper's, which truncates (the utility): one line, cut with an
+     ellipsis, never a second row that moves the name. */
+  .kicker > p {
+    /* layout: the words are the wrapper's own inline content, so its ellipsis cuts them */
+    display: contents;
+  }
+
   .counts {
     min-inline-size: 0;
   }
@@ -106,6 +113,12 @@
     scale: 0.5;
   }
 
+  /* The half-size disc sits 12 px under the band's top, its arc showing as at rest, never cut flat by the screen's edge. */
+  .band[data-folded] .planet,
+  :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus:not(dialog *)) .band .planet {
+    translate: 0 calc(50% + var(--space-xs));
+  }
+
   .band[data-folded] :is(.rest, .counts),
   :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus:not(dialog *)) .band :is(.rest, .counts) {
     display: none;
@@ -137,16 +150,22 @@
       /* layout: the place at the start, the rooms' row in the rest */
       display: grid;
       /* layout: the two parts' shares */
-      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      grid-template-columns: max-content minmax(0, 1fr);
       /* layout: one line of the band's rows */
       align-items: center;
       /* layout: one line of the band's rows */
-      column-gap: var(--space-xs);
+      column-gap: var(--space-l);
       padding-block: var(--space-2xs);
+    }
+
+    .place {
+      /* layout: the words' own width, the planet being the band's (its end, not this cell's) */
+      padding-inline-end: 0;
     }
 
     .planet {
       scale: 0.5;
+      translate: 0 calc(50% + var(--space-xs));
     }
 
     .rest,

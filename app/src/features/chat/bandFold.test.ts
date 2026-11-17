@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { awayFromEnd, FAR, followLines, NEAR, nextFold } from "./bandFold.ts";
 
 describe("the place band's fold", () => {
@@ -67,6 +67,34 @@ describe("the place band's fold", () => {
     chip.blur();
     list.dispatchEvent(new Event("scroll"));
     expect(told).toEqual([true]);
+    stop.abort();
+    screen.remove();
+  });
+
+  it("folds when the focus left in the band is no keyboard's (a tapped chip keeps it on Android)", () => {
+    const screen = document.createElement("div");
+    const band = document.createElement("section");
+    band.setAttribute("data-phone-band", "");
+    const chip = document.createElement("a");
+    chip.href = "#";
+    band.append(chip);
+    const list = document.createElement("ol");
+    list.setAttribute("aria-label", "Messages");
+    screen.append(band, list);
+    document.body.append(screen);
+    Object.defineProperties(list, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 400, configurable: true },
+    });
+    const visible = vi.spyOn(chip, "matches").mockReturnValue(false);
+    const told: boolean[] = [];
+    const stop = new AbortController();
+    followLines(screen, (fold) => told.push(fold(false)), stop.signal);
+    chip.focus();
+    list.scrollTop = 0;
+    list.dispatchEvent(new Event("scroll"));
+    expect(told).toEqual([true]);
+    visible.mockRestore();
     stop.abort();
     screen.remove();
   });
