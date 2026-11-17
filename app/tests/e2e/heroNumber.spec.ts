@@ -12,9 +12,8 @@ const NUMBER = "[data-hero='number']";
 // nor with the count the fixtures serve.
 const COUNT = "534";
 
-// Serves the recorded file and its count, and counts the requests for each; a held count answers only once `release` is called, and a
-// missing one is the host's 404, as a deployment's before the job's first pass.
-async function served(page: Page, { held = false, missing = false } = {}) {
+// Serves the recorded file and its count, and counts the requests for each; a held count answers only once `release` is called.
+async function served(page: Page, { held = false } = {}) {
   const asked = { worlds: 0, count: 0 };
   let release: () => void = () => undefined;
   const released = new Promise<void>((done) => {
@@ -28,14 +27,13 @@ async function served(page: Page, { held = false, missing = false } = {}) {
   await page.route("**/worlds-count.json", async (route) => {
     asked.count += 1;
     await released;
-    await (missing
-      ? route.fulfill({ status: 404 })
-      : route.fulfill({ body: COUNTED, contentType: "application/json" }));
+    await route.fulfill({ body: COUNTED, contentType: "application/json" });
   });
   return { worlds: () => asked.worlds, count: () => asked.count, release };
 }
 
-for (const width of [390, 1280]) {
+// A computer's width alone: a phone has no home page, it opens straight into a chat (D13720).
+for (const width of [1280]) {
   test.describe(`at ${String(width)} px`, () => {
     test.use({ viewport: { width, height: 844 } });
 
@@ -50,8 +48,8 @@ for (const width of [390, 1280]) {
       expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldSpace")), "no scene ran").toBe(false);
       await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
       expect(file.count()).toBe(1);
-      // The page preloads the worlds' file for what is not a phone (preloads.ts, in the HTML), once, whether the scene runs or not.
-      expect(file.worlds()).toBe(width === 390 ? 0 : 1);
+      // The page preloads the worlds' file (preloads.ts, in the HTML), once, whether the scene runs or not.
+      expect(file.worlds()).toBe(1);
     });
 
     // The hero as the frames draw it (2 to 8), with a count: from its kicker to its actions, the live line and the ticker left out.
@@ -95,37 +93,26 @@ for (const width of [390, 1280]) {
   });
 }
 
-// The phone rule (D13711): a phone is the full chat alone, so even where the scene could run (`?test-gpu`) it asks nothing of the cosmos, the
-// worlds' file included, has no View in space, and keeps its number all the same.
+// The phone rule (D13711, D13720): a phone has no home page; its home is the Earth's general room, the full chat alone, so even where the
+// scene could run (`?test-gpu`) it draws no scene and offers no View in space. Its chat reads the worlds' file, as a computer's does.
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  const withNoSpace = async (page: Page, missing: boolean, line: string) => {
+  test("the home opens the Earth's general room, with no View in space and no scene", async ({ page }) => {
     // A first visit's welcome card is not the page under test: it is told away.
     await page.addInitScript(() => {
       localStorage.setItem("gnoworld:welcomed", "1");
     });
-    const file = await served(page, { missing });
+    await served(page);
     await page.goto("/?test-gpu");
     await hydrated(page);
-    await expect(page.locator("h1")).toHaveText(line);
+    await expect(page).toHaveURL(/\/earth\?chat=full$/);
+    await expect(page.locator("h1")).toHaveText("#general");
     await page.waitForLoadState("load");
+    await expect(page.locator(NUMBER)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
-    expect(file.count()).toBe(1);
-    expect(file.worlds(), "no worlds' file on a phone").toBe(0);
     expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldSpace")), "no scene ran").toBe(false);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
-  };
-
-  test("shows the number, with no View in space, and asks no worlds' file nor scene", async ({ page }) => {
-    await withNoSpace(page, false, `${COUNT} worlds in Onyx`);
-    await expect(page.locator(NUMBER)).toHaveText(COUNT);
-  });
-
-  test("with no count served, names the worlds without a number and still asks no worlds' file nor scene", async ({
-    page,
-  }) => {
-    await withNoSpace(page, true, "Worlds in Onyx");
   });
 });
 
