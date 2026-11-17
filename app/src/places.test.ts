@@ -111,7 +111,7 @@ describe("the worlds of the data files", () => {
         slug: "gnosh-ai",
         name: "gnosh.ai",
         description:
-          "gnosh.ai, a colony round gno.land's sun: an AI harness that thinks in gno, running gno code for its planning and memory.",
+          "gnosh.ai, a station round gno.land's sun: an AI harness that thinks in gno, running gno code for its planning and memory.",
         universe: "onyx",
         testnet: true,
         path: "/w/gnosh-ai",
