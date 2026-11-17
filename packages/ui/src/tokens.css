@@ -235,6 +235,8 @@
     --plate-fill: visible;
     /* What a plate's cards lay their wash on where it is not the plate's own fill: unset, the plate's --color-plate (Panel.module.css). */
     --plate-ground: initial;
+    /* What hides the plate where a framed planet stands in front of it (the app's globe.module.css); none elsewhere. */
+    --plate-mask: none;
     --color-plate-scene: var(--p-plate-scene);
     --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
 

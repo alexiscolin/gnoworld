@@ -79,6 +79,68 @@ test.describe("a texture that does not come", () => {
 });
 
 // A phone has no globe nor views bar (D13711): the Earth is its full chat, and the textures' credit stands in the Rooms drawer.
+// The framed Earth stands in front of the plate's words, masking them under its disc, yet takes none of their clicks or keys (D13735): a
+// button set just inside its limb, in the plate, is the one a click there reaches, and Tab reaches it.
+test.describe("the framed planet in front of the plate", () => {
+  test.use({ viewport: COMPUTER });
+
+  test("masks the plate under its disc and leaves its controls pressable and reachable", async ({ page }) => {
+    await page.goto(EARTH);
+    await hydrated(page);
+    await expect(kept(page)).toHaveAttribute("data-earth", "drawn", SLOW);
+    const plate = page.locator("[data-look='plate']");
+    expect(await plate.evaluate((box) => getComputedStyle(box).maskImage)).toContain("radial-gradient");
+    await plate.evaluate((box) => {
+      const globe = document.querySelector("[data-globe]")?.getBoundingClientRect();
+      const own = box.getBoundingClientRect();
+      if (globe === undefined) throw new Error("no globe");
+      // Inside the disc: 8 px right of its box's left edge, at its middle's height.
+      const [x, y] = [globe.left + 8, globe.top + globe.width / 2];
+      const under = document.createElement("button");
+      under.type = "button";
+      under.textContent = "Under the disc";
+      // Through the CSSOM: the site's policy refuses a style attribute set as text.
+      Object.assign(under.style, {
+        position: "absolute",
+        zIndex: "1",
+        left: `${String(x - own.left)}px`,
+        top: `${String(y - own.top)}px`,
+      });
+      under.addEventListener("click", () => {
+        under.dataset["pressed"] = "";
+      });
+      box.prepend(under);
+    });
+    const under = page.getByRole("button", { name: "Under the disc" });
+    // The page's arrival still moves the plate a moment: its place once it stands still.
+    let at = { x: 0, y: 0 };
+    await expect
+      .poll(async () => {
+        const box = await under.boundingBox();
+        const next = box === null ? at : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        const still = next.x === at.x && next.y === at.y;
+        at = next;
+        return still;
+      }, SLOW)
+      .toBe(true);
+    expect(
+      await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.textContent, at),
+      "the disc takes no click",
+    ).toBe("Under the disc");
+    await page.mouse.click(at.x, at.y);
+    await expect(under).toHaveAttribute("data-pressed", "");
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    let reached = false;
+    for (let step = 0; step < 60 && !reached; step += 1) {
+      await page.keyboard.press("Tab");
+      reached = await under.evaluate((button) => document.activeElement === button);
+    }
+    expect(reached, "Tab reaches the button under the disc").toBe(true);
+  });
+});
+
 test.describe("a touch screen", () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
 
