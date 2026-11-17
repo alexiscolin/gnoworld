@@ -83,7 +83,7 @@ export function cliDocument(address: Address, memo: string): { document: string;
     signatures: null,
     memo,
   });
-  const command = `gnokey sign --tx-path link.json --chainid ${CLI_CHAIN} --account-number 0 --account-sequence 0 KEY && cat link.json`;
+  const command = `gnokey sign --tx-path link.json --chainid ${CLI_CHAIN} --account-number 0 --account-sequence 0 ${address} && cat link.json`;
   return { document, command };
 }
 
