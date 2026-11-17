@@ -592,11 +592,8 @@ never the choice written again.
     - a token that does not exist, a token nothing uses, and a module class nothing uses;
     - a primitive read outside the token file;
     - a private property read outside its module;
-  - **compositions, not blocks, do layout:** `check_css.py` refuses `display: flex` or
-    `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
-    outer `margin`, in a block's module. A block that truly needs one (an icon beside a
-    label) says why in a `/* layout: … */` comment, and the gate prints the count of those
-    exceptions so review sees it grow (converted screen by screen);
+  - **compositions first for layout:** a layout a composition already gives (`Stack`, `Cluster`, `Center`...) is taken
+    from it, which review checks; a block may lay out its own parts with no comment (D13804);
   - **no copied rules:** the same set of three or more declarations in two modules fails
     `check_css.py`; it becomes a composition, a utility or a `composes`;
   - a class a component names (`styles.x`, `styles["x"]`) that its module lacks fails
