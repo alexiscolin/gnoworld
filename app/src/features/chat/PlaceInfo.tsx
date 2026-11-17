@@ -29,6 +29,11 @@ export interface PlaceInfoProps {
   panelRef?: Ref<HTMLElement>;
 }
 
+// A sheet's page says the description itself: it hands none, and none is drawn.
+function About({ text, bare }: { text: string; bare: boolean }) {
+  return bare && text === "" ? null : <p className={styles["about"]}>{text}</p>;
+}
+
 export function PlaceInfo({
   view,
   kicker,
@@ -55,7 +60,7 @@ export function PlaceInfo({
             <h2 className={styles["name"]}>{name}</h2>
           </>
         )}
-        <p className={styles["about"]}>{description}</p>
+        <About text={description} bare={bare} />
         {sheet ? (
           <>
             {live === "" ? null : <p className={styles["live"]}>{live}</p>}

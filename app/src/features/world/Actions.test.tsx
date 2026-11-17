@@ -7,7 +7,7 @@ import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { noMedia } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
-import { InPageSheet } from "../chat/placePage.ts";
+import { InPageSheet, SheetClose } from "../chat/placePage.ts";
 import { Actions } from "./Actions.tsx";
 
 // Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share
@@ -195,26 +195,47 @@ describe("a world's main action, in a room nobody spoke in", () => {
   });
 });
 
-// A phone: the two main actions in equal halves on one line, Follow and Share small on a line of their own, never a primary and a
-// secondary wrapped to two rows.
+// A phone: every action on one line, the main one with its words, Say hi, Follow and Share as named icon buttons; never wrapped to two rows
+// and never a stretched press (its ::after would cover the sheet's own controls).
 describe("a phone's actions", () => {
   const rowsOf = (box: HTMLElement) =>
     [...box.querySelectorAll("[data-row]")].map((row) =>
-      [...row.querySelectorAll("a, button")].map((n) => n.textContent),
+      [...row.querySelectorAll("a, button")].map((n) => n.textContent || n.getAttribute("aria-label")),
     );
   const onPhone = (matches: boolean) => {
     vi.stubGlobal("matchMedia", () => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   };
 
-  it("sets the main actions in one row and Follow and Share in another", async () => {
+  it("sets the main actions, then Follow and Share, in one row", async () => {
     onPhone(true);
     const lead = { label: "Read its page", href: "#page" };
     const second = { label: "Try a function", href: "#try" };
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
     expect(rowsOf(box)).toEqual([
-      ["Read its page", "Try a function"],
-      ["Follow", "Share"],
+      ["Read its page", "Try a function", "Following", "Share"].map((n) => (n === "Following" ? "Follow" : n)),
     ]);
+    expect(box.querySelector("[data-stretch]")).toBeNull();
+  });
+
+  it("leads with the proposals' words and names Say hi, Follow and Share on the same row", async () => {
+    onPhone(true);
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    expect(rowsOf(box)).toEqual([["Read the proposals", "Say hi in govdao", "Follow", "Share"]]);
+    expect(box.querySelector("[data-stretch]")).toBeNull();
+  });
+
+  it("goes back to the chat from Say hi by the sheet's close, and by the chat's anchor outside a sheet", async () => {
+    onPhone(true);
+    const close = vi.fn();
+    const { box } = await mountInStore(
+      <SheetClose value={close}>
+        <Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />
+      </SheetClose>,
+    );
+    act(() => {
+      box.querySelector<HTMLElement>("[aria-label='Say hi in govdao']")?.click();
+    });
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("keeps the computer's single row", async () => {

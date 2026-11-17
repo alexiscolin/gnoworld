@@ -1,11 +1,11 @@
 // A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
 // (a size budget on that paint); the share sheet's code comes at the first press.
 import { PHONE_QUERY } from "@gnoworld/core";
-import { Button, Cluster, Stack, type IconName } from "@gnoworld/ui";
+import { Button, Cluster, IconButton, type IconName } from "@gnoworld/ui";
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
 import { fullChatHref } from "../../fullChat.ts";
-import { composerBox, sheetHref, useInPageSheet, useMedia } from "../chat/index.ts";
+import { composerBox, sheetHref, useInPageSheet, useMedia, useSheetClose } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
 import styles from "./Actions.module.css";
@@ -57,8 +57,27 @@ const useNobodySpoke = (room: string | undefined) =>
     return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
   });
 
-// A phone's two main actions are equal halves of one line (Actions.module.css); elsewhere they are as wide as their words.
-const fitOf = (phone: boolean) => (phone ? ({ stretch: true } as const) : ({ pad: "wide" } as const));
+// Say hi in the room: in words, and on a phone (no room for them) the icon, named, leads back to the chat (the sheet's close, else the chat's anchor).
+function SayHi({ room, phone }: { room: string; phone: boolean }) {
+  const close = useSheetClose();
+  if (!phone) {
+    return (
+      <Button href="#chat" pad="wide" icon="chat">
+        {`Say hi in ${room}`}
+      </Button>
+    );
+  }
+  return (
+    <IconButton
+      icon="chat"
+      label={`Say hi in ${room}`}
+      onClick={() => {
+        if (close === null) window.location.hash = "#chat";
+        else close();
+      }}
+    />
+  );
+}
 
 // The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
@@ -70,7 +89,7 @@ function Leads({
   second,
   phone,
 }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second"> & { phone: boolean }) {
-  const fit = fitOf(phone);
+  const fit = { pad: "wide" } as const;
   const first = useNobodySpoke(room);
   const sheet = useInPageSheet();
   if (proposals !== undefined && isSitePath(proposals)) {
@@ -79,11 +98,7 @@ function Leads({
         <Button href={proposalsHref(proposals, sheet)} {...fit} emphasis="solid" icon="arrow">
           Read the proposals
         </Button>
-        {room === undefined ? null : (
-          <Button href="#chat" {...fit} icon="chat">
-            {`Say hi in ${room}`}
-          </Button>
-        )}
+        {room === undefined ? null : <SayHi room={room} phone={phone} />}
       </>
     );
   }
@@ -115,7 +130,7 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
     };
   }, []);
   const phone = useMedia(PHONE_QUERY);
-  const share = (size: "s" | "m") => (
+  const share = (size: "m") => (
     <Button
       icon="share"
       size={size}
@@ -126,20 +141,21 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
       Share
     </Button>
   );
-  // On a phone: the main actions in halves, then Follow and Share small on a line of their own, never a primary and a secondary wrapped.
+  // On a phone: one line (Actions.module.css), the main action with its words, then Say hi, Follow and Share as icon buttons named for assistive
+  // technology; the line scrolls in itself rather than wrap.
   if (phone) {
     return (
-      <Stack space="2xs" className={className}>
-        <div data-row="" className={styles["halves"]}>
-          <Leads {...leads} phone />
-        </div>
-        <div data-row="">
-          <Cluster space="2xs" wrap="no" justify="start">
-            <FollowButton kind="worlds" id={follow} size="s" />
-            {share("s")}
-          </Cluster>
-        </div>
-      </Stack>
+      <div data-row="" className={[styles["line"], className].join(" ")}>
+        <Leads {...leads} phone />
+        <FollowButton kind="worlds" id={follow} quiet />
+        <IconButton
+          icon="share"
+          label="Share"
+          onClick={() => {
+            sharePlace(place);
+          }}
+        />
+      </div>
     );
   }
   return (

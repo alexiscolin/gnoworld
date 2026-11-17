@@ -18,10 +18,17 @@ export const InPageSheet = InPageSheetContext.Provider;
 
 export const useInPageSheet = (): boolean => use(InPageSheetContext);
 
+/** What closes the phone's sheet, for a control of the page that leads back to the chat behind it (Say hi); none outside the sheet. */
+const SheetCloseContext = createContext<(() => void) | null>(null);
+
+export const SheetClose = SheetCloseContext.Provider;
+
+export const useSheetClose = (): (() => void) | null => use(SheetCloseContext);
+
 /** The search parameter naming the open sheet. */
 export const SHEET = "sheet";
-/** A phone's sheets, the shallower first (phoneSheet.ts keeps their history). */
-export type Sheet = "info" | "page";
+/** A phone's sheet (phoneSheet.ts keeps its history). */
+export type Sheet = "page";
 
 /** `href` (a path of this site) opening on `sheet`. Here, not with the sheets' history, so a page's link to a sheet (the proposals') carries
  * none of it on the first screen. */

@@ -1,4 +1,4 @@
-/* The phone's info sheet: ui's whole-screen dialog (wide="screen") holds it; the info panel's own inset is the column's, the dialog's
+/* The phone's sheet: ui's whole-screen dialog (wide="screen") holds it; the info panel's own inset is the column's, the dialog's
    padding is the sheet's. */
 @layer components {
   /* The sheet is as wide as the dialog's padding box and no wider: every rule and row keeps the same inset at both ends. */
@@ -15,14 +15,39 @@
     }
   }
 
+  /* The sheet's page, then its foot (the info), a step apart; the plate's fill runs out to the sheet's edges by one inset, and its own inner padding
+     keeps its words on the title's line. */
+  @media (width < 900px) {
+    .sheet {
+      --_inset: var(--space-s);
+
+      max-inline-size: none;
+      /* layout: the plate and the foot in one column */
+      display: flex;
+      /* layout: stacked */
+      flex-direction: column;
+      /* layout: the plate and the foot a step apart */
+      gap: var(--space-m);
+      /* The sheet's box reaches the screen's edges by one inset, inside its clip, where the plate's fill ends. */
+      /* layout: out to the screen's edge */
+      margin-inline: calc(-1 * var(--_inset));
+      padding-inline: var(--_inset);
+    }
+
+    .sheet [data-look="plate"] {
+      /* layout: the fill out to the screen's edge */
+      margin-inline: calc(-1 * var(--_inset));
+    }
+  }
+
   .sheet > aside {
     padding: 0;
     inline-size: 100%;
   }
 
-  /* The arrow of Send points up and Back's points against the text: the icon's own points along it (PhoneHeader.module.css). */
-  .back svg {
-    rotate: 180deg;
+  /* The title row answers a swipe down (phoneSheet.ts): the browser leaves its vertical drag to the pointer events. */
+  .swipe dialog > * > :first-child {
+    touch-action: none;
   }
 
   /* The textures' credit at the sheet's foot: a plain muted link-look button, a 44 px row. */
@@ -31,16 +56,7 @@
     /* layout: a step of air between the links and the credits */
     margin-block-start: var(--space-xs);
     color: var(--color-text-muted);
-  }
-
-  /* "Its page", the sheet's one primary, as wide as the sheet. */
-  .page {
-    padding-block-start: var(--space-2xs);
-  }
-
-  .page > button {
-    inline-size: 100%;
-    /* layout: the icon and the words centred in the full-width button */
-    justify-content: center;
+    /* layout: the credits' words on the foot's left line, as wide as they are */
+    align-self: flex-start;
   }
 }

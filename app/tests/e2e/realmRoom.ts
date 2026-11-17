@@ -25,14 +25,13 @@ export async function realmRoomListed(page: Page, realm: string): Promise<void> 
   );
 }
 
-/** A phone's page sheet: the dialog Info opens with "Its page", the one that goes back to Info. */
+/** A phone's place sheet: the one dialog the band opens, its page above and its info at the foot, closed by "Back to the chat". */
 export const pageSheet = (page: Page) =>
-  page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Back to Info" }) });
+  page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Back to the chat" }) });
 
-/** A phone's full chat of a place with the page sheet open on its page: Info, then "Its page". */
+/** A phone's full chat of a place with its sheet open: the band's press. */
 export async function openPageSheet(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /^Info/ }).click();
-  await page.getByRole("dialog", { name: "Info" }).getByRole("button", { name: "Its page" }).click();
+  await page.getByRole("button", { name: /info and its page/ }).click();
   await expect(pageSheet(page)).toBeVisible();
 }
 

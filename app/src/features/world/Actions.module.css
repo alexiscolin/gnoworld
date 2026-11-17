@@ -1,13 +1,26 @@
-/* A phone's two main actions: equal halves of one line (never a primary and a secondary on two rows). */
+/* A phone's actions on one line: the main action takes the room left, the icon buttons keep their size, and a line too narrow scrolls in itself. */
 @layer components {
-  .halves {
-    /* layout: one row of equal columns, whatever the words' lengths */
-    display: grid;
-    /* layout: equal halves, each able to shrink under its words */
-    grid-auto-columns: minmax(0, 1fr);
-    /* layout: side by side */
-    grid-auto-flow: column;
-    /* layout: the two halves a step apart */
-    gap: var(--space-2xs);
+  @media (width < 900px) {
+    .line {
+      /* layout: one row, never wrapped */
+      display: flex;
+      /* layout: the actions a step apart */
+      gap: var(--space-2xs);
+      overflow: auto hidden;
+    }
+
+    /* The main action takes the room left and never gives its words up; a line too narrow scrolls. */
+    .line > * {
+      /* layout: no button squeezed */
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .line > :first-child {
+      /* layout: the main action takes the room left */
+      flex-grow: 1;
+      /* layout: the words centred in the wide button */
+      justify-content: center;
+    }
   }
 }

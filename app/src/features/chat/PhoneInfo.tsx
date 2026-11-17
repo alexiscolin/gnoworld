@@ -1,17 +1,16 @@
-// The info of a place on a phone (under 900 px), where the wide full chat's info column has no room: a sheet over the chat holding that
-// same Info (one copy of the panel's logic), opened from the chat's header. Its title and Close are ui's Dialog's, which gives the focus
-// back to the control that opened it. Closed it holds nothing; it draws no planet (the place band over the chat holds it).
-// "Its page" swaps the sheet's content for the place's page, with a way back: one modal.
+// A place on a phone (under 900 px), where the wide full chat's info column has no room: one sheet over the chat, opened from the band. It holds
+// the place's page (its plate: live chip, description, actions, stats, charts) and, at its foot, what the Info panel holds (the live line,
+// who is here, the links out, the credits: one copy of the panel's logic); a place with no page shows those alone. Its title and close are
+// ui's Dialog's, which gives the focus back to the control that opened it; a swipe down on the title row closes it too (phoneSheet.ts).
 import type { ComponentProps, MouseEvent } from "react";
 import { useRef } from "react";
-import { Dialog, IconButton, PlanetThumb } from "@gnoworld/ui";
-import { discOf } from "../../lib/worldDisc.ts";
-import { worldOf } from "./PlaceView.tsx";
+import { Dialog } from "@gnoworld/ui";
 import { Info } from "./Info.tsx";
 import styles from "./PhoneInfo.module.css";
-import { PageButton, PlacePage } from "./PlaceSheet.tsx";
+import { PlacePage } from "./PlaceSheet.tsx";
+import { usePlacePage } from "./placePage.ts";
+import { useSwipeClose } from "./phoneSheet.ts";
 import { sectionId } from "./sectionId.ts";
-import type { ChatPlace } from "./ChatScreen.tsx";
 import { Credits } from "./Worlds.tsx";
 
 type InfoProps = ComponentProps<typeof Info>;
@@ -30,21 +29,8 @@ function follow(event: MouseEvent<HTMLElement>, onClose: () => void) {
   else onClose();
 }
 
-// The title row's mark: the place's picture for the info, Back for the page.
-function Lead({ place, paged, onBack }: { place: ChatPlace; paged: boolean; onBack: () => void }) {
-  return paged ? (
-    <span className={styles["back"]}>
-      <IconButton icon="arrow" label="Back to Info" emphasis="plain" onClick={onBack} />
-    </span>
-  ) : (
-    <PlanetThumb src={discOf(worldOf(place))} name={place.name} decorative />
-  );
-}
-
 export function PhoneInfo({
   open,
-  paged,
-  onPage,
   onClose,
   place,
   panelRef,
@@ -52,72 +38,43 @@ export function PhoneInfo({
 }: Omit<InfoProps, "buttons" | "close" | "page" | "panelRef" | "planet"> &
   Partial<Pick<InfoProps, "panelRef">> & {
     open: boolean;
-    /** The page shows in place of the info (the address's, phoneSheet.ts). */
-    paged: boolean;
-    onPage: (paged: boolean) => void;
     onClose: () => void;
   }) {
   const ownRef = useRef<HTMLElement>(null);
-  // One heading for both: the place's kicker and name in the title row, with its picture at the start for the info and Back for the page
-  // (so Back costs no row of its own). Close and Escape go back to the info first.
+  const plate = usePlacePage();
+  const page = plate !== null && plate !== undefined;
   return (
-    <Dialog
-      title={place.name}
-      kicker={place.kicker}
-      lead={
-        <Lead
-          place={place}
-          paged={paged}
-          onBack={() => {
-            onPage(false);
-          }}
-        />
-      }
-      wide="screen"
-      open={open}
-      onClose={
-        paged
-          ? () => {
-              onPage(false);
-            }
-          : onClose
-      }
-    >
-      {open ? (
-        <div
-          className={styles["sheet"]}
-          onClick={(event) => {
-            follow(event, onClose);
-          }}
-        >
-          {paged ? (
-            <PlacePage place={place} />
-          ) : (
-            <>
-              <Info
-                {...info}
-                place={place}
-                panelRef={panelRef ?? ownRef}
-                buttons={null}
-                close={null}
-                planet={false}
-                bare
-                page={
-                  <div className={styles["page"]}>
-                    <PageButton
-                      primary
-                      onOpen={() => {
-                        onPage(true);
-                      }}
-                    />
-                  </div>
-                }
-              />
-              <Credits className={styles["credits"]} />
-            </>
-          )}
-        </div>
-      ) : null}
-    </Dialog>
+    <div {...useSwipeClose(onClose)} className={styles["swipe"]}>
+      <Dialog
+        title={place.name}
+        kicker={place.kicker}
+        closeLabel="Back to the chat"
+        wide="screen"
+        open={open}
+        onClose={onClose}
+      >
+        {open ? (
+          <div
+            data-sheet=""
+            className={styles["sheet"]}
+            onClick={(event) => {
+              follow(event, onClose);
+            }}
+          >
+            {page ? <PlacePage place={place} onClose={onClose} /> : null}
+            <Info
+              {...info}
+              place={page ? { ...place, description: "" } : place}
+              panelRef={panelRef ?? ownRef}
+              buttons={null}
+              close={null}
+              planet={false}
+              bare
+            />
+            <Credits className={styles["credits"]} />
+          </div>
+        ) : null}
+      </Dialog>
+    </div>
   );
 }

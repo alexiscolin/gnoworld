@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, createRef, useEffect } from "react";
+import { act, createRef, useEffect, type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
-import { all, button, click, modals, mount, one, settled } from "../../../tests/mount.tsx";
+import { all, click, modals, mount, one, settled } from "../../../tests/mount.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { PlacePageProvider } from "./placePage.ts";
 import { PhoneInfo } from "./PhoneInfo.tsx";
@@ -35,14 +35,12 @@ const dialogOf = (box: HTMLElement): HTMLDialogElement => {
   if (!(found instanceof HTMLDialogElement)) throw new Error("not a dialog");
   return found;
 };
-const draw = (open: boolean, onClose: () => void, page: { paged?: boolean; onPage?: (paged: boolean) => void } = {}) =>
+const draw = (open: boolean, onClose: () => void, plate: ReactNode = <p data-plate="x">the page</p>) =>
   mount(
     <MemoryRouter>
-      <PlacePageProvider value={<p data-plate="x">the page</p>}>
+      <PlacePageProvider value={plate}>
         <PhoneInfo
           open={open}
-          paged={page.paged ?? false}
-          onPage={page.onPage ?? (() => undefined)}
           onClose={onClose}
           place={place}
           talking={undefined}
@@ -54,23 +52,64 @@ const draw = (open: boolean, onClose: () => void, page: { paged?: boolean; onPag
     </MemoryRouter>,
   );
 const sheet = (open: boolean, onClose: () => void) => draw(open, onClose);
+const swipe = (target: Element, dy: number) => {
+  const at = (type: string, y: number) =>
+    target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: 50, clientY: y }));
+  act(() => {
+    at("pointerdown", 20);
+    at("pointerup", 20 + dy);
+  });
+};
 
-describe("the info sheet of a phone", () => {
-  it("holds the full chat's info when open, under the place's name", () => {
+describe("the place's sheet of a phone", () => {
+  it("is one sheet: the page above, the info's parts at its foot, no Back and no Its page", async () => {
     const box = sheet(true, () => undefined);
+    await settled(() => all(box, "[data-plate]").length === 1);
     expect(dialogOf(box).open).toBe(true);
-    expect(one(box, "aside").getAttribute("aria-label")).toBe("golf");
+    const names = all(box, "button").map((each) => each.getAttribute("aria-label") ?? each.textContent);
+    expect(names).toContain("Back to the chat");
+    expect(names).not.toContain("Its page");
+    expect(names.some((name) => name.startsWith("Back to Info"))).toBe(false);
+    const plate = one(box, "[data-plate]");
+    expect(plate.compareDocumentPosition(one(box, "aside")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(all(box, "button").some((each) => each.textContent === "Credits")).toBe(true);
+    expect(all(box, "a[target='_blank']").length).toBeGreaterThan(0);
   });
 
-  it("draws none of the info while closed", () => {
+  it("shows the foot alone for a place with no page, with its description", () => {
+    const box = draw(true, () => undefined, null);
+    expect(all(box, "[data-plate]")).toEqual([]);
+    expect(one(box, "aside").textContent).toContain("d");
+    expect(all(box, "p").some((each) => each.textContent === "d")).toBe(true);
+  });
+
+  it("leaves the description to the page when there is one", async () => {
+    const box = sheet(true, () => undefined);
+    await settled(() => all(box, "[data-plate]").length === 1);
+    expect(all(box, "p").some((each) => each.textContent === "d")).toBe(false);
+  });
+
+  it("draws nothing of it while closed", () => {
     const box = sheet(false, () => undefined);
     expect(all(box, "aside")).toEqual([]);
     expect(dialogOf(box).open).toBe(false);
   });
 
-  it("asks to close from its Close control", () => {
+  it("asks to close from its close control, named for where it leads", () => {
     const onClose = vi.fn();
-    click(all(sheet(true, onClose), "button").find((each) => each.getAttribute("aria-label") === "Close"));
+    click(all(sheet(true, onClose), "button").find((each) => each.getAttribute("aria-label") === "Back to the chat"));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("closes by a swipe down that begins on the title row, not by a short one nor one in the content", async () => {
+    const onClose = vi.fn();
+    const box = sheet(true, onClose);
+    await settled(() => all(box, "[data-plate]").length === 1);
+    swipe(one(box, "h2"), 30);
+    expect(onClose).not.toHaveBeenCalled();
+    swipe(one(box, "[data-plate]"), 200);
+    expect(onClose).not.toHaveBeenCalled();
+    swipe(one(box, "h2"), 120);
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -102,7 +141,7 @@ describe("the info sheet of a phone", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it("keeps a link to a place on its own page open, scrolling to it with no history entry", () => {
+  it("keeps a link to a place of its own open, scrolling to it with no history entry", () => {
     const onClose = vi.fn();
     const scrolled = vi.fn();
     Object.assign(HTMLElement.prototype, { scrollIntoView: scrolled });
@@ -119,69 +158,12 @@ describe("the info sheet of a phone", () => {
     expect(location.hash).toBe(before);
   });
 
-  it("asks for the page from its button, and draws the page under the place's name, with a way back to the info", async () => {
-    const onPage = vi.fn();
-    click(
-      button(
-        draw(true, () => undefined, { onPage }),
-        "Its page",
-      ),
-    );
-    expect(onPage).toHaveBeenCalledWith(true);
-    const onClose = vi.fn();
-    const box = draw(true, onClose, { paged: true, onPage });
-    await settled(() => all(box, "[data-plate]").length === 1);
-    expect(all(box, "aside")).toEqual([]);
-    expect(one(box, "h2").textContent).toBe("golf");
-    click(button(box, "Back to Info"));
-    expect(onPage).toHaveBeenLastCalledWith(false);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("goes back to the info, not out of the sheet, on Close or Escape while the page shows", () => {
-    const onPage = vi.fn();
-    const onClose = vi.fn();
-    click(
-      all(draw(true, onClose, { paged: true, onPage }), "button").find(
-        (each) => each.getAttribute("aria-label") === "Close",
-      ),
-    );
-    expect(onPage).toHaveBeenCalledWith(false);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("shows the kicker and the name once each, in the title row, for the info and for the page", () => {
+  it("shows the kicker and the name once each, in the title row", () => {
     const words = (box: HTMLElement, text: string) =>
       all(box, "*").filter((each) => each.children.length === 0 && each.textContent === text).length;
-    for (const paged of [false, true]) {
-      const box = draw(true, () => undefined, { paged });
-      expect(words(box, "k")).toBe(1);
-      expect(words(box, "golf")).toBe(1);
-      expect(words(box, "Info")).toBe(0);
-    }
-  });
-
-  it("puts Back at the title row's start while the page shows, so the focus goes Back, title, Close, and none of the info", async () => {
-    const box = draw(true, () => undefined, { paged: true });
-    await settled(() => all(box, "[data-plate]").length === 1);
-    const names = all(box, "button").map((each) => each.getAttribute("aria-label"));
-    expect(names.slice(0, 2)).toEqual(["Back to Info", "Close"]);
-    const back = one(box, "button[aria-label='Back to Info']");
-    expect(back.compareDocumentPosition(one(box, "h2")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(all(box, "button").every((each) => each.textContent !== "Back to Info")).toBe(true);
-  });
-
-  it("ends the info with the Credits button, and not the page", async () => {
-    const info = sheet(true, () => undefined);
-    expect(all(info, "button").some((each) => each.textContent === "Credits")).toBe(true);
-    const page = draw(true, () => undefined, { paged: true });
-    await settled(() => all(page, "[data-plate]").length === 1);
-    expect(all(page, "button").some((each) => each.textContent === "Credits")).toBe(false);
-  });
-
-  it("leads with the place's picture, not Back, while the info shows", () => {
-    const box = draw(true, () => undefined);
-    expect(all(box, "button").map((each) => each.getAttribute("aria-label"))).not.toContain("Back to Info");
+    const box = sheet(true, () => undefined);
+    expect(words(box, "k")).toBe(1);
+    expect(words(box, "golf")).toBe(1);
   });
 
   it("never draws the planet: the band over the chat holds it, and a second view would make a second WebGL context", async () => {

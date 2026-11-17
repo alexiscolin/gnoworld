@@ -10,7 +10,7 @@ import { useSheet } from "./phoneSheet.ts";
 import { useViewport } from "./viewport.ts";
 
 type Header = Pick<PhoneHeaderProps, "rooms" | "chips" | "search">;
-type Sheet = Omit<ComponentProps<typeof PhoneInfo>, "open" | "paged" | "onPage" | "onClose">;
+type Sheet = Omit<ComponentProps<typeof PhoneInfo>, "open" | "onClose">;
 
 /** The phone's band and its rooms' row. The sheets are the address's (phoneSheet.ts), so Back closes them one by one and a move to another page closes
  * them. The screen is the visual viewport's size meanwhile. */
@@ -39,7 +39,7 @@ export function PhoneTop({
         present={present}
         folded={folded}
         onInfo={() => {
-          move("info");
+          move("page");
         }}
       >
         <PhoneHeader rooms={header.rooms} chips={header.chips} search={header.search} />
@@ -47,10 +47,6 @@ export function PhoneTop({
       <PhoneInfo
         {...info}
         open={sheet !== undefined}
-        paged={sheet === "page"}
-        onPage={(paged) => {
-          move(paged ? "page" : "info");
-        }}
         onClose={() => {
           move(undefined);
         }}

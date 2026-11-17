@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ComponentProps, ReactNode } from "react";
+import { type ComponentProps, type ReactNode } from "react";
 import { Link, MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
@@ -8,28 +8,10 @@ import { PhoneTop } from "./phoneChat.tsx";
 
 // The sheet's own content is PhoneInfo.test.tsx's: here it is only open or shut.
 vi.mock("./PhoneInfo.tsx", () => ({
-  PhoneInfo: ({
-    open,
-    paged,
-    onPage,
-    onClose,
-  }: {
-    open: boolean;
-    paged: boolean;
-    onPage: (paged: boolean) => void;
-    onClose: () => void;
-  }) =>
+  PhoneInfo: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
     open ? (
       <>
-        <p>{paged ? "The page sheet" : "The info sheet"}</p>
-        <button
-          type="button"
-          onClick={() => {
-            onPage(!paged);
-          }}
-        >
-          flip
-        </button>
+        <p>The sheet</p>
         <button type="button" onClick={onClose}>
           shut
         </button>
@@ -90,44 +72,32 @@ const draw = (at = "/r/news?chat=full") => {
 };
 const sheets = (box: HTMLElement) => all(box, "p").map((p) => p.textContent);
 
-describe("a phone's Info sheet", () => {
-  it("draws no Back, and the place band with the rooms' row in it above the sheets", () => {
+describe("a phone's place sheet", () => {
+  it("draws no Back, and the place band with the rooms' row in it above the sheet", () => {
     const box = draw();
     expect(button(box, "Back")).toBeUndefined();
     expect(button(box, "band")?.getAttribute("data-band")).toBe("open");
     expect(one(box, "i").textContent + one(box, "b").textContent).toBe("roomschips");
   });
 
-  it("opens the Info sheet from the band's one press", () => {
-    const box = draw();
-    click(button(box, "band"));
-    expect(sheets(box)).toEqual(["The info sheet"]);
-    expect(one(box, "output").textContent).toBe("?chat=full&sheet=info");
-  });
-
-  it("opens at Info, by an entry whose address holds it", () => {
+  it("opens the one sheet, the place's page, from the band's press, by one entry whose address holds it", () => {
     const box = draw();
     expect(sheets(box)).toEqual([]);
     click(button(box, "band"));
-    expect(sheets(box)).toEqual(["The info sheet"]);
-    expect(one(box, "output").textContent).toBe("?chat=full&sheet=info");
+    expect(sheets(box)).toEqual(["The sheet"]);
+    expect(one(box, "output").textContent).toBe("?chat=full&sheet=page");
   });
 
-  it("opens the page sheet from the info and closes it back to the info, then the info", () => {
+  it("closes to the chat's own address (the browser's Back: phoneSheet.test.tsx)", () => {
     const box = draw();
     click(button(box, "band"));
-    click(button(box, "flip"));
-    expect(sheets(box)).toEqual(["The page sheet"]);
-    click(button(box, "flip"));
-    expect(sheets(box)).toEqual(["The info sheet"]);
     click(button(box, "shut"));
     expect(sheets(box)).toEqual([]);
     expect(one(box, "output").textContent).toBe("?chat=full");
   });
 
   it("opens on a reload or a link that holds the parameter", () => {
-    expect(sheets(draw("/r/news?chat=full&sheet=info"))).toEqual(["The info sheet"]);
-    expect(sheets(draw("/r/news?chat=full&sheet=page"))).toEqual(["The page sheet"]);
+    expect(sheets(draw("/r/news?chat=full&sheet=page"))).toEqual(["The sheet"]);
   });
 
   it("shuts as another page opens", () => {

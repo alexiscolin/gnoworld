@@ -1,15 +1,17 @@
-// A phone's sheets (Info, then the place's page) in the address, a search parameter the router owns: opening one adds a history entry, so
-// the browser's Back closes the page to the info, the info, and only then leaves; a reload or a link that holds it opens the sheet.
+// A phone's sheet (the place's page, with its info at the foot) in the address, a search parameter the router owns: opening it adds one
+// history entry, so the browser's Back closes it; a reload or a link that holds it opens the sheet.
 // Never a hash (the plates use them for their own sections) and never in a shared link (share/link.ts drops the query).
+import type { PointerEvent } from "react";
+import { useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { SHEET, type Sheet } from "./placePage.ts";
 
-const DEPTH = { info: 1, page: 2 } as const;
+const DEPTH = { page: 1 } as const;
 
 /** The sheet the search names; none for any other value. */
 export function sheetOf(params: URLSearchParams): Sheet | undefined {
   const asked = params.get(SHEET);
-  return asked === "info" || asked === "page" ? asked : undefined;
+  return asked === "page" ? asked : undefined;
 }
 
 // The entries to go back over, when they are this code's own: a close from the page straight to none goes back over the whole run, so
@@ -49,6 +51,32 @@ export function useSheet(): { sheet: Sheet | undefined; move: (to: Sheet | undef
             ? navigate(next, { replace: true })
             : navigate(-back);
       Promise.resolve(done).catch(reportError);
+    },
+  };
+}
+
+// A swipe down on the sheet's title row: a drag of this many pixels at least, more down than across, closes it.
+const SWIPE_DISTANCE = 64;
+
+/** Whether a drag of (dx, dy) pixels is a swipe down that closes the sheet. */
+export const swipedDown = (dx: number, dy: number): boolean => dy >= SWIPE_DISTANCE && dy > Math.abs(dx);
+
+/** Pointer handlers closing the sheet by a swipe down that begins on its title row (what is not the sheet's content, `[data-sheet]`). */
+export function useSwipeClose(onClose: () => void) {
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  return {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      const inside = event.target instanceof Element && event.target.closest("dialog") !== null;
+      const title = event.target instanceof Element && event.target.closest("[data-sheet]") === null;
+      startRef.current = inside && title ? { x: event.clientX, y: event.clientY } : null;
+    },
+    onPointerUp: (event: PointerEvent<HTMLElement>) => {
+      const start = startRef.current;
+      startRef.current = null;
+      if (start !== null && swipedDown(event.clientX - start.x, event.clientY - start.y)) onClose();
+    },
+    onPointerCancel: () => {
+      startRef.current = null;
     },
   };
 }
