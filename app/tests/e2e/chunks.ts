@@ -15,7 +15,7 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 
 /** Each late chunk by its name, the chunks a page holds before it (their closures are not its weight), and its cap in bytes. `after`
  * absent: the chunk alone. */
-// Four chunks are capped: `scene` (three is in the `earth` chunk it imports), `Rail`, `thumbs` and `generated`. Each cap is the measured
+// Five chunks are capped: `scene` (three is in the `earth` chunk it imports), `Rail`, `thumbs`, `generated` and `gnoshColony`. Each cap is the measured
 // weight and 256 B; the first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 194,353 B measured, 256 B ahead.
@@ -27,6 +27,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "thumbs", cap: 2692 },
   // The temperate worlds' coasts, shapes and climates and the cream veins.
   { chunk: "generated", cap: 10_189 },
+  // gnosh's colony, asked when the scene draws it near (D13746): its crown, its hull drawn in the code, its lights.
+  { chunk: "gnoshColony", cap: 8000 },
 ];
 
 /** The one built file of a chunk's name (`scene` for `scene-B9x_Qa1z.js`, never `sceneView-…`); none, or two, throws. */

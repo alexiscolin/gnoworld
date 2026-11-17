@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { placeOf, type Planet, type System } from "../layout.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { EarthGround } from "./ground.ts";
@@ -336,5 +336,55 @@ describe("EarthGround on a page the Earth was drawn turned to its hour", () => {
     const wrapped = (d: number) => d - 360 * Math.round(d / 360);
     expect(Math.abs(extra)).toBeGreaterThan(1);
     expect(wrapped(ground.facing(earth, 40, view).lon - before.lon)).toBeCloseTo(wrapped(extra), 6);
+  });
+});
+
+// gnosh's colony has no ground of its own: its marks stand on points of its hull (colony/crown.ts), turn as the colony turns, and hide where
+// their face turns from the eye or the colony stands between them and it, never in the void (D13745).
+describe("a colony's marks", () => {
+  const seen = {
+    eye: { x: 0, y: 0, z: 5 },
+    project: (at: { x: number; y: number }, out: { x: number; y: number }) => {
+      [out.x, out.y] = [at.x, at.y];
+      return true;
+    },
+  };
+  const hullOf = () => ({
+    anchorFor: vi.fn((_ground: Vector3, at: Vector3, out: Vector3) => {
+      at.set(0, 0, 0.8);
+      out.set(0, 0, 1);
+    }),
+    blocks: vi.fn(() => false),
+  });
+
+  it("stands a mark on the hull point its spot gives, facing the eye, as long as nothing of the colony stands before it", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    const hull = hullOf();
+    ground.hull = hull;
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    ground.place(planet("gnosh-ai"), { seconds: 0, step: 0.1 }, seen);
+    expect(hull.anchorFor).toHaveBeenCalledOnce();
+    expect(placed.at(-1)).toEqual([1, 0, true]);
+    hull.blocks.mockReturnValue(true);
+    ground.place(planet("gnosh-ai"), { seconds: 0, step: 0.1 }, seen);
+    expect(placed.at(-1)?.[2]).toBe(false);
+  });
+
+  it("turns its marks with the colony: a quarter turn on, the point has moved with the hull and faces away", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    ground.hull = hullOf();
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    ground.place(planet("gnosh-ai"), { seconds: Math.PI / 2 / SPIN, step: 0.1 }, seen);
+    const [x, , front] = placed.at(-1) ?? [];
+    expect(x).toBeCloseTo(0.2, 5);
+    expect(front).toBe(false);
   });
 });
