@@ -54,13 +54,18 @@ export const login = (account: string, passphrase: string): Step[] => [
   ["AUTHENTICATE \\+", `AUTHENTICATE ${btoa(`\0${account}\0${passphrase}`)}`],
 ];
 
-// An account in a page that logged in with Adena's stand-in, the test wallet of that name: its address.
+// An account in a page that logged in with Adena's stand-in, the test wallet of that name: its address. A phone's header keeps Connect in
+// its menu and a phone opens into a chat: the login is made at a computer's width, the page's size given back after.
 export async function logIn(page: Page, as = ""): Promise<string> {
+  const size = page.viewportSize();
+  const narrow = size !== null && size.width < 900;
+  if (narrow) await page.setViewportSize({ width: 1280, height: 900 });
   await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
   await connectButton(page).click();
   await expect(accountPill(page)).toBeVisible();
+  if (narrow) await page.setViewportSize(size);
   const named = `/__wallet?as=${encodeURIComponent(as)}`;
   const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());
   return wallet.address;

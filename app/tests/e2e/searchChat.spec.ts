@@ -88,6 +88,8 @@ test("on a phone the search takes the screen, and a result gives it back at the 
     text: `I think the ${found} stays`,
     time: new Date().toISOString(),
   });
+  // A phone hides the band's rooms row (its search) while the field has the focus: leaving the field brings it back.
+  await page.getByRole("textbox", { name: "Message #games" }).blur();
   await page.getByRole("button", { name: "Search messages" }).first().click();
   await field(page).fill(found);
   const hit = panel(page).getByRole("button", { name: /stays/ });

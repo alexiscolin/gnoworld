@@ -1,4 +1,4 @@
-import { lines, pressWhoIsHere } from "./chat.ts";
+import { lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
@@ -81,20 +81,6 @@ test.describe("the chat as the video shows it", () => {
     await expect(
       page.getByText("Earth", { exact: true }).and(page.locator("[popover][data-shown=true]")),
     ).toBeVisible();
-  });
-
-  test("goes back to the universe's home, from the header's left edge, a control that works", async ({ page }) => {
-    await logIn(page, "screen-close");
-    // Only a window with no dock has a way out of the chat (a computer's has its dock to close to): a phone's, whose header has Back. With no
-    // page of the site before it, Back goes home: /w/bubble is the default universe's, whose home is the site's root.
-    await open(page, { width: 390, as: ACCOUNT });
-    const back = page.getByRole("button", { name: "Back" });
-    const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(back)]);
-    expect(shut.x - bar.x).toBeLessThanOrEqual(24);
-    expect(shut.width).toBeGreaterThanOrEqual(44);
-    await back.click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
-    await expect(page.locator("[data-chat-layout]")).toHaveCount(0);
   });
 
   test("draws each line with its nebula, its name, its time at the right edge and its text below", async ({ page }) => {
@@ -202,7 +188,8 @@ test.describe("the chat as the video shows it", () => {
     page,
   }) => {
     await open(page, { width: 390, as: GUEST });
-    await expect(worlds(page)).toBeHidden();
+    // The worlds are a row at the foot, not a column.
+    await expect(worlds(page)).toBeVisible();
     await expect(info(page)).toBeHidden();
     await expect(roomsButton(page)).toBeVisible();
     expect((await box(page.getByRole("list", { name: "Messages" }))).x).toBeLessThan(40);
@@ -217,16 +204,16 @@ test.describe("the chat as the video shows it", () => {
     await logIn(page, "screen-phone");
     await open(page, { width: 390, as: ACCOUNT });
     const message = await box(page.getByRole("group", { name: "Message box" }));
-    const bar = await box(page.locator('[data-chat-layout] [data-region="header"]'));
+    const bar = await box(page.getByRole("region", { name: "Bubble", exact: true }));
     for (const each of [message, bar]) {
       expect(each.x).toBeGreaterThanOrEqual(0);
       expect(each.x + each.width).toBeLessThanOrEqual(390);
     }
     expect(await sideways(page)).toBe(0);
     expect((await axeOf(page).analyze()).violations).toEqual([]);
-    // The info panel has no room on a phone: Who's here opens the people, each with its Message button.
-    await pressWhoIsHere(page);
-    const dialog = page.getByRole("dialog", { name: "Who's here" });
+    // The info panel has no room on a phone: the band opens the place's sheet, whose foot holds the people, each with its Message button.
+    await page.getByRole("button", { name: "Bubble: info and its page" }).click();
+    const dialog = page.getByRole("dialog", { name: "Bubble" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: /^Message/ }).first()).toBeVisible();
   });
@@ -249,7 +236,7 @@ test.describe("the chat as the video shows it", () => {
       page,
     }) => {
       await open(page, { width: width, as: GUEST });
-      await expect(worlds(page)).toBeHidden();
+      await expect(worlds(page)).toBeVisible();
       await expect(info(page)).toBeHidden();
       await expect(roomsNav(page)).toBeHidden();
       await expect(roomsButton(page)).toBeVisible();

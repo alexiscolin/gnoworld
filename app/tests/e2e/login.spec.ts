@@ -104,7 +104,7 @@ test.describe("on a phone", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
   test("logs in on a computer only: no login button, and the words that say so", async ({ page }) => {
-    await adena(page);
+    // No Adena found (a phone has none): the menu says so; where Adena is found its Connect is a row of the menu instead.
     await page.goto("/");
     await hydrated(page);
     // A phone's header keeps the account's way in its menu: the words stand there.
@@ -126,7 +126,8 @@ for (const [width, here] of [
     test.use({ hasTouch: true, viewport: { width, height: 844 } });
 
     test(`says to use a computer in ${here}`, async ({ page }) => {
-      await adena(page);
+      // A screen with no Adena is told to use a computer; where Adena is found the menu holds its Connect instead.
+      if (width >= 900) await adena(page);
       await page.goto("/");
       await hydrated(page);
       const words = page.getByRole("banner").getByText(USE_A_COMPUTER);
@@ -147,23 +148,28 @@ for (const [width, size] of [
   [900, "13px"],
 ] as const) {
   test(`draws Get started's steps in ${size} at ${String(width)} px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 800 });
+    // Opened at a computer's width (a phone's header has no Connect where Adena is absent), then narrowed to the width read.
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     await hydrated(page);
     await connectButton(page).click();
+    await page.setViewportSize({ width, height: 800 });
     const steps = page.getByRole("dialog", { name: "Get started" }).getByRole("list").first();
     await expect(steps).toBeVisible();
     expect(await steps.evaluate((el) => getComputedStyle(el).fontSize)).toBe(size);
   });
 }
 
-// A narrow window with a mouse still shows the button, which a touch phone does not: it stays a 44 px target.
+// Where Adena is found a phone's menu holds Connect as a row: it stays a 44 px target.
 test("draws the header's Connect Adena 44 px tall at 390 px", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await adena(page);
   await page.goto("/");
   await hydrated(page);
-  expect((await connectButton(page).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await page.getByRole("button", { name: "Menu" }).click();
+  expect((await page.getByRole("menuitem", { name: /^Connect Adena/ }).boundingBox())?.height).toBeGreaterThanOrEqual(
+    44,
+  );
 });
 
 // The way out is in the account's menu, which a phone given a computer's session must still reach.
