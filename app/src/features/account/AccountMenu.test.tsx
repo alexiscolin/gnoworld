@@ -98,6 +98,9 @@ describe("the account's menu", () => {
         <Opened address={undefined} lead={null} onLogOut={() => undefined} onConnect={() => undefined} phone />,
       );
       expect(items(computer).slice(0, 2)).toEqual(["Connect Adena", "Log in with gnokey"]);
+      // A wide computer's header has its Connect, gnokey in it: its menu has no second one (the split's review).
+      const wide = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+      expect(items(wide)).not.toContain("Log in with gnokey");
       pointer(false);
       const touch = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} phone />);
       expect(items(touch)).not.toContain("Log in with gnokey");

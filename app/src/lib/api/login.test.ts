@@ -1,7 +1,7 @@
 import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TIMEOUT_MS } from "./http.ts";
-import { loginApi, pageLoginApi, type Fetcher } from "./login.ts";
+import { FILE_MAX_BYTES, loginApi, pageLoginApi, type Fetcher } from "./login.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -164,6 +164,12 @@ describe("the login's calls to the server", () => {
     const { api, sent } = server(json(200, { address: ADDRESS }));
     expect(await api.verifyFile({ ...FILE, file: "é".repeat(2049) })).toEqual({ ok: false, reason: "refused" });
     expect(sent).toHaveLength(0);
+    // Exactly the most the server reads is sent: it refuses only past it (server/src/login/cliProof.ts).
+    expect(await api.verifyFile({ ...FILE, file: "x".repeat(FILE_MAX_BYTES) })).toEqual({
+      ok: true,
+      value: { address: ADDRESS },
+    });
+    expect(sent).toHaveLength(1);
   });
 
   it("asks a ticket for Ergo with an empty object", async () => {
