@@ -49,6 +49,7 @@ export class Maps {
   readonly #relief: Late<ReliefMaps> = { asked: false };
   #earth: EarthMaps | undefined;
   #earthAsked = false;
+  #ahead = false;
   // The page's own maps still on their way: the other worlds' wait for them, so they never share the link with them.
   #pageLeft = 0;
 
@@ -77,6 +78,7 @@ export class Maps {
       loading.then(
         ([maps, clouds]) => {
           this.#earth = { ...maps, clouds };
+          if (this.#ahead) this.#askFull();
         },
         () => {
           if (!signal.aborted) setTimeout(() => (this.#earthAsked = false), AGAIN_MS);
@@ -84,6 +86,25 @@ export class Maps {
       );
     }
     return this.#earth;
+  }
+
+  /** The Earth is gone to (the home, its page): its full size and relief are asked with its first maps, not once it is held near, which a
+   * dive found them missing and swapped them in. Where it is only warmed (the galaxy, another world) they wait: 3.2 MB, and their bitmaps.
+   * Its first maps are the page's own, as the planet it brings close. */
+  earthAhead(): void {
+    this.#ahead = true;
+    this.earth(true);
+    this.#askFull();
+  }
+
+  #askFull(): void {
+    this.fullEarth();
+    this.heights();
+  }
+
+  /** The Earth's full-size maps if they came, asking none. */
+  get fullCame(): FullEarth | undefined {
+    return this.#full.value;
   }
 
   /** The Earth's full-size maps, once they came. */

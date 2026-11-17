@@ -1,9 +1,11 @@
-// How often the scene draws and how sharp: ambient drawing at 60 Hz at most, 30 where the window has no focus; the
+// How often the scene draws and how sharp: ambient drawing at 30 Hz at most, 15 where the window has no focus; the
 // pixel ratio stepped down by itself only where the frames cannot keep up.
 import type { Need } from "./redraw.ts";
 
-const AMBIENT_MS = 16.7;
-const UNFOCUSED_MS = 33.3;
+// A slow motion of its own: the galaxy's turn moves its median star a pixel a frame at 30 Hz, its fastest three (1440x900). Drawn at
+// 60 Hz it cost twice the GPU, and heated a laptop.
+const AMBIENT_MS = 1000 / 30;
+const UNFOCUSED_MS = 1000 / 15;
 
 /** The least time between two frames the loop works on: none for what moves by the hand or by an ease. */
 export const gapFor = (need: Need, focused: boolean): number =>

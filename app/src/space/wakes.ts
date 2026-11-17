@@ -5,7 +5,7 @@ const INPUTS = ["pointermove", "pointerdown", "wheel", "keydown", "touchstart"] 
 /** Calls `wakes.input` on each input and the window's resize, `wakes.change` as the page shows again, until `signal` aborts. */
 export function wakeOn(
   on: { page: EventTarget; window: EventTarget },
-  wakes: { input: () => void; change: () => void },
+  wakes: { input: (event: Event) => void; change: () => void },
   signal: AbortSignal,
 ): void {
   const { page, window } = on;
