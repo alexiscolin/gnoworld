@@ -13,16 +13,14 @@ export interface LoginViewProps {
   session: Login["session"];
   step: Login["step"];
   problem: Login["problem"];
-  /** Adena's way in. */
+  /** Adena's way in; the command line's is its menu's own (ConnectMenu.tsx). */
   onLogIn: () => void;
-  /** The command line's way in (D13881). */
-  onKey: () => void;
   /** The network's name, after the button in its pill, and after the words of a touch screen. */
   network?: ReactNode;
 }
 
 // The menu's code comes with Connect's first press, as the device's menu's does (AccountMenu.tsx).
-const ConnectMenu = lazy(async () => ({ default: (await import("./ConnectMenu.tsx")).ConnectMenu }));
+const ConnectMenu = lazy(() => import("./ConnectMenu.tsx"));
 
 /** What a phone is told where Adena is not found: atop a guest's menu, its header having no room for words. */
 export const USE_A_COMPUTER = "To log in, use a computer; once logged in you can write from here.";
@@ -33,7 +31,7 @@ const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…"
 const wordsOf = (step: Login["step"], stopped: string | undefined) =>
   stopped ?? (step === "idle" ? "Connect" : STEPS[step]);
 
-export function LoginView({ session, step, problem, onLogIn, onKey, network = null }: LoginViewProps) {
+export function LoginView({ session, step, problem, onLogIn, network = null }: LoginViewProps) {
   const [asked, setAsked] = useState(false);
   // There from the start, empty: a screen reader announces a region's change. Alone once the session is known or awaited, so no empty box
   // holds a gap after the account's pill.
@@ -67,7 +65,7 @@ export function LoginView({ session, step, problem, onLogIn, onKey, network = nu
         <span className="pill-group">
           {asked ? (
             <Suspense fallback={trigger}>
-              <ConnectMenu words={words} lead={lead} busy={step !== "idle"} onAdena={onLogIn} onKey={onKey} />
+              <ConnectMenu words={words} lead={lead} busy={step !== "idle"} onAdena={onLogIn} />
             </Suspense>
           ) : (
             trigger

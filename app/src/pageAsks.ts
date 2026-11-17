@@ -5,15 +5,7 @@ import { useSyncExternalStore } from "react";
 import { Heard } from "./lib/heard.ts";
 
 type Ask =
-  | "log-in"
-  | "key-login"
-  | "pick-name"
-  | "who-is-here"
-  | "jarvis"
-  | "jarvis-catch-up"
-  | "jarvis-ask"
-  | "jarvis-said"
-  | "rooms";
+  "log-in" | "pick-name" | "who-is-here" | "jarvis" | "jarvis-catch-up" | "jarvis-ask" | "jarvis-said" | "rooms";
 const eventOf = (ask: Ask) => `gnoworld:${ask}`;
 
 /** Asks the page's owner of `ask` to act. */

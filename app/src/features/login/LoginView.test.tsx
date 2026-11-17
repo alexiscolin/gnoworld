@@ -53,14 +53,7 @@ const said = (html: string) =>
     .trim();
 const view = (over: Partial<LoginViewProps> = {}) =>
   renderToStaticMarkup(
-    <LoginView
-      session={{ kind: "out" }}
-      step="idle"
-      problem={undefined}
-      onLogIn={() => undefined}
-      onKey={() => undefined}
-      {...over}
-    />,
+    <LoginView session={{ kind: "out" }} step="idle" problem={undefined} onLogIn={() => undefined} {...over} />,
   );
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => said(m[1] ?? ""));
 

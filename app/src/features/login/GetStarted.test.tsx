@@ -164,15 +164,14 @@ describe("the dialog Get started, opened and closed from the control", () => {
 });
 
 describe("the header's Connect (D13881)", () => {
-  it("asks the page for the command line's login from its gnokey row", async () => {
-    const heard = vi.fn();
-    window.addEventListener("gnoworld:key-login", heard);
+  // The header imports no device view: the gnokey row opens #key-login as a link to it does (deviceViews.ts), off the first screen.
+  it("opens the command line's login from its gnokey row, at #key-login", async () => {
     const box = mount(
       <LoginControl login={{ session: out, step: "idle", problem: undefined, chat: "off" }} logIn={vi.fn()} />,
     );
     await choose(box, "Connect", "gnokey");
-    expect(heard).toHaveBeenCalledOnce();
-    window.removeEventListener("gnoworld:key-login", heard);
+    expect(window.location.hash).toBe("#key-login");
+    window.location.hash = "";
   });
 
   it("offers no gnokey in Get started any more: Connect's menu holds it", async () => {

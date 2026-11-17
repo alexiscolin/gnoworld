@@ -9,13 +9,18 @@ export interface ConnectMenuProps {
   lead: ReactNode;
   busy: boolean;
   onAdena: () => void;
-  onKey: () => void;
 }
 
-export function ConnectMenu({ words, lead, busy, onAdena, onKey }: ConnectMenuProps) {
+/** gnokey opens the device view #key-login as a link to it does (deviceViews.ts): the header imports no device view. */
+export default function ConnectMenu({ words, lead, busy, onAdena }: ConnectMenuProps) {
   const items = [
     { label: "Adena", onSelect: onAdena },
-    { label: "gnokey", onSelect: onKey },
+    {
+      label: "gnokey",
+      onSelect: () => {
+        window.location.hash = "#key-login";
+      },
+    },
   ];
   return <Menu trigger={words} label="Connect with" lead={lead} busy={busy} items={items} openAtOnce />;
 }

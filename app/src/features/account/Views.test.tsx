@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import { MemoryRouter } from "react-router";
-import { act } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { modals, mount, settled } from "../../../tests/mount.tsx";
-import { askFor } from "../../pageAsks.ts";
 import { StoreProvider } from "../../storeContext.tsx";
-import { DeviceViews } from "./DeviceViews.tsx";
 import { Views } from "./Views.tsx";
 
 describe("the device's views", () => {
@@ -37,21 +34,6 @@ describe("the device's views", () => {
         </StoreProvider>
       </MemoryRouter>,
     );
-    await settled(() => document.querySelector("dialog[open]")?.textContent.includes("Log in with gnokey") === true);
-    expect(document.querySelector("dialog[open]")?.textContent).toContain("Your key signs a code offline");
-  });
-
-  it("opens it when Get started asks, from any place", async () => {
-    mount(
-      <MemoryRouter initialEntries={["/earth"]}>
-        <StoreProvider>
-          <DeviceViews universe="onyx" />
-        </StoreProvider>
-      </MemoryRouter>,
-    );
-    act(() => {
-      askFor("key-login");
-    });
     await settled(() => document.querySelector("dialog[open]")?.textContent.includes("Log in with gnokey") === true);
     expect(document.querySelector("dialog[open]")?.textContent).toContain("Your key signs a code offline");
   });
