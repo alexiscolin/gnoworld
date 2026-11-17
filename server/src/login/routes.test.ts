@@ -12,6 +12,8 @@ import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin, NONCE_ACTION, NONCE_LINK, NONCE_HOST } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
+import { cliBlock } from "./cliProof.ts";
+import { cliFile, cliKey, type CliKey } from "../testing/cliSigner.ts";
 
 // Written out, not imported: a cookie that loses its __Host- prefix must fail here.
 const SESSION = "__Host-session";
@@ -41,7 +43,10 @@ const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] 
   const app = makeApp(log, () => true);
   const login = makeLogin(db, { chains: ["onyx-1", "gnoland-1"], now, nonceCap });
   const tickets = makeTickets(db, { now });
-  app.route("/api/login", loginRoutes(login, { log, origins, proxy: PROXY, newAccountsPerHour, now, tickets }));
+  app.route(
+    "/api/login",
+    loginRoutes(login, { log, origins, proxy: PROXY, newAccountsPerHour, now, tickets, block: cliBlock }),
+  );
   const rows = (table: string): unknown => db.prepare(`SELECT count(*) AS n FROM ${table}`).get();
   return { app, db, clock, lines, rows, tickets };
 };
@@ -865,5 +870,183 @@ describe("tickets", () => {
     }
     expect(await answer(await mint(app, cookies[3]))).toEqual([429, TOO_MANY]);
     expect((await mint(app, cookies[3], { peer: "198.51.100.9" })).status).toBe(200);
+  });
+});
+
+describe("the command line's login (D13880)", () => {
+  const CliChallenge = z.strictObject({
+    nonce: z.string(),
+    memo: z.string(),
+    block: z.string(),
+    expiresAt: z.string(),
+  });
+  const cliChallenge = async (app: App, key: CliKey, sent: Sent = {}) => {
+    const response = await post(app, "cli/challenge", { body: { address: key.address }, ...sent });
+    expect(response.status).toBe(200);
+    return CliChallenge.parse(await response.json());
+  };
+  const cliVerify = (app: App, made: { nonce: string; memo: string }, { key, ...sent }: Sent & { key: CliKey }) =>
+    post(app, "cli/verify", {
+      body: { nonce: made.nonce, address: key.address, file: cliFile(key, made.memo) },
+      ...sent,
+    });
+  const causes = (lines: string[]) =>
+    lines.map((line) => /"event":"login_refused".*"error":"(\w+)"/.exec(line)?.[1]).filter(Boolean);
+
+  it("answers a code with its nonce, its one-line memo, the block to copy and its expiry, not to be cached", async () => {
+    const { app } = setup();
+    const key = cliKey();
+    const response = await post(app, "cli/challenge", { body: { address: key.address } });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const made = CliChallenge.parse(await response.json());
+    expect(made.memo).toContain("Domain: gnoworld.test Nonce: ");
+    expect(made.memo).not.toContain("\n");
+    expect(made.block).toBe(cliBlock(key.address, made.memo));
+    expect(made.block).toContain("--chainid gnoworld-link");
+    expect(made.block).not.toMatch(/broadcast|maketx/);
+  });
+
+  it("logs in with the signed file: the same cookie as Adena's, and a body with the address alone", async () => {
+    const { app } = setup();
+    const key = cliKey();
+    const response = await cliVerify(app, await cliChallenge(app, key), { key });
+    const token = tokenOf(response);
+    expect(response.headers.get("set-cookie")).toBe(
+      `${SESSION}=${token}; Max-Age=7776000; Path=/; HttpOnly; Secure; SameSite=Strict`,
+    );
+    expect(await answer(response)).toEqual([200, JSON.stringify({ address: key.address })]);
+    expect(await (await me(app, session(token))).text()).toBe(JSON.stringify({ address: key.address }));
+  });
+
+  it("logs in once when the same file arrives twice at once", async () => {
+    const { app, rows } = setup();
+    const key = cliKey();
+    const made = await cliChallenge(app, key);
+    const both = await Promise.all([
+      cliVerify(app, made, { key, peer: "198.51.100.20" }),
+      cliVerify(app, made, { key, peer: "198.51.100.21" }),
+    ]);
+    expect(both.map((response) => response.status).toSorted()).toEqual([200, 400]);
+    expect(rows("tokens")).toEqual({ n: 1 });
+  });
+
+  it("answers a replayed, expired, other-host or other-chain file as every other refused login, the cause in the log", async () => {
+    const { app, clock, lines } = setup({ origins: [ORIGIN, "https://other.test"] });
+    const key = cliKey();
+    const used = await cliChallenge(app, key);
+    await cliVerify(app, used, { key });
+    const [expired, elsewhere, chain] = [
+      await cliChallenge(app, key),
+      await cliChallenge(app, key),
+      await cliChallenge(app, key),
+    ];
+    const otherChain = cliFile(key, chain.memo, { doc: { chainId: "onyx-1" } });
+    const sent = [
+      await cliVerify(app, used, { key, peer: "198.51.100.1" }),
+      await cliVerify(app, elsewhere, { key, origin: "https://other.test", peer: "198.51.100.2" }),
+      await post(app, "cli/verify", {
+        body: { nonce: chain.nonce, address: key.address, file: otherChain },
+        peer: "198.51.100.3",
+      }),
+    ];
+    clock.now += 5 * MINUTE;
+    sent.push(await cliVerify(app, expired, { key, peer: "198.51.100.6" }));
+    for (const response of sent) expect(await answer(response)).toEqual([400, REFUSED]);
+    expect(causes(lines)).toEqual(["nonce", "nonce", "proof", "nonce"]);
+  });
+
+  it("refuses a body of any other shape, the same answer, nothing spent or written", async () => {
+    const { app, lines, rows } = setup();
+    const key = cliKey();
+    const made = await cliChallenge(app, key);
+    const file = cliFile(key, made.memo);
+    const good = { nonce: made.nonce, address: key.address, file };
+    const refused: [string, unknown][] = [
+      ["cli/challenge", "{"],
+      ["cli/challenge", {}],
+      ["cli/challenge", { address: misspelt(key.address) }],
+      ["cli/challenge", { address: `cosmos${key.address.slice(2)}` }],
+      ["cli/challenge", { address: "" }],
+      ["cli/challenge", { address: 1 }],
+      ["cli/challenge", { address: key.address, chainId: "onyx-1" }],
+      ["cli/verify", "{"],
+      ["cli/verify", { address: key.address, file }],
+      ["cli/verify", { ...good, nonce: "short" }],
+      ["cli/verify", { ...good, address: misspelt(key.address) }],
+      ["cli/verify", { ...good, file: { msg: [] } }],
+      ["cli/verify", { ...good, file: "x".repeat(4097) }],
+      ["cli/verify", { ...good, file: "é".repeat(2049) }],
+      ["cli/verify", { ...good, debug: true }],
+      ["cli/verify", { nonce: made.nonce, address: key.address, proof: {} }],
+    ];
+    const before = [rows("nonces"), rows("accounts"), rows("tokens")];
+    for (const [index, [path, body]] of refused.entries()) {
+      const response = await post(app, path, { body, peer: `198.51.100.${String(index + 30)}` });
+      expect(await answer(response)).toEqual([400, REFUSED]);
+    }
+    expect([rows("nonces"), rows("accounts"), rows("tokens")]).toEqual(before);
+    expect(causes(lines)).toEqual(refused.map(() => "body"));
+    expect((await post(app, "cli/verify", { body: good })).status).toBe(200);
+  });
+
+  it("refuses another site's Origin and a body not said to be JSON, before any work", async () => {
+    const { app, rows } = setup();
+    const key = cliKey();
+    for (const path of ["cli/challenge", "cli/verify"]) {
+      const body = { address: key.address };
+      expect((await post(app, path, { body, origin: "https://evil.test" })).status).toBe(403);
+      expect((await post(app, path, { body, origin: undefined })).status).toBe(403);
+      expect((await post(app, path, { body, type: "text/plain" })).status).toBe(415);
+    }
+    expect(rows("nonces")).toEqual({ n: 0 });
+  });
+
+  it("shares the login's limits: 10 calls a minute a visitor across both ways, and the new accounts an hour", async () => {
+    const { app } = setup({ newAccountsPerHour: 1 });
+    const [first, second] = [cliKey(), cliKey()];
+    expect((await cliVerify(app, await cliChallenge(app, first), { key: first })).status).toBe(200);
+    const refused = await cliVerify(app, await cliChallenge(app, second), { key: second });
+    expect(await answer(refused)).toEqual([429, TOO_MANY]);
+    for (let i = 0; i < 6; i++)
+      expect((await post(app, "challenge", { body: { chainId: "onyx-1" } })).status).toBe(200);
+    const body = { address: first.address };
+    expect(await answer(await post(app, "cli/challenge", { body }))).toEqual([429, TOO_MANY]);
+    expect((await post(app, "cli/challenge", { body, peer: "198.51.100.9" })).status).toBe(200);
+  });
+
+  it("counts its codes against the login's nonce cap, the Adena login's with them", async () => {
+    const { app } = setup({ nonceCap: 2 });
+    const body = { address: cliKey().address };
+    expect((await post(app, "challenge", { body: { chainId: "onyx-1" } })).status).toBe(200);
+    expect((await post(app, "cli/challenge", { body })).status).toBe(200);
+    expect(await answer(await post(app, "cli/challenge", { body, peer: "198.51.100.9" }))).toEqual([429, TOO_MANY]);
+    const adena = await post(app, "challenge", { body: { chainId: "onyx-1" }, peer: "198.51.100.9" });
+    expect(await answer(adena)).toEqual([429, TOO_MANY]);
+  });
+
+  it("logs a login with the account hashed and the route, never the token, the address, the nonce, the memo or the file", async () => {
+    const { app, lines } = setup();
+    const key = cliKey();
+    const made = await cliChallenge(app, key);
+    const file = cliFile(key, made.memo);
+    const token = tokenOf(await post(app, "cli/verify", { body: { nonce: made.nonce, address: key.address, file } }));
+    await post(app, "cli/verify", { body: { nonce: made.nonce, address: key.address, file } });
+    const logged = lines.join("");
+    expect(logged).toContain('"event":"login","route":"/api/login/cli/verify"');
+    expect(logged).toContain(createHmac("sha256", PEPPER).update(key.address).digest("hex"));
+    for (const secret of [token, key.address, made.nonce, made.memo, file]) expect(logged).not.toContain(secret);
+  });
+
+  it("is not mounted on the admin console's login", async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
+    opened.push(db);
+    const log = logger(PEPPER, () => true);
+    const settings = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
+    const [site, console] = [makeApp(log, () => true), makeApp(log, () => true)];
+    site.route("/api/login", loginFrom(db, settings, { log }));
+    console.route("/api/login", loginFrom(db, settings, { log, console: true }));
+    const key = cliKey();
+    expect((await post(site, "cli/challenge", { body: { address: key.address } })).status).toBe(200);
+    expect((await post(console, "cli/challenge", { body: { address: key.address } })).status).toBe(404);
   });
 });
