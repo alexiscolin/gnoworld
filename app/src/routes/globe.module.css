@@ -77,7 +77,7 @@
       /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; held so that, at the study's centre, the disc's limb,
          drawn 1.04 radii out (measured), would stand a step (--space-m) right of the plate's content edge */
       --_radius: min(37vi, 59vb, (var(--_study-x) - var(--_start) - var(--space-m)) / 1.04);
-      /* raw: Alexis's 55 px left of the study's centre, the same size (D13735): the limb up to 31 px over the content's edge */
+      /* raw: Alexis's 55 px left of the study's centre, the same size (D13735): the drawn limb 11 to 16 px over the content's edge */
       --_x: calc(var(--_study-x) - 55px);
     }
 
@@ -97,13 +97,14 @@
       --plate-ground: var(--color-plate-scene);
     }
 
-    /* The framed planet stands in front of the plate (D13735): the plate is masked by its disc, its limb 1.04 radii out, in the plate's
-       own box (from the page's edge, under the dock's top). A mask only hides: the plate's controls under it still take clicks and keys. */
+    /* The framed planet stands in front of the plate (D13735): the plate is hidden inside 1.03 radii and comes back by 1.07, across the
+       glow's falloff round the drawn limb (1.04), in the plate's own box (from the page's edge, under the dock's top). A mask only hides:
+       the plate's controls under it still take clicks and keys. */
     .globe[data-framing]:is([data-earth="drawn"], [data-world="drawn"]) + * {
       --plate-mask: radial-gradient(
-        circle calc(var(--_radius) * 1.04) at calc(var(--_x) - var(--page-edge)) calc(var(--_middle) - var(--dock-top)),
-        transparent 99.5%,
-        currentColor 100%
+        circle at calc(var(--_x) - var(--page-edge)) calc(var(--_middle) - var(--dock-top)),
+        transparent calc(var(--_radius) * 1.03),
+        currentColor calc(var(--_radius) * 1.07)
       );
     }
   }

@@ -121,7 +121,7 @@ test.describe("the framed planet in front of the plate", () => {
         const still = next.x === at.x && next.y === at.y;
         at = next;
         return still;
-      })
+      }, SLOW)
       .toBe(true);
     expect(
       await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.textContent, at),

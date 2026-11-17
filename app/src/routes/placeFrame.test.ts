@@ -18,13 +18,13 @@ describe("the framed planet", () => {
     expect(rule("--_start")).toBe("calc(var(--page-edge) + var(--plate-w) - var(--plate-inset-end))");
   });
 
-  // In front of the plate's words (D13735): the plate is masked by the disc, the planet's limb 1.04 radii out, in the plate's own box,
-  // which starts at the page's edge under the dock's top; a mask draws, it takes no click.
+  // In front of the plate's words (D13735): the plate is hidden inside 1.03 radii and comes back by 1.07, across the glow's falloff (the
+  // drawn limb is at 1.04), in the plate's own box, which starts at the page's edge under the dock's top; a mask draws, it takes no click.
   it("masks the plate where its disc stands, in the plate's own box", () => {
     // As one line: the formatter breaks the gradient over several.
     const mask = rule("--plate-mask").replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")");
     expect(mask).toBe(
-      "radial-gradient(circle calc(var(--_radius) * 1.04) at calc(var(--_x) - var(--page-edge)) calc(var(--_middle) - var(--dock-top)), transparent 99.5%, currentColor 100%)",
+      "radial-gradient(circle at calc(var(--_x) - var(--page-edge)) calc(var(--_middle) - var(--dock-top)), transparent calc(var(--_radius) * 1.03), currentColor calc(var(--_radius) * 1.07))",
     );
     expect(token("--plate-mask")).toBe("none");
     expect(read("../../../packages/ui/src/Panel/Panel.module.css")).toContain("mask-image: var(--plate-mask);");
