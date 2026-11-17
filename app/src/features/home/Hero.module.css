@@ -250,13 +250,9 @@
       /* raw: under the header's 96 px, as the list's kicker at 101 */
       max-block-size: calc(100dvb - 101px - var(--space-l));
       overflow: auto;
-    }
-  }
-
-  /* Where space cannot stand and the list shows, a window under 800 px high has no room for both over the page: both stay in its flow. */
-  @media (width >= 900px) and (height < 800px) {
-    .hero:has(~ .worlds[data-rail="fallback"]) {
-      position: static;
+      /* Room inside the scroll for a focus ring at the hero's edges, taken back outside, so the hero keeps its place. */
+      padding: calc(var(--focus-width) + var(--focus-offset));
+      margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
     }
   }
 

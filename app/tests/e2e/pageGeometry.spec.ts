@@ -495,10 +495,18 @@ test.describe("the chat's dock beside the plate", () => {
 // The home's hero stands at the cosmos' foot, 48 px from the left and 32 from the bottom, at every computer size: a wide and short window
 // (1798 by 726) put it back in the page's flow, under the logo. A window too short for it keeps it under the header, its room scrolled.
 test.describe("the home's hero at every computer size", () => {
+  // The hero's content box: a short window gives it room for focus rings inside, taken back outside.
   const heroOf = (page: Page) =>
     page.locator("[data-hero='number']").evaluate((number) => {
-      const hero = number.closest("[data-exit]")?.getBoundingClientRect();
-      return { left: hero?.left ?? 0, top: hero?.top ?? 0, bottom: hero?.bottom ?? 0 };
+      const hero = number.closest("[data-exit]");
+      const box = hero?.getBoundingClientRect();
+      const pad = hero === null ? undefined : getComputedStyle(hero);
+      const inset = (side: "Left" | "Top" | "Bottom") => parseFloat(pad?.[`padding${side}`] ?? "0");
+      return {
+        left: (box?.left ?? 0) + inset("Left"),
+        top: (box?.top ?? 0) + inset("Top"),
+        bottom: (box?.bottom ?? 0) - inset("Bottom"),
+      };
     });
   for (const [width, height] of [
     [1280, 800],
