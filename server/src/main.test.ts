@@ -836,6 +836,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
         ...settings(),
         PREVIEWS_FILE: join(dir, "previews.json"),
         UNIVERSES_FILE: universes,
+        MODERATION: "on",
         OPENAI_API_KEY_FILE: join(dir, "key"),
         HTTPS_PROXY: way.proxy,
         NODE_USE_ENV_PROXY: "1",
@@ -851,11 +852,51 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  it("starts with a PREVIEWS_FILE and moderation off, a key file named: no preview pass, nothing asked", async () => {
+    const dir = folder("gnoworld-previews-off-");
+    const universes = join(dir, "universes.json");
+    writeFileSync(
+      universes,
+      JSON.stringify([
+        {
+          id: "b",
+          name: "U",
+          chainId: "b-1",
+          rpc: "https://rpc.the-default.example:443",
+          gnoweb: "https://gnoweb.the-default.example",
+          indexer: "https://indexer.the-default.example/graphql/query",
+          testnet: true,
+          default: true,
+        },
+      ]),
+    );
+    writeFileSync(join(dir, "hubs.json"), "[]");
+    writeFileSync(join(dir, "key"), "sk-a-key-of-at-least-thirty-two-characters");
+    const way = await tunnels();
+    try {
+      const server = start({
+        ...settings(),
+        PREVIEWS_FILE: join(dir, "previews.json"),
+        UNIVERSES_FILE: universes,
+        OPENAI_API_KEY_FILE: join(dir, "key"),
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      expect(server.out.stdout).not.toContain('"event":"previews_');
+      expect(way.seen).toEqual([]);
+    } finally {
+      way.close();
+    }
+  });
+
   it.each([
     ["no UNIVERSES_FILE", {}, "setting UNIVERSES_FILE: required"],
     [
-      "no OPENAI_API_KEY_FILE: no check, so no job",
-      { UNIVERSES_FILE: "/nowhere/universes.json" },
+      "MODERATION=on and no OPENAI_API_KEY_FILE: no check",
+      { UNIVERSES_FILE: "/nowhere/universes.json", MODERATION: "on" },
       "setting OPENAI_API_KEY_FILE: required",
     ],
   ])("does not start with a PREVIEWS_FILE and %s: it fails closed, naming the setting", async (_, over, said) => {
@@ -1372,6 +1413,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
         ROLES_FILE: roles,
         ERGO_PORT: String(ergo.port),
         ERGO_OPER_PASSWORD_FILE: oper,
+        MODERATION: "on",
         OPENAI_API_KEY_FILE: join(keys, "openai"),
       };
       const first = start(env, [...FLAGS, "--import", hook]);

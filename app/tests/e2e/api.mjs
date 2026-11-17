@@ -127,7 +127,7 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
         : { JARVIS: "on", JARVIS_URL: standin.url, JARVIS_DOOR_KEY_FILE: join(dir, "jarvis-key") }),
       // A guest speaks only with moderation (closed without it): the workshop alone may be given the key's file, by its absolute path.
       ...(jobs !== undefined && process.env.WORKSHOP_OPENAI_KEY_FILE
-        ? { OPENAI_API_KEY_FILE: process.env.WORKSHOP_OPENAI_KEY_FILE }
+        ? { MODERATION: "on", OPENAI_API_KEY_FILE: process.env.WORKSHOP_OPENAI_KEY_FILE }
         : {}),
     },
     stdio: ["ignore", "pipe", "inherit"],

@@ -334,6 +334,7 @@ describe("the chat, as the server starts it", () => {
       const config = loadConfig({
         DATABASE: join(dir, "server.db"),
         LOG_PEPPER_FILE: files.pepper,
+        MODERATION: "on",
         OPENAI_API_KEY_FILE: files.key,
       });
       const calls: { url: string; init: RequestInit }[] = [];
@@ -353,6 +354,29 @@ describe("the chat, as the server starts it", () => {
       expect(calls.map(({ url }) => url)).toEqual(["https://api.openai.com/v1/moderations"]);
       expect(new Headers(calls[0]?.init.headers).get("authorization")).toBe(`Bearer ${key}`);
       expect(calls[0]?.init.body).toBe(JSON.stringify({ model: "omni-moderation-latest", input: "hello" }));
+    });
+
+    it("sends nothing to OpenAI with a key file named and MODERATION unset, as the server loads it", async () => {
+      const files = { key: join(dir, "key-off"), pepper: join(dir, "pepper-off") };
+      writeFileSync(files.key, `sk-${"k".repeat(40)}\n`);
+      writeFileSync(files.pepper, `${PEPPER}\n`);
+      const config = loadConfig({
+        DATABASE: join(dir, "server-off.db"),
+        LOG_PEPPER_FILE: files.pepper,
+        OPENAI_API_KEY_FILE: files.key,
+      });
+      const calls: string[] = [];
+      vi.stubGlobal("fetch", (url: string) => {
+        calls.push(url);
+        return Promise.reject(new Error("no network here"));
+      });
+      const mark = logged.length;
+      const { peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: config.moderation });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "unchecked", reason: "no_key" }]);
+      vi.unstubAllGlobals();
+      expect(calls).toEqual([]);
+      expect(logged.slice(mark).filter((line) => line.includes('"moderation_off"'))).toHaveLength(1);
     });
 
     it("holds an account 59 minutes old to a new account's links under a one-hour setting", async () => {

@@ -31,13 +31,12 @@ const bootPrices = ({ markets, universes }: Config_, log: Boot["log"]) =>
     ? undefined
     : startPrices({ file: markets, log, ...(universes === undefined ? {} : { universe: defaultUniverse(universes) }) });
 
-// The worlds job (every half hour, WORLDS_FILE) and the previews job (every six hours, PREVIEWS_FILE, each page read by the
-// moderation check) read the default universe alone: with no chain, or for previews no check, the server stops rather than run.
-function refuseWithout({ worlds, previews, universes, moderation }: Config_): void {
+// The worlds job (every half hour, WORLDS_FILE) and the previews job (every six hours, PREVIEWS_FILE) read the default
+// universe alone: with no chain the server stops rather than run. The previews run only with moderation on (MODERATION=on),
+// each page checked before it is written: off, there is no previews job.
+function refuseWithout({ worlds, previews, universes }: Config_): void {
   if ((worlds !== undefined || previews !== undefined) && universes === undefined)
     throw new Error("setting UNIVERSES_FILE: required");
-  if (previews !== undefined && moderation.openaiKey === undefined)
-    throw new Error("setting OPENAI_API_KEY_FILE: required");
 }
 
 /** Each job is none without its data file; the worlds and previews jobs read the default universe alone, so without it the server stops. */

@@ -55,6 +55,8 @@ for secret in ergo_oper_password log_pepper openai_api_key; do openssl rand -hex
 [ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key"
 export DEMO_HTPASSWD_FILE="$tmp/htpasswd" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
 export LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
+# Moderation on with the operator's key alone: the made-up one in its place must never reach OpenAI.
+if [ -n "$key" ]; then export MODERATION=on; else export MODERATION=off; fi
 export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test INSIDE_SUBNET=172.30.91.0/24 WEB_ADDRESS=172.30.91.10
 # The load comes from one address of the internal network, which the server and Ergo believe in web's place:
 # each virtual user is a visitor of its own (X-Real-IP, X-Forwarded-For).

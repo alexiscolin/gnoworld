@@ -172,9 +172,9 @@ const MODERATION = {
 const KEY = new Secret("sk-test");
 
 describe("cardsBoot", () => {
-  it("refuses cards on without OpenAI's key", () => {
+  it("refuses cards on without OpenAI's key, naming MODERATION and the key's file", () => {
     expect(() => cardsBoot({ cards: CARDS_ON, moderation: { ...MODERATION, openaiKey: undefined } })).toThrow(
-      "OPENAI_API_KEY_FILE",
+      "setting MODERATION=on and OPENAI_API_KEY_FILE: required",
     );
   });
 

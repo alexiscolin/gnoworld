@@ -13,6 +13,7 @@ import {
   databasePath,
   host,
   isOrigin,
+  keyFile,
   list,
   parseSettings,
   port,
@@ -175,10 +176,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     universes: settings.UNIVERSES_FILE,
     hubs: hubsOf(env, settings.HUBS_FILE),
     moderation: {
-      openaiKey:
-        OPENAI_API_KEY_FILE === undefined
-          ? undefined
-          : new Secret(readWord("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
+      // Opt-in: only MODERATION=on reads OpenAI's key, and then the server stops without it.
+      openaiKey: settings.MODERATION === "on" ? keyFile("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE, true) : undefined,
       thresholds: MODERATION_THRESHOLDS,
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },

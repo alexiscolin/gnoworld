@@ -60,14 +60,14 @@ const files = () => {
   return { universes, worlds };
 };
 
-const boot = (over: { markets?: string; universes?: string; worlds?: string } = {}) => {
+const boot = (over: { markets?: string; universes?: string; worlds?: string; previews?: string } = {}) => {
   const db = openDatabase(":memory:", migrations);
   opened.push(db);
   const config = {
     markets: over.markets,
     universes: over.universes,
     worlds: over.worlds,
-    previews: undefined,
+    previews: over.previews,
     moderation: {
       openaiKey: undefined,
       thresholds: {},
@@ -117,6 +117,14 @@ describe("bootJobs", () => {
       undefined,
       undefined,
     ]);
+  });
+
+  // Moderation is opt-in (MODERATION=on): with it off the server runs, and the previews, each page checked before it is
+  // written, are the one job left out.
+  it("starts with a previews file and moderation off, and makes no previews job", () => {
+    const { universes } = files();
+    const { jobs } = boot({ universes, previews: join(dir, "previews.json") });
+    expect(jobs.previews).toBeUndefined();
   });
 
   it("starts no timer, CoinGecko's included, for a config it refuses", () => {

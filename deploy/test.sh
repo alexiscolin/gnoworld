@@ -358,6 +358,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
+	mutant "moderation on by default" "the server's moderation is off unless MODERATION=on" \
+		compose 'services: { server: { environment: { MODERATION: "on" } } }'
 	mutant "the way out's port answers what it did not accept" "the guard lets nothing else out" \
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
@@ -556,6 +558,7 @@ else
 	cat >"$tmp/fake/docker" <<'FAKE'
 #!/bin/sh
 printf '%s\n' "$*" >>"$FAKE_LOG"
+[ "$1" != compose ] || printf 'env MODERATION=%s\n' "${MODERATION:-}" >>"$FAKE_LOG"
 case "$*" in
 "ps -aq --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
 "compose "*" ps -q "*) echo c0ntainer ;;
@@ -610,6 +613,14 @@ FAKE
 	(load "" all) >"$tmp/load.log" 2>&1 || true
 	expect "and skipped among the rest, no line sent" \
 		"$(grep -c 'messages: skipped' "$tmp/load.log" || true) $(grep -c 'SCENARIO=messages' "$tmp/fake.log" || true)" "1 0"
+	expect "and the load's stack checks nothing: its own made-up key never reaches OpenAI" \
+		"$(grep -c '^env MODERATION=on$' "$tmp/fake.log" || true)" 0
+	printf 'sk-%s\n' "$(openssl rand -hex 20)" >"$tmp/k6_key"
+	: >"$tmp/fake.log"
+	(exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO= OPENAI_API_KEY_FILE="$tmp/k6_key" sh "$here/k6/run.sh" logins) \
+		>"$tmp/load.log" 2>&1 || true
+	expect "with the operator's key, the load's stack checks each line" \
+		"$(grep '^env MODERATION=' "$tmp/fake.log" | sort -u | tr '\n' ' ')" "env MODERATION=on "
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
@@ -624,6 +635,8 @@ FAKE
 	export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key" # a made-up key: no key at all, jarvis reads it only when on, and no proof here asks the model
 	export JARVIS_DOOR_KEY_FILE="$tmp/jarvis_door_key" # the door's key, made up too: the server's and jarvis's, which prove each other
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
+	# The stack checks each line with OpenAI (opt-in, off by default): the proofs of the check and the previews need it on.
+	export MODERATION=on
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
 	# jarvis's network and the admin API's, apart from the defaults (172.30.91 and 172.30.92) as the internal one is.
 	export JARVIS_SUBNET="${TEST_JARVIS_SUBNET:-172.30.93.0/24}" JARVIS_ADDRESS="${TEST_JARVIS_ADDRESS:-172.30.93.10}"
@@ -904,6 +917,9 @@ PY
 	# jarvis answers nothing, so its door answers off, or not_ready when on.
 	# Read once, Compose's refusal of the project a fail: a count of 0 must not stand for a file that does not load.
 	services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"
+	# Moderation is opt-in: Compose gives the server MODERATION=off when the operator sets none.
+	expect "the server's moderation is off unless MODERATION=on" \
+		"$(env -u MODERATION docker compose -p "$project" $files config server | sed -n 's/^ *MODERATION: *//p')" off
 	expect "the default services hold no jarvis, nor its reader, nor their ways out" \
 		"$(printf '%s\n' "$services" | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
 	expect "the default services are web, Ergo, the server, the guard and the server's way out" \

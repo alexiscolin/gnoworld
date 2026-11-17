@@ -24,7 +24,7 @@ A secret is only ever read from a file; `.env` holds the file's path, never its 
 | `demo_htpasswd` | The password (nginx basic auth) | `web` | `htpasswd -cB deploy/secrets/demo_htpasswd team` | yes |
 | `ergo_oper_password` | The chat operator's password, 48 characters | `ergo`, `server` | `openssl rand -hex 24 > deploy/secrets/ergo_oper_password` | yes |
 | `log_pepper` | Hashing key of the logs' accounts and visitors | `server` | `openssl rand -hex 32 > deploy/secrets/log_pepper` | yes (32 bytes at least) |
-| `openai_api_key` | OpenAI moderation (and the previews' and the link cards' check) | `server` | one line, the key | yes as a file; the server reads it when `OPENAI_API_KEY_FILE` is set, which compose always does |
+| `openai_api_key` | OpenAI moderation (and the previews' and the link cards' check) | `server` | one line, the key | yes as a file, any text while `MODERATION` is off; the server reads it with `MODERATION=on` alone |
 | `anthropic_api_key` | Anthropic key of a workspace with its own spend limit | `jarvis`, only when on | one line, the key | the file yes, any text when Jarvis is off |
 | `jarvis_door_key` | The shared key the server sends and Jarvis asks of every request | `server`, `jarvis` (and its health check) | `openssl rand -hex 32 > deploy/secrets/jarvis_door_key` | yes, whatever `JARVIS` says: a missing or short file stops the whole stack |
 
@@ -50,6 +50,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 | `INSIDE_SUBNET`, `JARVIS_SUBNET`, `JARVIS_OUT_SUBNET`, `READER_SUBNET`, `READER_OUT_SUBNET`, `LINKS_SUBNET`, `LINKS_OUT_SUBNET`, `ADMIN_SUBNET` | `172.30.89.0/24`, `.91.0/24`, `.95.0/24`, `.97.0/24`, `.99.0/24`, `.101.0/24`, `.103.0/24`, `.92.0/24` | Each network's subnet; change an address and its subnet together |
 | `JARVIS` | `off` | Section 4 |
 | `LINK_CARDS` | `0` | Section 4 |
+| `MODERATION` | `off` | OpenAI's moderation: `on` reads `openai_api_key` and checks every line and preview page |
 | `JARVIS_GNOSCOPE` | `off` | Jarvis's gnoscope tools: `on` or `off` |
 | `JARVIS_BUDGET_USD`, `JARVIS_TRANSLATION_BUDGET_USD` | `3`, `1` | A day's budgets in whole dollars, kept from the first start (an admin changes them after) |
 | `GUEST_CHAT`, `GUEST_NAMES_PER_VISITOR_HOUR`, `GUEST_NAMES_PER_HOUR`, `GUEST_LIVING` | `on`, `10`, `600`, `5000` | Guest chat and its limits, below |
@@ -83,7 +84,8 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `MARKETS_FILE`, `WORLDS_FILE`, `PREVIEWS_FILE` | none: no timer or job | absolute path | Files the prices timer, the worlds job and the preview job write (compose: `/markets/markets.json`, `worlds.json`, `previews.json`) |
 | `UNIVERSES_FILE` | none | absolute path | The universes' data file (compose: `/app/app/data/universes.json`) |
 | `HUBS_FILE` | none | absolute path | The hubs' data file; set without `UNIVERSES_FILE` stops the server. Not set by compose |
-| `OPENAI_API_KEY_FILE` | none: no moderation | secret file | OpenAI's key |
+| `MODERATION` | off | exactly `on` | On, `OPENAI_API_KEY_FILE` is read (unset, the server stops); any other value or none is off: lines unchecked, no previews job |
+| `OPENAI_API_KEY_FILE` | none | secret file | OpenAI's key, read with `MODERATION=on` alone |
 | `MODERATION_THRESHOLDS` | `{}` | JSON, a score above 0 and at most 1 per category | A score that hides a category instead of OpenAI's own flag; `sexual/minors` always hides on OpenAI's flag. Categories: `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `self-harm`, `self-harm/instructions`, `self-harm/intent`, `sexual`, `sexual/minors`, `violence`, `violence/graphic` |
 | `NEW_ACCOUNT_HOURS` | `24` | 1 to 720 | How long an account is "new" |
 | `MUTE_STRIKES`, `MUTE_WINDOW_MINUTES`, `MUTE_MINUTES`, `MUTE_MAX` | `3`, `10`, `5`, `50` | up to 99, 1440, 10080, 100 | Hidden `STRIKES` times in `WINDOW` minutes mutes for `MINUTES`, `MAX` mutes at once a world (Ergo's ban list holds 100 a room) |

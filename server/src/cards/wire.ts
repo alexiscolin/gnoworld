@@ -50,7 +50,8 @@ export const thenCards =
 
 /** main's part: the boot's refusals, the chat's options, and the flow's expiry for the retention, which starts before the chat. */
 export function cardsBoot({ cards, moderation }: Pick<Config, "cards" | "moderation">) {
-  if (cards.enabled && moderation.openaiKey === undefined) throw new Error("setting OPENAI_API_KEY_FILE: required");
+  if (cards.enabled && moderation.openaiKey === undefined)
+    throw new Error("setting MODERATION=on and OPENAI_API_KEY_FILE: required");
   const kept: { flow?: CardFlow | undefined } = {};
   return {
     options:

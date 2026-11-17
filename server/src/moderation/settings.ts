@@ -6,6 +6,8 @@ import { z } from "zod";
 import { CATEGORIES } from "./provider.ts";
 
 export const moderationSettings = () => ({
+  // Any text at all: only `on` switches OpenAI's moderation on and reads its key; off by default.
+  MODERATION: z.string().optional(),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
   // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
   MODERATION_THRESHOLDS: z

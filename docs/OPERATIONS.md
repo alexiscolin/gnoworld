@@ -276,8 +276,9 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 
 ### The moderation check
 
-- **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
-  unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
+- **Its settings.** Opt-in: `MODERATION=on` (compose: `off` by default) reads OpenAI's key from `OPENAI_API_KEY_FILE`
+  (one word, 32 characters at least); off, nothing leaves the server, every message is unchecked and the alert says so at
+  the start.
   The thresholds that replace OpenAI's own flag and the hours an account counts as new are the server's defaults: compose does not
   forward `MODERATION_THRESHOLDS` or `NEW_ACCOUNT_HOURS`, so `deploy/.env` cannot set them
   ([CONFIGURATION.md](CONFIGURATION.md), section 3).
@@ -449,8 +450,8 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   first pass, asks for a realm with a deployer, functions and counts, and prints the job's log lines. The indexer's queries are those
   onyx-1's answers (`server/src/worlds/onyxIndexer.json`); its per-realm filter is refused there (422), so the counts come from the paged read
   of every call. A first pass of onyx-1's 767 realms, measured outside Docker: 1,634 calls (7 of them the indexer's) in 7.0 minutes, every realm counted.
-- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`): with `UNIVERSES_FILE` and
-  `OPENAI_API_KEY_FILE` (the server refuses to start with the file named and either missing), at start and then every six hours from
+- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`): with `UNIVERSES_FILE` (the server
+  refuses to start without it) and moderation on (`MODERATION=on`; off, there is no previews job), at start and then every six hours from
   the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
   `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
   time a quarter-second apart, each within 10 s and 64 KiB. It keeps a page's first 4,096 bytes, cut at a line's end, has OpenAI's
