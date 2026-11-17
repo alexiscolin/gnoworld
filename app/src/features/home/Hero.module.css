@@ -229,33 +229,10 @@
   }
 
   @media (width < 900px) {
-    /* A phone draws no space: no "View in space" under the list, no views' pill over the hero, a tap target to each world. */
+    /* A phone has no home: it goes on to its chat as the page hydrates (routes/phoneAway.ts), so the pre-rendered hero and list are never drawn. */
+    .hero,
     .worlds {
-      padding-block-end: var(--space-xl);
-    }
-
-    .worlds a {
-      /* layout: the link's words centred on its 44 px height */
-      display: flex;
-      /* layout: the words centred on that height */
-      align-items: center;
-      min-block-size: var(--control-m);
-    }
-
-    .actions {
-      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px */
-      flex-wrap: wrap;
-    }
-
-    .action {
-      /* raw: 48 px tall and 20 at the sides on a phone (the prototype's line 772) */
-      block-size: 48px;
-      /* raw: the prototype's and the frames' own value */
-      padding-inline: 20px;
-    }
-
-    .line {
-      white-space: normal;
+      display: none;
     }
   }
 

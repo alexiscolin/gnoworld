@@ -3,6 +3,7 @@ import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } 
 import { use } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { fakeStream } from "../../tests/fakeStream.ts";
+import { SignedIn } from "../../tests/grabStore.tsx";
 import { expectFollowAndShare } from "../../tests/plateButtons.ts";
 import { noMedia, noObservers } from "../../tests/mount.tsx";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
@@ -20,6 +21,14 @@ import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 // stream followed through useVerdicts, its thread's cards drawn from the calls the page gave), the rooms' own service being no business of it.
 // The shell's host draws it (routed.tsx), the chain's contexts given from what the page holds.
 const NO_CALLS: readonly never[] = [];
+// A logged-in account opening a world charts it once, whatever the screen: a phone draws the chat alone, never the world's page.
+const chart = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve({ ok: true as const, value: { world: "bubble", first: false } })),
+);
+vi.mock(import("../lib/api/signals.ts"), async (original) => {
+  const real = await original();
+  return { ...real, pageSignalsApi: () => ({ ...real.pageSignalsApi(), chart }) };
+});
 const probing = vi.hoisted(() => ({ on: false, place: undefined as { slug: string } | undefined }));
 vi.mock(import("../features/chat/Chat.tsx"), async (original) => {
   const actual = await original();
@@ -397,5 +406,48 @@ describe("a world's page and the chain's stream", () => {
   test("closes the stream when the page is left", async () => {
     probing.on = true;
     await expectStreamClosedOnLeave(route(), "/w/govdao", DOOR);
+  });
+});
+
+describe("a world's chart", () => {
+  const media = (phone: boolean) =>
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: phone && query === "(max-width: 899px)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+  let leave = (): void => undefined;
+  afterEach(() => {
+    leave();
+    chart.mockClear();
+  });
+  const Signed = () => (
+    <>
+      <SignedIn />
+      <World />
+    </>
+  );
+
+  test.each([
+    ["a phone", true],
+    ["a computer", false],
+  ])("%s charts the world once when an account is logged in", async (_, phone) => {
+    media(phone);
+    ({ leave } = drawRoute(
+      { path: "/w/:world", Component: Signed, loader: clientLoader, ErrorBoundary },
+      phone ? "/w/bubble?chat=full" : "/w/bubble",
+    ));
+    await vi.waitFor(
+      () => {
+        expect(chart).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 4000 },
+    );
+    expect(chart).toHaveBeenCalledWith("bubble");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(chart).toHaveBeenCalledTimes(1);
   });
 });

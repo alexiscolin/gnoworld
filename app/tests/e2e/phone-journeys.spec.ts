@@ -449,3 +449,29 @@ test.describe("search on a phone", () => {
     await expect(bubbleBox(page)).toBeVisible();
   });
 });
+
+// A phone opening `/` never sees the home: the pre-rendered page is hidden until the chat has taken its place, so the hero's heading is
+// never shown between the first paint and the chat's composer.
+test.describe("the home on a phone", () => {
+  test.use({ viewport: SIZES[1], isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: AGENT });
+
+  test("never shows the hero's heading on the way into the chat", async ({ page }) => {
+    await welcomed(page);
+    await scripted(page, GUEST);
+    await page.addInitScript(() => {
+      const seen: string[] = [];
+      Reflect.set(window, "__heroSeen", seen);
+      const look = () => {
+        // The hero's heading says its worlds or its people; the chat's names its room.
+        for (const heading of document.querySelectorAll("h1"))
+          if (/worlds|exploring/i.test(heading.textContent) && heading.checkVisibility())
+            seen.push(heading.textContent);
+        requestAnimationFrame(look);
+      };
+      look();
+    });
+    await page.goto("/");
+    await expect(bubbleBox(page).or(page.getByRole("textbox", { name: /^Message #/ }))).toBeVisible();
+    expect(await page.evaluate(() => String(Reflect.get(window, "__heroSeen")))).toBe("");
+  });
+});

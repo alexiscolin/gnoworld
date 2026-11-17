@@ -83,6 +83,8 @@ export default function World() {
         plate={plate}
         page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />}
       />
+      {/* The arrival banners and the chart call: the route's, so the chat alone (a phone's) charts the world too; nothing shows unless the server's signal says this account earned one. */}
+      <Banners world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
       <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
   );
@@ -107,8 +109,6 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
         plate={
           <>
             <Kicker planet>{kickerOf(world)}</Kicker>
-            {/* The arrival banners: nothing unless the server's signal says this account earned one. */}
-            <Banners world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
             <Panel.Title>{world.name}</Panel.Title>
             {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
           </>
