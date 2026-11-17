@@ -8,7 +8,7 @@ import type { TokenAnswer } from "@gnoworld/schemas/indexer";
 import { Card, Cell, DayChart, Figures, Progress, Sidebar, Stack, type Figure } from "@gnoworld/ui";
 import { PersonLink } from "../../features/chat/index.ts";
 import { ErrorView, errorKind, useWhere } from "../../features/errors/index.ts";
-import { amountText, plain, short } from "../../lib/chainText.ts";
+import { amountNumber, amountText, plain, short } from "../../lib/chainText.ts";
 import { DAY_MS } from "../../lib/days.ts";
 import { isUnread, queryClient } from "../../lib/query/client.ts";
 import { dayLabel } from "./days.ts";
@@ -44,7 +44,7 @@ function figuresOf(token: Token, today: number): Figure[] {
           {
             key: "supply",
             label: "Supply",
-            value: Number(supply) / 10 ** decimals,
+            value: amountNumber(supply, decimals),
             full: amountText(supply, decimals),
             sub: "minted less burned",
           },

@@ -47,6 +47,11 @@ describe("a figure in its cell", () => {
     expect(valueOf(figure)).toEqual({ seen: "1.86B", read: "1,859,191,185", hover: "1,859,191,185", dim: false });
   });
 
+  it("rounds nothing it reads: a number with more decimals than grouped writes is compact, its exact text read and on hover", () => {
+    const figure = { key: "supply", label: "Supply", value: 1.234567, full: "1.234567", sub: "minted less burned" };
+    expect(valueOf(figure)).toEqual({ seen: "1.23", read: "1.234567", hover: "1.234567", dim: false });
+  });
+
   it("dims a word that stands in place of a count, and only a word", () => {
     expect(valueOf({ key: "last", label: "Last call", value: "Never", sub: "its time is not read" })).toMatchObject({
       seen: "Never",

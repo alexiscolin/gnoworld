@@ -84,6 +84,10 @@ describe("a token's figures, each in its column", () => {
     });
   });
 
+  it("reads a supply's every decimal, where grouping would round it", () => {
+    expect(supplyOf("1234567", 6)).toEqual({ seen: "1.23", read: "1.234567", hover: "1.234567", dim: false });
+  });
+
   it("writes a supply with decimals the same way, its exact value whole", () => {
     expect(supplyOf("1859191185500000", 6)).toEqual({
       seen: "1.86B",

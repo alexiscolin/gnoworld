@@ -33,7 +33,7 @@ export interface FiguresProps {
 // The count's arrival, the proposal's: 1.1 s after 0.7 s.
 const COUNT = { count: 1100, after: 700 };
 // The longest count a cell writes whole: five characters of the figure's type (101 px) fit the narrowest plate's cell, 106 px at a
-// 1728 px window; a longer one is written compactly, its exact value read and shown on hover. ceiling: past 9999T it grows again (1,230,000T).
+// 1728 px window; a longer exact text is written compactly, read and shown on hover whole. ceiling: past 9999T it grows again (1,230,000T).
 const WHOLE = 5;
 
 // The proposal's small line: 64 by 32 px, with a dot at its last value.
@@ -53,8 +53,8 @@ function Trace({ values }: { values: readonly number[] }) {
 function Value({ value, unit, full }: Pick<Figure, "value" | "unit" | "full">) {
   const given = typeof value === "number" && Number.isFinite(value) ? value : 0;
   const shown = useCounted(given, COUNT);
-  const long = grouped(given).length > WHOLE;
   const exact = full ?? grouped(given);
+  const long = exact.length > WHOLE;
   return typeof value === "string" ? (
     <span className={styles["value"]} data-dim="">
       {value}
