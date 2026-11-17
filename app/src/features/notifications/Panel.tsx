@@ -156,6 +156,8 @@ export function Panel({
             markRead("all");
           }}
           onClose={onClose}
+          phone={phone}
+          unread={unread("all")}
         />
         <Tabs
           label="Kinds"

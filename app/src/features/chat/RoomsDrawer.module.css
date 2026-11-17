@@ -28,13 +28,15 @@
   }
 
   @media (width < 900px) {
-    /* One left line: the body's box runs 16 px in from each edge, and the title and its rows' words stand a NavItem's padding inside it. */
+    /* One left line: the title, the kickers and the items' boxes run 16 px in from the edge (and the notch's, held left), the title at
+       the size of the other sheets'. */
     .title {
-      padding-inline: calc(var(--space-s) + var(--space-xs));
+      padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) var(--space-s);
+      font: var(--font-title-m);
     }
 
     .body {
-      padding-inline: var(--space-s);
+      padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) var(--space-s);
     }
 
     /* The rooms' links and the sections' toggles are 44 px, as a finger needs (NavItem's own height is this token). */

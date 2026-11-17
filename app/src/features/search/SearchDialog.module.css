@@ -221,8 +221,8 @@
     }
   }
 
-  /* A phone has the results alone. */
-  @media (width <= 640px) {
+  /* A phone has the results alone, in one column (a landscape phone included: the preview needs 900 px). */
+  @media (width < 900px) {
     .body {
       /* layout: the palette's own arrangement */
       grid-template-columns: minmax(0, 1fr);
@@ -234,6 +234,54 @@
 
     .preview {
       display: none;
+    }
+
+    .head {
+      /* layout: the head's one track is the screen's width, so the chip rows scroll inside it (their end fades), not past it */
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .results {
+      /* layout: the rows end the list, so the hand-off follows the last row and the keyboard does not cover it */
+      align-content: start;
+    }
+
+    /* One left edge: the kickers, the leads and the trails on the sheet's 16 px inset, every row's words after one 32 px lead, the
+       chosen row's fill out to the screen's edges. */
+    .listbox {
+      /* layout: the list out to the screen's edges, by the sheet's inset */
+      margin-inline: calc(-1 * var(--space-s));
+    }
+
+    .group {
+      padding-inline: var(--space-s);
+    }
+
+    .row {
+      /* layout: a lead of one width for a planet, a face and a room's #, so the words share one line */
+      grid-template-columns: var(--thumb-s) minmax(0, 1fr) auto;
+      padding-inline: var(--space-s);
+      border-radius: 0;
+    }
+
+    .row > :first-child {
+      /* layout: a smaller lead (a room's #) centred in its column */
+      justify-self: center;
+    }
+
+    .handOff {
+      /* layout: the hand-off's row edge to edge, as the list's */
+      inline-size: calc(100% + 2 * var(--space-s));
+      /* layout: out to the screen's edges, as the list */
+      margin-inline: calc(-1 * var(--space-s));
+    }
+  }
+
+  /* A phone tall enough shows the sort on a line of its own under the kinds, never beside them. */
+  @media (width < 900px) and (height >= 500px) {
+    .head > :first-child > :last-child {
+      /* layout: the sort a line of its own */
+      flex-basis: 100%;
     }
   }
 
