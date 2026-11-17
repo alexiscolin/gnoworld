@@ -1,71 +1,58 @@
-// The programs every planet draws with, made once right after the first screen (D13772): a world of the generator's with air, glow and
-// rings, and the Earth, each surface opaque and coming in (transparent), on screen and as the blur draws it (rig/blurred.ts): three keys a
-// program by all of these. A planet made later finds its programs made: where the browser compiles none aside (Firefox has no
-// KHR_parallel_shader_compile), the frame it lands on no longer compiles them (measured with software GL: its longest frame 2133 to 1767
-// ms, the home's first dive). Such a browser still makes no planet during a flight (view.ts, waitsToMake): made there, they doubled the
-// dive. What made them stays alive, out of the stage: three drops a program its last material leaves.
+// The programs every planet and moon draws with, made once right after the first screen (D13772): a world of the generator's with air,
+// glow and rings and the Earth, each surface opaque and coming in (transparent), and the two kinds of moon, whose own head makes their
+// surface another program (moonLook.ts), all on screen and as the blur draws them (rig/blurred.ts): three keys a program by these. A planet
+// made later finds its programs made: where the browser compiles none aside (Firefox has no KHR_parallel_shader_compile), the frame it lands
+// on no longer compiles them (measured with software GL: its longest frame 2133 to 1767 ms, the home's first dive). Such a browser still
+// makes no planet during a flight (view.ts, waitsToMake): made there, they doubled the dive. Their materials are never disposed, so three
+// keeps the programs; nothing else holds them.
 import { Group, Texture, type Camera, type Scene, type WebGLRenderer } from "three";
-import { afterLoad } from "../../afterLoad.ts";
 import { earthPlanet } from "../earth/earth.ts";
 import { createWorld, worldOf } from "../planet/generated.ts";
-import type { Planet } from "../planet/planet.ts";
 import { inBlurPixel } from "../rig/blurred.ts";
 import { SPHERE } from "./adopt.ts";
+import { moonOf } from "./moonLook.ts";
+import { EARTH_ROOM } from "./moonSlot.ts";
 
-type Compiler = Pick<WebGLRenderer, "compile" | "compileAsync" | "getContext" | "getRenderTarget" | "setRenderTarget">;
+type Compiler = Pick<WebGLRenderer, "compile" | "getContext" | "getRenderTarget" | "setRenderTarget">;
 
 // A world with air and rings: every part a generated planet may have (programs.test.ts counts their programs).
 const FULL = "c";
 
-const made = new WeakMap<object, Promise<void>>();
-const kept: Planet[] = [];
+const made = new WeakSet<object>();
+const asked = new WeakSet<object>();
 
-/** Makes the planets' programs on `renderer`, once. */
-export function warmPrograms({
-  renderer,
-  camera,
-  stage,
-}: {
-  renderer: Compiler;
-  camera: Camera;
-  stage: Scene;
-}): Promise<void> {
-  const before = made.get(renderer);
-  if (before !== undefined) return before;
+/** Makes the programs on `renderer`, once, in this task. */
+export function warmPrograms({ renderer, camera, stage }: { renderer: Compiler; camera: Camera; stage: Scene }): void {
+  if (made.has(renderer)) return;
+  made.add(renderer);
   const blank = new Texture();
-  const planets = [
-    createWorld(worldOf(FULL), { map: () => blank, clouds: blank, ring: blank }, SPHERE),
-    earthPlanet({ day: blank, night: blank, clouds: blank }, SPHERE),
-  ];
-  const group = new Group().add(...planets.map((planet) => planet.group));
-  const compile = async () => {
+  const set = { map: () => blank, clouds: blank, ring: blank };
+  const maps = { earth: () => ({ day: blank, night: blank, clouds: blank, moon: blank }), setOf: () => set };
+  const planets = [createWorld(worldOf(FULL), set, SPHERE), earthPlanet(maps.earth(), SPHERE)];
+  const moons = [EARTH_ROOM, FULL].flatMap((room) => moonOf(room, { maps, sphere: SPHERE }) ?? []);
+  const group = new Group().add(...[...planets, ...moons].map(({ group: each }) => each));
+  for (const share of [1, 0.5]) {
+    for (const planet of planets) planet.setArrive(share);
     inBlurPixel(renderer, () => {
       renderer.compile(group, camera, stage);
     });
-    await renderer.compileAsync(group, camera, stage);
-  };
-  const making = compile()
-    .then(() => {
-      for (const planet of planets) planet.setArrive(0.5);
-      return compile();
-    })
-    .then(() => {
-      kept.push(...planets);
-    });
-  made.set(renderer, making);
-  return making;
+    renderer.compile(group, camera, stage);
+  }
 }
 
-/** Makes them in the task after the first frame where nothing flies (the home's dive waits for its loader), else at the next moment of
- * rest: never in a flight, where a browser that compiles none aside would hold its frames. */
-export function programsAtRest(
-  space: { readonly rig: { readonly flying: boolean }; renderer: Compiler; camera: Camera; stage: { scene: Scene } },
-  signal: AbortSignal,
-): void {
-  const now = (): void => {
-    if (signal.aborted) return;
-    if (space.rig.flying) afterLoad(now, signal);
-    else warmPrograms({ renderer: space.renderer, camera: space.camera, stage: space.stage.scene }).catch(reportError);
-  };
-  setTimeout(now, 0);
+/** Called each frame once the first has drawn: at the first where nothing flies (the home's dive waits for its loader), the programs in the
+ * next task, never inside a frame; none in the chat's small view, which shows one world and is made anew for the next. */
+export function programsAtRest(space: {
+  readonly disposed: boolean;
+  readonly options: { readonly inChat?: boolean | undefined };
+  readonly rig: { readonly flying: boolean };
+  readonly renderer: Compiler;
+  readonly camera: Camera;
+  readonly stage: { readonly scene: Scene };
+}): void {
+  if (asked.has(space) || space.rig.flying || space.options.inChat === true) return;
+  asked.add(space);
+  setTimeout(() => {
+    if (!space.disposed) warmPrograms({ renderer: space.renderer, camera: space.camera, stage: space.stage.scene });
+  }, 0);
 }

@@ -45,8 +45,8 @@ export function runFrames(space: Space, signal: AbortSignal): void {
       if (!drawn && space.universe !== undefined) {
         drawn = true;
         space.options.events.drawn();
-        programsAtRest(space, signal);
       }
+      if (drawn) programsAtRest(space);
       sharpen(now);
       return state.need;
     },
