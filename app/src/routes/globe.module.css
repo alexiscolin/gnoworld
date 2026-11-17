@@ -93,6 +93,7 @@
        to the planet's space with no hole cut in another: the page's own fill, and its arrival, give way to it. */
     .globe:is([data-earth="drawn"], [data-world="drawn"]) + * {
       --plate-fill: hidden;
+      --plate-ground: var(--color-plate-scene);
     }
   }
 

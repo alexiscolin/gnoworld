@@ -20,6 +20,8 @@
     --p-sky: #5eaafd;
     --p-white: #ffffff;
     --p-mist: #c8d0de;
+    /* The plate's fill the scene paints beside a planet (app's space/parts/marks.ts, its test reads both). */
+    --p-plate-scene: #1e212d;
 
     --color-space: var(--p-space);
     --color-text: var(--p-text);
@@ -231,6 +233,9 @@
     --page-edge: var(--space-m);
     /* Whether the plate's own fill shows: a page that draws a globe beside it sets `hidden`, its canvas painting the fill. */
     --plate-fill: visible;
+    /* What a plate's cards lay their wash on where it is not the plate's own fill: unset, the plate's --color-plate (Panel.module.css). */
+    --plate-ground: initial;
+    --color-plate-scene: var(--p-plate-scene);
     --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
 
     --radius-s: 8px;
