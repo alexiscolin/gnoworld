@@ -277,7 +277,13 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(code.block).toContain("gnoworld-link");
     const done = await posted(
       "links/verify",
-      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo) },
+      // The logged-in account signs the same text too (the wallet audit's medium 1).
+      {
+        nonce: code.nonce,
+        address: key.address,
+        file: cliFile(key, code.memo),
+        by: { proof: who.sign("onyx-1", code.memo) },
+      },
       cookie,
     );
     expect(done.status).toBe(200);

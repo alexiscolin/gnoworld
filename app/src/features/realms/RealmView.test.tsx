@@ -444,7 +444,10 @@ describe("a realm's view, with `$help` links on its page", () => {
     const box = await shown(link("Vote YES", "func=Vote&option=YES&send=1ugnot"));
     await pressed(box, "Vote YES");
     await filled(box, ["YES"]);
-    expect(one(box, CARD).textContent).not.toContain("ugnot");
+    // The command line's way (D13880) prints the fee and the deposit cap in ugnot, and sends no coin.
+    const command = one(box, CARD).querySelector(".fine-only")?.textContent ?? "";
+    expect(one(box, CARD).textContent.replace(command, "")).not.toContain("ugnot");
+    expect(command).not.toContain("-send");
   });
 
   test("gives each of two actions a card of its own, filled with its own text, the first one untouched", async () => {
