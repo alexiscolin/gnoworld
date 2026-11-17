@@ -491,3 +491,40 @@ test.describe("the chat's dock beside the plate", () => {
     });
   }
 });
+
+// The home's hero stands at the cosmos' foot, 48 px from the left and 32 from the bottom, at every computer size: a wide and short window
+// (1798 by 726) put it back in the page's flow, under the logo. A window too short for it keeps it under the header, its room scrolled.
+test.describe("the home's hero at every computer size", () => {
+  const heroOf = (page: Page) =>
+    page.locator("[data-hero='number']").evaluate((number) => {
+      const hero = number.closest("[data-exit]")?.getBoundingClientRect();
+      return { left: hero?.left ?? 0, top: hero?.top ?? 0, bottom: hero?.bottom ?? 0 };
+    });
+  for (const [width, height] of [
+    [1280, 800],
+    [1491, 920],
+    [1728, 1080],
+    [1798, 726],
+    [2560, 1080],
+  ] as const) {
+    test(`stands at the foot, left, under the header, at ${String(width)} by ${String(height)}`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await hydrated(page);
+      const hero = await heroOf(page);
+      near(hero.left, 48, "the hero's left");
+      near(height - hero.bottom, 32, "the hero's bottom gap");
+      expect(hero.top, "the hero's top, under the header's 96 px").toBeGreaterThan(96);
+    });
+  }
+
+  test("stays under the header in a window too short to hold it, at 1440 by 380", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 380 });
+    await page.goto("/");
+    await hydrated(page);
+    const hero = await heroOf(page);
+    near(hero.left, 48, "the hero's left");
+    expect(hero.top, "the hero's top, under the header's 96 px").toBeGreaterThan(96);
+    expect(hero.bottom, "the hero's foot, within the window").toBeLessThanOrEqual(380 - 32 + 2);
+  });
+});
