@@ -61,3 +61,35 @@ describe("a token's days, the chain's", () => {
     expect(drawn([token(old, { day: "2026-09-03", height: 7 })]).textContent).not.toContain("Transfers per day");
   });
 });
+
+describe("a token's figures, each in its column", () => {
+  // The Supply cell's value as each reader meets it: seen (the counted text), read by a screen reader, shown on hover, dimmed or not.
+  function supplyOf(supply: string, decimals: number) {
+    const box = drawn([{ ...token([], null), supply, decimals, holders: 22 }]);
+    const cell = [...box.querySelectorAll("section > div > div")].find((one) => one.textContent.startsWith("Supply"));
+    return {
+      seen: cell?.querySelector("[aria-hidden='true']")?.textContent,
+      read: cell?.querySelector(".visually-hidden")?.textContent,
+      hover: cell?.querySelector("[title]")?.getAttribute("title"),
+      dim: cell?.querySelector("[data-dim]") !== null,
+    };
+  }
+
+  it("draws a ten-digit supply as a number like the other figures: compact, not dimmed, its exact value read and on hover", () => {
+    expect(supplyOf("1859191185", 0)).toEqual({
+      seen: "1.86B",
+      read: "1,859,191,185",
+      hover: "1,859,191,185",
+      dim: false,
+    });
+  });
+
+  it("writes a supply with decimals the same way, its exact value whole", () => {
+    expect(supplyOf("1859191185500000", 6)).toEqual({
+      seen: "1.86B",
+      read: "1,859,191,185.5",
+      hover: "1,859,191,185.5",
+      dim: false,
+    });
+  });
+});

@@ -17,6 +17,7 @@ const unstyled: {
       | "stillCopy"
       | "useAlone"
       | "grouped"
+      | "compact"
       | "holdsEscape"
       | "typedIn"
       | "composing"
@@ -151,6 +152,7 @@ it("exports every component of the design system, iconNode, stillCopy, sightRef,
       "Tabs",
       "Tooltip",
       "grouped",
+      "compact",
       "iconNode",
       "sightRef",
       "stillCopy",

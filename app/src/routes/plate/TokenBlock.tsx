@@ -40,7 +40,15 @@ function figuresOf(token: Token, today: number): Figure[] {
     ...(holders === null ? [] : [{ key: "holders", label: "Holders", value: holders, sub: "with a balance" }]),
     ...(supply === null
       ? []
-      : [{ key: "supply", label: "Supply", value: amountText(supply, decimals), sub: "minted less burned" }]),
+      : [
+          {
+            key: "supply",
+            label: "Supply",
+            value: Number(supply) / 10 ** decimals,
+            full: amountText(supply, decimals),
+            sub: "minted less burned",
+          },
+        ]),
     { key: "today", label: "Transfers today", value: today, sub },
   ];
 }

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { Cluster, Grid, Stack } from "../compositions/index.ts";
 import { zeroHeight, Sparkline } from "../Sparkline/Sparkline.tsx";
 import { useCounted } from "../Stat/useCounted.ts";
-import { grouped } from "../format.ts";
+import { compact, grouped } from "../format.ts";
 import card from "../Card/Card.module.css";
 import styles from "./Figures.module.css";
 
@@ -11,8 +11,10 @@ export interface Figure {
   key: string;
   /** What it counts, over the value. */
   label: string;
-  /** A count, drawn counting up on arrival; or a word in its place (Never), dimmed. */
+  /** A count, drawn counting up on arrival and compactly past five characters (12.3K); or a word in its place (Never), dimmed. */
   value: number | string;
+  /** The count's exact text where a number cannot hold it exactly (a token's supply): read, and shown on hover, in place of the count. */
+  full?: string | undefined;
   /** Beside the count, small ("days ago"). */
   unit?: string | undefined;
   /** Under the value, in the meta type. */
@@ -30,6 +32,9 @@ export interface FiguresProps {
 
 // The count's arrival, the proposal's: 1.1 s after 0.7 s.
 const COUNT = { count: 1100, after: 700 };
+// The longest count a cell writes whole: five characters of the figure's type (101 px) fit the narrowest plate's cell, 106 px at a
+// 1728 px window; a longer one is written compactly, its exact value read and shown on hover. ceiling: past 9999T it grows again (1,230,000T).
+const WHOLE = 5;
 
 // The proposal's small line: 64 by 32 px, with a dot at its last value.
 function Trace({ values }: { values: readonly number[] }) {
@@ -45,17 +50,19 @@ function Trace({ values }: { values: readonly number[] }) {
   );
 }
 
-function Value({ value, unit }: Pick<Figure, "value" | "unit">) {
+function Value({ value, unit, full }: Pick<Figure, "value" | "unit" | "full">) {
   const given = typeof value === "number" && Number.isFinite(value) ? value : 0;
   const shown = useCounted(given, COUNT);
+  const long = grouped(given).length > WHOLE;
+  const exact = full ?? grouped(given);
   return typeof value === "string" ? (
     <span className={styles["value"]} data-dim="">
       {value}
     </span>
   ) : (
-    <span className={styles["value"]}>
-      <span aria-hidden="true">{grouped(shown)}</span>
-      <span className="visually-hidden">{grouped(given)}</span>
+    <span className={styles["value"]} title={long ? exact : undefined}>
+      <span aria-hidden="true">{long ? compact(shown) : grouped(shown)}</span>
+      <span className="visually-hidden">{exact}</span>
       {unit === undefined ? null : <small>{unit}</small>}
     </span>
   );
@@ -75,7 +82,7 @@ export function Figures({ label, figures }: FiguresProps) {
       data-edge="solid"
     >
       <Grid cols={12} space="s">
-        {figures.map(({ key, label: name, value, unit, sub, spark }, at) => (
+        {figures.map(({ key, label: name, value, unit, full, sub, spark }, at) => (
           <div
             key={key}
             className={styles["cell"]}
@@ -86,7 +93,7 @@ export function Figures({ label, figures }: FiguresProps) {
             <Stack space="2xs">
               <span className={styles["label"]}>{name}</span>
               <Cluster justify="between" align="end" wrap="no" space="2xs">
-                <Value value={value} unit={unit} />
+                <Value value={value} unit={unit} full={full} />
                 {spark === undefined || spark.length < 2 ? null : <Trace values={spark} />}
               </Cluster>
               <span className="meta">{sub}</span>
