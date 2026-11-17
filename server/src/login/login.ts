@@ -5,7 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { Address, type Challenge, type VerifyRequest } from "@gnoworld/schemas";
 import { z } from "zod";
-import { makeSigned, type Options } from "./signed.ts";
+import { makeSigned, type CliLogin, type Options } from "./signed.ts";
 
 export { makeSigned, type Signed } from "./signed.ts";
 
@@ -52,6 +52,9 @@ export interface Login {
     // The host the proof comes from: its challenge's own, or the nonce is not this one's.
     host: string,
   ) => Promise<{ token: string; maxAge: number } | "nonce" | "proof" | "new_account">;
+  // The command line's login (D13880): the same, its proof the file the address's key signed.
+  cliChallenge: (address: Address, domain: string) => Challenge | "full" | "text";
+  cliVerify: (request: CliLogin, mayCreate: () => boolean, host: string) => ReturnType<Login["verify"]>;
   session: (token: string | undefined) => Address | undefined;
   // When a live session's token was signed, in ms; undefined for none, an ended one or an unknown.
   signedAt: (token: string | undefined) => number | undefined;
@@ -89,6 +92,20 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
     ),
   };
 
+  // A proved address's token, its account made first when it is new and the limit lets it.
+  const admit = (address: Address, mayCreate: () => boolean): { token: string; maxAge: number } | "new_account" => {
+    const at = now();
+    if (sql.known.get(address) === undefined) {
+      if (!mayCreate()) return "new_account";
+      sql.addAccount.run(address, at);
+    }
+    sql.purgeTokens.run(at);
+    const token = randomBytes(32).toString("base64url");
+    sql.addToken.run(sha256(token), address, at, at + sliding);
+    sql.dropOldTokens.run(address, address, tokensPerAccount);
+    return { token, maxAge: cap / 1000 };
+  };
+
   return {
     challenge: (chainId, domain) =>
       signed.issue(chainId, domain, {
@@ -97,18 +114,14 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
 
     async verify(request, mayCreate, host) {
       const proved = await signed.prove(request, host);
-      if (proved !== "proved") return proved;
-      const { address } = request;
-      const at = now();
-      if (sql.known.get(address) === undefined) {
-        if (!mayCreate()) return "new_account";
-        sql.addAccount.run(address, at);
-      }
-      sql.purgeTokens.run(at);
-      const token = randomBytes(32).toString("base64url");
-      sql.addToken.run(sha256(token), address, at, at + sliding);
-      sql.dropOldTokens.run(address, address, tokensPerAccount);
-      return { token, maxAge: cap / 1000 };
+      return proved === "proved" ? admit(request.address, mayCreate) : proved;
+    },
+
+    cliChallenge: (address, domain) => signed.issueCli(address, domain),
+
+    async cliVerify(request, mayCreate, host) {
+      const proved = await signed.proveCli(request, host);
+      return proved === "proved" ? admit(request.address, mayCreate) : proved;
     },
 
     signedAt(token) {
