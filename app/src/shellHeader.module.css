@@ -1,5 +1,5 @@
 /* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
-   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, one row:
+   and fixed at the top of the screen (DESIGN-SYSTEM.md, Layout); on a phone, one row:
    the logo and the controls, with no views (the full chat only). The one breakpoint of both is here. */
 @layer components {
   /* The views' bar's height, one source for the bars and the room the page leaves under them; the two are no parent and child. */
@@ -8,68 +8,53 @@
   }
 
   .header {
-    /* layout: the header's cells on a grid, the account's group out of it on a phone */
     display: grid;
-    /* layout: the logo and the account on one row, the network on the next */
     grid-template-columns: auto 1fr;
-    /* layout: a space step between the cells */
     gap: var(--space-2xs) var(--space-s);
-    /* layout: the cells' centres share a line */
     align-items: center;
     padding: var(--space-s);
   }
 
   .brand {
-    /* layout: a computer's grid sees the logo alone: the box takes no part in it */
+    /* A computer's grid sees the logo alone: the box takes no part in it */
     display: contents;
   }
 
   .testnet {
-    /* layout: a phone's warning, drawn only there (shellHeader.tsx); the chip or the dot, one of them shown */
     display: grid;
-    /* layout: the chip or the dot on the logo's line */
     align-items: center;
     min-inline-size: 0;
   }
 
   .logo {
-    /* layout: the link is a box of its logo's height, so no line's leading moves the mark off the row's middle */
+    /* The link is a box of its logo's height, so no line's leading moves the mark off the row's middle */
     display: flex;
-    /* layout: the link is as wide as its logo, not as its cell */
     justify-self: start;
     text-decoration: none;
   }
 
   .end {
-    /* layout: on a phone the network and the account are the header's own cells */
+    /* On a phone the network and the account are the header's own cells */
     display: contents;
   }
 
   .network {
-    /* layout: the network on its own row under the logo and the account on a phone */
     grid-column: 1 / -1;
-    /* layout: after the account, which shares the logo's row */
     order: 1;
-    /* layout: a paragraph with no margin of its own: the grid spaces it */
     margin-block: 0;
   }
 
   /* Where one is and how one looks, side by side (a computer's; a phone draws none). */
   .bars {
-    /* layout: the two pills side by side */
     display: flex;
-    /* layout: a step between the pills */
     gap: var(--space-2xs);
   }
 
   /* The views: a pill with its levels and the chat; the ways: Space and Map. */
   .views,
   .ways {
-    /* layout: the links in one row */
     display: flex;
-    /* layout: they share a middle */
     align-items: center;
-    /* layout: the links 2 px apart (the prototype's #hnav .links) */
     /* raw: the prototype's and the frames' own value */
     gap: 2px;
     block-size: var(--_bar);
@@ -82,25 +67,21 @@
     /* raw: none till the header measures it */
     --_fill-w: 0px;
 
-    /* layout: the box the fill stands in */
     position: relative;
-    /* layout: the fill's own stacking, so its -1 stays over the pill's glass, cream */
+    /* The fill's own stacking, so its -1 stays over the pill's glass */
     isolation: isolate;
-    /* layout: the phone's bar but for the ways' pill */
     flex: 1;
     min-inline-size: 0;
   }
 
   .view {
-    /* layout: the label in the middle of its link */
     display: grid;
-    /* layout: the label in the middle of its link */
     place-items: center;
     /* a link is 34 px tall inside the 44 px pill */
     block-size: var(--round-h);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
-    /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
+    /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the design's letters are those) */
     font: 500 0.71875rem/1 var(--family-sans);
     /* raw: the prototype's and the frames' own value */
     letter-spacing: 0.1em;
@@ -120,37 +101,29 @@
 
   /* A way's icon before its word, on one line. */
   .view:has(svg) {
-    /* layout: the icon and the word on one line */
     grid-auto-flow: column;
     /* raw: a step between them, as the bar's icons sit */
-    /* layout: the icon and the word apart */
     gap: 6px;
   }
 
   /* A level's mark, its word and its name's pill on one line; on a narrow bar the name gives way, cut shorter. */
   .view:has(.mark),
   .named {
-    /* layout: the mark and the words, or the word and the name, on one line */
     grid-auto-flow: column;
-    /* layout: the first whole, the second giving way */
     grid-template-columns: auto minmax(0, max-content);
-    /* layout: they share a middle */
     align-items: center;
     /* raw: a step between them, as the bar's icons sit */
-    /* layout: each a step from the next */
     gap: 6px;
     min-inline-size: 0;
   }
 
   .named {
-    /* layout: the word and the name, a grid of their own in the level */
     display: grid;
     transition: gap calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
   /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it. */
   .view[data-bare] .named {
-    /* layout: no step left where the name stood */
     gap: 0;
   }
 
@@ -231,7 +204,6 @@
     }
 
     .view:has(.mark) {
-      /* layout: the words alone, giving way */
       grid-template-columns: minmax(0, max-content);
     }
   }
@@ -246,7 +218,7 @@
     background: none;
   }
 
-  /* Between two levels, the video's chevron (the breadcrumb's, packages/ui), at 60%. */
+  /* Between two levels, the design's chevron (the breadcrumb's, packages/ui), at 60%. */
   .chevron::before {
     content: "\203a";
   }
@@ -255,12 +227,10 @@
     /* raw: how far the chevron leans off the cream, the room a level's padding gives the other side */
     --_lean: 8px;
 
-    /* layout: the chevron keeps its room when the levels give way */
     flex: none;
     color: var(--color-text-muted);
     /* raw: the breadcrumb's 60% */
     opacity: 0.6;
-    /* layout: the chevron between two levels */
     margin-inline: var(--space-2xs);
     font: var(--font-ui);
     /* It leans as the cream slides, never moving a level. */
@@ -282,7 +252,7 @@
 
   /* The chat's divider and its link are the pill's own items. */
   .chatWay {
-    /* layout: the divider and the link are the pill's own items */
+    /* The divider and the link are the pill's own items */
     display: contents;
   }
 
@@ -339,13 +309,11 @@
   }
 
   .divider {
-    /* layout: the line keeps its room when the levels give way */
     flex: none;
     /* raw: a line 1 px wide and 16 high, 4 px off each side (the prototype's .vsep) */
     inline-size: 1px;
     /* raw: the prototype's and the frames' own value */
     block-size: 16px;
-    /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-3xs);
     background: var(--color-line-strong);
   }
@@ -360,7 +328,6 @@
 
     /* The word hidden, the name alone in its level, giving way. */
     .named {
-      /* layout: the name's pill no wider than the room the bar leaves */
       grid-template-columns: minmax(0, max-content);
     }
 
@@ -394,43 +361,36 @@
     }
 
     .header {
-      /* layout: the notch's room above, never less than the step; the mark and the controls on the safe lines S and E */
+      /* The notch's room above, never less than the step; the mark and controls on the safe lines S and E */
       padding-block: max(var(--space-2xs), env(safe-area-inset-top)) var(--space-2xs);
       padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) calc(var(--space-s) + env(safe-area-inset-right));
-      /* layout: the logo and the controls on one line, at every width from 320 px: the network and the way in are rows of the account's menu */
+      /* The logo and controls on one line at every width from 320 px: the network and the way in are rows of the account's menu */
       grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .brand {
-      /* layout: the logo and the testnet's warning on one line, a step apart, giving way before the controls */
       display: grid;
-      /* layout: the logo and the warning side by side, from the start */
       grid-auto-flow: column;
-      /* layout: from the start, never spread */
       justify-content: start;
-      /* layout: they share a middle */
       align-items: center;
-      /* layout: a step between the logo and the warning */
       column-gap: var(--space-2xs);
       min-inline-size: 0;
     }
 
     .logo {
-      /* layout: the link is a 44 px target round its mark */
       align-items: center;
-      /* layout: the mark at the start of the target, so it sits on the safe line, not 6 px in */
+      /* The mark at the start of the target, so it sits on the safe line, not 6 px in */
       justify-content: start;
       min-inline-size: var(--control-m);
       min-block-size: var(--control-m);
     }
 
     .network {
-      /* layout: the account's menu holds the network */
       display: none;
     }
 
     .controls {
-      /* layout: the last glyph on E, as the logo's ink sits on S (the 44 px target hangs out by the glyph's side room) */
+      /* The last glyph on E, as the logo's ink sits on S (the 44 px target hangs out by the glyph's side room) */
       margin-inline-end: calc((var(--phone-icon) - var(--control-m)) / 2);
     }
 
@@ -464,7 +424,6 @@
   }
 
   .views:not([data-filled]) > .fill {
-    /* layout: no fill till it is placed */
     display: none;
   }
 
@@ -476,8 +435,7 @@
 
   @media (width >= 900px) {
     .header {
-      /* layout: logo, views, the end: the views in the exact middle while the end fits its half; past it, the end keeps its controls whole
-         and the views give way to the left */
+      /* Views in the exact middle while the end fits its half; past it, the end keeps its controls whole and the views give way */
       grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
       /* a control's words stay on one line: the row never grows a second */
       white-space: nowrap;
@@ -497,19 +455,14 @@
     }
 
     .end {
-      /* layout: the network and the account in a row at the right */
       display: flex;
-      /* layout: a space step between them */
       gap: var(--space-s);
-      /* layout: at the header's right edge */
       justify-content: flex-end;
-      /* layout: their centres share a line */
       align-items: center;
     }
 
     .network {
-      /* layout: the network is one cell of the end's row, not a row of its own: last, at the right, where the account's pill names it once
-         the session is known, so it never jumps sides */
+      /* The network is one cell of the end's row, last at the right where the account pill names it, so it never jumps sides */
       grid-column: auto;
       order: 1;
     }
@@ -520,22 +473,20 @@
     }
 
     .bars {
-      /* layout: in the header's flow, its middle cell */
       position: static;
     }
 
     .views {
-      /* layout: as wide as its links, and no wider than the room the logo and the end leave: its names give way */
       flex: 0 1 auto;
     }
 
     .bars {
-      /* layout: the middle cell shrinks below its links' width instead of running under the logo */
+      /* The middle cell shrinks below its links' width instead of running under the logo */
       min-inline-size: 0;
     }
 
     .ways {
-      /* layout: Space and Map keep their width: the levels give way before them */
+      /* Space and Map keep their width: the levels give way before them */
       flex: none;
     }
   }
@@ -545,7 +496,6 @@
      A page whose chat never comes shows itself after 4 s. */
   :root[data-chat="full"]::before {
     content: "";
-    /* layout: over the whole window */
     position: fixed;
     inset: 0;
     /* raw: the full chat's own layer (ChatScreen.module.css): under the page's header from 900 px (4), over a phone's */

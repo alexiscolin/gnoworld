@@ -27,7 +27,7 @@ export const chatPlace = (
   ...place,
   kicker,
   home: universe.home.path,
-  // The Earth first, as the video's column starts (frame 80): its page is the universe's, not a hub's.
+  // The Earth first, as the design's column starts: its page is the universe's, not a hub's.
   worlds: [
     { slug: EARTH_CHAT.slug, name: EARTH_CHAT.name, href: universe.earth.path },
     ...universe.worlds.map(({ path: href, ...world }) => ({ ...world, href })),
@@ -35,7 +35,7 @@ export const chatPlace = (
   universe,
 });
 
-/** The general chat, one for every universe: the Earth stays one place (ADR-0002 §10). Its pills are the Earth's (frame 56). */
+/** The general chat, one for every universe: the Earth stays one place (ADR-0002 §10). Its pills are the Earth's. */
 export const EARTH_CHAT = {
   slug: "earth",
   name: "Earth",

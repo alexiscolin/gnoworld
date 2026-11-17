@@ -9,6 +9,8 @@ interface Fields {
   status?: number;
   port?: number;
   error?: string;
+  // A thrown error's frames, from failureOf: where it failed, never its message.
+  stack?: string;
   ms?: number;
   // A room's name, which is public.
   room?: string;
@@ -29,6 +31,23 @@ interface Fields {
 }
 export type Log = (event: string, fields?: Fields) => void;
 
+/** A thrown value as a line may hold it: an Error's name and its stack's frames, never its message, which may quote what a request
+ * sent; any other value, its type alone. */
+export function failureOf(thrown: unknown): { error: string; stack?: string } {
+  if (!(thrown instanceof Error)) return { error: typeof thrown };
+  const error = /^\w{1,64}$/.test(thrown.name) ? thrown.name : "Error";
+  if (typeof thrown.stack !== "string") return { error };
+  // V8 writes the stack on its first read, opening with the error's text (name and message, as Error.prototype.toString gives them),
+  // skipped whole. ceiling: a name or message changed after that first read shifts the count, and a line of the message shaped like
+  // a frame then passes; nothing here changes either once an error is made.
+  const frames = thrown.stack
+    .split("\n")
+    .slice(Error.prototype.toString.call(thrown).split("\n").length)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("at "));
+  return frames.length > 0 ? { error, stack: frames.join("\n") } : { error };
+}
+
 export function logger(pepper: string, write: (line: string) => void): Log {
   const hmac = (who: string | undefined): string | undefined =>
     who === undefined ? undefined : createHmac("sha256", pepper).update(who).digest("hex");
@@ -40,6 +59,7 @@ export function logger(pepper: string, write: (line: string) => void): Log {
       status,
       port,
       error,
+      stack,
       ms,
       room,
       msgid,
@@ -60,6 +80,7 @@ export function logger(pepper: string, write: (line: string) => void): Log {
       status,
       port,
       error,
+      stack,
       ms,
       room,
       msgid,

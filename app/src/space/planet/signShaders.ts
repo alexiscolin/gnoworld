@@ -87,7 +87,7 @@ void main() {
 }
 `;
 
-// The colours of the "Uncharted signal" of frame 4: a pink heart in a deep red glow, no sun's and no heat's.
+// The colours of the "Uncharted signal" in the design: a pink heart in a deep red glow, no sun's and no heat's.
 // The heart (a comment here, not in the shader, which ships) covers the small body, whose edge falls near 0.92, so no limb shows through.
 export const HALO_FRAGMENT = /* glsl */ `
 uniform float signal;

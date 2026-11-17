@@ -68,7 +68,7 @@ function unseen(state: State, notice: Notice): boolean {
   return time > (markOf(state, where) ?? "");
 }
 
-// ponytail: one list kept for the last call, its notices compared one by one, so a selector's answer is the same array
+// ceiling: one list kept for the last call, its notices compared one by one, so a selector's answer is the same array
 // while nothing it holds changed (zustand draws again for each new one); a store a test makes replaces it.
 let listed: readonly Notice[] = [];
 /** The notices that count, oldest first: the same array while they are the same. */
@@ -85,7 +85,7 @@ const meOf = ({ chat, login }: State) => chat.me ?? (login.session.kind === "in"
 
 // When this page opened, on its clock: a room it never read (Ergo's place `*`, or none yet) counts the lines that came since, none from
 // before, so a never read room is no "200 unread".
-// ponytail: the page's own clock, kept per page; a room's own follow time if a reload's lines must count from the first visit.
+// ceiling: the page's own clock, kept per page; a room's own follow time if a reload's lines must count from the first visit.
 const PAGE_OPENED = new Date().toISOString();
 
 // The lines of a room that are new to the reader: past its mark (or the page's opening while none is known), another's, no NOTICE, no edit.

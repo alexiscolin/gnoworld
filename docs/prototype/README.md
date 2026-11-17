@@ -2,15 +2,13 @@
 
 The prototype was approved on 2026-10-16. It is the reference for what gnoworld does and
 how it feels. It is **not** a code base. Nothing here is imported, built or maintained.
-Every concept is rebuilt slice by slice, test first, as `docs/plans/backlog.md` lists. The
+Every concept is rebuilt slice by slice, test first, as `docs/process/plans/backlog.md` lists. The
 scope and the decisions it changes are in [ADR-0002](../../adr/0002-validated-prototype.md).
 
 ## Where to see it
 
-- Live prototype (private artifact):
-  https://claude.ai/artifact/RyqhV8fFAJfNq8s14Fh9WL, version 57.
-- Walkthrough videos (private artifact), recorded with real mouse and keyboard input:
-  https://claude.ai/artifact/RwKWwKdK19K8pavLeSfWUD.
+- Live prototype: a private design page, version 57.
+- Walkthrough videos, recorded with real mouse and keyboard input: a private design page.
   - Essentials: 2:24.
   - Complete: 3:36.
 - `source/`: the prototype's page and script, frozen as they were approved.

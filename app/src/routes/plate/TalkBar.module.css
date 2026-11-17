@@ -14,7 +14,6 @@
 
   /* The words give way (cut with an ellipsis) before the bar's button does: a long line never runs out of the bar. */
   .who {
-    /* layout: the faces and words take what the button leaves */
     flex: 1 1 0;
     min-inline-size: 0;
   }
@@ -35,7 +34,6 @@
 
     display: inline-block;
     inline-size: var(--avatar-m);
-    /* layout: each face stands 8 px over the one before it */
     margin-inline-start: calc(var(--space-2xs) * -1);
     background: var(--_bg);
     box-shadow: 0 0 0 var(--line-width) var(--color-space);
@@ -49,7 +47,6 @@
   }
 
   .face:first-child {
-    /* layout: the first stands where it is */
     margin-inline-start: 0;
   }
 
@@ -120,14 +117,11 @@
   /* Under 400 px the button takes the line under the words (they ask the whole line), so the title keeps one line. */
   @media (width < 400px) {
     .talk > * {
-      /* layout: the button drops to its own line */
       flex-wrap: wrap;
-      /* layout: a step between the words and the button */
       row-gap: var(--space-xs);
     }
 
     .talk .who {
-      /* layout: the words ask the whole line */
       flex-basis: 100%;
     }
   }

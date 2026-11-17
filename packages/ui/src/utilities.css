@@ -37,7 +37,7 @@
     text-transform: none;
   }
 
-  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are. */
+  /* A dot before words, in its tone: a kicker's, a Plan's world where people are. */
   .dot {
     display: inline-block;
     inline-size: var(--size-dot);
@@ -60,7 +60,7 @@
     --_dot: var(--color-signal);
   }
 
-  /* The place's own colour, as a plate's kickers have it (frames 26, 40). */
+  /* The place's own colour, as a plate's kickers have it. */
   .dot[data-tone="world"] {
     --_dot: var(--world);
   }
@@ -83,7 +83,7 @@
     /* raw: a view link's 34 px inside the 44 px pill (shellHeader.module.css) */
     --_h: var(--round-h);
 
-    /* layout: no room to share with the pill's 40 px controls: the icons are its links' height */
+    /* No room to share with the pill's 40 px controls: the icons are its links' height */
     margin-block: 0;
     border-radius: var(--radius-pill);
   }
@@ -112,7 +112,6 @@
   }
 
   .held-top {
-    /* layout: held at the top of its scrolling box while the lines pass under */
     position: sticky;
     inset-block-start: var(--_held-top);
     /* raw: over the lines under it, which stand at auto */
@@ -322,7 +321,6 @@
   /* A control and its sibling controls in one pill: the box's line is drawn here, so the button first in it draws none of its own (its
      transparent edge keeps the pill's height); the header's way in or account, with the network's menu after a divider. */
   .pill-group {
-    /* layout: the controls on a line, sharing a middle */
     display: inline-flex;
     align-items: center;
     border-radius: var(--radius-pill);
@@ -401,7 +399,7 @@
     padding: 0;
     /* raw: 2 px each side lifts the box past 24 px (WCAG 2.5.8) and the matching negative margin gives the room back */
     padding-block: 2px;
-    /* layout: the room the padding took, given back, so a line keeps its measures */
+    /* Gives back the room the padding took, so a line keeps its measures */
     margin-block: -2px;
     border: 0;
     background: none;

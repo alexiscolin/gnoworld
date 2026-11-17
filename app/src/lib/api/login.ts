@@ -10,7 +10,7 @@ export type { Fetcher, Result } from "./http.ts";
 export const FILE_MAX_BYTES = 4096;
 /** Whether a pasted file is more than the server reads: never sent. */
 export const tooBig = (file: string): boolean => new TextEncoder().encode(file).length > FILE_MAX_BYTES;
-/** A command-line code: the login's (D13880), a link's and a release's (links.ts); the block is the server's, shown as it came. */
+/** A command-line code: the login's, a link's and a release's (links.ts); the block is the server's, shown as it came. */
 export const CliChallenge = z.object({
   nonce: Nonce,
   memo: z.string().check(z.maxLength(1024)),
@@ -32,7 +32,7 @@ export function loginApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     /** The proof posted; the account logged in, which must be the one that signed. */
     verify: async (request: { nonce: string; address: Address; proof: Proof }): Promise<Result<Me>> =>
       named(await send({ path: "verify", body: request, schema: Me }), request.address),
-    /** A code and the block to copy, for the command-line key of `address` (D13880). */
+    /** A code and the block to copy, for the command-line key of `address`. */
     cliChallenge: (address: Address) => send({ path: "cli/challenge", body: { address }, schema: CliChallenge }),
     /** The file the command-line tool wrote, as it was pasted: at most 4 KiB, which the server reads. */
     verifyFile: async (request: { nonce: string; address: Address; file: string }): Promise<Result<Me>> =>

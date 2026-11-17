@@ -1,7 +1,7 @@
 // The most called worlds of the last 7 UTC days, computed once a worlds pass from the rollup's days and served from memory at
 // GET /api/trending, never per request. A world's realms add up; worlds rank by people a day (the sum of each day's distinct callers, so a
 // bot that calls a realm a thousand times a day is one), ties by calls then id; the top five, with how many worlds were called.
-// ponytail: a person calling two realms of one world on one day counts twice, the rollup keeping callers per realm; per world if it matters.
+// ceiling: a person calling two realms of one world on one day counts twice, the rollup keeping callers per realm; per world if it matters.
 import { EARTH, labelName } from "@gnoworld/core";
 import { Trending, TRENDING_DAYS, TRENDING_MOST } from "@gnoworld/schemas/indexer";
 import type { Worlds } from "@gnoworld/schemas/indexer";

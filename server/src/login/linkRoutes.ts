@@ -152,7 +152,7 @@ export function linkRoutes(options: LinkRoutesOptions): Hono<Guarded> {
   const refuse = refuserOf(log, "link_refused", refusals);
   const { caller, fresh } = gates(options, refuse);
   const reads = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
-  // ponytail: a fixed window of codes issued, not a count of the pending ones; 10 a /64 in 10 minutes.
+  // ceiling: a fixed window of codes issued, not a count of the pending ones; 10 a /64 in 10 minutes.
   const issued = limiter({ max: 10, windowMs: 10 * 60_000, keys: 100_000 });
 
   const app = new Hono<Guarded>();

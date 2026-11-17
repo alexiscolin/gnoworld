@@ -204,7 +204,15 @@ describe("the reconciler's pass", () => {
       log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
     });
     await reconciler.pass();
-    expect(lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{").trim())).toEqual([
+    expect(lines.every((line) => /"stack":"at [^"]*reconcile\.test\.ts/.test(line))).toBe(true);
+    expect(
+      lines.map((line) =>
+        line
+          .replace(/^\{"time":"[^"]+",/, "{")
+          .replace(/,"stack":"[^"]*"/, "")
+          .trim(),
+      ),
+    ).toEqual([
       '{"event":"room_unreconciled","error":"RangeError","room":"#broken"}',
       '{"event":"room_unreconciled","error":"Error","room":"#odd"}',
     ]);

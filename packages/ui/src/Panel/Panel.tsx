@@ -110,7 +110,7 @@ function Layout({ plate, children }: LayoutProps) {
 }
 
 /** The dock at the right on a wide screen, under that width no place of its own: beside a plate, inside its outline (Layout), or
- * `alone` over the scene with every corner round (the chat over the cosmos, frame 143). */
+ * `alone` over the scene with every corner round (the chat over the cosmos). */
 function Dock({ alone = false, children }: { alone?: boolean; children: ReactNode }) {
   return (
     <div className={styles["dock"]} data-dock="" data-alone={alone ? "" : undefined} data-exit="">

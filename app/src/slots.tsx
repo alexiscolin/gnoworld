@@ -1,5 +1,5 @@
 // The places other features fill: named and typed here, filled from their own features through `plug`, one import line each in
-// plugs.ts, so the header, the passport and the arrival import nothing of theirs. A slot nobody filled draws nothing.
+// featurePlugs.ts, so the header, the passport and the arrival import nothing of theirs. A slot nobody filled draws nothing.
 import { createElement, type ComponentType } from "react";
 import type { RealmBlocks } from "./features/realms/RealmBlocks.tsx";
 import type { DeviceSlice } from "./store/keep.ts";

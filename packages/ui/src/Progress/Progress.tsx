@@ -7,7 +7,7 @@ export interface ProgressProps {
   value: number;
   max: number;
   /** A bar that fills, a step a dot (a quest's steps, a constellation's worlds: 12 at most, past that a bar), or an arc of three quarters
-   * of a ring that fills clockwise from its lower left (the search drawer's passport, frame 99). */
+   * of a ring that fills clockwise from its lower left (the search drawer's passport). */
   kind?: "bar" | "steps" | "arc";
   /** The words beside it, as shown ("3/5"); none draws the gauge alone. */
   shown?: string;

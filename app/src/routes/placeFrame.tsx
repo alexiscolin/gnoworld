@@ -1,10 +1,10 @@
-// The frame of a place's page in space (frames 22, 93, 104): the planet's place the page lays out and the scene draws in, the plate at the
+// The frame of a place's page in space: the planet's place the page lays out and the scene draws in, the plate at the
 // left, the dock at the right, and space's foot (SpaceFoot.tsx). A world's page and a realm's are this frame; only the plate's content and the dock's
 // chat differ. On a computer the planet stands larger than the window, lit at three quarters.
 import type { ReactNode } from "react";
 import { Panel } from "@gnoworld/ui";
 import { chatHeld, LOADING, PlateFrame } from "../features/chat/index.ts";
-import { DOCKED, useMedia } from "../features/chat/useMedia.ts";
+import { DOCKED, useMedia } from "../features/chat/dock/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { StatusRing } from "../features/world/StatusRing.tsx";
 import type { Ring } from "../features/world/statusRing.ts";

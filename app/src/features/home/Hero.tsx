@@ -1,5 +1,5 @@
-// The home's hero (frames 1 to 8): the kicker, the big number, its line and the two big actions. The number counts the people online, as
-// the video's "671 ONLINE", and the line the worlds drawn; where the server does not say (another universe, a server down), the number counts
+// The home's hero: the kicker, the big number, its line and the two big actions. The number counts the people online, as
+// the design's "671 ONLINE", and the line the worlds drawn; where the server does not say (another universe, a server down), the number counts
 // the worlds the page gives it. No sample: none while none is known.
 import type { PresencePeople } from "@gnoworld/schemas/indexer";
 import { Icon, Kicker, sightRef } from "@gnoworld/ui";
@@ -10,7 +10,7 @@ import { GoExplore } from "./GoExplore.tsx";
 import { Network } from "./Network.tsx";
 import styles from "./Hero.module.css";
 import { Lenses } from "../../Lenses.tsx";
-import { useSwapped } from "../../swapped.ts";
+import { useSwapped } from "../../useSwapped.ts";
 import { fullChatHref, leaveDock } from "../../fullChat.ts";
 
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
@@ -114,7 +114,7 @@ function Line({ universe, worlds, people, coming, system }: HeroProps & { coming
   );
 }
 
-// The video's pair (frame 4): Go explore filled, then Join the chat, the Earth's general room. A system has none: both lead elsewhere
+// The design's pair: Go explore filled, then Join the chat, the Earth's general room. A system has none: both lead elsewhere
 // (its views are the header's). The universe marks whether the cosmos stands beside them, where the Earth's label says "Start
 // here" to a newcomer.
 function Actions({ universe, system, newcomer }: Pick<HeroProps, "universe" | "system" | "newcomer">) {

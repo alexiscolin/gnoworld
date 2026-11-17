@@ -7,7 +7,7 @@ import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { noMedia, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
-import { InPageSheet, SheetClose } from "../chat/placePage.ts";
+import { InPageSheet, SheetClose } from "../chat/phone/placePage.ts";
 import { Actions } from "./Actions.tsx";
 
 // Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share

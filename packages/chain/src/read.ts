@@ -1,7 +1,9 @@
-// The browser's one way to read the chain: `fetch` and Zod, nothing else. One GET of an https address,
-// its answer read under a time limit and a size cap, then through a schema. A fault is a typed state with its next step, and
-// every result, good or not, names where it was read and when: the page never shows a number without its source.
-// One request a call: no retry, no timer left behind, so nothing polls. Unlike lib/api/http.ts it caps the answer's size.
+// This is the browser's only way to read the chain, and it uses just `fetch` and Zod. It sends one GET to an
+// https address, reads the answer under a time limit and a size cap, and then checks it against a schema.
+// A failure is a typed state that comes with a next step for the reader. Every result, good or not, says where
+// it was read and when, so the page never shows a number without its source.
+// Each call makes one request, with no retry and no timer left behind, so nothing polls.
+// Unlike lib/api/http.ts, it caps the size of the answer.
 import type * as z from "zod/mini";
 import { jsonOfBytes } from "@gnoworld/schemas";
 import { fetchBytes, type ChainFetch, type FailureKind } from "./transport.ts";
@@ -15,12 +17,14 @@ export interface Source {
   readonly at: string;
 }
 
-/** Where a read that never reached the network was to be asked, and when: the clock is `options.now`. */
+/** The source of a read that never reached the network: the address it would have asked, and when.
+ * The time comes from `options.now`. */
 export function sourceOf(url: string, options: ReadOptions): Source {
   return { url, at: (options.now ?? (() => new Date()))().toISOString() };
 }
 
-/** The host an address goes to, as the browser reads it; the address itself when it has none or is no address. */
+/** The host that an address points to, as the browser reads it.
+ * It returns the address itself if there is no host or the text is not an address. */
 export function hostOf(href: string): string {
   try {
     return new URL(href).host || href;
@@ -31,9 +35,9 @@ export function hostOf(href: string): string {
 
 export interface Failure {
   readonly kind: FailureKind;
-  /** What the reader may do now, in a sentence of ours; never a word of the answer. */
+  /** What the reader can do now, in a sentence we wrote. It never contains any text from the answer. */
   readonly next: string;
-  /** The HTTP status of a `down` that answered. */
+  /** The HTTP status, for a `down` failure where the service did answer. */
   readonly status?: number;
 }
 
@@ -45,9 +49,9 @@ export interface ReadOptions {
   fetch?: ChainFetch;
   timeoutMs?: number;
   maxBytes?: number;
-  /** The clock, for the source's time. */
+  /** The clock, used for the time in the source. */
   now?: () => Date;
-  /** Ends the request early: a page that left. */
+  /** Ends the request early, for example when the page has been closed. */
   signal?: AbortSignal;
 }
 
@@ -67,12 +71,13 @@ const NEXT: Record<FailureKind, string> = {
   "not-landed": "The chain has not put this transaction in a block yet. It may still be on its way.",
 };
 
-/** A failed read of a kind of ours, for a layer above the transport: the failure carries our sentence, never the answer's. */
+/** Builds a failed read of one of our failure kinds, for layers above the transport.
+ * The failure carries our own sentence, never text from the answer. */
 export function failedRead<T>(kind: FailureKind, source: Source, status?: number): ChainRead<T> {
   return { ok: false, failure: { kind, next: NEXT[kind], ...(status === undefined ? {} : { status }) }, source };
 }
 
-/** Whether an address is https with no credentials in it: the only kind a read asks. */
+/** Whether an address is https with no credentials in it. A read only asks addresses of this kind. */
 export function isHttps(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -82,7 +87,8 @@ export function isHttps(url: string): boolean {
   }
 }
 
-/** One read of an https address through a schema: the value with its source, or a typed failure with its next step. */
+/** Reads one https address and checks the result against a schema.
+ * It returns the value with its source, or a typed failure with its next step. */
 export async function readChain<T>(
   url: string,
   schema: z.ZodMiniType<T>,

@@ -2,7 +2,7 @@
 import { worldsFollowedIn } from "../follow/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { useUnread } from "./useUnread.ts";
+import { useUnread } from "./rooms/useUnread.ts";
 import { Worlds } from "./Worlds.tsx";
 
 export function useWorldsOf(place: ChatPlace, full: boolean) {

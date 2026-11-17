@@ -7,11 +7,9 @@
 
   /* The name that opens the menu: the heading's own type, a chevron a step after it. */
   .trigger {
-    /* layout: the words from their start: a name too long for its track gives way at its end, never at both */
+    /* Start-aligned: a name too long for its track gives way at its end, never at both */
     justify-items: start;
-    /* layout: the words giving way to their ellipsis before the chevron */
     grid-template-columns: minmax(0, max-content) auto;
-    /* layout: the chevron's distance from the words */
     gap: var(--space-3xs);
     max-inline-size: 100%;
   }
@@ -23,13 +21,9 @@
 
   /* The place and the room in one row on the messages' edge, the row giving way before the controls. */
   .where {
-    /* layout: one row that never wraps, each name shrinking to its ellipsis (the truncate utility on each) */
     display: flex;
-    /* layout: the names on their first line's baseline */
     align-items: first baseline;
-    /* layout: a small step round the slash */
     column-gap: var(--space-2xs);
-    /* layout: as wide as its names, never wider than the conversation's column leaves */
     flex: 0 1 auto;
     min-inline-size: 0;
   }
@@ -37,7 +31,6 @@
   /* The conversation's column in the wide full chat's band: the place and the room at its start, its buttons at its end, over the lines'
      times. */
   .middle {
-    /* layout: what the band leaves between the place and the controls */
     flex: 1 1 0;
     min-inline-size: 0;
   }
@@ -48,67 +41,56 @@
   }
 
   .controls {
-    /* layout: the controls at the far end of the header's row */
     margin-inline-start: auto;
   }
 
   /* Over the info column in the wide full chat: its width and the messages' inset, less the band's padding and step, so the place's
      buttons end where the lines' times do. */
   .over {
-    /* layout: the info column's measure */
     flex: none;
     inline-size: calc(var(--chat-info) + var(--chat-inset) - 2 * var(--space-m));
   }
 
-  /* The rooms' control and the place: on a wide chat, items of the header's one row (frame 60). */
+  /* The rooms' control and the place: on a wide chat, items of the header's one row. */
   .place {
-    /* layout: on a wide chat, the place over the worlds' and the rooms' columns, so what follows stands on the messages' edge */
     display: block;
-    /* layout: it keeps that measure */
     flex: none;
-    /* layout: the two columns, less the header's own padding and step: the kicker stands on the rooms' column's edge */
+    /* Both columns less the header's padding and step, so the kicker stands on the rooms' column edge */
     inline-size: calc(var(--chat-worlds) + var(--chat-rooms) - 2 * var(--space-m));
     /* raw: the place's kicker a step under the label's size, so a room's whole name fits beside the rooms' control */
     --font-label: 500 0.59375rem/1 var(--family-mono);
   }
 
   /* The chat's breakpoint, from its own width (ChatScreen.tsx's `data-compact`: no container query, none holds one). A
-     phone's header keeps two rows (frame 38: the place and the controls, then the name); a dock's one, what does not fit under "More"
+     phone's header keeps two rows (the place and the controls, then the name); a dock's one, what does not fit under "More"
      (PlaceActs.tsx). */
   [data-compact] {
     .place {
-      /* layout: the first row, the controls at its end */
       display: grid;
-      /* layout: the rooms' control whole, the kicker in what is left, which may shrink to nothing */
       grid-template-columns: auto minmax(0, 1fr);
-      /* layout: what the controls leave of the first row */
       flex: 1 1 0;
       inline-size: auto;
       /* the rooms' control's height, before its chunk comes: the row does not grow when it does */
       min-block-size: var(--control-s);
-      /* layout: the control and the place on one line */
       align-items: center;
-      /* layout: the header's own step between them */
       gap: inherit;
     }
 
     /* The rooms' control drawn flush, whole: its icon on the name's left edge, its fill out in the band's margin;
        the kicker after it gives way at its end. */
     .place > :first-child {
-      /* layout: the control's padding and edge, a small step and a hairline, taken back */
+      /* Takes back the control's padding and hairline edge */
       margin-inline-start: calc(-1 * (var(--space-s) + var(--line-width)));
       white-space: nowrap;
     }
 
     .title {
-      /* layout: the second row, whole, under the place and the controls */
       flex-basis: 100%;
       order: 1;
       white-space: nowrap;
     }
 
     .mark {
-      /* layout: after the name */
       order: 2;
     }
 
@@ -118,8 +100,7 @@
     }
 
     .place:empty ~ .title {
-      /* layout: the row's first item, all the row leaves, so a long name gives way to its ellipsis and never sends the controls to a row
-         of their own */
+      /* Takes all the row leaves, so a long name ellipsizes instead of pushing the controls to their own row */
       flex: 1 1 0;
       order: 0;
       min-inline-size: 0;
@@ -127,7 +108,6 @@
 
     /* A direct message's name, long, takes the second row whole; its mark, said at once, and the controls make the third. */
     .title:has(~ .mark) {
-      /* layout: a row of its own */
       flex-basis: 100%;
     }
 
@@ -142,7 +122,7 @@
       overflow: hidden;
       /* raw: room for the ink a glyph draws past its 22 px line (a #'s bars, a g's tail), which the clip cut */
       padding: 2px;
-      /* layout: the padding taken back, so the name stands where it did */
+      /* Takes back the padding so the name stays where it was */
       margin: -2px;
     }
   }

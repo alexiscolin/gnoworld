@@ -16,7 +16,7 @@ export interface ActivityChartProps {
   sparkline?: boolean;
   /** How far apart the values are: an hour unless asked. */
   unit?: "hour" | "day";
-  /** Its row of peak and now; false where the page writes them in its own words (a plate's, frames 26 and 40). */
+  /** Its row of peak and now; false where the page writes them in its own words (a plate's). */
   figures?: boolean;
 }
 

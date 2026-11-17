@@ -18,7 +18,7 @@ export interface FlashProps {
    * same words are the same flash, whatever object holds them: to say them again, pass null between. */
   message: FlashMessage | null;
   onClose: () => void;
-  /** An arrival's banner (frames 23, 93): under the header, over the scene, never pushing the page; timed even with its action. */
+  /** An arrival's banner: under the header, over the scene, never pushing the page; timed even with its action. */
   banner?: boolean;
 }
 
@@ -119,7 +119,7 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
       <Cluster space="m">
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
-          {/* A banner's line is in the one label style, as frames 18, 23 and 93 draw it ("TODAY'S EXPEDITION · 1 OF 3"). */}
+          {/* A banner's line is in the one label style, as the design draw it ("TODAY'S EXPEDITION · 1 OF 3"). */}
           {line === undefined ? null : <p className={banner ? "label" : "meta"}>{line}</p>}
         </Stack>
         <Cluster space="2xs">

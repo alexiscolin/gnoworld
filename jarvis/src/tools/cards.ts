@@ -193,7 +193,7 @@ async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ra
   if (button.type === "fly") return flyCard(setup, button, asked);
   if (asked.shared === true) return refused("a shared answer carries flights alone.");
   if (profile === undefined) return refused("an action's button names its realm's chain profile.");
-  // The button runs on the chain it carries (D13508), and the check ran on the profile's universe: the two must be one.
+  // The button runs on the chain it carries, and the check ran on the profile's universe: the two must be one.
   const checkedOn = setup.places.universes.get(profile)?.chainId;
   if (button.chainId !== checkedOn)
     return refused(

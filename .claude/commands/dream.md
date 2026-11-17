@@ -3,7 +3,7 @@ description: The dream, at a slice's end (D13182) — the read-only dreamer agen
 argument-hint: "<slice number> [the slice's shared folder, if not .claude/tmp/slice-<n>]"
 ---
 
-Run the dream over slice $ARGUMENTS (Alexis, 2026-10-28, `docs/decisions.md`). It changes nothing by itself: it proposes,
+Run the dream over slice $ARGUMENTS (Alexis, 2026-10-28, `docs/process/decisions.md`). It changes nothing by itself: it proposes,
 Alexis decides, then Claude applies what he accepted.
 
 1. **Keep the memory as it is.** Copy every file of this project's memory folder (the one MEMORY.md is in) to
@@ -11,7 +11,7 @@ Alexis decides, then Claude applies what he accepted.
 2. **Read, never write.** Launch the `dreamer` agent (`.claude/agents/dreamer.md`: Read, Grep and Glob alone) with these
    inputs and nothing else, never a transcript: the slice's shared folder (by default `.claude/tmp/slice-<n>/`: its
    `learnings.md`, the branches' state files, `reports/`; for slice 4, `.claude/tmp/handoff-slice5/slice4-reports/`), the
-   slice's rows of `docs/review-log.md` and `docs/review/findings.md`, `docs/decisions.md`'s rows of the slice, the slice's
+   slice's rows of `docs/process/review-log.md` and `docs/process/review/findings.md`, `docs/process/decisions.md`'s rows of the slice, the slice's
    handoff (`.claude/tmp/handoff-slice<n+1>/HANDOFF.md`), `CLAUDE.md`, `.claude/rules/`, the memory files.
 3. **Put it to Alexis**, in French, as a numbered list: one line each, its evidence and prevalence, and the recommendation
    (accept, change, drop). Save the agent's table to `.claude/tmp/dream/<today>/proposals.md`. A proposal whose evidence is
@@ -21,6 +21,6 @@ Alexis decides, then Claude applies what he accepted.
      each, and MEMORY.md's index line;
    - a rule, a test or a check: on a branch of its own, test first for a check, through `/pre-merge` and a pull request like any
      harness change;
-   - a decision: a row of `docs/decisions.md`, with its reason.
-5. **Measure the dream itself** in `docs/review-log.md`: its tokens, proposals made, accepted, and those that later
+   - a decision: a row of `docs/process/decisions.md`, with its reason.
+5. **Measure the dream itself** in `docs/process/review-log.md`: its tokens, proposals made, accepted, and those that later
    prevented a finding (the next slice's dream reads them).

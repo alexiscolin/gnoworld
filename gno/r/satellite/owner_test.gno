@@ -7,7 +7,7 @@ import (
 	"gno.land/p/nt/uassert/v0"
 )
 
-// The largest price whose seven days still fit an int64.
+// The largest price at which seven days of rent still fit in an int64.
 const topPrice = 1317624576693539401
 
 func TestRentRefusedWhilePaused(cur realm, t *testing.T) {
@@ -29,7 +29,7 @@ func TestRentRefusedWhilePaused(cur realm, t *testing.T) {
 	uassert.Equal(t, 1, rentals.Size())
 }
 
-// Pausing stops new rentals, never moderation: closes and takedowns go on.
+// Pausing stops new rentals but never stops moderation: closes and takedowns still work.
 func TestPauseLeavesCloseAndTakedown(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -47,10 +47,10 @@ func TestPauseLeavesCloseAndTakedown(cur realm, t *testing.T) {
 	uassert.Equal(t, p0, bal(alice))
 	_, _, _, ok := Rental("venus")
 	uassert.False(t, ok)
-	uassert.Equal(t, 2*p0, held) // venus's two days begun, until it is closed
+	uassert.Equal(t, 2*p0, held) // venus's two days have begun, and are held until it is closed
 }
 
-// A rental keeps the price it paid: a later price changes no refund.
+// A rental keeps the price it paid, so a later price change does not alter a refund.
 func TestTakedownRefundsAtThePriceTheRentalPaid(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(adm))
@@ -64,10 +64,10 @@ func TestTakedownRefundsAtThePriceTheRentalPaid(cur realm, t *testing.T) {
 	Takedown(cross(cur), "mars", "r1")
 	uassert.Equal(t, 1, bal(alice))
 	uassert.Equal(t, 2, bal(self))
-	uassert.Equal(t, 2, held) // the two days begun, at the price paid
+	uassert.Equal(t, 2, held) // the two days that have begun, at the price paid
 }
 
-// A close takes out of the held total what the rental paid, not today's price.
+// A close removes from the held total what the rental paid, not today's price.
 func TestCloseReleasesWhatTheRentalPaid(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -80,7 +80,7 @@ func TestCloseReleasesWhatTheRentalPaid(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, held)
 }
 
-// Every owner action is refused to anyone else, the operator included.
+// Every owner action is refused to anyone else, including the operator.
 func TestOwnerActionsRefusedToOthers(cur realm, t *testing.T) {
 	fresh()
 	for _, who := range []address{alice, mod} {
@@ -141,7 +141,7 @@ func TestSetOperator(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(mod))
 	uassert.AbortsWithMessage(t, cur, "only the owner or the operator takes a satellite down", func() { Takedown(cross(cur), "mars", "r1") })
 
-	// None: the owner alone takes down.
+	// With no operator, only the owner can take a satellite down.
 	testing.SetRealm(testing.NewUserRealm(adm))
 	SetOperator(cross(cur), "")
 	uassert.Equal(t, address(""), Operator())
@@ -156,14 +156,14 @@ func TestSetOperator(cur realm, t *testing.T) {
 	uassert.False(t, ok)
 }
 
-// The owner proposes, and only the proposed address takes over.
+// The owner proposes a new owner, and only the proposed address can take over.
 func TestOwnershipMovesInTwoSteps(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(adm))
 	uassert.AbortsWithMessage(t, cur, "not an address", func() { ProposeOwner(cross(cur), "g1bad") })
 	uassert.AbortsWithMessage(t, cur, "not an address", func() { ProposeOwner(cross(cur), "") })
 	ProposeOwner(cross(cur), carol)
-	ProposeOwner(cross(cur), bob) // a second proposal replaces the first
+	ProposeOwner(cross(cur), bob) // a second proposal replaces the first one
 	uassert.Equal(t, adm, Owner())
 
 	for _, who := range []address{carol, alice, mod, adm} {
@@ -184,14 +184,14 @@ func TestOwnershipMovesInTwoSteps(cur realm, t *testing.T) {
 	uassert.Equal(t, 2*p0, Price())
 }
 
-// The owner withdraws the realm's balance minus the payments of rentals
-// not closed, so every takedown can still refund.
+// The owner can withdraw the realm's balance minus the payments of rentals
+// that are not closed, so that every takedown can still pay its refund.
 func TestWithdrawNeverTakesHeldPayments(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
 	pay(3 * p0)
 	Rent(cross(cur), "mars", "hello", 3)
-	testing.IssueCoins(self, chain.Coins{{"ugnot", 5}}) // sent to the realm outside a rent
+	testing.IssueCoins(self, chain.Coins{{"ugnot", 5}}) // coins sent to the realm without a rent
 
 	testing.SetRealm(testing.NewUserRealm(adm))
 	for _, n := range []int{6, 0, -1, -3 * p0} {
@@ -205,21 +205,21 @@ func TestWithdrawNeverTakesHeldPayments(cur realm, t *testing.T) {
 	uassert.Equal(t, 3*p0, bal(self))
 	uassert.AbortsWithMessage(t, cur, "withdraw 1 to 0 ugnot", func() { Withdraw(cross(cur), carol, 1) })
 
-	// Day two has begun: the takedown refunds one day, and two are earned once
-	// the rental it leaves ended is closed.
+	// Day two has begun, so the takedown refunds one day. Two days are earned once
+	// the ended rental that it leaves behind is closed.
 	at(t0 + oneDay)
 	Takedown(cross(cur), "mars", "r1")
 	uassert.Equal(t, p0, bal(alice))
 	uassert.AbortsWithMessage(t, cur, "withdraw 1 to 0 ugnot", func() { Withdraw(cross(cur), carol, 1) })
-	at(t0 + 3*oneDay) // the end it was paid for
+	at(t0 + 3*oneDay) // the end that was paid for
 	Close(cross(cur), "mars")
 	Withdraw(cross(cur), carol, 2*p0)
 	uassert.Equal(t, 0, bal(self))
 	uassert.Equal(t, 2*p0+5, bal(carol))
 }
 
-// An ended rental not yet closed is still held: its payer gets nothing back,
-// but the owner withdraws it only once it is closed.
+// An ended rental that is not closed yet is still held. Its payer gets nothing back,
+// and the owner can withdraw its payment only once it is closed.
 func TestWithdrawWaitsForTheClose(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))

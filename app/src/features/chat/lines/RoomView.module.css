@@ -1,0 +1,394 @@
+/* A room: the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
+   line that mentions the reader apart. */
+@layer components {
+  /* The conversation: a column that fills its region, the list in it scrolling alone (.fill) over the composer. */
+  .main {
+    display: flex;
+    flex-grow: 1;
+    flex-direction: column;
+    /* Lets the column shrink below its content, so the list scrolls and the page does not */
+    min-block-size: 0;
+  }
+
+  /* What stands above the lines, at the lines' own inset: the link's state, and a room's word while it holds no line. */
+  .lead {
+    padding-block-start: var(--space-s);
+    padding-inline: var(--chat-inset);
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  /* The bar asks the list's own width, not the page's (LineActions); the lines a step apart, as the design's are. */
+  .lines {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    /* No gap: each line holds its own padding, so the pointer crosses between lines and bar without leaving a row */
+    gap: 0;
+  }
+
+  /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
+     the page; the thread's list keeps its own height. */
+  .fill {
+    margin: 0;
+    list-style: none;
+    flex: 1;
+    min-block-size: 0;
+    overflow: auto;
+    /* raw: 20 px above the first line and below the last (the prototype's #chatList padding) */
+    --_pad: 20px;
+    padding-block: var(--_pad);
+    /* held labels stand at the box's edge, not under its padding (utilities.css) */
+    --_held-top: calc(-1 * var(--_pad));
+    --_room: max(var(--chat-inset), var(--space-l));
+    padding-inline: calc(var(--_room) - var(--focus-width) - var(--focus-offset))
+      calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
+    /* the design's chat text, a half point under the body's */
+    font: var(--font-chat);
+  }
+
+  .lines > li {
+    /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (nine
+       small controls and its inset) and the times' column it keeps clear, so the bar covers no word and no time. */
+    --_gutter: calc(9 * var(--control-xs) + var(--chat-times));
+    position: relative;
+    /* Room for the focus ring, drawn outside the line, which the scrolling list would clip */
+    margin-inline: calc(var(--focus-width) + var(--focus-offset));
+    padding-inline-end: var(--_gutter);
+    /* a row to point at, as Slack's: its own room above and below its words, which the fill and the bar's overlap hold */
+    padding-block: var(--space-3xs);
+    border-radius: var(--radius-s);
+    overflow-wrap: anywhere;
+    scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  /* Narrow, the bar floats over the line's end as it does wide, which keeps no room for it: the line never moves as the bar comes. */
+  @container (inline-size < 24rem) {
+    .lines > li {
+      --_gutter: calc(0 * var(--control-s));
+    }
+  }
+
+  /* Bare rows (a thread's) draw no bar: they keep clear of the times' column alone, wide or narrow. */
+  .lines[data-bare] > li {
+    --_gutter: var(--chat-times);
+  }
+
+  /* A line's foot: its reactions at the start, its thread's chip at the end, on one row; no row when it holds neither. */
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3xs);
+  }
+
+  .foot:empty {
+    display: none;
+  }
+
+  .thread {
+    margin-inline-start: auto;
+  }
+
+  /* The foot reaches the row's end, through the room the line keeps for its bar: the thread's chip under the time, not mid-row. */
+  .lines > li > .foot {
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  /* The line pointed at: a faint fill and nothing else, so no line under it moves. */
+  @media (hover: hover) {
+    .lines > li:hover {
+      background: var(--color-fill);
+    }
+  }
+
+  /* A line that goes on its author's group (LineView's `grouped`): close under the one before it, a head of marks only; its time
+     waits at the row's end under the heads' times, shown as the line is pointed at or holds the focus. */
+  .lines > li[data-grouped] {
+    margin-block-start: 0;
+  }
+
+  /* A line that opens a group stands a step under the one before it, as the design's lines do: the step less the two paddings. */
+  .lines > li:not([data-grouped]) {
+    margin-block-start: calc(var(--space-s) - var(--space-3xs) * 2);
+  }
+
+  .lines > li:first-child {
+    margin-block-start: 0;
+  }
+
+  .groupTime {
+    position: absolute;
+    /* At the row's far end, where its head's time stands, so every time is in one column */
+    inset-inline-end: 0;
+    /* On the text's first line, which the row's padding and the text's hair put under the row's top */
+    inset-block-start: calc(var(--space-3xs) + var(--space-3xs) / 2);
+    color: var(--color-text-muted);
+    /* the head's own time in mono on a line twice its size, the chat's text line within a pixel, so it stands on the text's first line */
+    font: var(--text-2xs)/2 var(--family-mono);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .lines > li:hover .groupTime,
+  .lines > li:focus-within .groupTime {
+    opacity: 1;
+  }
+
+  .lines > li:last-child {
+    margin-block-end: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  .time,
+  .mark,
+  .mentionsYou,
+  .replying {
+    font: var(--font-meta);
+  }
+
+  /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
+     author in the text's own colour and bolder: the prototype's quote. */
+  .replying {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .time,
+  .mark {
+    color: var(--color-text-muted);
+  }
+
+  /* The country a line declares: the design, a box 22 by 15 between the face and the name. */
+  .country {
+    /* raw: a step above the line's width, and a corner under the small radius, as the frames draw it */
+    padding: 1px var(--space-3xs);
+    border: var(--line-width) solid var(--color-line);
+    /* raw: the frames' corner, under every radius token */
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    font-family: var(--family-mono);
+    font-size: var(--text-3xs);
+    line-height: 1.2;
+    /* raw: the frames' tracking, a tighter one than the labels' */
+    letter-spacing: 0.06em;
+    /* raw: the frames set it on the name's baseline, a pixel under the row's centre */
+    translate: 0 1px;
+    /* raw: the frames' 22 px box, held whatever the font's metrics make of two letters (a runner's mono was a pixel narrower) */
+    inline-size: 22px;
+    display: grid;
+    justify-items: center;
+  }
+
+  /* The face opens its author's card, as the name does. */
+  .face {
+    cursor: pointer;
+  }
+
+  /* An account's first words in the room: the design's mint "new here" tag after the name. */
+  .newHere {
+    /* raw: the frame's tag, a pixel above and under its words */
+    padding: 1px var(--space-2xs);
+    border-radius: var(--radius-s);
+    background: var(--color-mine-soft);
+    color: var(--color-mine);
+    font-family: var(--family-mono);
+    font-size: var(--text-2xs);
+  }
+
+  /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
+     bar, as the divider's rule does (the bar covers it only while pointed at). */
+  .head {
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  .head .time {
+    margin-inline-start: auto;
+    /* the design's time in mono (the prototype's #chatList li em) */
+    font: var(--text-2xs)/1 var(--family-mono);
+  }
+
+  [data-line-text] {
+    margin-block-start: calc(var(--space-3xs) / 2);
+  }
+
+  /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
+  .mark > svg {
+    display: inline-block;
+    margin-inline-end: var(--space-3xs);
+    vertical-align: text-bottom;
+  }
+
+  .who {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .action {
+    font-style: italic;
+  }
+
+  .notice .text {
+    color: var(--color-text-muted);
+  }
+
+  /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word. */
+  .lines > li[data-about-me] {
+    padding-inline-start: var(--space-2xs);
+    border-inline-start: var(--line-width) solid var(--color-warm);
+    background: var(--color-warm-soft);
+  }
+
+  .mentionsYou {
+    color: var(--color-warm);
+  }
+
+  /* My own line: my name in mint, the word "you" after it (DESIGN-SYSTEM.md, Avatar). */
+  .lines > li[data-mine] .author {
+    color: var(--color-mine);
+  }
+
+  /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
+     whole in its title. */
+  .typing {
+    padding-inline: var(--chat-inset);
+    /* One line of this font, which no token names */
+    min-block-size: 1lh;
+    margin-block: var(--space-2xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
+     in the label style and a rule running on, so the times stay in one column. */
+  .divider {
+    display: flex;
+    gap: var(--space-2xs);
+    /* The rule runs the line's whole width, over the room kept for its bar, which this row holds none of */
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view. */
+  .lines > li.day {
+    /* held at the top over its day's lines by `held-top` (utilities.css) */
+    /* No step above, which a held label would leave open to the lines under it */
+    margin-block-start: 0;
+    display: flex;
+    column-gap: var(--space-2xs);
+    padding-inline-end: 0;
+    margin-inline-end: 0;
+    color: var(--color-text-muted);
+  }
+
+  .lines > li.day::after {
+    content: "";
+    align-self: center;
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* A poll's bars run the line's whole width, over the room kept for its bar, as the design draws them. */
+  /* A line's translation, under its words: the text's own size and ink, a rule at its start and a step in, no box. */
+  .translation {
+    margin-block-start: var(--space-3xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    padding-inline-start: var(--space-s);
+  }
+
+  .translated {
+    display: block;
+  }
+
+  .wide {
+    margin-inline-end: calc(-1 * var(--_gutter));
+    margin-block-start: var(--space-2xs);
+  }
+
+  .divider::after {
+    content: "";
+    /* Rule on the word's line (not the row's align-items: Popover's danger item holds the three alike) */
+    align-self: center;
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-new-line);
+  }
+
+  .fresh {
+    color: var(--color-new);
+  }
+}
+
+/* A phone's country chip: its letters at the phone's larger --text-3xs no longer fit the frames' 22 px, so it grows with them instead of wrapping. */
+@layer components {
+  @media (width < 900px) {
+    .country {
+      inline-size: auto;
+      /* raw: the frames' 22 px, the least a chip of two letters keeps */
+      min-inline-size: 22px;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* A phone's finger: the author's name gains an invisible 44 px box growing upward only (the line's first row holds links), into the
+   head's own padding, where the step between lines moved, so it covers no line before it. In the utilities layer, above the generic
+   bare-button box, which is symmetric and would win from the components layer. */
+@layer components {
+  @media (width < 900px) {
+    .lines > li:not([data-grouped], :first-child) {
+      /* The design's step between lines is the head's own room above and below */
+      margin-block-start: 0;
+    }
+
+    .lines > li:not([data-grouped]) .head {
+      /* What the 44 px box lacks above the name's line, less the row's own padding */
+      padding-block-start: max(var(--space-3xs), calc(var(--control-m) - 1lh - var(--space-3xs)));
+    }
+  }
+}
+
+@layer utilities {
+  @media (width < 900px) {
+    .author button[type][aria-haspopup]::after {
+      /* the name's top edge up by what the line lacks of 44 px; none below */
+      inset-block: calc(1lh - var(--control-m)) 0;
+    }
+  }
+}
+
+/* A phone's lines on the 16 px line (the header's and the composer's): avatar and words at the chat's inset, not the wide room's 32; the
+   typing line over the list's foot, in the list's own padding, so no band of its own cuts a line; a few lines sit at the composer, not
+   under the band. */
+@layer components {
+  @media (width < 900px) {
+    .fill {
+      --_room: var(--chat-inset);
+    }
+
+    /* A phone keeps no room for the pointer's bar (the desktop's 256 px gutter wrapped every line in a 133 px column from 408 px wide): it
+       floats over the line's end, as in the narrow container. A thread's bare rows (0,2,1) keep their times' column. */
+    .lines > li {
+      /* raw: no room kept */
+      --_gutter: 0px;
+    }
+
+    /* One author's lines a line apart, not a paragraph: the step lies in the head's own room above. */
+    .lines > li[data-grouped] {
+      padding-block-start: 0;
+    }
+
+    .fill > li:first-child {
+      /* The list's room above its first line goes to the lines' top, so few lines settle at the foot */
+      margin-block-start: auto;
+    }
+
+    .typing {
+      /* Pulled up its own height over the list's foot, so it takes no room and no band cuts a line */
+      margin-block: calc(-1 * 1lh) 0;
+      pointer-events: none;
+    }
+  }
+}

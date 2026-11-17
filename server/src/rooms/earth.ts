@@ -13,7 +13,7 @@ CREATE TABLE room_said (room TEXT NOT NULL, hour INTEGER NOT NULL, n INTEGER NOT
 `;
 
 // Until room_said counted accounts' lines too it held guests' alone, accounts' past lines being in the verdicts: add them, by the
-// hour as hourOf computes it, to what a guest left there (F13501). A hidden line is none.
+// hour as hourOf computes it, to what a guest left there. A hidden line is none.
 export const ROOM_SAID_BACKFILL = `
 INSERT INTO room_said (room, hour, n)
 SELECT room, at / 3600000, count(*) FROM verdicts WHERE action <> 'hide' GROUP BY room, at / 3600000

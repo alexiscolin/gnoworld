@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { all, button, click, settled } from "../../../tests/mount.tsx";
-import { shortAddress } from "./names.ts";
+import { shortAddress } from "./rooms/names.ts";
 import { PersonCard, type PersonCardProps } from "./PersonCard.tsx";
 
 // A person's card: Message and Follow only for an account the reader can name, never for a guest, oneself or a nick; Message goes to

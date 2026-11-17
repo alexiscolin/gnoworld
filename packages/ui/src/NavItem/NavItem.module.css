@@ -1,13 +1,10 @@
-/* The item of a column of places: on the video's pill (38 px high, 10 px round), cream when it is the one in view, a count
+/* The item of a column of places: on the design's pill (38 px high, 10 px round), cream when it is the one in view, a count
    or a dot at its end (the prototype's .room, index.html:603-641). */
 @layer components {
   .item {
     position: relative;
-    /* layout: the link and the badge side by side, the link taking what the badge leaves */
     display: grid;
-    /* layout: the link takes the width, its end (the fact and the badge) its own */
     grid-template-columns: minmax(0, 1fr) auto;
-    /* layout: the badge centred on the link's line */
     align-items: center;
     font: var(--font-body);
     cursor: pointer;
@@ -41,7 +38,7 @@
 
   .item[data-soon] .main {
     opacity: 1;
-    /* layout: the button stands in its tooltip's anchor, not in the item's grid: as tall as the pill all the same */
+    /* The button stands in its tooltip's anchor, not in the item's grid: as tall as the pill all the same */
     min-block-size: var(--chat-item);
   }
 
@@ -57,13 +54,10 @@
 
   .main {
     min-inline-size: 0;
-    /* layout: the lead and the words side by side from the start */
     display: flex;
-    /* layout: the lead centred on the words' line */
     align-items: center;
-    /* layout: a step between the lead and the words */
     column-gap: var(--space-xs);
-    /* layout: as tall as the item, so the whole height is the link */
+    /* As tall as the item, so the whole height is the link */
     align-self: stretch;
     text-decoration: none;
   }
@@ -74,7 +68,6 @@
   }
 
   .lead {
-    /* layout: the lead keeps its size beside the words */
     flex: none;
     color: var(--color-text-muted);
   }
@@ -84,11 +77,8 @@
   }
 
   .end {
-    /* layout: the fact and the badge on one line, a step apart */
     display: inline-flex;
-    /* layout: they share a middle */
     align-items: center;
-    /* layout: a step between the fact and the badge */
     gap: var(--space-xs);
   }
 

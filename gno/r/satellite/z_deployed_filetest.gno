@@ -8,10 +8,10 @@ import (
 	"gno.land/r/gnoworld/satellite"
 )
 
-// The realm as deployed: renting paused at 2,000,000 ugnot a day,
-// its deployer the owner, no operator. gno test deploys an imported realm
-// from the empty address, which no test can call from: this file is the only
-// test that sees init's state, and nothing here can unpause it.
+// This is the realm as deployed: renting is paused at 2,000,000 ugnot a day,
+// the deployer is the owner, and there is no operator. gno test deploys an imported realm
+// from the empty address, and no test can call from that address. So this file is the only
+// test that sees the state init leaves, and nothing here can unpause the realm.
 func main(cur realm) {
 	println(satellite.Paused(), satellite.Price(), satellite.Owner() == "", satellite.Operator() == "")
 	testing.SetRealm(testing.NewUserRealm(chain.PackageAddress("gno.land/r/test/alice")))

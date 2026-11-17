@@ -21,7 +21,6 @@
   }
 
   .skeleton[data-shape="line"] + .skeleton {
-    /* layout: the lines of a paragraph, a line's leading apart */
     margin-block-start: var(--space-2xs);
   }
 

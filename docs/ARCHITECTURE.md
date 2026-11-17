@@ -4,6 +4,29 @@ How the code is laid out, which way dependencies point, and the rules that keep 
 safe and leak-free. The decisions behind it are in [ADR-0001](../adr/0001-gnoworld.md) §12–14
 and [ADR-0002](../adr/0002-validated-prototype.md).
 
+## Words of the house
+
+The product's own words (world, realm, dust, station, moon) are ADR-0002's. The code and the docs also use these:
+
+| Word | Meaning |
+|---|---|
+| plate | The panel over the scene that shows one place, the Earth, a world or a realm: its hero, talk bar, figures and calls (`app/src/routes/plate/`) |
+| door | The server's gateway to Jarvis: its routes under `/api/jarvis`, quotas, kept answers and admin API (`server/src/door/`) |
+| tier 1 | The security-critical code [REVIEW.md](REVIEW.md) lists, read whole and mutation-tested |
+| the gate | The checks a change passes: `scripts/check.sh` at each commit, GitHub's gate on each pull request |
+| planted bypass | A fault planted on purpose that a guard's test must catch, to prove the guard works |
+| red pass, green pass | The review of a branch's failing tests before any code, and of the tests once the code passes them |
+| the night | The nightly run on GitHub: the slow and display tests, more journeys, StrykerJS and the harness's mutants |
+| slice | One step of the backlog, with its plan |
+| chief | The Claude Code session that plans a slice, cuts it into parts, briefs them and merges them |
+| part | One branch of a slice, run by its own Claude Code session in its own worktree |
+| workshop | `pnpm workshop`: the app and a local backend, to try a design live ([DEVELOPMENT.md](DEVELOPMENT.md)) |
+| ping-pong | A design session in the workshop: the owner looks, Claude retouches live, and the batch lands later, tested |
+| pose | The owner's word for landing the commits validated in the workshop (`/pose`) |
+| dream | At a slice's end, a read-only agent reads its evidence and proposes rules, memories and checks for the owner to accept |
+| twins | The copies of the project's sandbox rules, with this machine's paths, that the hook installer writes into each Claude Code profile |
+| land | The owner's command that pushes a session's branch to GitHub and opens its pull request (`scripts/land.py`) |
+
 ## The pieces
 
 ```
@@ -11,7 +34,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ Ergo over WebSocket .................. rooms, history, presence (IRCv3)
   ├─ gno.land RPC ......................... free reads: vm/qrender, vm/qeval, vm/qfile, vm/qpaths
   ├─ markets.json ......................... prices, written every 5 minutes by the server's timer
-  ├─ indexer.gno.land (graphql-ws) ........ chain events, live
+  ├─ indexer.gno.land (GraphQL, HTTP) ..... a realm's facts; the server polls it once a block, no subscription
   ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)
   ├─ server (TypeScript on Node) ......... login for Ergo and linked accounts, moderation (the bot's and the owners'), search, link cards,
   │                                        the activity API, signals, prices, the worlds' rollup (people, tokens, network, calls),
@@ -39,8 +62,8 @@ and the deployment live in one repository, with one lockfile and one gate:
 - a change that spans the client and the server lands in one commit, tested together;
 - the admin console (`admin/`, not built yet) will stay in the monorepo; it is hidden on the network, never by splitting the repo
   (ADR-0002 §6);
-- the repository is private, but nothing relies on that: no secret ever lives in the code,
-  and every protection holds as if the code were public.
+- the repository is public: no secret ever lives in the code, and every protection holds with the code in
+  plain view.
 
 ```
 app/                         the web client
@@ -52,7 +75,7 @@ app/                         the web client
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen; `routes/plate/` builds a place's plate (hero, talk bar,
                              figures, calls, who calls, what it can do, tokens, around it) from one model for the Earth, a hub and a realm
-    meta.ts                  each page's title, description, canonical and Open Graph tags
+    pageMeta.ts                  each page's title, description, canonical and Open Graph tags
     lib/                     the boundaries: Ergo client, the realm reads around `@gnoworld/chain` (`lib/chain`,
                              with evalCall's checks), the server's routes (`lib/api`), Adena (`lib/adena`), what the device keeps
                              (`lib/keep`, `lib/drafts`: the browser's `localStorage`, each field through its schema); they parse with
@@ -98,7 +121,7 @@ deploy/                      compose.yaml (the demo stack, the reference wiring 
                              and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
                              egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       not built yet: the admin console, on its own origin (ADR-0002 §6), reusing ui and lib
-gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
+gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/process/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
 ```
 
 Inside a feature:
@@ -133,7 +156,7 @@ Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`:
 | `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
 | `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `space` directly: the canvas is mounted by the universe feature |
-| the files loose in `app/src` (`meta.ts`, `knownOf.ts`, `csp.ts`, the build's data checks) | any folder above | No wall of their own: lint's zones name `sw`, `features`, `routes`, `lib`, `store` and `space` as targets, so a loose file is checked only by the rules every file has, and a folder reaches one as it reaches any |
+| the files loose in `app/src` (`pageMeta.ts`, `realmKnown.ts`, `csp.ts`, the build's data checks) | any folder above | No wall of their own: lint's zones name `sw`, `features`, `routes`, `lib`, `store` and `space` as targets, so a loose file is checked only by the rules every file has, and a folder reaches one as it reaches any |
 
 This is ADR-0001 §12's split: a bug is either in the space or in the interface, and
 the store is where they meet.
@@ -409,10 +432,12 @@ Each change that adds a resource proves it is released:
 
 ## Budgets the gate checks
 
+A cap moves only by the owner's decision, recorded with its reason, never to the latest measure plus a margin.
+
 | Budget | Limit | Where |
 |---|---|---|
-| JavaScript before the first usable screen | 279,143 B gzip on an Earth's or a world's page, 276,255 B on a page with no plate, each 256 B over its measure | `app/tests/e2e/budgets.spec.ts` (ADR-0001 §12 set 150 KB; the caps are the measured sizes) |
-| Total on mobile | 3 MB | ADR-0001 §12 |
+| JavaScript before the first usable screen | 300,000 B gzip, on every page | `app/tests/e2e/budgets.spec.ts`, ADR-0001 §12 (D13801) |
+| Everything a phone downloads, the precache included | 3,300,000 B gzip | `app/tests/e2e/budgets.spec.ts`, ADR-0001 §12 (D13801) |
 | LCP, CLS, TBT (the lab stand-in for INP) on a mid-range mobile profile | 2.5 s, 0.1, 200 ms | ADR-0002 §2. INP itself is measured in the field |
 | Frames while travelling | 60 fps on a mid-range phone | ADR-0001 §12 |
 | Memory after 20 flights | GPU resources at baseline, JS heap within 10% | Above |

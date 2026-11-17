@@ -1,5 +1,5 @@
 // What the bell keeps doing once the page has settled: its count, read again each minute as an event comes into the coming day.
-import { events, news } from "../../lateData.ts";
+import { events, news } from "../../eventsAndNews.ts";
 import { useEffect, useState } from "react";
 import { unseenNotices } from "../../store/notices.ts";
 import { useApp } from "../../storeContext.tsx";

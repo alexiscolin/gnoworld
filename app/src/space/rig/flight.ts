@@ -8,7 +8,7 @@ import { blankPose, copyPose, type Pose } from "./pose.ts";
 /** Where a flight goes: the pose asked, read each frame (false while it cannot be told yet), and what it says on its way. */
 export interface Goal {
   readonly pose: (out: Pose) => boolean;
-  /** At 68 % of the way: the page's text starts entering (the video's frame 19). */
+  /** At 68 % of the way: the page's text starts entering. */
   readonly near?: (() => void) | undefined;
   readonly landed?: (() => void) | undefined;
   /** A turn round what the eye looks at, as far off: the field of view stays, so it never seems to step back. */

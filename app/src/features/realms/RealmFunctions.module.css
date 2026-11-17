@@ -7,7 +7,6 @@
     transition: max-block-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
     max-inline-size: 100%;
     overflow: auto;
-    /* layout: a preformatted block's own margin, which the browser gives it, taken off */
     margin: 0;
     padding: var(--space-xs) var(--space-s);
     border-radius: var(--radius-m);

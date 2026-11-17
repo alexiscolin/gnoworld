@@ -2,9 +2,9 @@
 // §12's budget). The build's pre-render and the hydration draw the same words; the panel follows.
 import { lazy, Suspense, useSyncExternalStore } from "react";
 import type { ChainHeard } from "../../store/chain.ts";
-import { ChainCallsContext, ChainPlaceContext, type ChainPlace } from "./chainThread.ts";
+import { ChainCallsContext, ChainPlaceContext, type ChainPlace } from "./lines/chainThread.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { LOADING } from "./Loading.tsx";
+import { LOADING } from "./dock/Loading.tsx";
 
 const ChatPanel = lazy(() => import("./ChatPanel.tsx").then(({ ChatPanel: panel }) => ({ default: panel })));
 const NO_CALLS: readonly ChainHeard[] = [];

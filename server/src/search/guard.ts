@@ -1,5 +1,5 @@
 // The index failing never stops the chat or the retention: a step that throws is logged under `event` and answers its fallback.
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 
 export const guarded =
   (log: Log, event = "search_failed") =>
@@ -7,7 +7,7 @@ export const guarded =
     try {
       return work();
     } catch (error) {
-      log(event, { reason: step, error: error instanceof Error ? error.name : "unknown" });
+      log(event, { reason: step, ...failureOf(error) });
       return fallback;
     }
   };

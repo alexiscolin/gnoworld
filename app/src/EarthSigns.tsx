@@ -1,4 +1,4 @@
-// The signs over the globe, as HTML anchored to the ground (ADR-0001 §7; frames 43 to 55, 85): who says what from where, each country's hour,
+// The signs over the globe, as HTML anchored to the ground (ADR-0001 §7): who says what from where, each country's hour,
 // the far side's counts, the side rooms. Bubbles repeat the chat, so screen readers skip them; a pin is a link, and a room with no place stays in
 // the chat's list. On another world (`world`) the bubbles alone stand, each on its speaker's own spot (spot.ts).
 import { countryName, centreOf, type Count, type Trend } from "@gnoworld/core/bubbles";

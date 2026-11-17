@@ -10,7 +10,7 @@ export interface Motion {
   watch: (changed: () => void, signal: AbortSignal) => void;
 }
 
-/** Whether the full chat covers space (features/chat/full.ts marks the root): the scene draws nothing it would hide. Its change is told
+/** Whether the full chat covers space (features/chat/dock/fullState.ts marks the root): the scene draws nothing it would hide. Its change is told
  * by Motion's `watch`, which reads the root's marks. */
 export const coveredByChat = (): boolean =>
   "document" in globalThis && document.documentElement.dataset["chat"] === "full";

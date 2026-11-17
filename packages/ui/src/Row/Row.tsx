@@ -8,7 +8,7 @@ export interface RowProps {
   subtitle?: string;
   /** In words what the 3D shows: "12 here now". */
   activity?: string;
-  /** The subtitle in the one label style (mono caps), as a notification's place is (frames 86, 87); the meta line by default. */
+  /** The subtitle in the one label style (mono caps), as a notification's place is; the meta line by default. */
   subtitleLook?: "meta" | "label";
   /** A picture, an icon or an avatar's slot, before the words. */
   lead?: ReactNode;

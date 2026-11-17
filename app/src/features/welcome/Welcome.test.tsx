@@ -9,7 +9,7 @@ import { WelcomeSlot } from "./WelcomeSlot.tsx";
 
 // the welcome card shows once, at a first visit of a logged-out reader on a page of space; any use of it keeps it away for good.
 const KEY = "gnoworld:welcomed";
-vi.mock("../../later.ts", () => ({ useAfterLoad: () => true }));
+vi.mock("../../afterLoad.ts", () => ({ useAfterLoad: () => true }));
 
 // The session the reader's store holds, set as the page mounts.
 function As({ who }: { who: "out" | "in" }) {

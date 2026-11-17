@@ -1,8 +1,8 @@
 // The file the server's prices timer writes and the home page reads (ADR-0002 §6, "Prices"):
-// where the prices come from, when they were read, and the tokens that have a price, in the video's order.
+// where the prices come from, when they were read, and the tokens that have a price, in the design's order.
 import { z } from "./zod.ts";
 
-/** The tokens the markets row shows, in the video's order. */
+/** The tokens the markets row shows, in the design's order. */
 export const MARKET_SYMBOLS = ["GNOT", "ATONE", "BTC"] as const;
 
 /** A token's price in dollars (a trillionth to a billion) and its 24 hour change in percent (a fall of at most 100, a rise of a million), null when the source has none. */

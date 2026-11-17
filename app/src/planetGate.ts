@@ -1,6 +1,6 @@
 // The gate of a phone's 3D planet (the place band's): the band shows its still at the first paint, and the engine (MiniSpace's chunk, its
 // GPU probe, the scene and earth chunks) is asked only once the first screen is idle and the band in view, never for a reader who saves data
-// or whose link the browser estimates at 2g (D13721, the phone's side), never on a weak GPU, and never twice.
+// or whose link the browser estimates at 2g (the phone's side), never on a weak GPU, and never twice.
 import { gpuCanDraw } from "./features/universe/gpu.ts";
 import { savesData } from "./lib/saveData.ts";
 

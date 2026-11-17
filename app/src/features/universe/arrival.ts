@@ -1,4 +1,4 @@
-// A page's arrival and leaving (the video's frames 19 and 20), with GSAP on the design system's own panel: first the
+// A page's arrival and leaving, with GSAP on the design system's own panel: first the
 // grounds, the plate's fill (space's own, frame.ts, on a page with a planet) and frame and the chat's panel; once they stand, the words:
 // the kicker, the title and the first screen's lines rise as the proposal's score has them (the plate's blocks play theirs in their own sheets), the chat's lines rise. It starts as the flight
 // nears its end, or at once on a page opened directly. Leaving plays the same back, 2.6 times as fast, on the page's ghost. Nothing moves

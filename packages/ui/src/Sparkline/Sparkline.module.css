@@ -1,11 +1,11 @@
-/* The sparkline: a 1 px line in its tone over its area, the tone at 28% at the line's height fading to none at the foot (frame 6's markets
+/* The sparkline: a 1 px line in its tone over its area, the tone at 28% at the line's height fading to none at the foot (the design's markets
    row: 58 by 22 px beside each price). */
 @layer components {
   .spark {
     --_tone: var(--color-text-muted);
 
     display: block;
-    /* raw: 58 by 22 px, frame 6's sparklines */
+    /* raw: 58 by 22 px, the design's sparklines */
     inline-size: 58px;
     /* raw: the same */
     block-size: 22px;
@@ -40,7 +40,7 @@
 
   .top {
     stop-color: var(--_tone);
-    /* raw: the area's shade at the line's height, frame 6 */
+    /* raw: the area's shade at the line's height, the design */
     stop-opacity: 0.28;
   }
 

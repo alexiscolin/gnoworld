@@ -74,7 +74,6 @@
   /* The header row: 28 px and 8 more below it; its title, a hint that gives way, and the buttons at the end. */
   .card[data-look="hub"] .header {
     block-size: var(--control-header);
-    /* layout: the card's own */
     margin-block-end: var(--space-2xs);
     /* The row measures its own width: a narrow square's title and hint follow it (below). */
     container-type: inline-size;
@@ -114,16 +113,14 @@
   /* The buttons and the hint at the end of the row keep their size; the meta line gives way first, then the title, so a short title
      is never cut beside a long path. */
   .end {
-    /* layout: this row's own arrangement */
     flex: none;
     min-inline-size: 0;
   }
 
   .meta {
     min-inline-size: 0;
-    /* layout: this row's own arrangement; it shrinks far faster than the title (its weight against the title's 1) */
+    /* Shrinks far faster than the title (weight 1000 against the title's 1) */
     flex: 0 1000 auto;
-    /* layout: right after the title, the buttons pushed to the end */
     margin-inline-end: auto;
   }
 
@@ -137,13 +134,11 @@
   }
 
   .mark {
-    /* layout: the mark keeps its size beside the title */
     flex: none;
     inline-size: var(--control-l);
   }
 
   .actions {
-    /* layout: the actions at the card's foot */
     margin-block-start: auto;
   }
 
@@ -153,7 +148,7 @@
   }
 
   .lead {
-    /* layout: the icon's own box, no line's leading under it */
+    /* The icon's own box, no line's leading under it */
     display: flex;
     color: var(--color-text-muted);
   }

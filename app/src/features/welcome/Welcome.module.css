@@ -64,7 +64,6 @@
     }
 
     .welcome h2 {
-      /* layout: one line of title, cut */
       display: -webkit-box;
       overflow: hidden;
       -webkit-box-orient: vertical;

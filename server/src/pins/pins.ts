@@ -1,4 +1,4 @@
-// ponytail: a room's pins: the line as Ergo held it when a moderator pinned it, kept in the server's database, since Ergo keeps
+// ceiling: a room's pins: the line as Ergo held it when a moderator pinned it, kept in the server's database, since Ergo keeps
 // a channel's metadata for registered channels alone and ours are not.
 // A pin is read from Ergo by its id, never taken from the page; it ends with its line: a delete, a hide or an edit by
 // the author drops it, and a re-read of each pin (check) drops those Ergo no longer holds.

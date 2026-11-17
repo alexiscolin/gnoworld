@@ -2,14 +2,11 @@
 @layer components {
   @media (width < 900px) {
     .line {
-      /* layout: one row */
       display: flex;
-      /* layout: the actions a step apart */
       gap: var(--space-2xs);
     }
 
     .line > * {
-      /* layout: no button squeezed */
       flex-shrink: 0;
       white-space: nowrap;
     }

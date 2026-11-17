@@ -8,8 +8,8 @@ import type { ChatProps } from "./Chat.tsx";
 
 vi.mock("./Chat.tsx", () => ({ Chat: () => <p data-testid="chat" /> }));
 const lets = vi.hoisted(() => ({ gone: 0 }));
-vi.mock("./fullHost.tsx", async (original) => {
-  const real = await original<typeof import("./fullHost.tsx")>();
+vi.mock("./dock/FullChatHost.tsx", async (original) => {
+  const real = await original<typeof import("./dock/FullChatHost.tsx")>();
   return {
     ...real,
     hold: (held: Parameters<typeof real.hold>[0]) => {

@@ -2,7 +2,7 @@
 import { Navigate, data } from "react-router";
 import { RouteError } from "../features/errors/index.ts";
 import { SEARCH_HASH } from "../features/search/index.ts";
-import { listMeta } from "../meta.ts";
+import { listMeta } from "../pageMeta.ts";
 import { pageOf } from "../places.ts";
 
 export const meta = listMeta;

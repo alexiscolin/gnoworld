@@ -7,11 +7,11 @@ Review by risk, not line by line everywhere.
 | Tier | What | Written by | How it is reviewed |
 |---|---|---|---|
 | 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization (`server/src/ergo/`) | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
-| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builders (`app/src/lib/chain/evalCall.ts`, for a realm's call, `packages/schemas/src/realmPath.ts`, the realm-path grammar it builds from, and core's chain folder, `packages/core/src/chain/`, where the name read's builder and the CSP's host rule live, F3535) | Alexis for the core, Claude elsewhere | Alexis reads every line |
-| 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
-| 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop and its egress (`jarvis/src/`, whose allowlist.ts and gnomcp.ts decide them), Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
-| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), a call's arguments (`packages/core/src/args/`), the service worker (`app/src/sw/`), the server's guard of every route that changes something, its rate limits and its settings (`server/src/guard.ts`, `server/src/limit.ts`, `server/src/config.ts`, and the service's two guards, `packages/service/src/net.ts` for publicUrl and `packages/service/src/settings.ts` for absolute, T2), the chat's players (the embed host list, `app/src/features/chat/embeds.ts`, and its frame's sandbox, `app/src/features/chat/Embed.tsx`), the warning before a realm page's link leaves (`app/src/features/realms/useExternalLinks.tsx`, and `app/src/leaving.tsx`, where 8c moved it for the calendar and the bell too), the link that stops another host's address before the router (`app/src/pagePath.ts`) | Claude | Alexis reads every line |
-| 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
+| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builders (`app/src/lib/chain/evalCall.ts`, for a realm's call, `packages/schemas/src/realmPath.ts`, the realm-path grammar it builds from, and core's chain folder, `packages/core/src/chain/`, where the name read's builder and the CSP's host rule live, F3535) | Claude | Alexis reads the tests, the function cards and the diff; the `security-reviewer` reads every line |
+| 2 | Other TypeScript (state, queries, views), the rest of the core (packages/core) included | Claude, test first | Alexis decides the rules the tests hold and reads the tests; the `reviewer` reads every line |
+| 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop and its egress (`jarvis/src/`, whose allowlist.ts and gnomcp.ts decide them), Adena (`app/src/lib/adena/`) | Claude | Alexis reads the tests, the function cards and the diff; the `security-reviewer` reads every line |
+| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), a call's arguments (`packages/core/src/args/`), the service worker (`app/src/sw/`), the server's guard of every route that changes something, its rate limits and its settings (`server/src/guard.ts`, `server/src/limit.ts`, `server/src/config.ts`, and the service's two guards, `packages/service/src/net.ts` for publicUrl and `packages/service/src/settings.ts` for absolute, T2), the chat's players (the embed host list, `app/src/features/chat/embeds.ts`, and its frame's sandbox, `app/src/features/chat/Embed.tsx`), the warning before a realm page's link leaves (`app/src/features/realms/useExternalLinks.tsx`, and `app/src/leaving.tsx`, where 8c moved it for the calendar and the bell too), the link that stops another host's address before the router (`app/src/pagePath.ts`) | Claude | Alexis reads the tests, the function cards and the diff; the `security-reviewer` reads every line |
+| 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests; the `reviewer` reads every line |
 | 3 | Interface, 3D, motion: `app/src/features/errors/`, `app/src/features/home/`, `app/src/features/list/`, `app/src/features/search/`, `app/src/features/update/`, `app/src/features/world/`, and the design system's folders `packages/ui/src/ActivityChart/`, `packages/ui/src/Avatar/`, `packages/ui/src/Breadcrumb/`, `packages/ui/src/Button/`, `packages/ui/src/Card/`, `packages/ui/src/ChatLayout/`, `packages/ui/src/Chip/`, `packages/ui/src/compositions/`, `packages/ui/src/Dialog/`, `packages/ui/src/EmptyState/`, `packages/ui/src/Field/`, `packages/ui/src/Flash/`, `packages/ui/src/icons/`, `packages/ui/src/Kicker/`, `packages/ui/src/Logo/`, `packages/ui/src/NavItem/`, `packages/ui/src/Overview/`, `packages/ui/src/Panel/`, `packages/ui/src/PlanetThumb/`, `packages/ui/src/Popover/`, `packages/ui/src/Row/`, `packages/ui/src/Skeleton/`, `packages/ui/src/Stat/`, `packages/ui/src/Tabs/`, `packages/ui/src/TokensPage/`, `packages/ui/src/Tooltip/`, each named one by one | Either | Run it; read the budgets the gate prints |
 
 The backticked tier-1 paths of this table are read by machines: by `.claude/workflows/branch.js` (its security lens), by
@@ -72,7 +72,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    size each input reaches, and simplification. Where StrykerJS runs on the files it reads its
    survivors and writes no mutant by hand. A tier-1 file or the harness adds the `security-reviewer`
    (Opus, the threat model), a realm the `gno-auditor`. A changed screen is the `reviewer`'s too, read
-   with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
+   with the video's frames (`docs/process/design/video-screens.md`) in the same pass; the `design-reviewer`
    runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
    `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
    missing fail the step). One review a pull request, before the owner's merge (D13181). Each finding names its
@@ -90,7 +90,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    row, or moot). A second round runs only for a high finding fixed in a tier-1 file, only its
    lens, on the diff since the first; after three rounds the review stops and Claude and the owner
    reconsider the approach.
-6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
+6. **Learn from it.** Every finding goes into [the findings ledger](process/review/findings.md), with its
    status and evidence, numbered in its slice's range (slice N: F N000 to N999, a hundred a
    part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
@@ -113,9 +113,9 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
-   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A branch may raise one
-   chunk's size cap by up to 256 B without asking, never the first screen's: the new cap, its size
-   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
+   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A size cap moves
+   only by the owner's decision, recorded with its reason (D13801), never to the latest measure plus a margin:
+   in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
 
 ### A branch's weight by its kind
 
@@ -141,4 +141,4 @@ job refuses a harness file no commit declares on a line `Harness-changed: <path>
 
 The owner reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). The notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
-The author gives the whole review card, all 8 items (`CLAUDE.md`, "Review card (end of every change)"): what to read line by line, what to read and skim, what to try, what the tests prove, what not to trust, what changed, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.
+The author gives the whole review card, all 8 items (`CLAUDE.md`, "Review card (end of every change)"): what to read line by line, what to read and skim, what to try, what the tests prove, what not to trust, what changed, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](process/review-log.md): what was caught, what was missed, and why.

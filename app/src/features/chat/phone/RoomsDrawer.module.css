@@ -1,0 +1,61 @@
+/* A phone's rooms drawer, on ui's side drawer: the title row stays, the rooms and the worlds scroll under it. */
+@layer components {
+  .drawer {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    block-size: 100%;
+  }
+
+  .title {
+    margin: 0;
+    /* Level with Close, which the drawer draws at its top end corner (ui's Dialog) */
+    min-block-size: calc(var(--control-m) + 2 * var(--space-s));
+    padding-inline: var(--space-m);
+    display: flex;
+    align-items: center;
+    border-block-end: var(--line-width) solid var(--color-line);
+    font: var(--font-title-room);
+  }
+
+  .body {
+    overflow: auto;
+    padding: var(--space-s) var(--space-xs) max(var(--space-m), env(safe-area-inset-bottom));
+  }
+
+  @media (width < 900px) {
+    /* One left line: the title, the kickers and the items' boxes run 16 px in from the edge (and the notch's, held left), the title at
+       the size of the other sheets'. */
+    .title {
+      padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) var(--space-s);
+      font: var(--font-title-m);
+    }
+
+    .body {
+      padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) var(--space-s);
+    }
+
+    /* The rooms' links and the sections' toggles are 44 px, as a finger needs (NavItem's own height is this token). */
+    .body {
+      --chat-item: var(--control-m);
+      /* the items' 44 px is the step: no gap on top of it */
+      --chat-item-gap: 0px;
+    }
+
+    /* Over Disclosure's own height for a section's name (its selector's weight: four attributes and classes). */
+    .body[data-drawer-body] h2 button[aria-expanded][aria-controls] {
+      min-block-size: var(--control-m);
+    }
+
+    /* The worlds under the rooms, their section a step below the last; the row of worlds at the chat's foot holds them while it shows,
+       so the drawer lists them on a short window alone (PhoneWorlds is hidden under 500 px tall, ChatScreen.module.css). */
+    .worlds {
+      margin-block-start: var(--space-m);
+    }
+
+    @media (height >= 500px) {
+      .worlds {
+        display: none;
+      }
+    }
+  }
+}

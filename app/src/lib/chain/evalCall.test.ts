@@ -7,7 +7,7 @@ import { evalCall, userCall } from "./evalCall.ts";
 
 // Tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
 // (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
-// two calls on a proved address, or nothing.
+// two reads of a proved address, or nothing.
 
 // A port of gno's parseQueryEvalData (gno.land/pkg/sdk/vm/handler.go:289 at v1.5.0): the first dot AFTER the first slash cuts the
 // realm from the expression. A realm path with a dot past its first slash would change what is asked.
@@ -304,13 +304,11 @@ describe("evalCall, a read with its typed arguments", () => {
 describe("evalNameOf, the name registered for one address", () => {
   const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
 
-  it("builds the one expression, in the exact shape the data of vm/qeval is cut by", () => {
+  it("builds the one expression, in the exact shape the data of vm/qeval is cut by, nil-guarded", () => {
     const data = evalNameOf(ADDRESS);
-    expect(data).toBe(`gno.land/r/sys/users.ResolveAddress(address("${ADDRESS}")).Name()`);
-    expect(parseQueryEvalData(data ?? "")).toEqual({
-      pkgPath: "gno.land/r/sys/users",
-      expr: `ResolveAddress(address("${ADDRESS}")).Name()`,
-    });
+    const expr = `func() string { d := ResolveAddress(address("${ADDRESS}")); if d == nil { return "" }; return d.Name() }()`;
+    expect(data).toBe(`gno.land/r/sys/users.${expr}`);
+    expect(parseQueryEvalData(data ?? "")).toEqual({ pkgPath: "gno.land/r/sys/users", expr });
   });
 
   it("takes an address of 40 characters in bech32's alphabet after g1, and nothing else", () => {
@@ -364,7 +362,9 @@ describe("evalNameOf, the name registered for one address", () => {
           const data = evalNameOf(text);
           if (data === null) return;
           built += 1;
-          expect(data).toBe(`gno.land/r/sys/users.ResolveAddress(address("${text}")).Name()`);
+          expect(data).toBe(
+            `gno.land/r/sys/users.func() string { d := ResolveAddress(address("${text}")); if d == nil { return "" }; return d.Name() }()`,
+          );
           expect(text).toMatch(/^g1[023456789acdefghjklmnpqrstuvwxyz]{38}$/);
         },
       ),
@@ -382,15 +382,17 @@ describe("evalNameOf, the name registered for one address", () => {
 describe("userCall, the two expressions on r/sys/users's record of an address", () => {
   const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
-  it.each([
-    ["IsDeleted", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").IsDeleted()`],
-    ["Name", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").Name()`],
-  ] as const)("builds %s as one fixed expression, which gno's parser cuts at r/sys/users", (call, expression) => {
-    expect(userCall(ADDRESS, call)).toBe(expression);
+  it("builds IsDeleted as one fixed expression, which gno's parser cuts at r/sys/users", () => {
+    const expression = `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").IsDeleted()`;
+    expect(userCall(ADDRESS, "IsDeleted")).toBe(expression);
     expect(parseQueryEvalData(expression)).toEqual({
       pkgPath: "gno.land/r/sys/users",
-      expr: `ResolveAddress("${ADDRESS}").${call}()`,
+      expr: `ResolveAddress("${ADDRESS}").IsDeleted()`,
     });
+  });
+
+  it("builds Name with core's one builder, never a second one: an address with no record answers an empty name", () => {
+    expect(userCall(ADDRESS, "Name")).toBe(evalNameOf(ADDRESS));
   });
 
   it.each([
@@ -421,7 +423,7 @@ describe("userCall, the two expressions on r/sys/users's record of an address", 
     fc.assert(
       fc.property(fc.oneof(fc.string(), around, fc.constant(ADDRESS)), (account) => {
         const built = userCall(account, "Name");
-        expect(built === null || built === `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").Name()`).toBe(true);
+        expect(built === null || built === evalNameOf(ADDRESS)).toBe(true);
         expect(built !== null).toBe(account === ADDRESS);
       }),
       { numRuns: 1000 },

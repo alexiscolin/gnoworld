@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Proposed. Amended by [ADR-0002](0002-validated-prototype.md): §7 (levels and navigation rules, mobile included), §10 (the generated face is a nebula), §12 (routing and rendering), §13 (pieces and hosting), "Ideas to place" and the rollout (phase 0 gains calls signed by users, Jarvis, plain DMs and satellites); it answers part of question 5 (moderation of public rooms) |
+| Status | Accepted: phase 0 is built on it (the backlog), nothing of it is on chain yet. Amended by [ADR-0002](0002-validated-prototype.md): §7 (levels and navigation rules, mobile included), §10 (the generated face is a nebula), §12 (routing and rendering), §13 (pieces and hosting), "Ideas to place" and the rollout (phase 0 gains calls signed by users, Jarvis, plain DMs and satellites); it answers part of question 5 (moderation of public rooms) |
 | Date | 2026-10-14 |
 | Author | Alexis Colin |
 | Verified against | `gnoland-1` (mainnet, `v1.5.1`, height 786,583) and `onyx-1` (`v1.5.1-rc.1`, height 385,528), both at commit `07e44776c`; source read at tag `v1.5.1`. Mainnet realms and names read on 2026-10-14 (gnoscope index height 789,357). |
@@ -513,7 +513,7 @@ list as the truth.
 There is one adapter per hub kind. Phase 1 ships open hubs and the BUBBLE balance;
 DAO adapters come in phase 2.
 
-`ponytail:` adapters are pinned to a realm version (`escrow_v4`, `memba_dao_channels_v2`).
+`ceiling:` adapters are pinned to a realm version (`escrow_v4`, `memba_dao_channels_v2`).
 A new version means a new adapter.
 
 ### 9. Rooms
@@ -623,16 +623,20 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
   - the MLS worker loads at the first private room.
 - `?debug` shows frames per second, draw calls and memory. Source maps ship. There is one
   logger.
-- Budgets, proposed and confirmed in phase 0, are checked by Playwright in the gate (§14):
-  - at most 150 KB of compressed JavaScript before the first usable screen;
-  - at most 3 MB in all on mobile, against gno.world's 11.1 MB;
+- Budgets, checked by Playwright in the gate (§14), set in phase 0 by D13801:
+  - at most 300,000 B of gzip JavaScript before the first usable screen, on every page. The first
+    proposal, 150 KB, was never reachable with the 3D scene, the chat and the login on the first
+    screen; the cap holds 6 % over the largest page measured at the decision (282,407 B);
+  - at most 3,300,000 B in all on mobile, the precache included, about 5 % over the measure at the
+    decision, against gno.world's 11.1 MB;
   - 60 fps on a mid-range phone.
+  - A cap moves only by the owner's decision, recorded with its reason, never to the latest measure plus a margin.
 
 **PWA rules:**
 - Precache the app's hashed files, its scripts, styles and fonts, and its shell, its pages, their data,
   the manifest and the icon, each with its digest, so that the app opens with no network and a page keeps
   its face; a new tab opens the version before the click, and the version before is kept until the next
-  update (slice 4, docs/decisions.md 2026-10-18). Textures are cached on first use.
+  update (slice 4, docs/process/decisions.md 2026-10-18). Textures are cached on first use.
 - Never cache chain reads or relay traffic: the truth is the chain.
 - Updates are explicit: "new version, reload".
 - The service worker is off in development; `?nosw` unregisters it.
@@ -686,7 +690,7 @@ The relay's store is SQLite: one file, through the pure-Go `modernc.org/sqlite`.
 inspected with `sqlite3` and backed up by copying the file. It never holds plaintext or
 history.
 
-`ponytail:` one relay instance holds thousands of connections. Several instances would move
+`ceiling:` one relay instance holds thousands of connections. Several instances would move
 SQLite to Postgres and join the instances through NATS or Redis pub/sub.
 
 Hosting at 0 € for phase 0:
@@ -801,7 +805,9 @@ What the numbers say:
 - **Interpreted code costs far more than native calls.** Building seven 32-byte strings per
   call cost more than two ed25519 verifications. Constants are folded before execution, so
   lookup tables belong in `const`.
-- **Storage is billed per object, not per byte.** Storing the record as an encoded string
+- **Storage is billed per byte, and every object brings bytes of its own.** The deposit is the
+  bytes stored times the chain's storage price (100 ugnot a byte by default, `vm:p:storage_price`), and
+  each live object adds its metadata to those bytes. Storing the record as an encoded string
   instead of a struct saved 873 B (−28%). This matches the ~780 B per live object that
   `r/moul/agents/relay/v0` reports.
 - **Kept seals stay a paid extra.** The default seal never touches storage.

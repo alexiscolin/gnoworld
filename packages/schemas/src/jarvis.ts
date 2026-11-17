@@ -70,7 +70,7 @@ const Place = z.string().check(z.minLength(1), z.maxLength(JARVIS_CAPS.place), z
 // The chains an action is checked on: the universes' chain ids (app/data/universes.json, which a test compares).
 const Checked = z.enum(["onyx-1", "gnoland-1"]);
 
-/** A button on an answer: fly to a place, or open a proposed action's call card on the chain it was checked on (D13508). */
+/** A button on an answer: fly to a place, or open a proposed action's call card on the chain it was checked on. */
 export const AnswerButton = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("fly"), label: text(JARVIS_CAPS.label), place: Place }),
   z.strictObject({

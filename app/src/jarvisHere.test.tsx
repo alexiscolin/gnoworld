@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { all, click, mount, popovers } from "../tests/mount.tsx";
-import { QuickActions } from "./features/chat/QuickActions.tsx";
+import { QuickActions } from "./features/chat/composer/QuickActions.tsx";
 import { Opened } from "./features/account/Opened.tsx";
 import {
   addJarvisItem,

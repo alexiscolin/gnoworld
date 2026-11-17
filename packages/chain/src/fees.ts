@@ -26,7 +26,7 @@ const LATEST = 20;
 /** The newest rows asked for, a few more than LATEST: the filter lets other messages through, and each row is checked again. */
 const ASKED = 60;
 /** The blocks under the tip a read looks back, narrowest first, each tried when the one before gave too few calls.
- * ponytail: a function with fewer than 20 calls in the last million blocks gives fewer; a time-bound index would widen it. */
+ * ceiling: a function with fewer than 20 calls in the last million blocks gives fewer; a time-bound index would widen it. */
 const WINDOWS = [1_000, 10_000, 100_000, 1_000_000];
 
 // Whether a row is one successful call of `func` in `realm`: one message, the filter's checked again.

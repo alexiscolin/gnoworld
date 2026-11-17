@@ -1,7 +1,7 @@
-// A place's arrival, its code asked a moment after the first screen (later.ts): the pill shows as the place settles, a second after the
-// page has loaded, about when a flight lands it (frames 23, 93).
+// A place's arrival, its code asked a moment after the first screen (afterLoad.ts): the pill shows as the place settles, a second after the
+// page has loaded, about when a flight lands it.
 import { lazy, Suspense } from "react";
-import { useAfterLoad } from "../../later.ts";
+import { useAfterLoad } from "../../afterLoad.ts";
 import type { ArrivalProps } from "./Arrival.tsx";
 
 const SETTLED_MS = 1000;

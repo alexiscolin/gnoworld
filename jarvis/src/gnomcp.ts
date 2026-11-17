@@ -93,7 +93,7 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   };
   return {
     async call(name, args, signal) {
-      // ponytail: a find over the table of seven reads.
+      // ceiling: a find over the table of seven reads.
       const parsed = tools.find((tool) => tool.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       const current = closed ? undefined : await until(live(), signal);

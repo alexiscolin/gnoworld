@@ -3,7 +3,7 @@
 // video call and the events first, then the people, then the search (`LEAVING`); the expand button never leaves (ChatHeader.tsx).
 import { ComingSoon, IconButton, Menu, type IconName } from "@gnoworld/ui";
 import { createContext, use } from "react";
-import { useControlSize } from "./full.ts";
+import { useControlSize } from "./dock/fullState.ts";
 
 /** One of the place's buttons, in the order they stand: `onSelect` none says it is greyed, to come. */
 export interface Act {
@@ -58,7 +58,7 @@ export function PlaceActs({ acts }: { acts: readonly Act[] }) {
   );
 }
 
-/** The place's acts: search in the chat, then who is here, the events and the video call. */
+/** The place's acts: search in the chat, then who is here, the events and the design call. */
 export const placeActs = (search: Act, onWhoIsHere: () => void): Act[] => [
   search,
   { label: "Who's here", icon: "people", onSelect: onWhoIsHere },

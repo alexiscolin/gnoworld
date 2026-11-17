@@ -13,10 +13,9 @@
   }
 
   .unit {
-    /* raw: the frame sets its unit about 5 px after the figure, the space counted (frame 26) */
-    /* layout: the unit stands a little off its figure */
+    /* raw: the frame sets its unit about 5 px after the figure, the space counted */
     margin-inline-start: 0.2em;
-    /* layout: the figure's tight tracking is not the unit's words' */
+    /* The figure's tight tracking is not the unit's words' */
     letter-spacing: normal;
     color: var(--color-text-muted);
     font: var(--font-body);
@@ -24,15 +23,14 @@
 
   /* A unit that continues the figure ("1/9") touches it. */
   .unit[data-of] {
-    /* layout: no step off the figure */
     margin-inline-start: 0;
   }
 
   /* The caption's icon stands on its line, the kicker's dot's step before its words. */
   .caption {
-    /* layout: the icon and the words on one line, the icon at the first line's top (12 px over the label's 11) when they wrap */
+    /* Icon at the first line's top (12 px over the label's 11) when the words wrap */
     display: flex;
-    /* layout: the kicker's dot's step (utilities.css, .dot) */
+    /* The kicker's dot's step (utilities.css, .dot) */
     gap: var(--space-2xs);
   }
 

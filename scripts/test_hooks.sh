@@ -771,7 +771,7 @@ for k, p in own_rules:
 # An instruction file below a tree's root, at any depth, the session's own tree or a sibling's (7w3, S2-3): to commands and the file
 # tools alike, in the main checkout too. A name that only holds one of theirs stays open.
 for tree in (ROOT, f"{NEW_HOME}/slice-7", MAIN_HOME):
-    for p in ("app/CLAUDE.md", "docs/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
+    for p in ("app/CLAUDE.md", "docs/process/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
               "server/src/.claude/rules/x.md", "app/.claude/skills/s/SKILL.md", "CLAUDE.md", "AGENTS.md"):
         # A sibling's rules are open since the unlock (2026-11-06), and its other instructions to the file tools alone.
         sibling = tree not in (ROOT, MAIN_HOME)
@@ -795,7 +795,7 @@ for p in (f"{TMPU}/notes.md", f"{above_main}/notes.md", f"{NEW_HOME}/csp.diff"):
 # What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
 # gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
 for tree in (ROOT, f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
-    for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/tsc/root.tsbuildinfo",
+    for p in ("docs/process/review/findings.md", "docs/process/decisions.md", "docs/process/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/tsc/root.tsbuildinfo",
               ".stryker-tmp/sandbox-x/app/package.json", ".stryker-tmp/sandbox-x/packages/core/package.json", "node_modules/.vite/x"):
         assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed"
 # A worktree's own folder stays open, to its making and to a rename: a glob holds no folder at its `*` (F4893, asked).
@@ -1646,7 +1646,7 @@ docs="$here"/check_docs.py
 d="$t/docs-root"
 mkdir -p "$d/scripts" "$d/.claude/rules"
 touch "$d/scripts/real.sh"
-printf 'Run `scripts/real.sh`, see `docs/plans/slice-$ARGUMENTS.md`.\n' >"$d/CLAUDE.md"
+printf 'Run `scripts/real.sh`, see `docs/process/plans/slice-$ARGUMENTS.md`.\n' >"$d/CLAUDE.md"
 good_rules "$d"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
@@ -1753,8 +1753,8 @@ rules >/dev/null && fail "check_docs accepted a root with no CLAUDE.md, whose it
 # The findings ledger: a known status, a fixed finding names a commit that exists, a rejected
 # one says why, and no id twice.
 git -C "$d" add -A && git -C "$d" commit -qm base && sha=$(git -C "$d" rev-parse --short HEAD)
-mkdir -p "$d/docs/review"
-row() { printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n%s\n' "$1" >"$d/docs/review/findings.md"; python3 -I "$docs" "$d" >/dev/null 2>&1; }
+mkdir -p "$d/docs/process/review"
+row() { printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n%s\n' "$1" >"$d/docs/process/review/findings.md"; python3 -I "$docs" "$d" >/dev/null 2>&1; }
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | \`$sha\`, its test |" || fail "check_docs refused a fixed finding naming its commit"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | the code already checks it |" || fail "check_docs refused a rejected finding with its reason"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | done | x |" && fail "check_docs accepted an unknown status"
@@ -1784,10 +1784,10 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | as \`0badc0de0badc0de0bad
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | \`$sha\`, then \`0badc0de\` |" && fail "check_docs accepted a fix citing a second commit the repo lacks"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | claimed | as \`$blob\` holds |" && fail "check_docs accepted a cited blob as a commit"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | its test |" && fail "check_docs accepted a fixed finding citing no commit"
-o="$t/docs-copy" && mkdir -p "$o/docs/review" && good_rules "$o"
-printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | `0badc0de` |\n| F002 | 2026-10-17 | a | x.py:1 | a bug | moot | as `0badc0de` shows |\n' >"$o/docs/review/findings.md"
+o="$t/docs-copy" && mkdir -p "$o/docs/process/review" && good_rules "$o"
+printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | `0badc0de` |\n| F002 | 2026-10-17 | a | x.py:1 | a bug | moot | as `0badc0de` shows |\n' >"$o/docs/process/review/findings.md"
 python3 -I "$docs" "$o" >/dev/null 2>&1 || fail "check_docs refused cited commits outside a repository, where none can be read"
-rm -r "$d/docs/review"
+rm -r "$d/docs/process/review"
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
 mkdir -p "$d/app/src/routes" "$d/packages/core/src"
 touch "$d/app/src/routes/home.tsx" "$d/app/src/routes/home.test.tsx" "$d/packages/core/src/irc.ts" "$d/packages/core/src/irc.test.ts"
@@ -2036,22 +2036,22 @@ out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs pas
 printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
 # Both ledgers merge by union (.gitattributes, D13408): two branches appending rows to each merge clean, every row kept. A row
 # both sides change is kept twice, and check_docs refuses it in either ledger: union never hides a collision.
-u="$t/union" && mkdir -p "$u/docs/review" && git -C "$u" init -q -b base && cp "$here/../.gitattributes" "$u/.gitattributes" && : >"$u/CLAUDE.md" && good_rules "$u"
+u="$t/union" && mkdir -p "$u/docs/process/review" && git -C "$u" init -q -b base && cp "$here/../.gitattributes" "$u/.gitattributes" && : >"$u/CLAUDE.md" && good_rules "$u"
 ug() { git -C "$u" -c user.name=t -c user.email=t@t "$@"; }
-row_d() { printf '| 2026-11-16 | %s | why | where |\n' "$1" >>"$u/docs/decisions.md"; }
-row_f() { printf '| %s | 2026-11-16 | r | `x` | %s | %s | %s |\n' "$1" "$2" "$3" "$4" >>"$u/docs/review/findings.md"; }
-printf '| Date | Decision | Why | Where it lives |\n|---|---|---|---|\n' >"$u/docs/decisions.md" && row_d "D9000: the base" && row_d "D9000, amended after the review: kept"
-printf '| Id | Date | By | Where | What | Status | Evidence |\n|---|---|---|---|---|---|---|\n' >"$u/docs/review/findings.md" && row_f F9000 "the base" claimed —
+row_d() { printf '| 2026-11-16 | %s | why | where |\n' "$1" >>"$u/docs/process/decisions.md"; }
+row_f() { printf '| %s | 2026-11-16 | r | `x` | %s | %s | %s |\n' "$1" "$2" "$3" "$4" >>"$u/docs/process/review/findings.md"; }
+printf '| Date | Decision | Why | Where it lives |\n|---|---|---|---|\n' >"$u/docs/process/decisions.md" && row_d "D9000: the base" && row_d "D9000, amended after the review: kept"
+printf '| Id | Date | By | Where | What | Status | Evidence |\n|---|---|---|---|---|---|---|\n' >"$u/docs/process/review/findings.md" && row_f F9000 "the base" claimed —
 ug add -A && ug commit -qm base && ug branch -q two && ug branch -q edit1 && ug branch -q edit2
 row_d "D9001: one" && row_f F9001 one claimed — && ug commit -qam one
 ug switch -q two && row_d "D9002: two" && row_f F9002 two claimed — && ug commit -qam two
 out=$(ug merge -q --no-edit base 2>&1) || fail "two branches appending to both ledgers did not merge clean by union: $out"
-[ "$(grep -c '^| 2026-11-16 | D900' "$u/docs/decisions.md")" = 4 ] && [ "$(grep -c '^| F900' "$u/docs/review/findings.md")" = 3 ] ||
-	fail "the union merge of both ledgers lost a row: $(cat "$u/docs/decisions.md" "$u/docs/review/findings.md")"
+[ "$(grep -c '^| 2026-11-16 | D900' "$u/docs/process/decisions.md")" = 4 ] && [ "$(grep -c '^| F900' "$u/docs/process/review/findings.md")" = 3 ] ||
+	fail "the union merge of both ledgers lost a row: $(cat "$u/docs/process/decisions.md" "$u/docs/process/review/findings.md")"
 out=$(python3 -I "$docs" "$u" 2>&1) || fail "check_docs refused two ledgers merged by union, every row once: $out"
 for side in 1 2; do
-	ug switch -q "edit$side" && sed -i.bak "s/^| F9000 .*/| F9000 | 2026-11-16 | r | \`x\` | the base | rejected | side $side |/; s/^| 2026-11-16 | D9000: the base .*/| 2026-11-16 | D9000: the base, side $side | why | where |/; s/^| 2026-11-16 | D9000, amended after the review: kept .*/| 2026-11-16 | D9000, amended after the review: kept, side $side | why | where |/" "$u/docs/review/findings.md" "$u/docs/decisions.md" &&
-		rm "$u/docs/review/findings.md.bak" "$u/docs/decisions.md.bak" && ug commit -qam "side $side"
+	ug switch -q "edit$side" && sed -i.bak "s/^| F9000 .*/| F9000 | 2026-11-16 | r | \`x\` | the base | rejected | side $side |/; s/^| 2026-11-16 | D9000: the base .*/| 2026-11-16 | D9000: the base, side $side | why | where |/; s/^| 2026-11-16 | D9000, amended after the review: kept .*/| 2026-11-16 | D9000, amended after the review: kept, side $side | why | where |/" "$u/docs/process/review/findings.md" "$u/docs/process/decisions.md" &&
+		rm "$u/docs/process/review/findings.md.bak" "$u/docs/process/decisions.md.bak" && ug commit -qam "side $side"
 done
 out=$(ug merge -q --no-edit edit1 2>&1) || fail "a row both sides changed did not merge by union: $out"
 out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a union merge that kept a row both sides changed twice: $out"
@@ -2059,7 +2059,7 @@ printf '%s\n' "$out" | grep -qF "  F9000: the id is used twice" || fail "check_d
 printf '%s\n' "$out" | grep -qF "  D9000: written twice" || fail "check_docs did not name the decision a union merge kept twice: $out"
 printf '%s\n' "$out" | grep -qF "  D9000 amended: written twice" || fail "check_docs did not name the amended row a union merge kept twice: $out"
 [ "$(printf '%s\n' "$out" | grep -c '  D9000')" = 2 ] || fail "check_docs named the decision's rows other than once each: $out"
-grep -v '^| F9000 .* side 1 |$' "$u/docs/review/findings.md" >"$u/f.md" && mv "$u/f.md" "$u/docs/review/findings.md"
+grep -v '^| F9000 .* side 1 |$' "$u/docs/process/review/findings.md" >"$u/f.md" && mv "$u/f.md" "$u/docs/process/review/findings.md"
 out=$(python3 -I "$docs" "$u" 2>&1) && fail "check_docs passed a decision a union merge kept twice, the findings clean: $out"
 fi
 
@@ -2084,7 +2084,7 @@ out=$(docs_at "$n") || fail "check_docs refused the root's own instructions, or 
 mkdir -p "$n/docs" "$n/app/src" "$n/app/.claude-x" && for p in docs/notes-CLAUDE.md docs/CLAUDE.md.orig app/src/agents.ts app/.claude-x/a.md; do printf 'x\n' >"$n/$p"; done
 out=$(docs_at "$n") || fail "check_docs refused a name that only holds an instruction file's: $out"
 rm -r "${n:?}/docs" "${n:?}/app"
-for p in app/CLAUDE.md docs/plans/CLAUDE.md app/CLAUDE.local.md packages/core/AGENTS.md CLAUDE.local.md AGENTS.md .claude/AGENTS.md \
+for p in app/CLAUDE.md docs/process/plans/CLAUDE.md app/CLAUDE.local.md packages/core/AGENTS.md CLAUDE.local.md AGENTS.md .claude/AGENTS.md \
 	.claude/CLAUDE.local.md app/.claude/CLAUDE.md app/.claude/rules/x.md server/src/.claude/skills/s/SKILL.md app/.claude/agents/x.md \
 	app/.claude/commands/x.md app/.claude/skills/s/run.sh app/.claude/settings.json \
 	app/claude.md docs/Agents.MD app/.Claude/rules/x.md packages/ui/Claude.Local.md; do
@@ -6806,7 +6806,7 @@ const base = (files) => (l) =>
     const d = await withDesign(["app/src/space/frame.ts"]);
     const call = d.calls.find((c) => c.label === "design-reviewer");
     ok(call.agentType === "design-reviewer", `the design lens ran as ${call.agentType}`);
-    for (const word of ["1728", "1080", "docs/design/video-screens.md", "video-frames", "write nothing"])
+    for (const word of ["1728", "1080", "docs/process/design/video-screens.md", "video-frames", "write nothing"])
       ok(call.prompt.includes(word), `the design-reviewer was not told ${word}: ${call.prompt}`);
     ok(!call.prompt.includes("learnings.md"), "the read-only design-reviewer was told to write the learnings");
     ok(call.schema.properties.framesMissing && call.schema.properties.findings, "the design-reviewer's answer has no framesMissing, or no findings");
@@ -6843,7 +6843,7 @@ const base = (files) => (l) =>
     ok(/^name: design-reviewer$/m.test(brief), "the design-reviewer's brief names another agent");
     const tools = ((brief.match(/^tools: (.*)$/m) || [])[1] || "");
     ok(/\bRead\b/.test(tools) && !/\b(Write|Edit|NotebookEdit)\b/.test(tools), `the design-reviewer is not read-only: tools: ${tools}`);
-    for (const word of ["1728", "1080", "docs/design/video-screens.md", "~/.cache/gnoworld-tools/video-frames/", "position", "size", "spacing", "type", "colour", "radius", "both pictures"])
+    for (const word of ["1728", "1080", "docs/process/design/video-screens.md", "~/.cache/gnoworld-tools/video-frames/", "position", "size", "spacing", "type", "colour", "radius", "both pictures"])
       ok(brief.includes(word), `the design-reviewer's brief lacks ${word}`);
     ok(/missing[^.]*fail[^.]*never skip/i.test(brief), "the design-reviewer's brief has no one sentence saying that missing frames fail the step, never skip it");
     ok(/git command that writes the index/.test(brief), "the design-reviewer's brief lacks the git-index rule");
@@ -7252,10 +7252,10 @@ if part check_docs_cells; then
 # that read it. A pipe in a cell is escaped, `\|`, as the splitter reads it.
 docs="$here"/check_docs.py
 c="$t/cells-root"
-mkdir -p "$c/docs/review"
+mkdir -p "$c/docs/process/review"
 printf '' >"$c/CLAUDE.md"
 good_rules "$c"
-cells() { printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n%s\n' "$1" >"$c/docs/review/findings.md"; python3 -I "$docs" "$c" 2>&1; }
+cells() { printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n%s\n' "$1" >"$c/docs/process/review/findings.md"; python3 -I "$docs" "$c" 2>&1; }
 cells '| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | why |' >/dev/null || fail "check_docs refused a row of seven cells"
 out=$(cells '| F002 | 2026-10-17 | a | x.py:1 | a bug | rejected |') && fail "check_docs accepted a row of six cells"
 printf '%s\n' "$out" | grep -q "F002" && printf '%s\n' "$out" | grep -qi "cells" || fail "check_docs did not name the row of six cells and say cells: $out"
@@ -7264,7 +7264,7 @@ printf '%s\n' "$out" | grep -q "F003" || fail "check_docs did not name the row o
 cells '| F004 | 2026-10-17 | a | x.py:1 | a \| b | rejected | why |' >/dev/null || fail "check_docs refused a row whose pipe is escaped"
 out=$(cells '| F005 | 2026-10-17 | a | x.py:1 | a bug | rejected | why | |') && fail "check_docs accepted a row with a trailing empty cell (eight)"
 printf '%s\n' "$out" | grep -q "F005" || fail "check_docs did not name the row with a trailing empty cell: $out"
-printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F006 | 2026-10-17 | a | x.py:1 | a bug | rejected | why |\n\nF007 | a sentence that starts like a row | and has pipes, but no row.\n' >"$c/docs/review/findings.md"
+printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F006 | 2026-10-17 | a | x.py:1 | a bug | rejected | why |\n\nF007 | a sentence that starts like a row | and has pipes, but no row.\n' >"$c/docs/process/review/findings.md"
 python3 -I "$docs" "$c" >/dev/null 2>&1 || fail "check_docs read a sentence with pipes as a ledger row"
 fi
 

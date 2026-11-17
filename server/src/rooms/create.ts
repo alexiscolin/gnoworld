@@ -48,7 +48,7 @@ export const LIVE_EARTH_SQL =
 
 /** The Earth's public rooms at most, the live ones: an archived room keeps its name and frees its place. */
 export const EARTH_ROOMS_MAX = 1_000;
-/** The public rooms made in the window (earthWindowStart), archived ones too: archiving frees no place, only time does (C12, D13675). */
+/** The public rooms made in the window (earthWindowStart), archived ones too: archiving frees no place, only time does. */
 export const EARTH_ROWS_MAX = 5_000;
 /** The public rooms an account makes in a day, archived ones counted. */
 export const EARTH_PER_DAY = 3;
@@ -135,7 +135,7 @@ export function makeRooms({
   const RealmRow = z.object({ yes: z.number() }).optional();
   const sql = roomSql(db);
   const stateOf = (room: string) => State.parse(sql.state.get(room));
-  // The rows go in one transaction (F13511: a stop between them left an orphan row and a realm answering 500 for ever); the
+  // The rows go in one transaction (a stop between them left an orphan row and a realm answering 500 for ever); the
   // JOIN and the SAMODEs follow once it committed.
   const open = (room: string, world: string, rows: () => void = () => undefined) => {
     transaction(db, () => {

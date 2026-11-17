@@ -1,10 +1,10 @@
 // An account's chat on a world's page: the direct messages and what the account was told, drawn with the rooms. Its code
 // is an account's alone, asked once the session is one (ADR-0001 §12).
 import type { RoomList } from "@gnoworld/schemas";
-import { useDms } from "./Dms.tsx";
-import { Loaded, type LoadedProps } from "./Loaded.tsx";
-import { LOADING } from "./Loading.tsx";
-import { useNotices } from "./useNotices.ts";
+import { useDms } from "./rooms/Dms.tsx";
+import { Loaded, type LoadedProps } from "./rooms/Loaded.tsx";
+import { LOADING } from "./dock/Loading.tsx";
+import { useNotices } from "./rooms/useNotices.ts";
 
 export interface AccountChatProps extends Omit<LoadedProps, "sections" | "dms" | "noticing"> {
   /** Whether the rooms came, or could not. */

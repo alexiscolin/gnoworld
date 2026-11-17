@@ -104,7 +104,7 @@ export function placesTool(data: Places) {
         .toLowerCase()
         .split(/\s/)
         .filter((word) => word !== "");
-      // ponytail: a pass over every place, about 3,000 at most (three files of 1,000 rows, two places a universe).
+      // ceiling: a pass over every place, about 3,000 at most (three files of 1,000 rows, two places a universe).
       const matched =
         words.length === 0 ? [] : data.found.filter((place) => words.every((word) => place.words.includes(word)));
       if (matched.length === 0)

@@ -1,5 +1,5 @@
-// The command line's login (D13880), for a computer with gnokey and no Adena: the address, the server's block to run offline, the
-// file it printed pasted back, then the server's cookie. A device view (#key-login), opened by Connect's gnokey row (D13881).
+// The command line's login, for a computer with gnokey and no Adena: the address, the server's block to run offline, the
+// file it printed pasted back, then the server's cookie. A device view (#key-login), opened by Connect's gnokey row.
 import { shortAddress, type Address } from "@gnoworld/schemas";
 import { Dialog } from "@gnoworld/ui";
 import { pageLoginApi } from "../../lib/api/login.ts";

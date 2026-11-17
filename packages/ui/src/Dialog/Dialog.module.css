@@ -42,7 +42,7 @@
       max-inline-size: none;
       block-size: 100dvb;
       max-block-size: none;
-      /* layout: the browser centres a modal dialog with its margins; the sheet fills the screen */
+      /* The browser centres a modal dialog with its margins; the sheet fills the screen */
       margin: 0;
       padding-block: max(var(--space-s), env(safe-area-inset-top)) max(var(--space-s), env(safe-area-inset-bottom));
       padding-inline: max(var(--space-s), env(safe-area-inset-left)) max(var(--space-s), env(safe-area-inset-right));
@@ -60,7 +60,6 @@
     }
 
     .head {
-      /* layout: the head's ground and rule run to the sheet's edges, over the dialog's padding */
       margin-inline: calc(-1 * max(var(--space-s), env(safe-area-inset-left)))
         calc(-1 * max(var(--space-s), env(safe-area-inset-right)));
       padding-block: max(var(--space-s), env(safe-area-inset-top)) var(--space-2xs);
@@ -71,7 +70,7 @@
     /* The kicker has none of its own 8 px above it, and 4 px (not 12) down to the title row. */
     .dialog[data-width="screen"] .kicker {
       padding-block-start: 0;
-      /* layout: the row's step is 12, here 4 */
+      /* The row's step is 12, here 4 */
       margin-block-end: calc(var(--space-3xs) - var(--space-xs));
     }
 
@@ -86,7 +85,6 @@
   /* Held sideways: the sheet's content in one readable column, centred, as wide as a dialog. */
   @media (width < 900px) and (height < 500px) {
     .head {
-      /* layout: a short screen's head, 8 px from the top */
       padding-block-start: max(var(--space-2xs), env(safe-area-inset-top));
     }
 
@@ -98,9 +96,7 @@
 
   /* Close ends on the row's edge: the title row's last part grows a pixel or so, the button stays at the end of it. */
   .close {
-    /* layout: the button at the part's end */
     display: flex;
-    /* layout: at the end */
     justify-content: flex-end;
   }
 
@@ -145,7 +141,7 @@
   /* The drawer: the screen's start, its full height, 360 px, on the surface the dock and the plates use, so no word of the page reads
      through it (frames 98 to 100); Close in its top end corner, the page beside it seen whole. */
   .dialog[data-side="start"] {
-    /* raw: 360 px, frame 99 */
+    /* raw: the design's 360 px */
     --_w: 360px;
 
     position: fixed;
@@ -154,7 +150,7 @@
     inset-inline-end: auto;
     max-block-size: none;
     block-size: 100dvb;
-    /* layout: the browser centres a modal dialog with its margins; the drawer stands at the start */
+    /* The browser centres a modal dialog with its margins; the drawer stands at the start */
     margin: 0;
     padding: 0;
     border-block: 0;
@@ -166,7 +162,7 @@
      in the room left. */
   .dialog[data-side="start"] > * {
     block-size: 100%;
-    /* layout: no room for the title row, which draws nothing here */
+    /* No room for the title row, which draws nothing here */
     gap: 0;
   }
 
@@ -208,7 +204,7 @@
 
   .dialog[data-side="start"] .close {
     position: absolute;
-    /* raw: frame 99's Close, 18 px from the drawer's top */
+    /* raw: the design's Close, 18 px from the drawer's top */
     inset-block-start: 18px;
     /* raw: and 18 px from its end */
     inset-inline-end: 18px;

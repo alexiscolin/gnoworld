@@ -14,7 +14,7 @@ import { site, siteOf } from "./places.ts";
 import { PLANTED } from "./placesFixture.ts";
 import { Shell } from "./shell.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
-import { levelsOf } from "./shellWays.tsx";
+import { levelsOf } from "./headerPills.tsx";
 
 // The header as the video's frames 1, 20 and 37 show it: the logo, the views, the network named, "Testnet" on a testnet, search;
 // the chat is a control, and the passport's counter is not one.
@@ -195,7 +195,7 @@ describe("the header", () => {
   });
 
   // Layout wraps every document, the failed ones too: no loader data is there, and the header still tells the truth.
-  // The World level is the page's own, a path that holds a chat even when its world is not found (shellWays.tsx's worldAt).
+  // The World level is the page's own, a path that holds a chat even when its world is not found (headerPills.tsx's worldAt).
   test.each([
     ["/net/nope", "/earth"],
     ["/w/nope", "/w/nope"],

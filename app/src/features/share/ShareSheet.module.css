@@ -2,7 +2,6 @@
 @layer components {
   .picture {
     position: relative;
-    /* layout: a figure's own margin, which the sheet's stack spaces instead */
     margin: 0;
     overflow: clip;
     border-radius: var(--radius-m);
@@ -23,9 +22,7 @@
     position: absolute;
     inset-inline: 0;
     inset-block-end: 0;
-    /* layout: the label over the name */
     display: grid;
-    /* layout: the label's distance from the name */
     gap: var(--space-3xs);
     padding: var(--space-s);
     /* raw: the surface fading in under the caption, so its words read over any planet */

@@ -1,6 +1,6 @@
 // Any path no route matches: not found, inside the page, with the shell and its links around it.
 import { data } from "react-router";
-import { notFoundMeta } from "../meta.ts";
+import { notFoundMeta } from "../pageMeta.ts";
 import { RouteError } from "../features/errors/index.ts";
 
 // A loader in the browser makes the router wait before it hydrates, so the static host's

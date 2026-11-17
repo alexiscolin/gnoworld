@@ -5,7 +5,7 @@ import { useLoaderData, type MetaArgs } from "react-router";
 import { hubWorldOf } from "@gnoworld/core";
 import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
-import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
+import { failedWorldMeta, ORIGIN, worldMeta } from "../pageMeta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import { chatPlace } from "../features/chat/index.ts";
 import { PlaceChat } from "../features/chat/PlaceChat.tsx";

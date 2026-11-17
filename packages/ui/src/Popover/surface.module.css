@@ -16,7 +16,7 @@
     --appear-from: 0 calc(var(--_dir) * var(--space-3xs));
 
     inset: auto;
-    /* layout: the browser centres a popover with its margins; ours is placed in script */
+    /* The browser centres a popover with its margins; ours is placed in script */
     margin: 0;
     transform-origin: 50% 0;
   }

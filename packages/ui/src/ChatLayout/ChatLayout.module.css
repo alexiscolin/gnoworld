@@ -1,5 +1,5 @@
-/* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none (the video's frame
-   23.58.01). The widths are the video's, measured at 1728 px. */
+/* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none.
+   The widths are the design's, measured at 1728 px. */
 @layer components {
   .root {
     block-size: 100%;
@@ -7,9 +7,7 @@
   }
 
   .frame {
-    /* layout: the header over the body, filling the height its place gives it; no composition fills a height */
     display: flex;
-    /* layout: the header over the body */
     flex-flow: column;
     block-size: 100%;
     min-block-size: 0;
@@ -18,21 +16,16 @@
   }
 
   .header {
-    /* layout: the header's row centred in its band, which a composition (a row from the top) does not do */
     display: grid;
-    /* layout: centred in the band */
     align-content: center;
     min-block-size: var(--chat-head);
     padding-inline: var(--space-m);
-    /* layout: the header keeps its own height */
     flex: none;
     border-block-end: var(--line-width) solid var(--color-line);
   }
 
   .body {
-    /* layout: the regions side by side, each holding its own scroll, the page none */
     display: flex;
-    /* layout: takes what the header leaves */
     flex: 1;
     min-block-size: 0;
   }
@@ -40,7 +33,6 @@
   .worlds,
   .rooms,
   .info {
-    /* layout: a region keeps its measure */
     flex: none;
     overflow: auto;
     border-inline-end: var(--line-width) solid var(--color-line);
@@ -63,9 +55,8 @@
   /* The drag handle on a border: a zero-width item of the row, its hit area drawn across the border, a line in the design system's
      colours while it is hovered, focused or dragged. */
   .handle {
-    /* layout: it takes no width of the row; the separator hangs over the border */
+    /* It takes no width of the row; the separator hangs over the border */
     position: relative;
-    /* layout: it keeps no width */
     flex: none;
     inline-size: 0;
     /* raw: above the regions' scroll, which the separator overhangs */
@@ -73,7 +64,6 @@
   }
 
   .separator {
-    /* layout: the hit area straddles the border, the body's whole height, its line drawn in the middle */
     position: absolute;
     inset-block: 0;
     inset-inline-start: calc(var(--space-2xs) * -1);
@@ -85,7 +75,6 @@
 
   .separator::after {
     content: "";
-    /* layout: the line, centred in the hit area and as high */
     position: absolute;
     inset-block-start: 0;
     block-size: 100%;
@@ -112,13 +101,10 @@
   }
 
   .conversation {
-    /* layout: the conversation takes the width the other regions leave; a column of its own parts */
     display: flex;
-    /* layout: takes the rest of the row */
     flex: 1;
-    /* layout: its parts one under the other */
     flex-flow: column;
-    /* layout: a flex item shrinks below its content only with this, so the regions scroll and the page does not */
+    /* A flex item shrinks below its content only with this, so the regions scroll and the page does not */
     min-inline-size: 0;
     min-block-size: 0;
   }
@@ -126,11 +112,9 @@
   /* A band over the columns (`band`), from the page header's foot, out of their flow: its row on the lines' own edge, its controls alone
      taking a click; the columns from its foot, under a rule across the window; the conversation's lines under its title. */
   .frame[data-band] > .header {
-    /* layout: the band over the columns' top, out of their way */
     position: absolute;
     inset-block-start: var(--banner-under);
     inset-inline: 0;
-    /* layout: the title on the lines' own edge (the app's room), past the band's padding */
     /* raw: no inset where the chat sets none, the lines' 32 px then */
     padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l)));
     border-block-end: 0;
@@ -142,13 +126,11 @@
   }
 
   .frame[data-band] > .header + * {
-    /* layout: the columns under the page's header, the band out of their flow */
     margin-block-start: var(--banner-under);
     border-block-start: var(--line-width) solid var(--color-line);
   }
 
   .frame[data-band] .conversation {
-    /* layout: the conversation's lines under its title */
     padding-block-start: var(--chat-head);
   }
 
@@ -163,7 +145,6 @@
     /* A thread, which the info slot holds, takes the whole width. */
     &[data-info-first] .info {
       display: block;
-      /* layout: the thread takes the whole width */
       flex: 1;
       inline-size: auto;
       border-inline-start: 0;

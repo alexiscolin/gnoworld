@@ -25,7 +25,7 @@ const KEPT = 24;
 export class Near {
   readonly #device: NearDevice;
   readonly #bones = new Bones();
-  /** The maps asked ahead of their being seen as themselves (warm.ts). */
+  /** The maps asked ahead of their being seen as themselves (warmRealm.ts). */
   readonly warm: Warm;
   readonly #held = new Map<number, Held>();
   readonly #at: Vec = { x: 0, y: 0, z: 0 };

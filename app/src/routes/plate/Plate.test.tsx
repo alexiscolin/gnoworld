@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import { InPageSheet } from "../../features/chat/placePage.ts";
+import { InPageSheet } from "../../features/chat/phone/placePage.ts";
 import type { PlateModel } from "./model.ts";
 import { standInPopovers } from "../../../tests/popover.ts";
 import { Plate } from "./Plate.tsx";

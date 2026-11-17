@@ -1,5 +1,5 @@
 import { GUEST_PREFIX, JARVIS_NICK } from "@gnoworld/core";
-import { isAccount, shortAddress } from "./names.ts";
+import { isAccount, shortAddress } from "./rooms/names.ts";
 
 interface PersonProps {
   name: string;

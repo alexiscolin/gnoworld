@@ -1,4 +1,4 @@
-// The bell's list (frames 86, 87; ADR-0002 §1, notifications by kind and by world): what the account was told in the rooms (Messages), the
+// The bell's list (ADR-0002 §1, notifications by kind and by world): what the account was told in the rooms (Messages), the
 // data's events of the coming day and the worlds of the moment the reader follows or that are new (Worlds), and the team's news (News). Each
 // is read until the reader marks it, or every one up to a time; nothing of it leaves the device. Pure: the clock and the sources are given.
 import type { Notice } from "@gnoworld/core";

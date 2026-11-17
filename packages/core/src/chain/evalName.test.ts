@@ -6,8 +6,12 @@ import { evalNameOf, evalOwner, isAddress, isName, looksLikeAddress, ownerOfAnsw
 const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
 
 describe("evalNameOf", () => {
-  it("composes the one expression for a valid address", () => {
-    expect(evalNameOf(ADDRESS)).toBe(`gno.land/r/sys/users.ResolveAddress(address("${ADDRESS}")).Name()`);
+  // ResolveAddress gives nil for an address with no record, and Name, a value method, panics on it (onyx-1, through gnomcp,
+  // 2026-11-17): the expression answers "" instead, as evalOwner does.
+  it("composes the one expression for a valid address, an empty name for an address with no record", () => {
+    expect(evalNameOf(ADDRESS)).toBe(
+      `gno.land/r/sys/users.func() string { d := ResolveAddress(address("${ADDRESS}")); if d == nil { return "" }; return d.Name() }()`,
+    );
   });
 
   it.each([` ${ADDRESS}`, `x")).Evil(address("${ADDRESS}`, `evil${ADDRESS}`, `"${ADDRESS}`])(

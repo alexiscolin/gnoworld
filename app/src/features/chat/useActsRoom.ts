@@ -1,6 +1,6 @@
 // How much room the chat header's own width leaves the place's buttons, so the header stays on one line: PlaceActs.tsx gives what does not fit to its "More" menu.
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { useFull } from "./full.ts";
+import { useFull } from "./dock/fullState.ts";
 import type { ActsRoom } from "./PlaceActs.tsx";
 
 // The narrowest the room's name is left before the buttons give way, where it ends in its ellipsis.

@@ -36,7 +36,6 @@
   }
 
   .reward {
-    /* layout: the badge keeps its size beside the words */
     flex: none;
     /* raw: the badge beside the words, a little larger than a thumb */
     inline-size: 44px;

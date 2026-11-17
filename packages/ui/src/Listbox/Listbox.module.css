@@ -1,7 +1,6 @@
 /* A list of words that complete a field: the floating surface's line and fill (surface.module.css), the lines of a menu. */
 @layer components {
   .list {
-    /* layout: no space round the list, its place is its container's */
     margin: 0;
     padding: var(--space-2xs);
     border-radius: var(--radius-box);

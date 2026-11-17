@@ -10,9 +10,9 @@ export default defineConfig({
   test: {
     name: "compiled",
     include: [
-      "src/features/chat/Lines.test.tsx",
-      "src/features/chat/composing.test.tsx",
-      "src/features/chat/lineFlash.test.tsx",
+      "src/features/chat/lines/Lines.test.tsx",
+      "src/features/chat/composer/composing.test.tsx",
+      "src/features/chat/lines/lineFlash.test.tsx",
     ],
     environment: "jsdom",
     expect: { requireAssertions: true },

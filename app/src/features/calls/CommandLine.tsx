@@ -1,4 +1,4 @@
-// The call a card shows as a command to run by hand (D13880), on a computer only, folded while Adena is in the page: the page never runs
+// The call a card shows as a command to run by hand, on a computer only, folded while Adena is in the page: the page never runs
 // it and never watches for it. None for an argument a shell could read otherwise: the fold says which, where the command would be.
 import { callFields } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
@@ -45,7 +45,7 @@ function command(card: CallCard, network: { chainId: string; rpc: string }, as: 
 }
 
 /** The card's command, signed by `as` when an account is logged in; open from the start with no Adena in the page, read without
- * touching its object (D254). */
+ * touching its object. */
 export default function CommandLine({
   card,
   network,

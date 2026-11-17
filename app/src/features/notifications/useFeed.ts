@@ -1,11 +1,11 @@
 // The bell's lines as the page holds their sources: the account's unseen notices, the data's events and news, and the followed worlds with
 // who is here in them once the panel asks the server.
-import { events, news } from "../../lateData.ts";
+import { events, news } from "../../eventsAndNews.ts";
 import type { Notice } from "@gnoworld/core";
 import { useLocation } from "react-router";
 import { unseenNotices } from "../../store/notices.ts";
 import { useApp } from "../../storeContext.tsx";
-import { noticeDone } from "../../told.ts";
+import { noticeDone } from "../../noticeDone.ts";
 import { dmHref, roomHref, roomLabel, roomWorld, whoIs } from "../chat/index.ts";
 import { isLive, placeOf, universeAt } from "../events/index.ts";
 import { worldsFollowedIn } from "../follow/index.ts";

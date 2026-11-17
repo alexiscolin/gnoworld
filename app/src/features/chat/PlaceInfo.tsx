@@ -1,5 +1,5 @@
-// The full-screen chat's info panel (the video's frame 23.58.01, right): the place's kicker and name, what it says of itself,
-// then Here now. Only what the page holds: the video's sample figures are never drawn.
+// The full-screen chat's info panel (the design.58.01, right): the place's kicker and name, what it says of itself,
+// then Here now. Only what the page holds: the design's sample figures are never drawn.
 import { Cluster, Kicker, Stack } from "@gnoworld/ui";
 import type { ReactNode, Ref } from "react";
 import { Figure } from "./Figure.tsx";

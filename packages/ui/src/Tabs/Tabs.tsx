@@ -27,7 +27,7 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   /** Icons alone, each tab named by its label and wearing it as a tooltip. */
   iconOnly?: boolean;
-  /** Small: tighter tabs, for a narrow panel's row (the bell's kinds, frames 86, 87); xs, a list's sort in the chip's type. */
+  /** Small: tighter tabs, for a narrow panel's row (the bell's kinds); xs, a list's sort in the chip's type. */
   size?: "xs" | "s" | "m";
   /** The row takes the whole width of its place, its tabs from the start (a card's Read and Write). */
   fill?: boolean;

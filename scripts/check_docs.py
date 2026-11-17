@@ -3,7 +3,7 @@
 # .claude/**/*.md (the ADRs, plans and ARCHITECTURE describe the future too), and checks
 # every `scripts/`, `.claude/`, `docs/`, `adr/` or `.githooks/` path written in backticks.
 # Paths with a template variable or under .claude/tmp/ are skipped. It also checks the findings
-# ledger, docs/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
+# ledger, docs/process/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
 # that no file git tracks or would, as staged or in the work tree, no name, link or commit message
 # of the branch holds a hidden character.
 # Usage: check_docs.py [root]
@@ -170,7 +170,7 @@ def commits(root, shas):
 def ledger_problems(root):
     """Each row of the findings ledger: a known status, a fixed one's commit, every commit it cites a real one, a
     rejected one's reason, a unique id."""
-    ledger, seen, out = root / "docs/review/findings.md", set(), []
+    ledger, seen, out = root / "docs/process/review/findings.md", set(), []
     if not ledger.is_file():
         return out
     rows = []
@@ -200,7 +200,7 @@ def ledger_problems(root):
 def decision_problems(root):
     """A decision's id written again says why, once (`D172, amended after the review`, `D40 confirmed`): a row both sides of a
     merge changed, which the ledger's union merge keeps twice (.gitattributes, D13408), is refused where it starts with its id."""
-    ledger, seen, out = root / "docs/decisions.md", set(), []
+    ledger, seen, out = root / "docs/process/decisions.md", set(), []
     if not ledger.is_file():
         return out
     for line in ledger.read_text().splitlines():
@@ -235,10 +235,10 @@ rules = lost_rules(root)
 if rules:
     report("check_docs", "check_docs: a rule the review depends on is gone:", rules)
 if problems:
-    report("check_docs", "check_docs: the findings ledger (docs/review/findings.md):", problems)
+    report("check_docs", "check_docs: the findings ledger (docs/process/review/findings.md):", problems)
 decisions = decision_problems(root)
 if decisions:
-    report("check_docs", "check_docs: the decisions (docs/decisions.md):", decisions)
+    report("check_docs", "check_docs: the decisions (docs/process/decisions.md):", decisions)
 # No instruction file below the root reaches a commit: every commit runs this, prose alone included.
 stray = stray_instructions(root)
 if stray:

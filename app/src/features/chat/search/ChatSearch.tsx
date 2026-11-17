@@ -4,7 +4,7 @@
 import type { SearchHit } from "@gnoworld/schemas";
 import { composing, EmptyState, Field, Icon, IconButton, ShowMore, Sidebar, Skeleton, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { useKeepFocus } from "../keepFocus.ts";
+import { useKeepFocus } from "../dock/useKeepFocus.ts";
 import { pageRecent } from "../../../lib/keep/recent.ts";
 import { parseFind, toQuery, type Time, type Who } from "./filters.ts";
 import { Filters } from "./Filters.tsx";
