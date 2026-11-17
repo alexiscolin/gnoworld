@@ -3,7 +3,7 @@
 **Status:** built and in `main` (the backlog); the plan below is kept as it was written.
 
 Approved by Alexis question by question on 2026-11-01 (section 9); nothing is built. Sources: backlog row 7 and "From the video's audit", ADR-0001 §7 and §12, ADR-0002 §3, §7 ("Scale") and §9 ("Rendering", "Memory"), `docs/ARCHITECTURE.md` ("The scene"), `docs/DESIGN-SYSTEM.md` (regions, breakpoints, credits), `docs/process/design/video-screens.md`, the frames (`~/.cache/gnoworld-tools/video-frames/`), decisions of 2026-10-31. Row 7 is cut in two: this slice is the video's look; what the video does not show waits in "7-after" (section 2, question 1).
-Plainly: this does not fit a week (section 7). The demo's floor is 7a to 7h, by Alexis. The mock-up of the look and the rules: https://claude.ai/artifact/5Z3eZVFLLYkGAHZEuKcre4; it shows the idea and is no code to reuse.
+Plainly: this does not fit a week (section 7). The demo's floor is 7a to 7h, by Alexis. The mock-up of the look and the rules is a private design page; it shows the idea and is no code to reuse.
 
 ## 1. Done when
 Row 7's tests, word for word, for what this slice builds: After 20 flights, GPU resources are at their baseline and the JS heap is within 10%; 60 fps while travelling on a mid-range phone profile; with reduced motion, flights become crossfades and nothing orbits; every place stays reachable with the 3D off; on a phone, nothing of the 3D loads before "View in space"; after a minute with no input the scene asks at most 10 frames a second, and none when hidden or covered; the Auto probe drops to Low above 20 ms and remembers it; "Reduce animations" freezes motion; the bench holds 60 fps with the CPU slowed 4×.
@@ -65,7 +65,7 @@ New: `app/src/scene/`, `packages/core/src/{planet,cosmos,space,lod,frame,ring}/`
 | 7g | Flights: camera-controls, the jump to a star you aim at, the flight panel, streaks, crossfade on reduced motion, shaders compiled ahead, Esc lands (18, 19, 36, 88, 89, 101, 128, 129, 142) | The 20-flight leak; reduced motion; the panel's regions | 7d, 7h |
 | 7i | The rail, in the order Earth, trends, rising, seeds; cap of 25, "See all", dock magnification (4) | Order and cap; the keyboard | 7h |
 | 7j | The country tag (opt-in), the person card | Opt-in; no tag no country | 6a's types |
-| 7k | Moved to slice 8 as 8e (Alexis, 2026-11-04, "Dans la tranche 8"): the bell and notifications by kind, the room's Media tab (86, 87) | — | — |
+| 7k | Moved to slice 8 as 8e (Alexis, 2026-11-04: in slice 8): the bell and notifications by kind, the room's Media tab (86, 87) | — | — |
 | 7l | The preview-capture job and the Open Graph images | No capture, no preview; the job's egress | nothing |
 | 7m | The minimal display mode | Everything comes back; the keyboard | 7e |
 Order and sessions: 7s with 7c; then 7a beside whichever is left, then 7a2; 7b with 7f; 7d with 7j; 7e with 7k; 7h with 7l; 7g with 7i; 7m last. Needs three: 7a, 7b, 7d to 7i, 7m. Go démo (question 20): the branches run without a stop until 7h, nothing reaches `main` without Alexis, and his one stop inside that run is 7b's realism test, which the rest builds on; the wallpaper gallery of 7d waits for him and stops nothing. Every branch is cut from `slice-7`, the integration branch (the Workflow's `base`), and the chief merges it back; `main` takes `slice-7` whole, through `/pre-merge`. `deploy/test.sh` runs in Alexis's Terminal on `slice-7` after a branch that touches `deploy/`, a timer or what a first load fetches, never beside a gate (the dream of 2026-11-01).

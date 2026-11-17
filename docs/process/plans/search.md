@@ -1,7 +1,7 @@
 # Search: ⌘K finds where to go, the chat's search finds what was said
 
-D13917 (`docs/process/decisions.md`, 2026-11-11), the canvas Alexis approved (https://claude.ai/artifact/MmYvckAYBK2p1jP8PzrsPo; the same screens as a
-plain page, https://claude.ai/artifact/E3VhowNtZcpe7RkhbX3vx9; backlog row 4c, `docs/process/decisions.md` 2026-10-21: "public rooms first, through
+D13917 (`docs/process/decisions.md`, 2026-11-11), the canvas Alexis approved (a private design page; the same screens as a
+plain page, another; backlog row 4c, `docs/process/decisions.md` 2026-10-21: "public rooms first, through
 `server`'s own index, which follows retention and erasure; a search never showing a line its reader cannot read"). Alexis: "implémente ça
 proprement, en best practice, avec récupération du code existant, pas de copie ni de code mort, sans régression même visuelle ou UX".
 A plan, no code. Every claim below cites a file I read in this session; what I did not verify is in section 10.

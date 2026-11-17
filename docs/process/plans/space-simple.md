@@ -1,21 +1,21 @@
 # Space, simple: the header, the tags, the Map (pingpong, 2026-11-08)
 
-Alexis's "go" (2026-11-08) on the proposal page's simple version (https://claude.ai/artifact/LnRHmz7848Qa7wQ6asmMoH, sections
+Alexis's "go" (2026-11-08) on the proposal page's simple version (a private design page, sections
 "La version simple" to "À trancher"; D424, D425). Built in the workshop, part by part, each seen live before the next; tests at the end
 (the radical mode, withdrawn by D13183; the hardening slice owes its tests, D13918), tier-1 files excepted.
 
 ## Rules for every part
 
-- No regression on what moves today (Alexis: "pas de régression du côté des animations"). Checked live after each part:
+- No regression on what moves today (Alexis: no regression in the animations). Checked live after each part:
   - the flight (van Wijk–Nuij), the lens shift riding it, the scan's undraw, the plate's arrival (GSAP, `arrival.ts`), the page's
     rise and its ghost (`rise.ts`), the rail's rise-in, the labels' declutter and the rail's magnify;
   - the chat's grow from its dock and shrink back (`fullMove.ts`), the views' sliding cream fill (D369), the Earth's signs and its
     turn to a sign with no zoom-out (D420);
   - V and the Plan's open (`viewKeys.ts`), Escape and the wheel going up a level.
-- Everything new moves with the same care (Alexis: "animé avec la même qualité et soin … smooth"): the design system's motion tokens
+- Everything new moves with the same care (Alexis: animated with the same quality and care, smooth): the design system's motion tokens
   (`--motion-fast/base/slow`, `--ease-standard/in`), GSAP where a sequence needs it as `arrival.ts` does, a dim or a glow eased, never
   snapped; nothing that loops for ever; reduced motion gives the end state at once.
-- Nothing jumps or moves at once, anywhere (Alexis: "partout … rien ne doit sauter ou bouger d'un coup"): what appears fades or rises
+- Nothing jumps or moves at once, anywhere (Alexis: everywhere, nothing may jump or move at once): what appears fades or rises
   in, what goes fades out, what changes size or place eases to it; a control that comes and goes keeps its room or folds smoothly.
 - One question, one place; one number per fact; mint for mine or unread alone, cream for lit or chosen, amber for people here now.
 

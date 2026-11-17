@@ -53,9 +53,9 @@ None. Web Share, IndexedDB and canvas capture are the browser's; the reminder is
 6. Quests: steps that call need slice 9. Recommendation: build the card and the steps now, the call step showing "needs a wallet, soon" in place, so slice 9 only plugs the call in.
 
 ## Alexis's answers (2026-11-04, by questions)
-1. The passport counter as the video ("3/19"), counted on the worlds the reader's own view lists; ADR-0002 §3's "never the total" line is edited by the slice's first commit ("Comme la vidéo").
-2. The screens no frame shows: built with the design system, after a mock-up artifact made with it for Alexis, which may wait a little ("les 2, un artifact avec le design system, qui attendra un peu").
+1. The passport counter as the video ("3/19"), counted on the worlds the reader's own view lists; ADR-0002 §3's "never the total" line is edited by the slice's first commit (as the video has it).
+2. The screens no frame shows: built with the design system, after a mock-up artifact made with it for Alexis, which may wait a little (both: a mock-up made with the design system, which can wait a little).
 3. Reminders only while the page is open and at the next open; the background is a later Push slice ("Page ouverte seule").
 4. Settings only for the features that exist ("Oui").
-5. The notifications panel (frames 86, 87) moves here as a fifth part, 8e, from slice 7's 7k ("Dans la tranche 8").
-6. Quests: the whole card now, the call step "needs a wallet, soon" until slice 9 ("Carte complète, appel à venir").
+5. The notifications panel (frames 86, 87) moves here as a fifth part, 8e, from slice 7's 7k (Alexis: in slice 8).
+6. Quests: the whole card now, the call step "needs a wallet, soon" until slice 9 (the whole card, the call to come).

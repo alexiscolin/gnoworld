@@ -7,10 +7,8 @@ scope and the decisions it changes are in [ADR-0002](../../adr/0002-validated-pr
 
 ## Where to see it
 
-- Live prototype (private artifact):
-  https://claude.ai/artifact/RyqhV8fFAJfNq8s14Fh9WL, version 57.
-- Walkthrough videos (private artifact), recorded with real mouse and keyboard input:
-  https://claude.ai/artifact/RwKWwKdK19K8pavLeSfWUD.
+- Live prototype: a private design page, version 57.
+- Walkthrough videos, recorded with real mouse and keyboard input: a private design page.
   - Essentials: 2:24.
   - Complete: 3:36.
 - `source/`: the prototype's page and script, frozen as they were approved.

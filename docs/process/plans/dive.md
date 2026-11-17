@@ -1,8 +1,8 @@
 # The dive, rebuilt (D401, D402)
 
-Alexis, 2026-11-08: the dive "ne marche pas du tout de manière propre", to rebuild from scratch to the video, after the demo he
-validated ("ok parfait, implémente cela comme tel"; "tous les éléments d'animation de la démo en entier"; "perf et intégration au
-top"; our own components and styles). The demo: https://claude.ai/artifact/2PySNFdmxfrdadoRmgbMqQ (its source is the reference for
+Alexis, 2026-11-08: the dive does not work cleanly at all, to rebuild from scratch to the video, after the demo he
+validated (to build as it is: every animation of the demo, whole; performance and integration at their best; our own components
+and styles). The demo, a private design page (its source is the reference for
 every value below). Ping-pong mode: no tests while it builds; they come once Alexis validates it live, before `main`.
 
 ## What is wrong today (the map of 2026-11-08)
@@ -74,8 +74,8 @@ the tests the old code's leave red (`scene.test.ts`, `cosmos.test.ts`, `resting.
 Grafting the rig onto the old cosmos failed, by Alexis's captures and ours: the old cosmos draws composed views (postcards, the
 ladder) that stand worlds as bodies or points by the view, at exaggerated sizes, so worlds pop in and out, a neighbour fills the
 screen over a page's planet, and a click lands on a composed view, not on what was clicked; and a page's planet no longer turned
-under a drag. Alexis: "ça n'a rien à voir avec la démo", "les mondes apparaissent et disparaissent", "on ne peut plus rotater les
-mondes", "quand on clique à un endroit on zoome à un autre".
+under a drag. Alexis: nothing like the demo; the worlds appear and vanish; they can no longer be rotated; a click at one place zooms to
+another.
 
 So the cosmos is drawn as the demo draws it, from the worlds' file: every namespace a system (a sun on its own tilted plane), every
 realm a planet on its orbit, in one instanced draw of ray-traced spheres never under 2.4 px (a dot far out, a sphere near), the
@@ -87,16 +87,16 @@ home) as the cosmos's drawing. A drag on a page turns round the planet, which ke
 
 ## From scratch (Alexis, 2026-11-08, 13:00): the demo itself, everything spatial replaced
 
-Alexis: "je veux ta démo, refais tout au propre, supprime et efface, je me fous des anciens tests ou barrières"; "tout ce qui est
-spatial peut disparaître sauf la GUI 2D"; "on refait tout au propre avec ces effets"; "il faut que ce soit smooth comme la démo".
+Alexis wants the demo itself, everything rebuilt cleanly and the old code deleted, whatever the old tests or guards; everything
+spatial may go but the 2D interface; it is redone cleanly with these effects, as smooth as the demo.
 Backup of the whole tree before it: `git stash list`, "backup: the pingpong tree before the space's rebuild from scratch".
 
 - **Delete**: `app/src/scene/` whole (old engine, its tests), `app/lab/` (its realism lab), the spatial parts of
   `features/universe` (labelDoors, EarthSigns, WorldMoons, globe painting, worldsFeed's scene parts, gpu probe tied to the old
   scene), the scene's chunk budgets and journeys that measure it. Keep the 2D GUI: header, ViewSwitch, hero, rail, SystemCrumb,
   the pages' panels and chat (ui's Panel, PlaceFrame, Dock), SpaceLoader (fed by the new engine's `data-ready`/`data-dive`).
-- **New engine** `app/src/space/`, a port of the demo's script (`.../scratchpad/dive/index.html`, the artifact
-  https://claude.ai/artifact/2PySNFdmxfrdadoRmgbMqQ) to typed modules under 200 lines, nothing made on a frame:
+- **New engine** `app/src/space/`, a port of the demo's script (`.../scratchpad/dive/index.html`, a private
+  design page) to typed modules under 200 lines, nothing made on a frame:
   - `layout` (core, pure, seeded by ids): the worlds' file → systems (one per namespace, a sun on its own tilted plane, placed in a
     disc, the liveliest nearest home) and planets (one per world, on its orbit); the Earth in the home system, fixed.
   - `planets` (one instanced draw of ray-traced spheres, never under 2.4 px, orbits on the GPU, the focused one's scan), `suns`
@@ -109,14 +109,14 @@ Backup of the whole tree before it: `git stash list`, "backup: the pingpong tree
   play `arrival.ts` at `near`. The URL stays the place.
 - Then: types, lint, build, the captures through `.../scratchpad/shoot.mjs` (headless Chromium `--single-process`, a test-GPU dev
   server on 5185 with the workshop's data), a loop of fixes till it is the demo, then Alexis's look.
-- **The planets as generated today** (Alexis, 13:05: "avec les vraies planètes comme générées actuellement, en termes de réalisme,
-  leur forme et leur génération en art génératif"): `scene/planet/` (the generated worlds' shaders and maps, `createWorld`,
+- **The planets as generated today** (Alexis, 13:05: with the real planets as generated today, their realism,
+  their shape and their generative art): `scene/planet/` (the generated worlds' shaders and maps, `createWorld`,
   `worldOf`, `mapNamesOf`, `loadMap`) moves to `app/src/space/planet/` unchanged; far out a world is the instanced impostor in its
   look's colours, and once it is a few pixels across on screen its generated planet stands at the same place and size (the K
   largest on screen; maps preloaded for the system the camera goes to, so nothing waits). The Earth is the hand-made one.
-- "Cette fois du propre direct, à l'identique, bien propre et best practice" (13:06).
+- Clean from the start this time, identical, by best practice (13:06).
 
-### The files (radical, from the start; Alexis 13:10: "radical et propre, dead code supprimé, sans dette technique")
+### The files (radical, from the start; Alexis 13:10: radical and clean, dead code deleted, no technical debt)
 
 Done 13:10: `app/src/scene/` and `app/lab/` deleted; kept and moved to `app/src/space/`: `planet/` (generated worlds), `earth/look.ts`,
 `earth/maps.ts`, `disposer.ts`, `motion.ts`, `openEvent.ts`, `overScene.ts`, `keyHeld.ts`, `onResize.ts`, `rig/{pose,flight,free,rig,

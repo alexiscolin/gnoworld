@@ -1,6 +1,6 @@
 # Slice 11, the realm's half: the satellites' slot realm, local only
 
-Backlog row 11, ADR-0002 §8 rows 7 and 11 and §9 ("The slot realm's roles"), all three amended 2026-11-03. Built on Alexis's MacBook the night of 2026-11-03 while slice 7 runs on the Mac Studio (`docs/process/decisions.md`). That night Alexis chose a simple realm with no server and no multisig ("un truc simple mais sécure"): anyone rents by paying, the owner or its operator takes a satellite down after a report, and the app shows one only once the chat's moderation passed it. Every choice marked D is by Claude, for Alexis's review, unless the row says Alexis.
+Backlog row 11, ADR-0002 §8 rows 7 and 11 and §9 ("The slot realm's roles"), all three amended 2026-11-03. Built on a second machine the night of 2026-11-03 while slice 7 runs on the main one (`docs/process/decisions.md`). That night Alexis chose a simple realm with no server and no multisig (something simple but secure): anyone rents by paying, the owner or its operator takes a satellite down after a report, and the app shows one only once the chat's moderation passed it. Every choice marked D is by Claude, for Alexis's review, unless the row says Alexis.
 
 ## 1. Done when
 
@@ -8,7 +8,7 @@ Row 11's acceptance, word for word (amended 2026-11-03): "A rent while paused, w
 
 ## 2. Out of scope
 
-The app's half (the rent card, the slot on the plate, satellites in space, "Sponsored", "Testnet", showing a satellite only once the chat's moderation passed it, and all of it behind an environment variable `SATELLITES`, off by default, Alexis 2026-11-04) and reports (slice 12). No deploy, no chain write: Alexis's, asked in the conversation. The `gnoworld` namespace is not registered on onyx-1 (`gno_packages @gnoworld` is empty, 2026-11-03; F062), so the deploy path is a question below. ADR-0002 §8 row 7, §9 and backlog row 11 were amended to the simple realm the same night (Alexis: "corrige tout sans rien laisser").
+The app's half (the rent card, the slot on the plate, satellites in space, "Sponsored", "Testnet", showing a satellite only once the chat's moderation passed it, and all of it behind an environment variable `SATELLITES`, off by default, Alexis 2026-11-04) and reports (slice 12). No deploy, no chain write: Alexis's, asked in the conversation. The `gnoworld` namespace is not registered on onyx-1 (`gno_packages @gnoworld` is empty, 2026-11-03; F062), so the deploy path is a question below. ADR-0002 §8 row 7, §9 and backlog row 11 were amended to the simple realm the same night (Alexis: fix all of it, leave nothing).
 
 ## 3. Threat model
 
@@ -37,7 +37,7 @@ ADR-0002 §9's realm row: `gno test`, filetests, the mutation check, `gno-audit`
 Creates `gno/r/satellite/` (module `gno.land/r/gnoworld/satellite`, D1). Changes `scripts/mutate.py` and its tests (Alexis, 2026-11-03). Tier 1: every file under `gno/r/`; the harness: `scripts/mutate.py`.
 - **11a, the mutation check's flips** (`scripts/mutate.py`, its probe and harness tests, seal's tests for its new survivors).
 - **11c, the realm** (`gno/r/satellite/` alone, its `GAPS` lines after 11a's merge): beside 11a, writing only new files; it merges 11a's work once the chief has merged it, then faces the flips. 11b, cut for the approval's signing and vectors, is not merged.
-They run side by side in two herdr panes (Alexis, 2026-11-03); two agents at most at once, as the account's usage limit is shared with the Mac Studio.
+They run side by side in two terminal panes (Alexis, 2026-11-03); two agents at most at once, as the usage limit is shared with the main machine.
 
 ## 8. Dependencies
 

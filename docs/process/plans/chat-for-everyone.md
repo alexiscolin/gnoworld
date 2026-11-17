@@ -28,7 +28,7 @@ no moderation key is set (fail closed), so the workshop, which has none, cannot 
 
 ## Changed on 2026-11-08: every world's chat open by default (Alexis, D413)
 
-Alexis: "tous doivent avoir un chat général ouvert par défaut", with guests speaking in them (D351), in one plan. What changes below:
+Alexis: all of them hold a general chat open by default, with guests speaking in them (D351), in one plan. What changes below:
 
 1. **Every room is made ahead, none on a first open.** The server makes the main room of every hub and the room of every realm its worlds job lists (`worlds/list.ts`), at start and each time the job adds realms, joining them a few a second so Ergo's flood guard never trips. It replaces D390's "never ahead" (Q5 below): the spike measured 5,000 rooms at +25 MB of Ergo's RAM, 0.4 s to join them all and 0.35 s for one read pass (`chat-for-everyone-spike.md`, "5,000 rooms"); the server's own reconciler pass on them is still to measure (part 5). The 5,000 cap stays as the job's ceiling: past it the job makes none more and logs it, never silently.
 2. **A realm the job does not list yet** (a system realm such as `gno.land/r/sys/namereg/v0`, which "Go explore" may pick, or one deployed since the job's last run) gets its room on its first open if it is on the chain: `POST /api/rooms/realm` reads the path from the chain with a timeout (the server's chain client; the query to use is checked with gnomcp in part 5), then takes the visitor's rate and the cap as today. A path not on the chain makes none (`not_found`).

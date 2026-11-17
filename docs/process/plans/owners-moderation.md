@@ -2,7 +2,7 @@
 
 Decisions: D391 (a deployer's claim is a later part: this is it), D13927, D13928, D13930 (first of the big parts), D13933
 (`@cosmjs/crypto`), all in `docs/process/decisions.md`. The proposal Alexis approved (its security table and "Triple check" bind this
-plan): https://claude.ai/artifact/2KjXggbZgsXp5muPP7kT8Q. Written 2026-11-11 by reading the code named below; nothing here is
+plan) is a private design page. Written 2026-11-11 by reading the code named below; nothing here is
 built. A chain fact that is not read in this session is marked "to verify" with the way.
 
 ## 1. What is built, in one paragraph

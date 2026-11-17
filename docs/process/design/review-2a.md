@@ -31,7 +31,7 @@ recorded tour. The designs and `docs/DESIGN-SYSTEM.md` follow them. What the rev
 
 ## The approved designs
 
-The designs live in the private design canvas https://claude.ai/artifact/4jCyjV2cxNjadXsPuHa7k2: the system at a glance, before and
+The designs live in a private design page: the system at a glance, before and
 after, the face, the cosmos, a trip, an arrival, the full chat, its states, the rich cards and the phone. Jarvis's answers stand out
 in the violet tone; a room shows people and help first; a person's face is a nebula with its constellation, its spread measured; a
 country is its flag.
