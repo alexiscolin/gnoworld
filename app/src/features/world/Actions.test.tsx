@@ -203,8 +203,45 @@ describe("a phone's actions", () => {
       [...row.querySelectorAll("a, button")].map((n) => n.textContent || n.getAttribute("aria-label")),
     );
   const onPhone = (matches: boolean) => {
-    vi.stubGlobal("matchMedia", () => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    // A phone as wide as 375: the under-360 query does not match.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: matches && !query.includes("359px"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
   };
+
+  it("draws the second action as a named icon, which scrolls to the section its href names", async () => {
+    onPhone(true);
+    const target = document.createElement("section");
+    target.id = "try";
+    const scroll = vi.fn();
+    target.scrollIntoView = scroll;
+    document.body.append(target);
+    const lead = { label: "Read its page", href: "#page" };
+    const second = { label: "Try a function", href: "#try" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    const press = box.querySelector<HTMLElement>("button[aria-label='Try a function']");
+    expect(press?.textContent).toBe("");
+    act(() => {
+      press?.click();
+    });
+    expect(scroll).toHaveBeenCalledWith({ block: "start" });
+    target.remove();
+  });
+
+  it("shortens 'Read the proposals' under 360 px, where three icons share its line", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: !query.includes("359px"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    expect(rowsOf(box)[0]?.[0]).toBe("Read the proposals");
+    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const narrow = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    expect(rowsOf(narrow.box)[0]?.[0]).toBe("Proposals");
+  });
 
   it("sets the main actions, then Follow and Share, in one row", async () => {
     onPhone(true);

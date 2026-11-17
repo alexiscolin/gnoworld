@@ -79,6 +79,32 @@ function SayHi({ room, phone }: { room: string; phone: boolean }) {
   );
 }
 
+// Under 360 px a phone's words and three icons share one 288 px line only when the words are short.
+const useProposalsWords = (phone: boolean) =>
+  useMedia("(max-width: 359px)") && phone ? "Proposals" : "Read the proposals";
+
+// The place's second action: outlined words, and on a phone a named icon that scrolls to the section its href names, else follows the href.
+function Second({ second, phone }: { second: NonNullable<ActionsProps["second"]>; phone: boolean }) {
+  if (!phone) {
+    return (
+      <Button href={second.href} pad="wide" icon={second.icon ?? "arrow"}>
+        {second.label}
+      </Button>
+    );
+  }
+  return (
+    <IconButton
+      icon={second.icon ?? "arrow"}
+      label={second.label}
+      onClick={() => {
+        const target = second.href.startsWith("#") ? document.getElementById(second.href.slice(1)) : null;
+        if (target === null) window.location.href = second.href;
+        else target.scrollIntoView({ block: "start" });
+      }}
+    />
+  );
+}
+
 // The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
 function Leads({
@@ -92,11 +118,12 @@ function Leads({
   const fit = { pad: "wide" } as const;
   const first = useNobodySpoke(room);
   const sheet = useInPageSheet();
+  const words = useProposalsWords(phone);
   if (proposals !== undefined && isSitePath(proposals)) {
     return (
       <>
         <Button href={proposalsHref(proposals, sheet)} {...fit} emphasis="solid" icon="arrow">
-          Read the proposals
+          {words}
         </Button>
         {room === undefined ? null : <SayHi room={room} phone={phone} />}
       </>
@@ -112,11 +139,7 @@ function Leads({
       <Button href={main.href} {...fit} emphasis="solid" icon={main.icon ?? "arrow"}>
         {main.label}
       </Button>
-      {second === undefined ? null : (
-        <Button href={second.href} {...fit} icon={second.icon ?? "arrow"}>
-          {second.label}
-        </Button>
-      )}
+      {second === undefined ? null : <Second second={second} phone={phone} />}
     </>
   );
 }
@@ -141,8 +164,8 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
       Share
     </Button>
   );
-  // On a phone: one line (Actions.module.css), the main action with its words, then Say hi, Follow and Share as icon buttons named for assistive
-  // technology; the line scrolls in itself rather than wrap.
+  // On a phone: one line (Actions.module.css), the main action with its words, then the second action, Say hi, Follow and Share as icon buttons named for assistive
+  // technology; nothing wraps, scrolls or stretches.
   if (phone) {
     return (
       <div data-row="" className={[styles["line"], className].join(" ")}>

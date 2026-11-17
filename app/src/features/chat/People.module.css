@@ -12,10 +12,10 @@
 
   /* A guest's face is the night disc alone, which the panel's own night hides: a hairline ring says it is there. */
   .guest {
-    /* layout: the ring hugs the disc alone, which a line's own height would grow */
+    /* layout: the ring inside the disc, which a line's own height would grow */
     display: grid;
     border-radius: var(--radius-pill);
-    box-shadow: 0 0 0 var(--line-width) var(--color-line-strong);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
   }
 
   /* A person the reader may write to: face and name in one button, plain as the row's words are. */
