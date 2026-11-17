@@ -23,7 +23,8 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
   him the tip's 16 hex.
 - The safety net never shrinks quietly: a test gone or switched off, a floor lowered, a gap or an ignore added is declared on a line
   of its own (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`) or GitHub's regressions job fails; no `.skip`, `.only`,
-  `.todo`, `.fails`. Floors rise with the scores.
+  `.todo`, `.fails`. Floors rise with the scores; a size cap moves only by a recorded decision with its reason, never to
+  the latest measure plus a margin (D13801).
 - A fix starts with the test that reproduces the bug, seen failing, committed with it. Never change a test to make code pass
   without saying so.
 
@@ -52,7 +53,8 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 - One slice at a time, each branch in its own session and worktree, two at most at once (docs/HARNESS.md, "Who does what").
   Slice N numbers its findings and decisions N000 to N999. Stop at a slice's end for Alexis's review; the dream runs then
   (D13182).
-- A decision Alexis makes in conversation goes into `docs/decisions.md` at once, with its reason and where it lives.
+- A decision Alexis makes in conversation goes into `docs/decisions.md` at once, with its reason and where it lives, in
+  neutral English, never as a quote; no personal detail (setup, accounts, machines, spend) reaches a committed file.
 - The prototype's video is the end state, to the pixel; quantities come from the chain and ADR-0002 §3. Never copy the prototype's
   code: rebuild each concept test first, with the design system's components. No interim look and no old version kept beside the
   new one: what a change replaces goes in the same branch. What varies from one world to another is generated from its seed, never

@@ -13,8 +13,10 @@ another name passes it: phase 3d locks the key stores), a raw call to a chain no
 realm page; the sandbox's network list does not hold in every session. Load the gno skill and read the chain before writing a `.gno` file: the guard no longer checks it, as it read
 text, not calls (D13174). Locally, `gno test`, `gno lint` and `gnodev` stay free.
 
-`.gno` looks like Go and is not: no goroutines, channels, `unsafe`, `net` or `os`; imports
-are `gno.land/p/...` or `gno.land/r/...`; the module file is `gnomod.toml`. Load the gno skill
+`.gno` looks like Go and is not: no goroutines, channels, `net` or `os`, and no Go `unsafe`
+(`unsafe.Pointer`, `uintptr`); gno's own `chain/runtime/unsafe` is something else, the stack-walking calls
+(`OriginCaller`, `PreviousRealm`, `OriginSend`) used with care below. Imports are `gno.land/p/...` or
+`gno.land/r/...`; the module file is `gnomod.toml`. Load the gno skill
 before writing or reviewing a realm, and read gno's
 [AI contract review guide](https://github.com/gnolang/gno/blob/master/docs/resources/gno-ai-contract-review.md)
 before reviewing one. From gno's AGENTS.md (gnolang/gno at 90cebca0d, 2026-10-15):
@@ -34,6 +36,7 @@ before reviewing one. From gno's AGENTS.md (gnolang/gno at 90cebca0d, 2026-10-15
 - `Render(path)` takes attacker input: `sanitize.InlineText`
   (`gno.land/p/nt/markdown/sanitize/v0`) on anything written into the markdown.
 
-Ours, besides: panic versus error, since an error does not revert; storage per object, and a
-change to a realm's storage layout is a migration (stop and ask); a new entry in `GAPS`
+Ours, besides: panic versus error, since an error does not revert; storage is billed per byte (100 ugnot a
+byte on onyx-1 and gnoland-1), each object adding bytes of its own, and a change to a realm's storage layout is
+a migration (stop and ask); a new entry in `GAPS`
 (`scripts/mutate.py`) needs its reason.
