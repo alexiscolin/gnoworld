@@ -1253,6 +1253,14 @@ describe("the command line's login (D13880)", () => {
     ).toBe("nonce");
   });
 
+  it("counts its nonces against the login's cap, as Adena's login does", () => {
+    const { key, login } = cliSetup({ nonceCap: 2 });
+    expect(typeof login.cliChallenge(key.address, DOMAIN)).toBe("object");
+    expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+    expect(login.cliChallenge(key.address, DOMAIN)).toBe("full");
+    expect(login.challenge("onyx-1", DOMAIN)).toBe("full");
+  });
+
   it("answers text, never a code the command line cannot sign, for a host the chain would encode differently", () => {
     const { db, key, login } = cliSetup();
     expect(login.cliChallenge(key.address, "gnoworld.test&x")).toBe("text");
