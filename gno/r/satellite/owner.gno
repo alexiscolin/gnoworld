@@ -7,11 +7,11 @@ import (
 	"strconv"
 )
 
-const maxPrice = math.MaxInt64 / longest // ugnot a day: the longest rental's cost still fits an int
+const maxPrice = math.MaxInt64 / longest // ugnot a day; the highest price at which the longest rental's cost still fits an int
 
-var pending address // the proposed owner, until it accepts
+var pending address // the proposed owner, until they accept
 
-// mustOwner refuses anyone but the owner, the operator included.
+// mustOwner panics unless the caller is the owner. The operator is refused too.
 func mustOwner(caller address) {
 	if caller != owner {
 		panic("only the owner may do this")
@@ -24,8 +24,8 @@ func mustAddress(a address) {
 	}
 }
 
-// SetPrice sets the price of a day, in ugnot, for rentals to come: a rental
-// keeps the price it paid. The owner only.
+// SetPrice sets the price of a day, in ugnot, for future rentals. A rental
+// keeps the price it paid. Only the owner may call it.
 func SetPrice(cur realm, perDay int) {
 	mustOwner(cur.Previous().Address())
 	if perDay < 1 || perDay > maxPrice {
@@ -36,7 +36,7 @@ func SetPrice(cur realm, perDay int) {
 }
 
 // SetOperator names the address that may take satellites down besides the
-// owner, or none with "". The owner only.
+// owner. Pass "" for no operator. Only the owner may call it.
 func SetOperator(cur realm, op address) {
 	mustOwner(cur.Previous().Address())
 	if op != "" {
@@ -46,23 +46,23 @@ func SetOperator(cur realm, op address) {
 	chain.Emit("SetOperator", "operator", op.String())
 }
 
-// Pause stops new rentals; live ones fly on, and closes and takedowns go on.
-// The owner only.
+// Pause stops new rentals. Live rentals keep flying, and closes and takedowns
+// still work. Only the owner may call it.
 func Pause(cur realm) {
 	mustOwner(cur.Previous().Address())
 	paused = true
 	chain.Emit("Pause")
 }
 
-// Unpause lets rentals start again. The owner only.
+// Unpause lets rentals start again. Only the owner may call it.
 func Unpause(cur realm) {
 	mustOwner(cur.Previous().Address())
 	paused = false
 	chain.Emit("Unpause")
 }
 
-// ProposeOwner names the next owner, who takes over by calling AcceptOwner;
-// a new proposal replaces the last. The owner only.
+// ProposeOwner names the next owner, who takes over by calling AcceptOwner.
+// A new proposal replaces the previous one. Only the owner may call it.
 func ProposeOwner(cur realm, next address) {
 	mustOwner(cur.Previous().Address())
 	mustAddress(next)
@@ -70,8 +70,8 @@ func ProposeOwner(cur realm, next address) {
 	chain.Emit("ProposeOwner", "owner", next.String())
 }
 
-// AcceptOwner makes the proposed owner the owner; the operator stays, for the
-// new owner to keep or change. That address only.
+// AcceptOwner makes the proposed owner the new owner. The operator stays in
+// place, and the new owner can keep or change it. Only the proposed address may call it.
 func AcceptOwner(cur realm) {
 	by := cur.Previous().Address()
 	if by != pending {
@@ -81,8 +81,9 @@ func AcceptOwner(cur realm) {
 	owner, pending = by, ""
 }
 
-// Withdraw sends amount ugnot to to, out of the realm's balance minus the
-// payments of rentals not closed, which takedowns may refund. The owner only.
+// Withdraw sends amount ugnot to the address to. It may only use the realm's balance
+// minus the payments of rentals that are not closed yet, because a takedown may
+// still refund those. Only the owner may call it.
 func Withdraw(cur realm, to address, amount int) {
 	mustOwner(cur.Previous().Address())
 	mustAddress(to)
@@ -94,7 +95,7 @@ func Withdraw(cur realm, to address, amount int) {
 	chain.Emit("Withdraw", "to", to.String(), "amount", strconv.Itoa(amount))
 }
 
-// Price is the price of a day, in ugnot, for a rental starting now.
+// Price is the price of a day, in ugnot, for a rental that starts now.
 func Price() int { return price }
 
 // Paused reports whether renting is paused.
@@ -103,5 +104,5 @@ func Paused() bool { return paused }
 // Owner is the realm's owner: its deployer, until a handover.
 func Owner() address { return owner }
 
-// Operator is the address that may take satellites down besides the owner, or "".
+// Operator is the address that may take satellites down besides the owner, or "" if there is none.
 func Operator() address { return operator }
