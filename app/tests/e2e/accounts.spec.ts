@@ -117,6 +117,17 @@ async function inSettings(page: Page) {
 }
 
 // Adena, switched to another account's wallet once logged in (the stand-in's account is fixed when the page starts).
+// The other account signs in Adena, Link stays off, then Adena switched back to the logged-in account signs the same text as it
+// (AsMe.test.tsx holds the wrong account's words). Link, now on, is handed back.
+async function signedByBoth(page: Page, dialog: Locator, { as, me }: { as: string; me: string }): Promise<Locator> {
+  await dialog.getByRole("button", { name: "Sign in Adena" }).click();
+  const link = dialog.getByRole("button", { name: "Link", exact: true });
+  await expect(link).toBeDisabled();
+  await adenaOn(page, as, me);
+  await dialog.getByRole("button", { name: "Sign in Adena" }).click();
+  return link;
+}
+
 async function adenaOn(page: Page, name: string, address: string): Promise<void> {
   await page.evaluate(
     ([who, at]) => {
@@ -176,12 +187,7 @@ test.describe("linked accounts", () => {
     await dialog.getByRole("button", { name: "Continue" }).click();
     await expect(dialog).toContainText(`Adena will sign this text, for ${shortAddress(other)}`);
     await expect(dialog.getByRole("blockquote")).toContainText(`Link ${other} to gnoworld`);
-    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
-    const link = dialog.getByRole("button", { name: "Link", exact: true });
-    await expect(link).toBeDisabled();
-    // Adena switched back to the logged-in account signs the same text as it (AsMe.test.tsx holds the wrong account's words).
-    await adenaOn(page, as, me);
-    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
+    const link = await signedByBoth(page, dialog, { as, me });
     await expect(dialog).toContainText(`Signed as ${shortAddress(me)}.`);
     await link.click();
     await expect(said(dialog).last()).toContainText(`${shortAddress(other)} is linked.`);
@@ -200,12 +206,7 @@ test.describe("linked accounts", () => {
     await adenaOn(page, name, await walletOf(page, name));
     held.refuse["/api/links/verify"] = { status: 403, error: "forbidden" };
     await dialog.getByRole("button", { name: "Continue" }).click();
-    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
-    const link = dialog.getByRole("button", { name: "Link", exact: true });
-    await expect(link).toBeDisabled();
-    await adenaOn(page, as, me);
-    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
-    await link.click();
+    await (await signedByBoth(page, dialog, { as, me })).click();
     await expect(said(dialog).last()).toContainText("already linked to another gnoworld account");
   });
 

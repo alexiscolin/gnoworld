@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { Address, shortAddress } from "@gnoworld/schemas";
-import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { button, click, mount, one, settled } from "../../../tests/mount.tsx";
-import type { Login, SignResult } from "../../lib/adena/adena.ts";
+import { button, click, mount, one, settled, typeInto } from "../../../tests/mount.tsx";
+import { wallet as signed } from "../../../tests/signingAdena.ts";
 import { AsMe } from "./AsMe.tsx";
 
 // The account that asks a link signs its text too (the wallet audit's medium 1): Adena as that account, or its key's file.
@@ -15,28 +14,7 @@ const PROOF = {
   signed: { chain_id: "onyx-1", account_number: "0", sequence: "0", fee: { amount: [], gas: "0" }, msgs: [], memo: "" },
   signature: { pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A".repeat(44) }, signature: "A".repeat(88) },
 };
-const signed = vi.hoisted(() => {
-  const state: { answer: SignResult; asked: Login[]; on: string; wait: Promise<void> } = {
-    answer: { ok: false, reason: "failed" },
-    asked: [],
-    on: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
-    wait: Promise.resolve(),
-  };
-  return state;
-});
-
-vi.mock(import("../../lib/adena/adena.ts"), async () => {
-  const { Address: Parsed } = await import("@gnoworld/schemas");
-  return {
-    pageAdena: () => ({}),
-    connect: () => Promise.resolve({ ok: true, address: Parsed.parse(signed.on), chainId: "onyx-1" }),
-    signLogin: async (_: unknown, login: Login) => {
-      signed.asked.push(login);
-      await signed.wait;
-      return signed.answer;
-    },
-  };
-});
+vi.mock(import("../../lib/adena/adena.ts"), async () => (await import("../../../tests/signingAdena.ts")).signingAdena);
 
 beforeEach(() => {
   vi.stubGlobal("reportError", vi.fn());
@@ -45,16 +23,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const typeInto = (field: HTMLElement, text: string) => {
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-};
-
 describe("AsMe", () => {
   it("has Adena sign the same text as the logged-in account, on the code's chain, and hands the proof on", async () => {
-    signed.answer = { ok: true, proof: PROOF };
+    signed.answer = () => ({ ok: true, proof: PROOF });
     const onBy = vi.fn();
     const box = mount(<AsMe me={ME} code={CODE} next onBy={onBy} />);
     click(button(box, "Sign in Adena"));
@@ -64,7 +35,7 @@ describe("AsMe", () => {
   });
 
   it("says which account Adena is on when it is not the logged-in one, and hands nothing on", async () => {
-    signed.answer = { ok: false, reason: "mismatch" };
+    signed.answer = () => ({ ok: false, reason: "mismatch" });
     const onBy = vi.fn();
     const box = mount(<AsMe me={ME} code={CODE} next onBy={onBy} />);
     click(button(box, "Sign in Adena"));
@@ -84,7 +55,7 @@ describe("AsMe", () => {
   });
 
   it("hands nothing on when Adena declines, and asks Adena once while it waits", async () => {
-    signed.answer = { ok: false, reason: "declined" };
+    signed.answer = () => ({ ok: false, reason: "declined" });
     let open: () => void = () => undefined;
     signed.wait = new Promise((resolve) => {
       open = resolve;
@@ -102,7 +73,7 @@ describe("AsMe", () => {
   });
 
   it("hands on one proof at a time: Adena's empties the pasted file, a file pasted after replaces Adena's", async () => {
-    signed.answer = { ok: true, proof: PROOF };
+    signed.answer = () => ({ ok: true, proof: PROOF });
     const onBy = vi.fn();
     const box = mount(<AsMe me={ME} code={CODE} next onBy={onBy} />);
     typeInto(one(box, "textarea"), FILE);

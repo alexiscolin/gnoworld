@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { Address } from "@gnoworld/schemas";
-import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { button, click, mount, modals, one, settled } from "../../../tests/mount.tsx";
+import { button, click, mount, modals, one, settled, typeInto } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { useApp } from "../../storeContext.tsx";
 import { GnokeyLogin, GnokeyLoginDialog } from "./GnokeyLogin.tsx";
@@ -26,12 +25,24 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const typeInto = (field: HTMLElement, text: string) => {
-  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  act(() => {
-    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+// The dialog in a store, `onLoggedIn` told of the account the server names.
+const drawn = (onLoggedIn = vi.fn()) =>
+  mount(
+    <StoreProvider>
+      <GnokeyLogin open onClose={() => undefined} onLoggedIn={onLoggedIn} />
+    </StoreProvider>,
+  );
+const askCode = (box: HTMLElement) => {
+  typeInto(one(box, "input"), ADDRESS);
+  click(button(box, "Get a code"));
+};
+const showsCode = async (box: HTMLElement) => {
+  askCode(box);
+  await settled(() => box.textContent.includes(CODE.block));
+};
+const logIn = (box: HTMLElement, file: string) => {
+  typeInto(one(box, "textarea"), file);
+  click(button(box, "Log in"));
 };
 
 describe("GnokeyLogin", () => {
@@ -42,18 +53,11 @@ describe("GnokeyLogin", () => {
       return Promise.resolve(Response.json(url.endsWith("/cli/challenge") ? CODE : { address: ADDRESS }));
     });
     const onLoggedIn = vi.fn();
-    const box = mount(
-      <StoreProvider>
-        <GnokeyLogin open onClose={() => undefined} onLoggedIn={onLoggedIn} />
-      </StoreProvider>,
-    );
-    typeInto(one(box, "input"), ADDRESS);
-    click(button(box, "Get a code"));
-    await settled(() => box.textContent.includes(CODE.block));
+    const box = drawn(onLoggedIn);
+    await showsCode(box);
     // The server keeps a login's code five minutes: the clock says so (the review's low 3).
     expect(box.textContent).toContain("The code works once, for 5:00 more");
-    typeInto(one(box, "textarea"), FILE);
-    click(button(box, "Log in"));
+    logIn(box, FILE);
     await settled(() => onLoggedIn.mock.calls.length > 0);
     expect(onLoggedIn).toHaveBeenCalledWith(ADDRESS);
     expect(asked).toEqual([
@@ -71,16 +75,9 @@ describe("GnokeyLogin", () => {
       );
     });
     const onLoggedIn = vi.fn();
-    const box = mount(
-      <StoreProvider>
-        <GnokeyLogin open onClose={() => undefined} onLoggedIn={onLoggedIn} />
-      </StoreProvider>,
-    );
-    typeInto(one(box, "input"), ADDRESS);
-    click(button(box, "Get a code"));
-    await settled(() => box.textContent.includes(CODE.block));
-    typeInto(one(box, "textarea"), FILE);
-    click(button(box, "Log in"));
+    const box = drawn(onLoggedIn);
+    await showsCode(box);
+    logIn(box, FILE);
     await settled(() => codes === 2);
     expect(onLoggedIn).not.toHaveBeenCalled();
     // The why is the paste box's own error, under it (the UX pass), and stays until the paste changes.
@@ -98,16 +95,9 @@ describe("GnokeyLogin", () => {
       codes += 1;
       return Promise.resolve(Response.json(CODE));
     });
-    const box = mount(
-      <StoreProvider>
-        <GnokeyLogin open onClose={() => undefined} onLoggedIn={vi.fn()} />
-      </StoreProvider>,
-    );
-    typeInto(one(box, "input"), ADDRESS);
-    click(button(box, "Get a code"));
-    await settled(() => box.textContent.includes(CODE.block));
-    typeInto(one(box, "textarea"), "hello");
-    click(button(box, "Log in"));
+    const box = drawn();
+    await showsCode(box);
+    logIn(box, "hello");
     expect(one(box, "textarea").getAttribute("aria-invalid")).toBe("true");
     expect(box.textContent).toContain("Paste only what");
     expect(codes).toBe(1);
@@ -115,11 +105,7 @@ describe("GnokeyLogin", () => {
 
   it("keeps Get a code pressed and in reach while the code is asked: busy, never disabled", () => {
     vi.stubGlobal("fetch", () => new Promise(() => undefined));
-    const box = mount(
-      <StoreProvider>
-        <GnokeyLogin open onClose={() => undefined} onLoggedIn={vi.fn()} />
-      </StoreProvider>,
-    );
+    const box = drawn();
     typeInto(one(box, "input"), ADDRESS);
     const get = button(box, "Get a code");
     click(get);
@@ -142,11 +128,8 @@ describe("GnokeyLogin", () => {
         <Session />
       </StoreProvider>,
     );
-    typeInto(one(box, "input"), ADDRESS);
-    click(button(box, "Get a code"));
-    await settled(() => box.textContent.includes(CODE.block));
-    typeInto(one(box, "textarea"), FILE);
-    click(button(box, "Log in"));
+    await showsCode(box);
+    logIn(box, FILE);
     await settled(() => onClose.mock.calls.length > 0);
     expect(one(box, "output").textContent).toBe(ADDRESS);
   });
@@ -156,13 +139,8 @@ describe("GnokeyLogin", () => {
     [400, "refused", "The server could not make a code for this address."],
   ])("says why no code came: %i %s", async (status, error, words) => {
     vi.stubGlobal("fetch", () => Promise.resolve(Response.json({ error }, { status })));
-    const box = mount(
-      <StoreProvider>
-        <GnokeyLogin open onClose={() => undefined} onLoggedIn={vi.fn()} />
-      </StoreProvider>,
-    );
-    typeInto(one(box, "input"), ADDRESS);
-    click(button(box, "Get a code"));
+    const box = drawn();
+    askCode(box);
     await settled(() => box.textContent.includes(words));
     expect(button(box, "Get a code")).toBeDefined();
   });

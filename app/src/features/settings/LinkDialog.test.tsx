@@ -2,8 +2,8 @@
 import { Address } from "@gnoworld/schemas";
 import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, button, click, modals, mount, settled } from "../../../tests/mount.tsx";
-import type { Login } from "../../lib/adena/adena.ts";
+import { all, button, click, modals, mount, settled, typeInto } from "../../../tests/mount.tsx";
+import { wallet as adena } from "../../../tests/signingAdena.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { LinkDialog } from "./LinkDialog.tsx";
 
@@ -25,25 +25,7 @@ const proofOf = (address: string) => ({
   },
   signature: { pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A".repeat(44) }, signature: "A".repeat(88) },
 });
-const adena = vi.hoisted(() => ({ asked: [] as Login[], wait: Promise.resolve() }));
-
-vi.mock(import("../../lib/adena/adena.ts"), async () => {
-  const { Address: Parsed } = await import("@gnoworld/schemas");
-  return {
-    pageAdena: () => ({}),
-    connect: () =>
-      Promise.resolve({
-        ok: true,
-        address: Parsed.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
-        chainId: "onyx-1",
-      }),
-    signLogin: async (_: unknown, login: Login) => {
-      adena.asked.push(login);
-      await adena.wait;
-      return { ok: true, proof: proofOf(login.address) };
-    },
-  };
-});
+vi.mock(import("../../lib/adena/adena.ts"), async () => (await import("../../../tests/signingAdena.ts")).signingAdena);
 
 // The server's /api/links: each code numbered, each verify kept, refused once when told.
 function server() {
@@ -79,14 +61,6 @@ function server() {
   return held;
 }
 
-const typeInto = (field: HTMLElement | undefined, text: string) => {
-  if (field === undefined) throw new Error("no field");
-  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  act(() => {
-    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-};
 const disabled = (element: HTMLElement | undefined) =>
   element?.getAttribute("aria-disabled") === "true" || (element instanceof HTMLButtonElement && element.disabled);
 
@@ -95,6 +69,7 @@ beforeEach(() => {
   vi.stubGlobal("reportError", vi.fn());
   adena.asked = [];
   adena.wait = Promise.resolve();
+  adena.answer = (login) => ({ ok: true, proof: proofOf(login.address) });
 });
 afterEach(() => {
   vi.unstubAllGlobals();

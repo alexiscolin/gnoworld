@@ -119,6 +119,16 @@ export function click(element: HTMLElement | undefined): void {
   });
 }
 
+/** Types `text` into an input or a textarea as a person would: the value set past React's own tracker, then its input event. */
+export function typeInto(field: HTMLElement | undefined, text: string): void {
+  if (field === undefined) throw new Error("no field to type into");
+  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  act(() => {
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 /** Presses the menu button `trigger`, waits for its item `item` (a menu's code may come with the first press), and presses it. */
 export async function choose(box: ParentNode, trigger: string, item: string): Promise<void> {
   click(button(box, trigger));
