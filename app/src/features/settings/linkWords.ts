@@ -39,7 +39,8 @@ const RELEASE_TOO_MANY = "Too many tries from this network: wait a few minutes, 
 
 /** What a refused verify says of the causes that depend on the flow: a link's 403 is an account in another identity, a release's only the guard's
  * Origin refusal; a release's 429 is a network that asked too much. The rest is `linkProblem`'s. */
-export function refusalWords(flow: "link" | "release", reason: Parameters<typeof linkProblem>[0]): string {
+export function refusalWords(flow: "link" | "release" | "login", reason: Parameters<typeof linkProblem>[0]): string {
+  if (flow === "login" && reason === "refused") return "The server could not make a code for this address.";
   if (flow === "link" && reason === "forbidden") return LINKED_ELSEWHERE;
   if (flow === "release" && reason === "too_many") return RELEASE_TOO_MANY;
   return linkProblem(reason);

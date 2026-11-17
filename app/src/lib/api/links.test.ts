@@ -1,7 +1,8 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Fetcher } from "./http.ts";
-import { FILE_MAX_BYTES, fileShape, linksApi } from "./links.ts";
+import { fileShape, linksApi } from "./links.ts";
+import { FILE_MAX_BYTES } from "./login.ts";
 
 // The browser's client of the linked accounts (server/src/login/linkRoutes.ts, mounted at /api/links): each answer read through its schema.
 const A = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

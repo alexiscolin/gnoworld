@@ -19,4 +19,9 @@ describe("the words of a refused verify", () => {
   it("keeps a link's 429 as it was", () => {
     expect(refusalWords("link", "too_many")).toBe(linkProblem("too_many"));
   });
+
+  it("says a refused login code is about the address, never a link", () => {
+    expect(refusalWords("login", "refused")).toBe("The server could not make a code for this address.");
+    expect(refusalWords("login", "too_many")).toBe(linkProblem("too_many"));
+  });
 });
