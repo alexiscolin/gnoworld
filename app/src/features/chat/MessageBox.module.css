@@ -269,11 +269,6 @@
       }
     }
 
-    /* A guest's field grows with its draft up to the cap, as an account's does (the ui's Field fixes its size with a weight of two and a type; :enabled is the one more). */
-    .box .field textarea:enabled {
-      field-sizing: content;
-    }
-
     /* At rest the field and Send are side by side, the foot (the format control and the quick actions' /) shown once the
        box has the focus, inside it, so the keyboard comes with the box whole above it. */
     .box:not(:focus-within) [role="textbox"],

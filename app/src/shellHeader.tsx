@@ -40,17 +40,12 @@ function Account({ universe }: { universe: UniverseView }) {
   );
 }
 
-// A testnet's warning stays in a phone's header, the network's name and switch being in the menu (DESIGN-SYSTEM.md, Trust): a warm chip,
-// a dot with the word for screen readers where the row has no room for the chip (shellHeader.module.css).
+// A testnet's warning stays in a phone's header, the network's name and switch being in the menu (DESIGN-SYSTEM.md, Trust): the warm chip alone.
 function PhoneTestnet({ testnet }: { testnet: boolean }) {
   const phone = useMedia(PHONE_QUERY);
   return phone && testnet ? (
     <span className={styles["testnet"]} data-testnet="">
       <Chip tone="warm">Testnet</Chip>
-      <span className={styles["testnetDot"]} data-dot="">
-        <span className="dot" data-tone="warm" aria-hidden="true" />
-        <span className="visually-hidden">Testnet</span>
-      </span>
     </span>
   ) : null;
 }

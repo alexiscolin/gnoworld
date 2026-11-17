@@ -32,11 +32,6 @@
     min-inline-size: 0;
   }
 
-  .testnetDot {
-    /* layout: the chip shows from 360 px; the dot's place is under it */
-    display: none;
-  }
-
   .logo {
     /* layout: the link is a box of its logo's height, so no line's leading moves the mark off the row's middle */
     display: flex;

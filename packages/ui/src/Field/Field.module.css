@@ -81,6 +81,13 @@
     resize: none;
   }
 
+  /* A phone's fixed box grows with its draft up to the cap, as a box of lines does (a guest's field). */
+  @media (width < 900px) {
+    textarea.box[data-fixed] {
+      field-sizing: content;
+    }
+  }
+
   /* With a prefix the frame is the one box; the input inside is bare, and the ring is the frame's, around the prefix too. */
   .frame {
     /* layout: the prefix and the input share the one frame */

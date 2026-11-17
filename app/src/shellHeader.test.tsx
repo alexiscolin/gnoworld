@@ -334,13 +334,12 @@ describe("the header's menu on a phone", () => {
     return box;
   };
 
-  test("a phone on a testnet keeps Testnet in the header, after the logo: a warm chip, and a dot with the word for under 360 px", async () => {
+  test("a phone on a testnet keeps Testnet in the header, after the logo: the warm chip alone", async () => {
     screenOf({ width: 390 });
     const box = await headerOf("/");
     const pill = box.querySelector("header [data-testnet]");
     expect(pill?.previousElementSibling?.getAttribute("aria-label")).toBe("gnoworld");
     expect(pill?.querySelector("[data-tone='warm']")?.textContent).toBe("Testnet");
-    expect(pill?.querySelector("[data-dot] .visually-hidden")?.textContent).toBe("Testnet");
   });
 
   test("a phone on mainnet, and a computer on a testnet, draw no such pill in the logo's place", async () => {

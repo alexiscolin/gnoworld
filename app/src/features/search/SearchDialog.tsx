@@ -29,6 +29,10 @@ function intoCards(event: KeyboardEvent<HTMLElement>) {
   card.focus();
 }
 
+function isDiscovering({ query, filters, namespace }: ReturnType<typeof usePalette>) {
+  return query.trim() === "" && filters.size === 0 && namespace === undefined;
+}
+
 export default function SearchDialog({
   universe,
   open,
@@ -45,7 +49,7 @@ export default function SearchDialog({
   const wide = phone ? "screen" : "sheet";
   const palette = usePalette(universe, open, start);
   // A chip or a namespace on, with no words, lists the places it keeps, not Discover.
-  const discovering = palette.query.trim() === "" && palette.filters.size === 0 && palette.namespace === undefined;
+  const discovering = isDiscovering(palette);
   const { flat, active, choose } = palette;
   const chosen = discovering ? undefined : palette.chosen;
   const discovery = useDiscover(discovering ? (palette.worlds ?? NO_WORLDS) : NO_WORLDS, {

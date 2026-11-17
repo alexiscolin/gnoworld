@@ -86,6 +86,30 @@ function useShown(panel: RefObject<HTMLElement | null>, open: boolean, onGone: (
   }, [panel, open]);
 }
 
+// The lines, or the empty state; `id` restarts the list's entrance when the filter changes.
+function Lines({
+  shown,
+  id,
+  now,
+  read,
+  onOpen,
+}: {
+  shown: readonly Item[];
+  id: string;
+  now: number;
+  read: Parameters<typeof isUnread>[1];
+  onOpen: (item: Item) => void;
+}) {
+  if (shown.length === 0) return <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />;
+  return (
+    <ol key={id} className={[styles["list"], "enter"].join(" ")}>
+      {shown.map((item) => (
+        <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={onOpen} />
+      ))}
+    </ol>
+  );
+}
+
 export function Panel({
   onClose,
   open: showing = true,
@@ -149,15 +173,7 @@ export function Panel({
           name={(slug) => placeOf(universe, slug)?.name ?? slug}
           onShow={setWorld}
         />
-        {shown.length === 0 ? (
-          <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />
-        ) : (
-          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], "enter"].join(" ")}>
-            {shown.map((item) => (
-              <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={open} />
-            ))}
-          </ol>
-        )}
+        <Lines shown={shown} id={`${kind}:${world ?? ""}`} now={now} read={read} onOpen={open} />
         {/* The chain's own lines (a new realm's signal, a proposal opened or closing) wait for the indexer's events. */}
         {/* A phone drops it: the greyed line is under the text contrast a small screen needs. */}
         {phone ? null : (
