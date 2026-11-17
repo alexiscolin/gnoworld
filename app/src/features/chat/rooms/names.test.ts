@@ -50,6 +50,7 @@ describe("a room of gnosh's colony", () => {
     expect(roomLabel("#gnosh-ai/help")).toBe("#help");
     expect(roomLabel("#gnosh-ai/showcase")).toBe("#showcase");
     expect(roomHref("#gnosh-ai")).toBe("/w/gnosh-ai");
+    expect(roomHref("#gnosh-ai/help")).toBe("/w/gnosh-ai?room=help");
   });
 
   it("leaves another station's main room named by its world", () => {

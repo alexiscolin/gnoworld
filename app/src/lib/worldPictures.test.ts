@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PICTURES, RERUN, staleWorlds, worldIds } from "../../tests/tools/pictureInputs.ts";
+import { inputsOf, PICTURES, RERUN, staleWorlds, worldIds } from "../../tests/tools/pictureInputs.ts";
 import { pictureOf } from "./worldPictures.ts";
 
 // The chat's planets are pictures of the real ones, taken once; a picture older than what its look is made from fails.
@@ -37,5 +37,14 @@ describe("worldPictures", () => {
       ["unpictured/world", "no picture"],
     ]);
     expect(RERUN).toContain("planetPictures");
+  });
+
+  // gnosh's colony is drawn by its own code, not a seeded planet's maps: its picture is retaken when that code changes (D13740).
+  it("makes the colony's picture from the colony's code and the portraits', and from no planet's map", () => {
+    const files = inputsOf("gnosh-ai");
+    for (const name of ["crown.ts", "hull.ts", "colony.ts", "materials.ts", "shapes.ts"])
+      expect(files.some((file) => file.endsWith(`/space/colony/${name}`)), name).toBe(true);
+    expect(files.some((file) => file.endsWith("/space/portraits.ts"))).toBe(true);
+    expect(files.some((file) => file.includes("/public/"))).toBe(false);
   });
 });

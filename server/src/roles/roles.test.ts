@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { typedRooms } from "../rooms/wire.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,6 +123,11 @@ describe("loadRoles", () => {
     expect([...(gnosh?.rooms?.keys() ?? [])]).toEqual(["#gnosh-ai/help", "#gnosh-ai/showcase"]);
     for (const room of gnosh?.rooms?.values() ?? []) expect(room).toMatchObject({ type: "open", hidden: false });
     expect(gnosh?.moderators.size).toBe(0);
+    expect([gnosh?.groups?.size ?? 0, gnosh?.sections?.length ?? 0]).toEqual([0, 0]);
+    expect(typedRooms(new Map([["gnosh-ai", gnosh as never]]))).toEqual([
+      { name: "#gnosh-ai/help", world: "gnosh-ai" },
+      { name: "#gnosh-ai/showcase", world: "gnosh-ai" },
+    ]);
     expect(gnosh?.rules).toEqual({ bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 });
   });
 
