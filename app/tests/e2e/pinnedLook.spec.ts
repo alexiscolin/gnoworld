@@ -11,7 +11,7 @@ test.describe("GovDAO's pinned Vote, as it looks", () => {
     const mask = [page.getByRole("banner")];
     const form = page.locator("[data-look='plate']").getByRole("figure");
     await expect(form).toHaveScreenshot("pinned-form.png", { mask });
-    const bar = page.getByRole("toolbar", { name: "Quick actions" });
+    const bar = page.getByRole("toolbar", { name: "Pinned actions" });
     await expect(bar.getByRole("button", { name: "Vote" })).toBeVisible();
     await expect(bar).toHaveScreenshot("pinned-bar.png", { mask });
     await bar.getByRole("button", { name: "Vote" }).click();
