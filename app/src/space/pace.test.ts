@@ -7,11 +7,11 @@ describe("gapFor", () => {
     expect(gapFor("full", false)).toBe(0);
   });
 
-  it("holds the ambient drawing to 60 Hz, and to 30 Hz where the window has no focus", () => {
-    expect(gapFor("ambient", true)).toBeGreaterThan(15);
-    expect(gapFor("ambient", true)).toBeLessThan(17);
-    expect(gapFor("none", false)).toBeGreaterThan(32);
-    expect(gapFor("none", false)).toBeLessThan(34);
+  it("holds the ambient drawing to 30 Hz, and to 15 Hz where the window has no focus", () => {
+    expect(gapFor("ambient", true)).toBeGreaterThan(33);
+    expect(gapFor("ambient", true)).toBeLessThan(34);
+    expect(gapFor("none", false)).toBeGreaterThan(66);
+    expect(gapFor("none", false)).toBeLessThan(67);
   });
 });
 

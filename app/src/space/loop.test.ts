@@ -168,6 +168,15 @@ describe("loop", () => {
     expect(l.log.steps).toHaveLength(2);
   });
 
+  it("works a frame of a view turning by itself every 33 ms on a 120 Hz screen, evenly", () => {
+    const l = make();
+    l.state.need = "ambient";
+    for (let tick = 0; tick <= 120; tick += 1) l.frame(1000 + (tick * 1000) / 120);
+    const gaps = l.log.steps.slice(1).map((s) => s.real);
+    expect(gaps).toHaveLength(30);
+    for (const gap of gaps) expect(gap).toBeCloseTo(1000 / 30, 5);
+  });
+
   it("asks a draw as the page shows again, a context comes back or its marks change", () => {
     const l = make();
     l.page.dispatchEvent(new Event("visibilitychange"));
@@ -211,11 +220,11 @@ describe("loop", () => {
     l.frame(1000);
     l.frame(1005);
     expect(l.log.steps).toHaveLength(1);
-    l.frame(1020);
+    l.frame(1035);
     expect(l.log.steps).toHaveLength(2);
     l.state.need = "full";
-    l.frame(1040);
-    l.frame(1041);
+    l.frame(1070);
+    l.frame(1071);
     expect(l.log.steps).toHaveLength(4);
   });
 
