@@ -12,7 +12,8 @@ import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_LINK, NONCE_HOST, type Login } from "./login.ts";
 import { verifies, verifyProof, type Verify } from "./verify.ts";
 import { cliFile, cliKey } from "../testing/cliSigner.ts";
-import { cliSafe } from "./cliProof.ts";
+import { cliSafe, cliVerify } from "./cliProof.ts";
+import { makeLinks } from "./links.ts";
 import { migrations } from "../migrations.ts";
 import { TICKET_TABLES } from "./ticket.ts";
 
@@ -23,6 +24,7 @@ const TTL = 5 * MINUTE;
 const DOMAIN = "gnoworld.test";
 const CHAINS = ["onyx-1", "gnoland-1"];
 const OTHER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+const PEPPER = "a-pepper-of-forty-characters-0123456789";
 
 const opened: DatabaseSync[] = [];
 afterEach(() => {
@@ -1251,6 +1253,60 @@ describe("the command line's login (D13880)", () => {
     expect(
       await login.verify({ nonce: cli.nonce, address: me.address, proof: me.sign("onyx-1", cli.text) }, anyone, DOMAIN),
     ).toBe("nonce");
+  });
+
+  it("never spends a link's code, and a login's nonce never finishes a link (distinct kinds and texts)", async () => {
+    const { db, key, logIn, asked, clock } = cliSetup();
+    const a = wallet();
+    const links = makeLinks(db, {
+      now: () => clock.now,
+      chainId: "onyx-1",
+      secret: PEPPER,
+      verifiers: { cli: cliVerify },
+    });
+    const code = links.startLink({
+      by: a.address,
+      kind: "cli",
+      subject: key.address,
+      host: DOMAIN,
+      signedAt: clock.now,
+    });
+    if (typeof code === "string") throw new Error(code);
+    expect(await logIn(code, { file: cliFile(key, code.text) })).toBe("nonce");
+    const made = asked();
+    const finished = await links.finishLink({
+      nonce: made.nonce,
+      by: a.address,
+      address: key.address,
+      host: DOMAIN,
+      signedAt: clock.now,
+      kind: "cli",
+      file: cliFile(key, made.text),
+      byProof: { kind: "adena", proof: a.sign("onyx-1", made.text) },
+    });
+    expect(finished).toBe("nonce");
+    expect(typeof (await logIn(made))).toBe("object");
+  });
+
+  it("counts none of its nonces against the links' cap", () => {
+    const { db, key, login } = cliSetup({ nonceCap: 2 });
+    expect(typeof login.cliChallenge(key.address, DOMAIN)).toBe("object");
+    expect(typeof login.cliChallenge(key.address, DOMAIN)).toBe("object");
+    const links = makeLinks(db, {
+      now: () => T0,
+      chainId: "onyx-1",
+      secret: PEPPER,
+      linkCap: 1,
+    });
+    expect(
+      typeof links.startLink({
+        by: wallet().address,
+        kind: "adena",
+        subject: wallet().address,
+        host: DOMAIN,
+        signedAt: T0,
+      }),
+    ).toBe("object");
   });
 
   it("counts its nonces against the login's cap, as Adena's login does", () => {
