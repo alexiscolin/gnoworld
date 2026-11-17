@@ -5074,7 +5074,7 @@ if part audit; then
 au="$t/audit"
 mkdir -p "$au"
 printf "lockfileVersion: '9.0'\n\npackages:\n\n  qs@6.15.1:\n    resolution: {}\n\n  '@scope/tool@1.2.0':\n    resolution: {}\n\nsnapshots:\n\n  '@scope/tool@1.2.0(qs@6.15.1)':\n    dependencies: {}\n" >"$au/pnpm-lock.yaml"
-audit() { printf '%s' "$1" >"$au/answer.json" && (cd "$au" && AUDIT_ANSWER="$au/answer.json" python3 -I "$here/audit.py" >/dev/null 2>&1); }
+audit() { printf '%s' "$1" >"$au/answer.json" && (cd "$au" && AUDIT_TODAY="${2:-2026-11-18}" AUDIT_ANSWER="$au/answer.json" python3 -I "$here/audit.py" >/dev/null 2>&1); }
 audit '{}' || fail "audit refused a lockfile with no advisory"
 python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d == {"qs": ["6.15.1"], "@scope/tool": ["1.2.0"]}, d' "$au/answer.json.request" || fail "audit did not ask about every locked package and version"
 audit '{"qs":[{"severity":"moderate","title":"DoS","url":"u","vulnerable_versions":"<6.16.0"}]}' && fail "audit let a moderate advisory through"
@@ -5082,6 +5082,28 @@ audit '{"qs":[{"severity":"low","title":"minor","url":"u","vulnerable_versions":
 audit 'not json' && fail "audit passed on an answer it could not read"
 printf "lockfileVersion: '10.0'\n\npackages:\n    \"lodash@4.17.20\":\n      resolution: {}\n" >"$au/pnpm-lock.yaml"
 audit '{}' && fail "audit passed on a lockfile it read no package from"
+# One advisory is let through until a date, on picomatch at or under 4.0.7 only (no fixed version is published).
+redos='{"severity":"high","title":"ReDoS","url":"https://github.com/advisories/GHSA-fc5q-39xc-vjpf","vulnerable_versions":"<=4.0.7"}'
+other='{"severity":"high","title":"other","url":"https://github.com/advisories/GHSA-c2c7-rcm5-vvqj","vulnerable_versions":"<=4.0.7"}'
+lock() { printf "lockfileVersion: '9.0'\n\npackages:\n" >"$au/pnpm-lock.yaml" && for p; do printf "\n  %s:\n    resolution: {}\n" "$p" >>"$au/pnpm-lock.yaml"; done; }
+lock picomatch@4.0.7 tool@1.2.0
+audit "{\"picomatch\":[$redos]}" 2026-12-18 || fail "audit refused picomatch's waived advisory on its last day"
+audit "{\"picomatch\":[$redos]}" 2026-12-19 && fail "audit let picomatch's waived advisory through past its end date"
+audit "{\"picomatch\":[$redos,$other]}" 2026-12-18 && fail "the waiver let another picomatch advisory through"
+audit "{\"tool\":[$redos]}" 2026-12-18 && fail "the waiver let the advisory through on another package"
+for v in 4.0.8 5.0.0 4.0.7-beta.1; do
+	lock picomatch@4.0.7 "picomatch@$v"
+	audit "{\"picomatch\":[$redos]}" 2026-12-18 && fail "the waiver let the advisory through with picomatch $v locked"
+done
+lock picomatch@2.3.1
+audit "{\"picomatch\":[$redos]}" 2026-12-18 || fail "the waiver refused picomatch 2.3.1, under 4.0.7"
+lock tool@1.2.0
+audit "{\"picomatch\":[$redos]}" 2026-12-18 && fail "the waiver held with no picomatch locked"
+# Outside tests the waiver is judged on the machine's own day, not on one written in.
+lock picomatch@4.0.7
+printf '{"picomatch":[%s]}' "$redos" >"$au/answer.json"
+out=$(cd "$au" && AUDIT_ANSWER="$au/answer.json" python3 -I "$here/audit.py" 2>&1)
+printf '%s' "$out" | grep -qF "judged on $(date +%F)" || fail "audit judged the waiver on another day than today: $out"
 fi
 
 if part push_range; then
