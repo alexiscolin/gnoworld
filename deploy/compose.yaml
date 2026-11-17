@@ -118,9 +118,10 @@ services:
       ERGO_HOST: ergo
       ERGO_PORT: "6667"
       ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
-      # OpenAI's moderation, opt-in: on, every line and preview page is checked with the key below; off, the
-      # key is never read, lines are shown unchecked and there are no previews.
-      MODERATION: ${MODERATION:-off}
+      # OpenAI's moderation, chosen in deploy/.env, never defaulted: on, every line and preview page is checked
+      # with the key below; off, the key is never read, account lines go unchecked, guests cannot speak, no
+      # public room can be made, and there are no previews nor link cards.
+      MODERATION: ${MODERATION:?set MODERATION=on or off in deploy/.env}
       OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
       # Ergo's volume, read-only, measured against its cap at each retention tick.
       ERGO_DATA: /ergo

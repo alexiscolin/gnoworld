@@ -31,7 +31,8 @@ the repository holds a key or names an account.
 1. **Write each key yourself, from the clipboard**, never typed into a chat or onto a command line (the shell's history keeps
    those). Copy the key at the provider, then, from the repository:
    `pbpaste > deploy/secrets/anthropic_api_key`, `pbpaste > deploy/secrets/openai_api_key`, then `chmod 644` each
-   (OPERATIONS.md, "Before the first start", step 4). To change one later, write it the same way, then
+   (OPERATIONS.md, "Before the first start", step 4), and set `MODERATION=on` in `deploy/.env` (step 3). To change one
+   later, write it the same way, then
    `docker compose -f deploy/compose.yaml restart server` (and `restart jarvis`).
    The OpenAI key is used for one thing here: the moderation check of each chat message, its text alone. The Anthropic key
    is used by Jarvis only.

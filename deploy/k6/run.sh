@@ -29,7 +29,7 @@ done
 # Each visitor's address is one of 250 x 250 (setup.ts, load.js), a stream's four to one.
 [ "$ACCOUNTS" -le 62500 ] && [ "$CROWD" -le 62500 ] && [ "$STREAMS" -le 250000 ] ||
 	missing "ACCOUNTS and CROWD 62,500 at most, STREAMS 250,000: the visitors' addresses"
-# Without OpenAI's key every line is unchecked and the breaker stops calling: the messages measure nothing.
+# Without OpenAI's key moderation is off: the messages would measure no check.
 key=${OPENAI_API_KEY_FILE:-}
 [ "$only" != messages ] || [ -n "$key" ] || missing "messages: set OPENAI_API_KEY_FILE, OpenAI's key, which checks each line"
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done

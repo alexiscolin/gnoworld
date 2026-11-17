@@ -50,7 +50,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 | `INSIDE_SUBNET`, `JARVIS_SUBNET`, `JARVIS_OUT_SUBNET`, `READER_SUBNET`, `READER_OUT_SUBNET`, `LINKS_SUBNET`, `LINKS_OUT_SUBNET`, `ADMIN_SUBNET` | `172.30.89.0/24`, `.91.0/24`, `.95.0/24`, `.97.0/24`, `.99.0/24`, `.101.0/24`, `.103.0/24`, `.92.0/24` | Each network's subnet; change an address and its subnet together |
 | `JARVIS` | `off` | Section 4 |
 | `LINK_CARDS` | `0` | Section 4 |
-| `MODERATION` | `off` | OpenAI's moderation: `on` reads `openai_api_key` and checks every line and preview page |
+| `MODERATION` | none, required | `on` or `off`. On, `openai_api_key` is read and every line and preview page checked; off: account lines unchecked, guests cannot speak (503), no public room can be made, no previews, `LINK_CARDS=1` stops the server |
 | `HOST_PUBLIC_ADDRESSES` | none | The host's own public IPv4 addresses, spaces between, which the guard refuses: set them when a public front runs on this host |
 | `JARVIS_GNOSCOPE` | `off` | Jarvis's gnoscope tools: `on` or `off` |
 | `JARVIS_BUDGET_USD`, `JARVIS_TRANSLATION_BUDGET_USD` | `3`, `1` | A day's budgets in whole dollars, kept from the first start (an admin changes them after) |
@@ -85,7 +85,7 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `MARKETS_FILE`, `WORLDS_FILE`, `PREVIEWS_FILE` | none: no timer or job | absolute path | Files the prices timer, the worlds job and the preview job write (compose: `/markets/markets.json`, `worlds.json`, `previews.json`) |
 | `UNIVERSES_FILE` | none | absolute path | The universes' data file (compose: `/app/app/data/universes.json`) |
 | `HUBS_FILE` | none | absolute path | The hubs' data file; set without `UNIVERSES_FILE` stops the server. Not set by compose |
-| `MODERATION` | off | exactly `on` | On, `OPENAI_API_KEY_FILE` is read (unset, the server stops); any other value or none is off: lines unchecked, no previews job |
+| `MODERATION` | off (compose requires it) | `on` or `off`, any other value stops the server | On, `OPENAI_API_KEY_FILE` is read (unset, the server stops). Off: account lines unchecked, guests cannot speak (503), no public room can be made, no previews, `LINK_CARDS=1` stops the server |
 | `OPENAI_API_KEY_FILE` | none | secret file | OpenAI's key, read with `MODERATION=on` alone |
 | `MODERATION_THRESHOLDS` | `{}` | JSON, a score above 0 and at most 1 per category | A score that hides a category instead of OpenAI's own flag; `sexual/minors` always hides on OpenAI's flag. Categories: `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `self-harm`, `self-harm/instructions`, `self-harm/intent`, `sexual`, `sexual/minors`, `violence`, `violence/graphic` |
 | `NEW_ACCOUNT_HOURS` | `24` | 1 to 720 | How long an account is "new" |
@@ -150,15 +150,17 @@ All required: `READER_LISTEN` (`host:port`), `READER_PROXY` (`guard:4753`), `REA
 ### `ergo`, `guard`, app tooling
 
 - `ergo` (its `environment:` in compose): `SERVER_NAME`, `ORIGINS`, `PROXY_FROM` (web's address), `INSIDE_SUBNET`, `AUTH_SOCKET`.
-- `guard` (its `environment:`): `JARVIS_OUT_ADDRESS`, `READER_OUT_ADDRESS`, `LINKS_OUT_ADDRESS` (it stops without them), `XTABLES_LOCKFILE`.
+- `guard` (its `environment:`): `JARVIS_OUT_ADDRESS`, `READER_OUT_ADDRESS`, `LINKS_OUT_ADDRESS` (it stops without them), `XTABLES_LOCKFILE`,
+  `HOST_PUBLIC_ADDRESSES` (it stops on a word that is no IPv4 address).
 - Development and tests only: `GNOWORLD_DATA`, `GNOWORLD_BUILD`, `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR`, `GNOWORLD_TOOLS`, `VITE_GNOWORLD_TEST_GPU`, `JARVIS_TEST_OUTBOUND`, `LEAK` (section 7 and the files named there).
 
 ## 4. Feature switches and their profiles
 
 | Switch | Off by default | To turn on | Undo |
 |---|---|---|---|
+| Moderation | none: `MODERATION` is required, `on` or `off` | `MODERATION=on`, OpenAI's key in `deploy/secrets/openai_api_key`. Guests, public rooms, previews and link cards need it | `MODERATION=off` |
 | Guest chat | on by default | `GUEST_CHAT=off` is the undo: read-only guests | remove the line |
-| Link cards | `LINK_CARDS=0` | `LINK_CARDS=1` in `.env`, and `--profile links`. The server stops at start with `LINK_CARDS=1` and no `LINK_READER_URL` (compose sets it) | `LINK_CARDS=0` |
+| Link cards | `LINK_CARDS=0` | `LINK_CARDS=1` in `.env`, and `--profile links`. The server stops at start with `LINK_CARDS=1` and no `LINK_READER_URL` (compose sets it), or without `MODERATION=on` | `LINK_CARDS=0` |
 | Jarvis | `JARVIS=off` | The evals gate (D13987) passes, then `sh deploy/jarvis-on.sh`, which writes `JARVIS=on` in `deploy/.env` only then (never by hand); then `--profile jarvis`. Without the profile the door answers `not_ready` | `JARVIS=off`, drop the profile |
 | gnoscope tools | `JARVIS_GNOSCOPE=off` | `JARVIS_GNOSCOPE=on` | `off` |
 | Admin API | off without `ADMIN_PORT` | compose sets port `8082` on its own network; `ADMIN_ORIGINS` names the console | empty `ADMIN_ORIGINS` |

@@ -358,8 +358,6 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
-	mutant "moderation on by default" "the server's moderation is off unless MODERATION=on" \
-		compose 'services: { server: { environment: { MODERATION: "on" } } }'
 	mutant "the guard is not told the host's own addresses" "the guard refuses the host's own address 192.0.2.7" \
 		compose 'services: { guard: { environment: { HOST_PUBLIC_ADDRESSES: "" } } }'
 	mutant "the guard forgets the host's own addresses" "the guard refuses the host's own address 192.0.2.9" \
@@ -620,7 +618,7 @@ FAKE
 	expect "and skipped among the rest, no line sent" \
 		"$(grep -c 'messages: skipped' "$tmp/load.log" || true) $(grep -c 'SCENARIO=messages' "$tmp/fake.log" || true)" "1 0"
 	expect "and the load's stack checks nothing: its own made-up key never reaches OpenAI" \
-		"$(grep -c '^env MODERATION=on$' "$tmp/fake.log" || true)" 0
+		"$(grep '^env MODERATION=' "$tmp/fake.log" | sort -u | tr '\n' ' ')" "env MODERATION=off "
 	printf 'sk-%s\n' "$(openssl rand -hex 20)" >"$tmp/k6_key"
 	: >"$tmp/fake.log"
 	(exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO= OPENAI_API_KEY_FILE="$tmp/k6_key" sh "$here/k6/run.sh" logins) \
@@ -736,7 +734,7 @@ FAKE
 			"guard: cannot find web's network
 exit 1"
 	done
-	for word in 192.0.2.256 example.com 2001:db8::1 192.0.2.7/32 1.2.3 01.2.3.4; do
+	for word in 192.0.2.256 example.com 2001:db8::1 192.0.2.7/32 1.2.3 01.2.3.4 '*'; do
 		expect "the guard does not start on a host address that is not one: $word" \
 			"$(guard_alone "192.0.2.7 $word" 2>&1; echo "exit $?")" "guard: HOST_PUBLIC_ADDRESSES: $word is not an IPv4 address
 exit 1"
@@ -947,9 +945,10 @@ PY
 	# jarvis answers nothing, so its door answers off, or not_ready when on.
 	# Read once, Compose's refusal of the project a fail: a count of 0 must not stand for a file that does not load.
 	services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"
-	# Moderation is opt-in: Compose gives the server MODERATION=off when the operator sets none.
-	expect "the server's moderation is off unless MODERATION=on" \
-		"$(env -u MODERATION docker compose -p "$project" $files config server | sed -n 's/^ *MODERATION: *//p')" off
+	# Moderation is chosen, never defaulted: a stack whose deploy/.env says neither on nor off does not start.
+	expect "Compose refuses a stack that does not choose MODERATION" \
+		"$(env -u MODERATION docker compose --env-file /dev/null -p "$project" $files config server 2>&1 >/dev/null |
+			grep -c 'set MODERATION=on or off' || true)" 1
 	expect "the default services hold no jarvis, nor its reader, nor their ways out" \
 		"$(printf '%s\n' "$services" | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
 	expect "the default services are web, Ergo, the server, the guard and the server's way out" \

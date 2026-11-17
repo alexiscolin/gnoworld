@@ -852,7 +852,8 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  it("starts with a PREVIEWS_FILE and moderation off, a key file named: no preview pass, nothing asked", async () => {
+  // That no preview job is made is boot.test.ts's to prove: this one shows the server itself starts and stops clean.
+  it("starts with a PREVIEWS_FILE and moderation off, a key file named", async () => {
     const dir = folder("gnoworld-previews-off-");
     const universes = join(dir, "universes.json");
     writeFileSync(
@@ -885,8 +886,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
       await listening(server);
       server.child.kill("SIGTERM");
       expect(await exited(server)).toBe(0);
-      expect(server.out.stdout).not.toContain('"event":"previews_');
-      expect(way.seen).toEqual([]);
     } finally {
       way.close();
     }

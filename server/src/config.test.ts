@@ -310,16 +310,13 @@ describe("loadConfig", () => {
   });
 
   // Opt-in: only MODERATION=on reads OpenAI's key, so a file left named, a good key or none, switches nothing on.
-  it.each([undefined, "off", "ON", "yes", "", " on", "on ", "1", "true"])(
-    "leaves moderation off with MODERATION %j, whatever key file is named",
-    (moderation) => {
-      const good = file("openai-off", `sk-${"o".repeat(40)}\n`);
-      for (const OPENAI_API_KEY_FILE of [good, "/nonexistent/gnoworld-openai"]) {
-        const env = { ...ENV, ...(moderation === undefined ? {} : { MODERATION: moderation }), OPENAI_API_KEY_FILE };
-        expect(loadConfig(env).moderation.openaiKey).toBeUndefined();
-      }
-    },
-  );
+  it.each([undefined, "off"])("leaves moderation off with MODERATION %j, whatever key file is named", (moderation) => {
+    const good = file("openai-off", `sk-${"o".repeat(40)}\n`);
+    for (const OPENAI_API_KEY_FILE of [good, "/nonexistent/gnoworld-openai"]) {
+      const env = { ...ENV, ...(moderation === undefined ? {} : { MODERATION: moderation }), OPENAI_API_KEY_FILE };
+      expect(loadConfig(env).moderation.openaiKey).toBeUndefined();
+    }
+  });
 
   it("refuses MODERATION=on without OPENAI_API_KEY_FILE, naming the setting", () => {
     expect(failure({ ...ENV, MODERATION: "on" })).toMatch(/^Error: setting OPENAI_API_KEY_FILE: required/);
@@ -327,6 +324,8 @@ describe("loadConfig", () => {
 
   it.each([
     ["OPENAI_API_KEY_FILE", { MODERATION: "on" }],
+    // On or off, nothing else: a typo would otherwise leave the chat unchecked.
+    ...["ON", "yes", "", "1", "true", " on", "on "].map((value) => ["MODERATION", { MODERATION: value }] as const),
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: "/nonexistent/gnoworld-openai" }],
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: file("openai-empty", "") }],
     ["OPENAI_API_KEY_FILE", { MODERATION: "on", OPENAI_API_KEY_FILE: file("openai-short", "sk-tiny-secret\n") }],
