@@ -189,17 +189,19 @@ export function Dialog({
       }}
     >
       <Stack space="m">
-        <Heading
-          kicker={kicker}
-          kickerId={kickerId}
-          lead={lead}
-          headingRef={headingRef}
-          id={titleId}
-          title={title}
-          {...close}
-          onClose={onClose}
-          side={side}
-        />
+        <div className={wide === "screen" ? ["held-top", styles["head"]].join(" ") : undefined}>
+          <Heading
+            kicker={kicker}
+            kickerId={kickerId}
+            lead={lead}
+            headingRef={headingRef}
+            id={titleId}
+            title={title}
+            {...close}
+            onClose={onClose}
+            side={side}
+          />
+        </div>
         {description === undefined ? null : (
           <p id={descriptionId} className={styles["description"]}>
             {description}

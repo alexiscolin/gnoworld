@@ -1,4 +1,5 @@
 // The account's menu itself, asked at its trigger's first press and drawn in its place, open (AccountMenu.tsx).
+import { shortAddress } from "@gnoworld/schemas";
 import { Menu, type IconName, type MenuItem } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { useCredits } from "../credits/index.ts";
@@ -22,6 +23,13 @@ const ownRows = (account: boolean, onPickName: (() => void) | undefined, onLogOu
         { label: "Log out", onSelect: onLogOut },
       ]
     : [];
+
+// A phone's trigger is plain, as the header's other tools; a computer's an outlined pill.
+const phoneLook = (phone: boolean | undefined) => (phone ? "plain" : "outline");
+
+// A phone's pill hides the address, so the menu says whose it is.
+const whose = (phone: boolean | undefined, address: string) =>
+  phone ? `Logged in as ${shortAddress(address)}` : undefined;
 
 /** The menu for `address`, or the device's for a guest; `lead` is drawn on an account's trigger, its face and address (AccountMenu.tsx). */
 export function Opened({
@@ -84,6 +92,7 @@ export function Opened({
         icon="menu"
         items={items}
         openAtOnce
+        emphasis={phoneLook(phone)}
         note={guestNote}
         busy={network.busy}
       />
@@ -95,6 +104,8 @@ export function Opened({
         wordsHidden
         items={items}
         openAtOnce
+        emphasis={phoneLook(phone)}
+        note={whose(phone, address)}
         busy={network.busy}
       />
     );

@@ -42,11 +42,55 @@
       max-block-size: none;
       /* layout: the browser centres a modal dialog with its margins; the sheet fills the screen */
       margin: 0;
-      padding-block: max(var(--space-m), env(safe-area-inset-top)) max(var(--space-s), env(safe-area-inset-bottom));
+      padding-block: max(var(--space-s), env(safe-area-inset-top)) max(var(--space-s), env(safe-area-inset-bottom));
       padding-inline: max(var(--space-s), env(safe-area-inset-left)) max(var(--space-s), env(safe-area-inset-right));
       border: 0;
       border-radius: 0;
       overflow: auto;
+    }
+  }
+
+  /* The sheet's head holds at its top edge, one height for every sheet: the dialog's top padding is the head's own (sticky holds under a
+     scroller's padding, so top 0 is exact), its Close drawn as the 44 px ring it is. */
+  @media (width < 900px) {
+    .dialog[data-width="screen"] {
+      padding-block-start: 0;
+    }
+
+    .head {
+      /* layout: the head's ground and rule run to the sheet's edges, over the dialog's padding */
+      margin-inline: calc(-1 * max(var(--space-s), env(safe-area-inset-left)))
+        calc(-1 * max(var(--space-s), env(safe-area-inset-right)));
+      padding-block: max(var(--space-s), env(safe-area-inset-top)) var(--space-2xs);
+      padding-inline: max(var(--space-s), env(safe-area-inset-left)) max(var(--space-s), env(safe-area-inset-right));
+      border-block-end: var(--line-width) solid var(--color-line);
+    }
+
+    /* The kicker has none of its own 8 px above it, and 4 px (not 12) down to the title row. */
+    .dialog[data-width="screen"] .kicker {
+      padding-block-start: 0;
+      /* layout: the row's step is 12, here 4 */
+      margin-block-end: calc(var(--space-3xs) - var(--space-xs));
+    }
+
+    .dialog[data-width="screen"] .close button,
+    .dialog[data-side="start"] .close button {
+      --_line: var(--color-line-strong);
+
+      border-radius: var(--radius-pill);
+    }
+  }
+
+  /* Held sideways: the sheet's content in one readable column, centred, as wide as a dialog. */
+  @media (width < 900px) and (height < 500px) {
+    .head {
+      /* layout: a short screen's head, 8 px from the top */
+      padding-block-start: max(var(--space-2xs), env(safe-area-inset-top));
+    }
+
+    .dialog[data-width="screen"] {
+      padding-inline: max(var(--space-s), env(safe-area-inset-left), calc((100% - var(--dialog-w)) / 2))
+        max(var(--space-s), env(safe-area-inset-right), calc((100% - var(--dialog-w)) / 2));
     }
   }
 
@@ -151,6 +195,12 @@
   @media (width < 900px) {
     .dialog[data-side="start"]::backdrop {
       background: var(--color-scrim);
+    }
+
+    /* Close on the sheets' grid: one padding from the top and the end, as every sheet's. */
+    .dialog[data-side="start"] .close {
+      inset-block-start: var(--space-s);
+      inset-inline-end: var(--space-s);
     }
   }
 

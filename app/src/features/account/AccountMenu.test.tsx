@@ -116,6 +116,15 @@ describe("the account's menu", () => {
     expect(menu?.querySelector("p")).toBeNull();
   });
 
+  it("on a phone tells a logged-in account whose it is, as the menu's note; a computer's pill says it already", () => {
+    const phone = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} phone />);
+    const menu = phone.querySelector("[role='menu']");
+    expect(menu?.firstElementChild?.textContent).toBe("Logged in as g1jg8m…vsqf5");
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    const computer = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} />);
+    expect(computer.querySelector("[role='menu']")?.querySelector("p")).toBeNull();
+  });
+
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {
     const box = mount(<Opened address={ADDRESS} lead={<span data-face="" />} onLogOut={() => undefined} />);
     const trigger = box.querySelector("button:not([role='menuitem'])");

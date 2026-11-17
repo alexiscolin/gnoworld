@@ -131,6 +131,59 @@
       margin-block-end: var(--space-3xs);
       border-block-end: var(--line-width) solid var(--color-line);
     }
+
+    /* The page under the menu is dimmed, as beside the drawer; a tap on the scrim closes the popover. */
+    .panel[data-kind="menu"]::backdrop {
+      background: var(--color-scrim);
+    }
+
+    /* The networks are a group of their own: a rule before the first and after the last, the separator's look. */
+    .item:not([role="menuitemradio"]) + .item[role="menuitemradio"],
+    .item[role="menuitemradio"] + .item:not([role="menuitemradio"]) {
+      position: relative;
+      /* layout: room for the rule between the group and its neighbour */
+      margin-block-start: calc(2 * var(--space-3xs) + var(--line-width));
+    }
+
+    .item:not([role="menuitemradio"]) + .item[role="menuitemradio"]::before,
+    .item[role="menuitemradio"] + .item:not([role="menuitemradio"])::before {
+      content: "";
+      position: absolute;
+      inset: calc(-1 * (var(--space-3xs) + var(--line-width))) 0 auto;
+      block-size: var(--line-width);
+      background: var(--color-line);
+    }
+  }
+
+  /* A phone held sideways: two columns so no row is cut; the column gap parts the groups, so their rules go. */
+  @media (width < 900px) and (height < 500px) {
+    .panel[data-kind="menu"] {
+      --_w: calc(2 * var(--popover-w));
+
+      /* layout: two columns of rows, so no row is cut on a short screen */
+      columns: 2;
+      /* layout: the gap parts the groups */
+      column-gap: var(--space-2xs);
+    }
+
+    .panel[data-kind="menu"] > * {
+      break-inside: avoid;
+    }
+
+    .note {
+      column-span: all;
+    }
+
+    .item:not([role="menuitemradio"]) + .item[role="menuitemradio"],
+    .item[role="menuitemradio"] + .item:not([role="menuitemradio"]) {
+      /* layout: the column gap parts them, no room for a rule */
+      margin-block-start: 0;
+    }
+
+    .item:not([role="menuitemradio"]) + .item[role="menuitemradio"]::before,
+    .item[role="menuitemradio"] + .item:not([role="menuitemradio"])::before {
+      content: none;
+    }
   }
 
   .separator {
