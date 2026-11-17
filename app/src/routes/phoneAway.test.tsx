@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { mount } from "../../tests/mount.tsx";
+import { stubPhone } from "../../tests/phoneMedia.ts";
 import PhoneAway from "./PhoneAway.tsx";
 import { phoneAway } from "./phoneAway.ts";
 
-let root: Root | undefined;
 let host: HTMLElement;
 
 function Probe() {
@@ -24,32 +23,19 @@ function Probe() {
 }
 
 const draw = (phone: boolean, recent = "", at = "/") => {
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: phone && query === "(max-width: 899px)",
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
+  stubPhone(phone);
   vi.stubGlobal("localStorage", { getItem: () => recent, setItem: () => undefined });
-  root = createRoot(host);
-  act(() => {
-    root?.render(
-      <MemoryRouter initialEntries={[at]}>
-        <Probe />
-      </MemoryRouter>,
-    );
-  });
+  host = mount(
+    <MemoryRouter initialEntries={[at]}>
+      <Probe />
+    </MemoryRouter>,
+  );
 };
 
 beforeEach(() => {
-  Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("reportError", vi.fn());
-  host = document.body.appendChild(document.createElement("div"));
 });
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  host.remove();
   vi.unstubAllGlobals();
 });
 

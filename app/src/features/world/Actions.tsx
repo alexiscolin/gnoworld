@@ -8,7 +8,8 @@ import { composerBox, useMedia } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
 import styles from "./Actions.module.css";
-import { isSitePath, useMain } from "./actionsShared.ts";
+import { useLeads } from "./actionsShared.ts";
+import { MainAction } from "./MainAction.tsx";
 
 const PhoneActions = lazy(async () => ({ default: (await import("./PhoneActions.tsx")).PhoneActions }));
 
@@ -44,15 +45,10 @@ export interface ActionsProps {
 
 // The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
-function Leads({
-  proposals,
-  say,
-  room,
-  lead,
-  second,
-}: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
-  const main = useMain({ room, lead, say });
-  if (proposals !== undefined && isSitePath(proposals)) {
+function Leads({ second, ...asked }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
+  const { main, proposals } = useLeads(asked);
+  const { room } = asked;
+  if (proposals !== undefined) {
     return (
       <>
         <Button href={proposals} pad="wide" emphasis="solid" icon="arrow">
@@ -68,9 +64,7 @@ function Leads({
   }
   return (
     <>
-      <Button href={main.href} pad="wide" emphasis="solid" icon={main.icon ?? "arrow"}>
-        {main.label}
-      </Button>
+      <MainAction main={main} />
       {second === undefined ? null : (
         <Button href={second.href} pad="wide" icon={second.icon ?? "arrow"}>
           {second.label}
