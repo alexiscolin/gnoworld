@@ -32,7 +32,13 @@ function CodeSteps({
     <>
       <Block block={code.block} help={`Replace KEY with the name of your key for ${address}.`} {...paste} />
       {mine === undefined ? null : (
-        <AsMe key={mine.code.text} me={mine.me} code={mine.code} signed={signed.by !== undefined} onBy={signed.onBy} />
+        <AsMe
+          key={mine.code.text}
+          me={mine.me}
+          code={mine.code}
+          next={signed.by === undefined && paste.file.trim() !== ""}
+          onBy={signed.onBy}
+        />
       )}
       <Disclosure title="What does the command sign?" size="s">
         <p className="meta">

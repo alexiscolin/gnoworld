@@ -138,7 +138,7 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
         <Stack space="2xs">
           <p className="meta">
             <span className="label">Adena will sign this text, for</span>{" "}
-            <span className="data-text">{shortAddress(ready.address)}</span>
+            <span className="data-text nowrap">{shortAddress(ready.address)}</span>
           </p>
           <blockquote className={[code["block"], "fill-box", "data-text"].join(" ")}>{ready.challenge.text}</blockquote>
         </Stack>
@@ -148,7 +148,7 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
           key={ready.challenge.nonce}
           me={me}
           code={{ text: ready.challenge.text, byBlock: ready.challenge.byBlock, chainId: ready.chainId }}
-          signed={ready.by !== undefined}
+          next={ready.by === undefined}
           onBy={(by) => {
             setStep((now) => (now.at === "ready" ? { ...now, by } : now));
           }}

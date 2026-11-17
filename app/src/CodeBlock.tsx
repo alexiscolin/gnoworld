@@ -18,7 +18,7 @@ export function CodeBlock({ text, help }: { text: string; help?: string }) {
       <Cluster justify={help === undefined ? "end" : "between"} wrap="no">
         {help === undefined ? null : <p className="meta">{help}</p>}
         {canCopy() ? (
-          <span>
+          <span className="nowrap">
             <Button
               size="s"
               onClick={() => {

@@ -25,16 +25,17 @@ async function signAsMe(me: Address, code: { text: string; chainId: string }): P
 }
 
 /** `me`'s own proof of the code's text, handed on as it comes: Adena's, or a file of the tool's shape; undefined while there is none.
- * Adena's way first, solid until `signed`; the gnokey way behind its fold (the UX pass). */
+ * Adena's way first, solid while it is the `next` act; the gnokey way behind its fold (the UX pass). */
 export function AsMe({
   me,
   code,
-  signed,
+  next,
   onBy,
 }: {
   me: Address;
   code: { text: string; byBlock: string; chainId: string };
-  signed: boolean;
+  /** Its Adena way is the next act: solid. */
+  next: boolean;
   onBy: (by: ByProof | undefined) => void;
 }) {
   const [file, setFile] = useState("");
@@ -59,7 +60,7 @@ export function AsMe({
       </Stack>
       <Cluster space="xs">
         <Button
-          emphasis={signed ? "outline" : "solid"}
+          emphasis={next ? "solid" : "outline"}
           busy={busy}
           onClick={() => {
             sign().catch(reportError);
