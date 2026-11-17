@@ -13,11 +13,11 @@ import ring from "../../phoneClose.module.css";
 import styles from "./Welcome.module.css";
 
 // A phone's sheet starts at the composer's top edge, so it covers the composer and the row of worlds whole: --welcome-top follows the chat's dock,
-// which may come after the card (its code is a chunk of its own).
-function useDockTop(cardRef: RefObject<HTMLElement | null>, phone: boolean) {
+// which may come after the card (its code is a chunk of its own), while the card is open; closed, it keeps its place as it fades.
+function useDockTop(cardRef: RefObject<HTMLElement | null>, watching: boolean) {
   useLayoutEffect(() => {
     const sheet = cardRef.current;
-    if (!phone || sheet === null) return;
+    if (!watching || sheet === null) return;
     const sizes = new ResizeObserver(() => {
       const dock = document.querySelector("[data-dock]");
       if (dock !== null) sheet.style.setProperty("--welcome-top", `${String(dock.getBoundingClientRect().top)}px`);
@@ -35,9 +35,8 @@ function useDockTop(cardRef: RefObject<HTMLElement | null>, phone: boolean) {
     return () => {
       arrivals.disconnect();
       sizes.disconnect();
-      sheet.style.removeProperty("--welcome-top");
     };
-  }, [cardRef, phone]);
+  }, [cardRef, watching]);
 }
 
 /** The card; closed it stays drawn, inert and faded, so that it leaves as it came. */
@@ -50,7 +49,7 @@ export function Welcome() {
   // A phone opens a world; it does not fly.
   const phone = useMedia(PHONE_QUERY);
   const cardRef = useRef<HTMLElement>(null);
-  useDockTop(cardRef, phone);
+  useDockTop(cardRef, phone && open);
   // Any use closes it for good.
   const using = (act: (from: HTMLElement) => void) => (event: MouseEvent<HTMLElement>) => {
     seen();
