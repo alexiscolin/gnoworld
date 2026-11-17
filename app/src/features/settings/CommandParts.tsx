@@ -71,7 +71,7 @@ export function Submit({
 
 // The fine print under the buttons, with the code's clock, counted from its arrival (the page trusts no clock but its own); it asks for a new
 // code when the time is up. Keyed by the code, so each starts at its flow's `seconds`.
-export function CodeNote({ seconds, onExpired }: { seconds: number; onExpired: () => void }) {
+function CodeNote({ seconds, onExpired }: { seconds: number; onExpired: () => void }) {
   const left = useCountdown(seconds);
   const expired = useEffectEvent(onExpired);
   useEffect(() => {

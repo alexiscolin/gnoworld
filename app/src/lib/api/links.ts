@@ -9,7 +9,7 @@ import { pageFetch } from "../query/policy.ts";
 import { CliChallenge, tooBig } from "./login.ts";
 
 export { type Fetcher, type Result } from "./http.ts";
-export { FILE_MAX_BYTES, type CliChallenge } from "./login.ts";
+export { type CliChallenge } from "./login.ts";
 
 const Signed = z.object({ signatures: z.array(z.unknown()).check(z.length(1)) });
 
@@ -44,7 +44,6 @@ export type AdenaChallenge = z.infer<typeof AdenaChallenge>;
 const Released = z.object({ ok: z.literal(true) });
 // A link's command-line code: the account's own block too, and the chain an Adena signature of it is for.
 const LinkCliChallenge = z.extend(CliChallenge, { byBlock: Block, chainId: AnyChainId });
-export type LinkCliChallenge = z.infer<typeof LinkCliChallenge>;
 /** The logged-in account's own proof of a link's text: Adena's, or its command-line key's file. */
 export type ByProof = { proof: Proof } | { file: string };
 
