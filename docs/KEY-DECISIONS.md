@@ -85,4 +85,3 @@ day-to-day log of every decision, the review findings and the plans are the proc
 27. **Decisions and findings are recorded in neutral English,** never as quotes and with no personal detail; the process journal
     lives in `docs/process/`. *Why:* the repository is public and read by people who were not in the conversation. *Where:*
     CLAUDE.md, [process/README.md](process/README.md).
-28. **Apache-2.0,** as gno. *Why:* the same terms as the chain it builds on. *Where:* [LICENSE](../LICENSE).

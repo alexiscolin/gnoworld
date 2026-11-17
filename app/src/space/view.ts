@@ -1,6 +1,7 @@
 // What the loop reads and writes of a Space each frame (frame.ts): its state between frames, the frame's pace and size, the numbers a frame is
 // drawn from, and the pixels a second its slow motions move.
 import { pixelRatioFor } from "@gnoworld/core";
+import type { WebGLRenderer } from "three";
 import type { Space } from "./scene.ts";
 import { placeOf, type Vec } from "./layout.ts";
 import { lowered, raised, type Verdict } from "./pace.ts";
@@ -25,7 +26,7 @@ export interface State {
   sized: boolean;
   /** When the near planets were last chosen, and what they are chosen by, written each time: a frame makes nothing. */
   chose: number;
-  readonly choosing: { pxK: number; seconds: number; open: number };
+  readonly choosing: { pxK: number; seconds: number; open: number; wait: boolean };
   freed: boolean;
   ticked: number;
   place: Space["place"];
@@ -42,7 +43,7 @@ export const stateOf = (space: Space): State => ({
   freed: false,
   ticked: -1,
   chose: 0,
-  choosing: { pxK: 0, seconds: 0, open: -1 },
+  choosing: { pxK: 0, seconds: 0, open: -1, wait: false },
   place: space.place,
   universe: space.universe,
   numbers: { eye: [0, 0, 0, 0, 0, 0, 1], shown: [] },
@@ -192,6 +193,11 @@ export const tick = (
   space.seconds += (ms / 1000) * space.rig.free.rate;
 };
 
+/** Whether no near planet is made now: in a flight, where the browser compiles no program aside (Firefox has no
+ * KHR_parallel_shader_compile), a planet made would hold a frame of it while its programs compile (parts/wanted.ts, madeOnly). */
+export const waitsToMake = (flying: boolean, renderer: Pick<WebGLRenderer, "extensions">): boolean =>
+  flying && !renderer.extensions.has("KHR_parallel_shader_compile");
+
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */
 export function choose(space: Space, state: State, now: number): void {
   const open = openedOf(space, space.stage.frame.uOpenNow.value);
@@ -201,6 +207,7 @@ export function choose(space: Space, state: State, now: number): void {
   state.choosing.pxK = space.see.pxK;
   state.choosing.seconds = space.seconds;
   state.choosing.open = open;
+  state.choosing.wait = waitsToMake(space.rig.flying, space.renderer);
   state.pxPerSecond = pixelsPerSecond(space);
   state.face = facesShow(space);
   space.stage.near?.choose(space.universe, space.camera.position, state.choosing);
