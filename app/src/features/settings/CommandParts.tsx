@@ -1,106 +1,148 @@
-// The pieces of the command-line flow that only draw: the block to copy and the box to paste into, the button, the code's clock, the address box.
-import { Button, Field, Stack } from "@gnoworld/ui";
-import { useEffect, useEffectEvent } from "react";
-import type { CliChallenge } from "../../lib/api/links.ts";
-import { canCopy, copyText } from "../../lib/copy.ts";
+// The pieces of the command-line flow that only draw: the address, the block to run and the box to paste into, the button, the code's clock.
+// Each is a step of the flow's Stack, the content's edges shared (the UX pass).
+import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
+import { useEffect, useEffectEvent, type ReactNode } from "react";
+import { CodeBlock } from "../../CodeBlock.tsx";
 import { clock, useCountdown } from "./useCountdown.ts";
-import styles from "./Settings.module.css";
 
-const CODE_SECONDS = 600;
 const PLACEHOLDER = '{"msg":[…],"fee":…,"signatures":[{"pub_key":…,"signature":…}],"memo":"…"}';
 
-// The block to copy and the box to paste into.
+// Two steps: the block to run, named `run`, with its help and what it signs (`about`) right under it, then the box to paste into, named
+// `paste`, with its own error. `focus`: the block's Copy takes the focus as it comes.
 export function Block({
-  code,
+  block,
+  help,
   file,
   onFile,
-  onCopied,
+  error = "",
+  run = "Run in a terminal",
+  paste = "Paste what it printed",
+  about = null,
+  focus = false,
 }: {
-  code: CliChallenge;
+  block: string;
+  help: string;
   file: string;
   onFile: (file: string) => void;
-  onCopied: (words: string) => void;
+  error?: string;
+  run?: string;
+  paste?: string;
+  about?: ReactNode;
+  focus?: boolean;
 }) {
   return (
-    <Stack space="2xs">
-      <span className="meta">Copy, run in your terminal (KEY is your key's name); nothing is sent</span>
-      <div className={styles["code"]}>
-        <pre className={[styles["block"], "fill-box", "data-text"].join(" ")} data-scroll="">
-          {code.block}
-        </pre>
-        {canCopy() ? (
-          <span className={styles["copy"]}>
-            <Button
-              size="s"
-              onClick={() => {
-                copyText(code.block)
-                  .then((copied) => {
-                    onCopied(copied ? "Copied" : "Could not copy the block");
-                  })
-                  .catch(reportError);
-              }}
-            >
-              Copy
-            </Button>
-          </span>
-        ) : null}
-      </div>
-      <Field kind="lines" label="Paste what it shows" value={file} onChange={onFile} placeholder={PLACEHOLDER} />
-    </Stack>
+    <>
+      <Stack space="2xs">
+        <p className="label">{run}</p>
+        <CodeBlock text={block} help={help} focus={focus} />
+        {about}
+      </Stack>
+      <Field
+        kind="lines"
+        label={paste}
+        value={file}
+        onChange={onFile}
+        placeholder={PLACEHOLDER}
+        {...(error === "" ? {} : { error })}
+      />
+    </>
   );
 }
 
-// Nothing to press without an address, while a code is asked for, or with nothing pasted under a code.
+// Nothing to press without an address, or with nothing pasted under a code; a code asked or a file checked is the button's busy.
 export const blocked = (valid: boolean, step: { at: string }, file: string) =>
-  !valid || step.at === "asking" || (step.at === "ready" && file.trim() === "");
+  !valid || (step.at === "ready" && file.trim() === "");
 
-// Get a code, then Link; the Link's own words while the server checks.
+// Get a code, then the flow's verb; its own words while the server checks, pressed and still in reach while it waits. Outline while the
+// next act is elsewhere (a link waiting for the logged-in account's own signature).
 export function Submit({
   ready,
+  asking,
   disabled,
   onClick,
+  verb,
+  emphasis,
 }: {
   ready: { checking?: true } | undefined;
+  asking: boolean;
   disabled: boolean;
   onClick: () => void;
+  verb: string;
+  emphasis: "solid" | "outline";
 }) {
   return (
-    <Button emphasis="solid" disabled={disabled || ready?.checking === true} onClick={onClick}>
-      {ready === undefined ? "Get a code" : ready.checking === true ? "Checking…" : "Link"}
+    <Button emphasis={emphasis} busy={asking || ready?.checking === true} disabled={disabled} onClick={onClick}>
+      {ready === undefined ? "Get a code" : ready.checking === true ? "Checking…" : verb}
     </Button>
   );
 }
 
-// How long the code works, counted from its arrival (the page trusts no clock but its own), and what the signature is for; it asks for a new code
-// when the time is up. Keyed by the code, so each starts at ten minutes.
-export function CodeNote({ onExpired }: { onExpired: () => void }) {
-  const left = useCountdown(CODE_SECONDS);
+// The fine print under the buttons, with the code's clock, counted from its arrival (the page trusts no clock but its own); it asks for a new
+// code when the time is up. Keyed by the code, so each starts at its flow's `seconds`.
+function CodeNote({ seconds, onExpired }: { seconds: number; onExpired: () => void }) {
+  const left = useCountdown(seconds);
   const expired = useEffectEvent(onExpired);
   useEffect(() => {
     if (left === 0) expired();
   }, [left]);
-  return (
-    <p className="meta">
-      {`The code works once, for ${clock(left)} more, for this site and this account. The signature is for a chain that does not exist, and the transaction sends nothing to anyone but the key itself.`}
-    </p>
-  );
+  return <p className="meta">{`Nothing is sent to the chain. The code works once, for ${clock(left)} more.`}</p>;
 }
 
 export function AddressBox({
+  label,
   typed,
   valid,
   onChange,
 }: {
+  label: string;
   typed: string;
   valid: boolean;
   onChange: (typed: string) => void;
 }) {
   return (
     <Field
-      label="Address"
+      label={label}
       value={typed}
       onChange={onChange}
+      placeholder="g1…"
       {...(typed !== "" && !valid ? { error: "This is not a gno address: it starts with g1." } : {})}
     />
+  );
+}
+
+const NOTHING = (): void => undefined;
+
+// The flow's end: the status line (held hidden while empty, so it takes no gap), the main button then Cancel at the content's start, and the
+// fine print under them, `note`, or the code's clock once there is a code. The Adena tab's end too, with no code.
+export function EndGroup({
+  said,
+  submit,
+  onCancel,
+  code,
+  onExpired = NOTHING,
+  note = "Nothing is sent to the chain.",
+}: {
+  said: string;
+  submit: ReactNode;
+  onCancel: () => void;
+  code: { nonce: string; seconds: number } | undefined;
+  onExpired?: () => void;
+  note?: string;
+}) {
+  return (
+    <Stack space="xs">
+      <p role="status" className={said === "" ? "visually-hidden" : undefined}>
+        {said}
+      </p>
+      <Cluster space="2xs">
+        {submit}
+        <Button onClick={onCancel}>Cancel</Button>
+      </Cluster>
+      {code === undefined ? (
+        <p className="meta">{note}</p>
+      ) : (
+        <CodeNote key={code.nonce} seconds={code.seconds} onExpired={onExpired} />
+      )}
+    </Stack>
   );
 }

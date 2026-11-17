@@ -65,7 +65,7 @@ function OpenCard({ card, place, level, title }: { card: CallCardState; place: C
       })
       .catch(report);
   }, [chain.indexer, realm, func, options]);
-  const signedIn = useApp((state) => state.login.session.kind === "in");
+  const session = useApp((state) => state.login.session);
   const { callsActions } = ensureCalls(store).getState();
   const { name, chainId, rpc } = chain;
   return (
@@ -74,12 +74,13 @@ function OpenCard({ card, place, level, title }: { card: CallCardState; place: C
       level={level}
       title={title}
       login={{
-        signedIn,
+        signedIn: session.kind === "in",
+        as: session.kind === "in" ? session.address : undefined,
         onLogIn: () => {
           askFor("log-in");
         },
       }}
-      network={{ name, chainId }}
+      network={{ name, chainId, rpc }}
       fee={feeText(fees)}
       onEdit={(index, text) => {
         callsActions.edit(id, index, text);

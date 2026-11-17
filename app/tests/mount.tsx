@@ -119,6 +119,16 @@ export function click(element: HTMLElement | undefined): void {
   });
 }
 
+/** Types `text` into an input or a textarea as a person would: the value set past React's own tracker, then its input event. */
+export function typeInto(field: HTMLElement | undefined, text: string): void {
+  if (field === undefined) throw new Error("no field to type into");
+  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  act(() => {
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 /** `element` rendered to static markup and read back as DOM, for what needs no events and no effects (a component whose
  * effects jsdom cannot run, such as the composer's popover). */
 export function markup(element: ReactElement): HTMLElement {

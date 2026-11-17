@@ -125,8 +125,10 @@ describe("cliDocument", () => {
       signatures: null,
       memo: MEMO,
     });
+    // The signer's address where the key's name would go: the tool takes either (gno v1.5.0 tm2/pkg/crypto/keys/client/sign.go,
+    // GetByNameOrAddress), so the block needs no edit (PR #41's UX review).
     expect(command).toBe(
-      "gnokey sign --tx-path link.json --chainid gnoworld-link --account-number 0 --account-sequence 0 KEY && cat link.json",
+      `gnokey sign --tx-path link.json --chainid gnoworld-link --account-number 0 --account-sequence 0 ${key.address} && cat link.json`,
     );
   });
 
