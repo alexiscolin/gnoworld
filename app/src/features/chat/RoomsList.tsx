@@ -24,7 +24,7 @@ export { RoomsNav } from "./RoomSections.tsx";
 
 /** What a list looks like where it stands: the default is the column's and the menu's (the filter always, New room a "+" at the first
  * section's name); a phone's drawer (DRAWER) shows its filter past PagedList's 12 rooms and New room as a full-width button at the foot. */
-export const RoomsLookContext = createContext({ filterPast: 0, wideNew: false });
+const RoomsLookContext = createContext({ filterPast: 0, wideNew: false });
 const DRAWER = { filterPast: 12, wideNew: true };
 
 /** A list as a phone's drawer shows it. */
