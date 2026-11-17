@@ -11,8 +11,12 @@ const BY_REALM = new Map(
   ),
 );
 
-/** The hub a world id stands for (its display name, its slug), or none: the cosmos knows worlds by realm. */
-export const hubOf = (id: string): { readonly name: string; readonly slug: string } | undefined => BY_REALM.get(id);
+// A hub on no realm (gnosh's colony) the cosmos knows by its slug.
+const BY_SLUG = new Map(hubs.map((hub) => [hub.slug, hub] as const));
+
+/** The hub a world id stands for (its display name, its slug), or none: the cosmos knows worlds by realm, a hub on none by its slug. */
+export const hubOf = (id: string): { readonly name: string; readonly slug: string } | undefined =>
+  BY_REALM.get(id) ?? BY_SLUG.get(id);
 
 /** A namespace or a world as the GUI names them: an address short, else the name the data gives (core's labelName), else its last part. */
 export const nameOf = (id: string): string => {

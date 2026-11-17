@@ -341,8 +341,12 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await listening(server);
     const peer = await ergo.peer(0);
     await welcome(peer, { echo: false });
-    // Every world of the roles file the server ships, the stations round the Earth among them, by name.
-    const rooms = shippedWorlds().map((world) => `#${world}`);
+    // Every world of the roles file the server ships, the stations round the Earth among them, by name; and its typed rooms (gnosh's
+    // #help and #showcase, D13744), in the names' order.
+    const roles = loadRoles(join(SERVER, "roles.json"));
+    const typed = [...roles.worlds.values()].flatMap(({ rooms }) => [...(rooms?.keys() ?? [])]);
+    const rooms = [...shippedWorlds().map((world) => `#${world}`), ...typed].toSorted();
+    expect(typed).toEqual(["#gnosh-ai/help", "#gnosh-ai/showcase"]);
     expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual([`JOIN ${rooms.join(",")}`]);
     const left = once(peer.socket, "close");
     server.child.kill("SIGTERM");

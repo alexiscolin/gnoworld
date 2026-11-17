@@ -71,6 +71,10 @@
     {
       "slug": "gnosh-ai",
       "moderators": [],
+      "rooms": [
+        { "room": "#gnosh-ai/help", "type": "open" },
+        { "room": "#gnosh-ai/showcase", "type": "open" }
+      ],
       "rules": {
         "bannedWords": [],
         "linksPerMessage": 3,

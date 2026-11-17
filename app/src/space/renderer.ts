@@ -1,6 +1,6 @@
 // The one place the renderer is made (ADR-0002 §9: the low-power adapter, no stencil), and with it the image's one grade (ADR-0002 §10):
 // a filmic curve holds the frames' deep black and rolls warm light off to white, before anything compiles, and for everything drawn.
-import { ACESFilmicToneMapping, WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, PCFShadowMap, WebGLRenderer } from "three";
 
 // The dive's grade: the planets' quads and the planets drawn as themselves are matched under it, the rail's portraits too.
 const EXPOSURE = 1;
@@ -53,6 +53,9 @@ export function createRenderer(canvas: HTMLCanvasElement, antialias: boolean, al
   const renderer = new WebGLRenderer({ canvas, antialias, alpha, stencil: false, powerPreference: "low-power" });
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
+  // Soft shadows, cast by gnosh's colony's light alone: with no light casting, three draws no shadow map.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFShadowMap;
   return renderer;
 }
 

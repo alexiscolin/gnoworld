@@ -77,9 +77,9 @@ describe("the site's worlds, by request", () => {
 });
 
 describe("the worlds of the data files", () => {
-  test("offer Bubble and GovDAO alone (the stations round the Earth are not offered, STATIONS_SHOWN), each canonical under /net/onyx, and each station's page stays routable", () => {
+  test("offer Bubble, GovDAO and gnosh's colony alone (of the stations, SHOWN_STATIONS's; STATIONS_SHOWN keeps the others out, D13742), each canonical under /net/onyx, and each station's page stays routable", () => {
     const stations = new Map(orbit.map(({ slug, name }) => [slug, name]));
-    expect(site.worlds).toHaveLength(2);
+    expect(site.worlds).toHaveLength(3);
     for (const [slug, name] of stations)
       expect(site.world(at(`/w/${slug}`)), slug).toMatchObject({ slug, name, kind: "station", path: `/w/${slug}` });
     expect(site.worlds).toEqual([
@@ -106,6 +106,17 @@ describe("the worlds of the data files", () => {
         realms: ["gno.land/r/gov/dao"],
         kind: "dao",
         actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
+      },
+      {
+        slug: "gnosh-ai",
+        name: "gnosh.ai",
+        description:
+          "gnosh.ai, a colony round gno.land's sun: an AI harness that thinks in gno, running gno code for its planning and memory.",
+        universe: "onyx",
+        testnet: true,
+        path: "/w/gnosh-ai",
+        canonical: "/net/onyx/w/gnosh-ai",
+        kind: "station",
       },
     ]);
   });

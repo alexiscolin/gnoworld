@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { typedRooms } from "../rooms/wire.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,10 +100,11 @@ describe("loadRoles", () => {
     expect([...shipped.worlds.keys()].sort()).toEqual(["earth", ...hubs.map(({ slug }) => slug)].sort());
   });
 
-  it("gives every world the server ships no moderator, group or typed room and the default rules (8l)", () => {
+  it("gives every world the server ships no moderator, group or typed room and the default rules (8l), gnosh's colony's two rooms aside", () => {
     const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
     const plain = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
-    const given = [...shipped.worlds].map(([slug, { moderators, groups, rooms, rules }]) => ({
+    const others = [...shipped.worlds].filter(([slug]) => slug !== "gnosh-ai");
+    const given = others.map(([slug, { moderators, groups, rooms, rules }]) => ({
       slug,
       held: [moderators.size, groups?.size, rooms?.size],
       rules,
@@ -111,6 +113,24 @@ describe("loadRoles", () => {
     expect(
       given.filter(({ held, rules }) => held.some((size) => size !== 0) || !isDeepStrictEqual(rules, plain)),
     ).toEqual([]);
+  });
+
+  // gnosh's colony has a chat as the Earth's (D13744): #help and #showcase, open to all, beside its main room; the server makes a typed
+  // room at its start (chatParts.ts's seedRooms), so the file alone opens them.
+  it("ships gnosh's colony two open rooms, #help and #showcase, and no moderator, group or rule of its own", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    const gnosh = shipped.worlds.get("gnosh-ai");
+    if (gnosh === undefined) throw new Error("no gnosh-ai in the shipped roles");
+    const rooms = gnosh.rooms ?? new Map();
+    expect([...rooms.keys()]).toEqual(["#gnosh-ai/help", "#gnosh-ai/showcase"]);
+    for (const room of rooms.values()) expect(room).toMatchObject({ type: "open", hidden: false });
+    expect(gnosh.moderators.size).toBe(0);
+    expect([gnosh.groups?.size, gnosh.sections?.length].map((size) => size ?? 0)).toEqual([0, 0]);
+    expect(typedRooms(new Map([["gnosh-ai", gnosh]]))).toEqual([
+      { name: "#gnosh-ai/help", world: "gnosh-ai" },
+      { name: "#gnosh-ai/showcase", world: "gnosh-ai" },
+    ]);
+    expect(gnosh.rules).toEqual({ bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 });
   });
 
   it("takes the smallest values each field allows", () => {

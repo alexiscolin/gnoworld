@@ -15,11 +15,13 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 
 /** Each late chunk by its name, the chunks a page holds before it (their closures are not its weight), and its cap in bytes. `after`
  * absent: the chunk alone. */
-// Four chunks are capped: `scene` (three is in the `earth` chunk it imports), `Rail`, `thumbs` and `generated`. Each cap is the measured
-// weight and 256 B; the first screen of every page that shows space holds `root` and `universe`.
+// Five chunks are capped: `scene` (three is in the `earth` chunk it imports), `Rail`, `thumbs`, `generated` and `gnoshColony`. The first
+// four caps were their measured weight and 256 B; a new chunk's cap is round, about a tenth over its measure, rounded up to the hundred, and
+// a cap moves only by the owner's recorded decision (D13750). The first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 194,353 B measured, 256 B ahead.
-  { chunk: "scene", after: ["root", "universe"], cap: 194_609 },
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 198,431 B measured, the cap the owner's (D13751):
+  // three's lit material, directional light and shadows, LOD and shapes for gnosh's colony stand in three's one shared chunk.
+  { chunk: "scene", after: ["root", "universe"], cap: 199_000 },
   // On the home's first screen: 19,888 B measured beyond `root` and `universe` (its worlds, their thumbs, the home's views and the follow
   // chunks it imports; the phone's worlds row reads the rail, D13719), 256 B ahead.
   { chunk: "Rail", after: ["root", "universe"], cap: 20_144 },
@@ -27,6 +29,9 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "thumbs", cap: 2692 },
   // The temperate worlds' coasts, shapes and climates and the cream veins.
   { chunk: "generated", cap: 10_189 },
+  // gnosh's colony, asked when the scene draws it near (D13746): 5,587 B measured alone; a new chunk's cap is round, about a tenth over
+  // its measure, rounded up to the hundred (D13750): 6,200 B.
+  { chunk: "gnoshColony", cap: 6200 },
 ];
 
 /** The one built file of a chunk's name (`scene` for `scene-B9x_Qa1z.js`, never `sceneView-…`); none, or two, throws. */

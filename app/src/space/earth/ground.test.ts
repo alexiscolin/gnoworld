@@ -1,9 +1,9 @@
 import { Quaternion, Vector3 } from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { placeOf, type Planet, type System } from "../layout.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { EarthGround } from "./ground.ts";
-import { dayOf } from "./light.ts";
+import { dayOf, kept } from "./light.ts";
 import type { Planet as Drawn } from "../planet/planet.ts";
 
 const v = { x: 0, y: 0, z: 0 };
@@ -336,5 +336,82 @@ describe("EarthGround on a page the Earth was drawn turned to its hour", () => {
     const wrapped = (d: number) => d - 360 * Math.round(d / 360);
     expect(Math.abs(extra)).toBeGreaterThan(1);
     expect(wrapped(ground.facing(earth, 40, view).lon - before.lon)).toBeCloseTo(wrapped(extra), 6);
+  });
+});
+
+// gnosh's colony has no ground of its own: its marks stand on points of its hull (colony/crown.ts), turn as the colony turns, and hide where
+// their face turns from the eye or the colony stands between them and it, never in the void (D13745).
+describe("a colony's marks", () => {
+  const seen = {
+    eye: { x: 0, y: 0, z: 5 },
+    project: (at: { x: number; y: number }, out: { x: number; y: number }) => {
+      [out.x, out.y] = [at.x, at.y];
+      return true;
+    },
+  };
+  const hullOf = () => ({
+    anchorFor: vi.fn((_ground: Vector3, at: Vector3, out: Vector3) => {
+      at.set(0, 0, 0.8);
+      out.set(0, 0, 1);
+    }),
+    blocks: vi.fn(() => false),
+    scale: 1,
+  });
+
+  it("stands a mark on the hull point its spot gives, facing the eye, as long as nothing of the colony stands before it", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    const hull = hullOf();
+    ground.hull = hull;
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    // The ground turns by the planet's spin and the Earth's kept day (light.ts's kept): taken back, the turn is none.
+    const still = { seconds: -kept() / SPIN, step: 0.1 };
+    ground.place(planet("gnosh-ai"), still, seen);
+    expect(hull.anchorFor).toHaveBeenCalledOnce();
+    // One sight line a mark a frame: none for the aim's probe, which tries thousands of turns.
+    expect(hull.blocks).toHaveBeenCalledOnce();
+    // The planet stands on its orbit of 1 at phase 0, at x 1; the hull point stands 0.8 out toward the eye, which sees it at x 1, y 0.
+    expect(placed.at(-1)).toEqual([1, 0, true]);
+    hull.blocks.mockReturnValue(true);
+    ground.place(planet("gnosh-ai"), still, seen);
+    expect(placed.at(-1)?.[2]).toBe(false);
+  });
+
+  // On its page the colony stands smaller than its planet's radius (gnoshColony.ts's setClose): its marks stand where its hull is then.
+  it("stands a mark at the share of the planet's radius the hull stands at", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    ground.hull = {
+      anchorFor: (_ground: Vector3, at: Vector3, out: Vector3) => {
+        at.set(0, 0.8, 0.6);
+        out.set(0, 0.6, 0.8);
+      },
+      blocks: () => false,
+      scale: 0.5,
+    };
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    ground.place(planet("gnosh-ai"), { seconds: -kept() / SPIN, step: 0.1 }, seen);
+    expect(placed.at(-1)?.[1]).toBeCloseTo(0.4, 6);
+  });
+
+  it("turns its marks with the colony: a quarter turn on, the point has moved with the hull and faces away", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    ground.hull = hullOf();
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    ground.place(planet("gnosh-ai"), { seconds: (Math.PI / 2 - kept()) / SPIN, step: 0.1 }, seen);
+    // A quarter turn takes the point 0.8 out along z to 0.8 back along x: 1 - 0.8; its face now looks along x, across the eye's line.
+    const [x, , front] = placed.at(-1) ?? [];
+    expect(x).toBeCloseTo(0.2, 5);
+    expect(front).toBe(false);
   });
 });

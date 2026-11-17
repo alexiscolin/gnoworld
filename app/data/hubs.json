@@ -47,7 +47,7 @@
   {
     "slug": "gnosh-ai",
     "name": "gnosh.ai",
-    "description": "gnosh.ai, a station round the Earth: an AI harness that thinks in gno, running gno code for its planning and memory.",
+    "description": "gnosh.ai, a colony round gno.land's sun: an AI harness that thinks in gno, running gno code for its planning and memory.",
     "universe": "onyx",
     "kind": "station"
   }

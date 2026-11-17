@@ -25,6 +25,7 @@ export function PlaceFrame({
   ring,
   chat,
   chatDue = false,
+  imposing = true,
 }: {
   label: string;
   plate: ReactNode;
@@ -33,8 +34,10 @@ export function PlaceFrame({
   /** The dock's chat, and whether its door to space has come (useSpace). */
   chat?: ReactNode;
   chatDue?: boolean;
+  /** Whether the planet stands larger than the window where the window allows: a colony stands whole beside the plate (D13749). */
+  imposing?: boolean;
 }) {
-  const framed = useFraming(DOCKED);
+  const framed = useFraming(DOCKED) && imposing;
   return (
     <>
       {/* The planet's place: the page lays it out, the scene draws in it. */}

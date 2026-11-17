@@ -14,6 +14,7 @@ import {
 } from "react";
 import rules from "../data/bubbles.json" with { type: "json" };
 import places from "../data/earthRooms.json" with { type: "json" };
+import { roomsOn } from "./colonyRooms.ts";
 import { BubbleSign, loadWords, Mark } from "./BubbleSign.tsx";
 import { followed } from "./lib/followed.ts";
 import type { StoreApi } from "zustand/vanilla";
@@ -83,7 +84,7 @@ export function PageSigns({
     store,
     ground: ground ?? pageGround,
     rules,
-    places: world === undefined ? places : [],
+    places: world === undefined ? places : roomsOn(world.id),
     ...(world === undefined ? {} : { world }),
   }));
   return <EarthSigns deps={deps} open={open} inside={ground !== undefined} />;

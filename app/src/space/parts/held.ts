@@ -67,3 +67,9 @@ export function holdOf(
   );
   return held;
 }
+
+/** The hull of the world `id` among `held`, drawn as itself: a colony's; none for a planet. */
+export function hullIn(held: ReadonlyMap<number, Held>, id: string): Held["drawn"]["hull"] {
+  for (const each of held.values()) if (each.planet.id === id) return each.drawn.hull;
+  return undefined;
+}

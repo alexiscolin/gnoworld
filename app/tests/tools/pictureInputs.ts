@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EARTH, hubWorldOf } from "@gnoworld/core";
+import { EARTH, hubWorldOf, SHOWN_STATIONS } from "@gnoworld/core";
 import { z } from "zod";
 import { mapNamesOf, worldOf } from "../../src/space/planet/generated.ts";
 import { mapUrl } from "../../src/space/planet/mapUrl.ts";
@@ -26,13 +26,29 @@ export function worldIds(): string[] {
   return [...new Set([EARTH, ...hubs.map(hubWorldOf)])];
 }
 
-/** A hash of what the world's look is made from: its seed, class and palette, its texture files, and the code that frames it. */
+// gnosh's colony is drawn by its own code, no seed's maps (D13740).
+const COLONY = [
+  ...["crown.ts", "hull.ts", "colony.ts", "materials.ts", "shapes.ts", "gnoshColony.ts"].map((name) =>
+    here(`../../src/space/colony/${name}`),
+  ),
+  here("../../src/space/stationWorlds.ts"),
+];
+
+/** The files a world's look is made from: the colony's code for gnosh's, else its texture files; and the code that frames it. */
+export function inputsOf(id: string): string[] {
+  const names = id === EARTH ? EARTH_MAPS : SHOWN_STATIONS.includes(id) ? [] : mapNamesOf(worldOf(id));
+  return [
+    ...(SHOWN_STATIONS.includes(id) ? COLONY : []),
+    ...names.map((name) => here(`../../public${mapUrl(name, "/")}`)),
+    here("../../src/space/portraits.ts"),
+  ];
+}
+
+/** A hash of what the world's look is made from: its seed, class and palette, and its files (inputsOf). */
 export function inputsHash(id: string): string {
-  const names = id === EARTH ? EARTH_MAPS : mapNamesOf(worldOf(id));
   const parts = [
     id === EARTH ? id : JSON.stringify(worldOf(id)),
-    ...names.map((name) => sha(readFileSync(here(`../../public${mapUrl(name, "/")}`)))),
-    sha(readFileSync(here("../../src/space/portraits.ts"))),
+    ...inputsOf(id).map((file) => sha(readFileSync(file))),
   ];
   return sha(new TextEncoder().encode(parts.join("|"))).slice(0, 8);
 }
