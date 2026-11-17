@@ -134,7 +134,7 @@
     /* The band's place while its code comes (ChatTop.tsx): its height at rest (PhoneBand.module.css: a step, the place's 88 px, the rooms' row, a few
        pixels and the rule), so the conversation does not move down as it arrives; one row on a short window. */
     :root:has(.topWaiting, [data-phone-band]) {
-      --phone-band: calc(var(--space-xs) + var(--control-m) * 3 + var(--space-3xs) + var(--line-width));
+      --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) * 3 + var(--line-width));
     }
 
     @media (height < 500px) {
@@ -165,11 +165,11 @@
       );
     }
 
-    :root:has([data-chat-screen] :is(textarea, input):focus) {
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) {
       --phone-worlds: 0px;
     }
 
-    :root:has([data-chat-screen] :is(textarea, input):focus) .worlds {
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) .worlds {
       display: none;
     }
 
@@ -197,8 +197,13 @@
   /* While a chat's field has the focus on a phone, the keyboard takes the screen's foot: the chat takes the shell header's room back
      (--shell-head, shellHeader.module.css) and covers it until the field lets go, so the lines and Send keep theirs. */
   @media (width < 900px) {
-    :root:has([data-chat-screen] :is(textarea, input):focus) {
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) {
       --shell-head: 0px;
+    }
+
+    /* ... and the header (the page's one outside the chat) is neither seen, focused nor tapped meanwhile. */
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) header:not([data-chat-screen] *) {
+      visibility: hidden;
     }
   }
 }

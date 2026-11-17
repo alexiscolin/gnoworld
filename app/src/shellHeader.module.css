@@ -420,18 +420,6 @@
       min-inline-size: 0;
     }
 
-    /* Under 360 px the chip's words would crowd the three 44 px controls at 320: a warm dot, its word kept for screen readers. */
-    @media (width < 360px) {
-      .testnet > :first-child {
-        display: none;
-      }
-
-      .testnetDot {
-        /* layout: the dot and its hidden word in the chip's place */
-        display: inline-flex;
-      }
-    }
-
     .logo {
       /* layout: the link is a 44 px target round its mark */
       align-items: center;

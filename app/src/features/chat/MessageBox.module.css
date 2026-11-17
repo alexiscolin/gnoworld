@@ -237,16 +237,41 @@
       overflow: auto;
     }
 
+    /* A long draft scrolls under the field's own edge: that edge stands a step inside the box (a margin, which the padding gave up), so no line is
+       cut at the box's border. */
+    .box [role="textbox"],
+    .box .field textarea {
+      /* layout: the field's edge a step inside the box */
+      margin-block-start: var(--space-2xs);
+      padding-block-start: var(--space-3xs);
+    }
+
     /* The box has its resting edge, one more line wide on each side; its field keeps the base's room, two lines to type before it grows. */
     .box {
       border: var(--line-width) solid var(--color-line-strong);
     }
 
-    /* Four lines' room at rest, which Send (44 px) and its inset sit inside. */
-    .box:not(:focus-within) [role="textbox"],
-    .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
-    .box:not(:focus-within) .field textarea {
-      min-block-size: calc(4lh + var(--space-s));
+    /* Four lines' room at rest, which Send (44 px) and its inset sit inside; a phone on its side rests at one line (the block below). */
+    @media (height >= 700px) {
+      .box:not(:focus-within) [role="textbox"],
+      .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
+      .box:not(:focus-within) .field textarea {
+        min-block-size: calc(4lh + var(--space-s));
+      }
+    }
+
+    /* A short phone (under 700 px tall) rests at two lines, still growing as one types. */
+    @media (500px <= height < 700px) {
+      .box:not(:focus-within) [role="textbox"],
+      .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
+      .box:not(:focus-within) .field textarea {
+        min-block-size: calc(2lh + var(--space-s));
+      }
+    }
+
+    /* A guest's field grows with its draft up to the cap, as an account's does (the ui's Field fixes its size with a weight of two and a type; :enabled is the one more). */
+    .box .field textarea:enabled {
+      field-sizing: content;
     }
 
     /* At rest the field and Send are side by side, the foot (the format control and the quick actions' /) shown once the

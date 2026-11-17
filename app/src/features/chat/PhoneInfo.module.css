@@ -38,6 +38,13 @@
       /* layout: the fill out to the screen's edge */
       margin-inline: calc(-1 * var(--_inset));
     }
+
+    /* A page opened from its URL holds its plates at opacity 0 till the arrival takes them (the ui's Panel, up to 6 s): the sheet's plate is
+       opened by a tap, long after, and shows at once. (html:root and :not([hidden]) lift the weight over the Panel's rule, `:root:not([data-live])`, whatever the sheets' order.) */
+    html:root .sheet [data-look="plate"]:not([hidden]) {
+      opacity: 1;
+      animation: none;
+    }
   }
 
   .sheet > aside {

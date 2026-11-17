@@ -3,12 +3,20 @@
   .bar {
     /* layout: the row is a grid item whose track would otherwise grow to its widest content (the chips), past the screen */
     min-inline-size: 0;
+    /* layout: row B is one 44 px row */
+    min-block-size: var(--control-m);
   }
 
   /* The two controls at the start: the large icon in a 44 px target (the icon button's own height, over its small size's), the first
      starting on the band's inline inset like the place's words above it. */
   .bar .tools button {
     --_h: var(--control-m);
+  }
+
+  /* The first control's glyph on the band's inset (the 44 px target hangs out by the glyph's side room), as the place's words above it. */
+  .tools {
+    /* layout: the glyph on the band's inset, the target's side room hung out */
+    margin-inline-start: calc((var(--icon-l) - var(--control-m)) / 2);
   }
 
   .tools button > svg {
@@ -31,7 +39,7 @@
 
   /* The keyboard owns the foot: no rooms' row while a chat field has the focus (the rooms' filter in the drawer is in a dialog, which
      this row holds, and keeps it shown). */
-  :root:has([data-chat-screen] :is(textarea, input):focus:not(dialog *)) .bar {
+  :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus:not(dialog *)) .bar {
     display: none;
   }
 }
