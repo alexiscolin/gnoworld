@@ -112,8 +112,10 @@
   }
 
   /* The line pointed at: a faint fill and nothing else, so no line under it moves. */
-  .lines > li:hover {
-    background: var(--color-fill);
+  @media (hover: hover) {
+    .lines > li:hover {
+      background: var(--color-fill);
+    }
   }
 
   /* A line that goes on its author's group (LineView's `grouped`): close under the one before it, a head of marks only; its time
@@ -403,6 +405,18 @@
   @media (width < 900px) {
     .fill {
       --_room: var(--chat-inset);
+    }
+
+    /* A phone keeps no room for the pointer's bar (the desktop's 256 px gutter wrapped every line in a 133 px column from 408 px wide): it
+       floats over the line's end, as in the narrow container. A thread's bare rows (0,2,1) keep their times' column. */
+    .lines > li {
+      /* raw: no room kept */
+      --_gutter: 0px;
+    }
+
+    /* One author's lines a line apart, not a paragraph: the step lies in the head's own room above. */
+    .lines > li[data-grouped] {
+      padding-block-start: 0;
     }
 
     .fill > li:first-child {

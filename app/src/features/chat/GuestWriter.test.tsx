@@ -74,7 +74,7 @@ describe("a guest's composer", () => {
     it("says in its placeholder that it speaks as a guest", () => {
       phone();
       const box = one(mount(<GuestWriter room="#games" />), "form textarea");
-      expect(box.getAttribute("placeholder")).toBe("Message #games as a guest");
+      expect(box.getAttribute("placeholder")).toBe("#games as a guest");
       expect(box.parentElement?.querySelector(`label[for="${box.id}"]`)?.textContent).toBe("Message #games");
     });
 

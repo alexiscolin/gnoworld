@@ -97,7 +97,7 @@ function GuestField(props: {
       resizable={false}
       hideLabel
       label={`Message ${label}`}
-      placeholder={`Message ${label}${asGuest ? " as a guest" : ""}`}
+      placeholder={asGuest ? `${label} as a guest` : `Message ${label}`}
       value={draft}
       invalid={problem !== undefined}
       describedBy={problem}

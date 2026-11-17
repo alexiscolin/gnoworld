@@ -80,8 +80,11 @@
       margin: calc(-1 * var(--space-3xs)) calc(-1 * var(--space-3xs)) 0;
     }
 
+    /* The home bar's inset goes under the row of worlds while it shows (it pads itself: ChatScreen's --phone-worlds counts it), under the box only when the row is hidden. */
     .dock {
-      padding-block-end: max(var(--space-s), env(safe-area-inset-bottom));
+      padding-block-end: max(var(--space-s), calc(env(safe-area-inset-bottom) - var(--phone-worlds)));
+      /* a step less above, so the lines keep the room */
+      padding-block-start: var(--space-2xs);
     }
 
     /* The composer's edge on the lines' own (the chat's inset), its words a step in. */
