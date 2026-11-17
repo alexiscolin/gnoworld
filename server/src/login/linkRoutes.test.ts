@@ -8,7 +8,7 @@ import { z } from "zod";
 import { BODY_LIMIT, makeApp } from "../app.ts";
 import { migrations } from "../migrations.ts";
 import { cliFile, cliKey } from "../testing/cliSigner.ts";
-import { cliDocument } from "./cliProof.ts";
+import { cliBlock, cliDocument } from "./cliProof.ts";
 import { linkRoutes, serverLinks } from "./linkRoutes.ts";
 import type { Links } from "./links.ts";
 
@@ -20,9 +20,12 @@ const PROXY = "10.0.0.2";
 const T0 = Date.parse("2026-11-11T12:00:00.000Z");
 const MINUTE = 60_000;
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
-const A = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+// The session's account holds a key here: a link needs its signature too (the wallet audit's medium 1).
+const OWNER = cliKey();
+const A = OWNER.address;
 const B = Address.parse("g1m68zzc430znqyxzv6jsfz45hgccacx3mk6qajw");
-const C = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");
+const C_KEY = cliKey();
+const C = C_KEY.address;
 const D = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const E = Address.parse("g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq");
 const hmac = (who: string): string =>
@@ -198,7 +201,10 @@ function setup({ script = {}, real = false, block = (address, memo) => `BLOCK ${
 type T = ReturnType<typeof setup>;
 
 const adena = { kind: "adena", address: B };
-const verifyAdena = { nonce: NONCE, address: B, proof: PROOF };
+const BY = { proof: PROOF };
+const verifyAdena = { nonce: NONCE, address: B, proof: PROOF, by: BY };
+// The session's own file over the code's text, for the real links: "a" is A's key, "c" C's.
+const byOf = (who: string, memo = "") => ({ file: cliFile(who === "c" ? C_KEY : OWNER, memo) });
 const unlinkB = { address: B };
 const ROUTES = [
   ["challenge", adena],
@@ -313,7 +319,7 @@ describe("POST /api/links/challenge", () => {
     const t = setup();
     const response = await t.challenge(adena, { who: "a", host: "evil.test" });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ...CHALLENGE, chainId: "onyx-1" });
+    expect(await response.json()).toEqual({ ...CHALLENGE, chainId: "onyx-1", byBlock: `BLOCK ${A} ${CHALLENGE.text}` });
     expect(t.calls.start).toEqual([{ by: A, kind: "adena", subject: B, host: "gnoworld.test", signedAt: T0 - MINUTE }]);
   });
 
@@ -324,7 +330,9 @@ describe("POST /api/links/challenge", () => {
       nonce: NONCE,
       memo: CHALLENGE.text,
       block: `BLOCK ${B} ${CHALLENGE.text}`,
+      byBlock: `BLOCK ${A} ${CHALLENGE.text}`,
       expiresAt: CHALLENGE.expiresAt,
+      chainId: "onyx-1",
     });
   });
 
@@ -382,26 +390,48 @@ describe("POST /api/links/verify", () => {
     const response = await t.verify(verifyAdena, { who: "a", host: "evil.test" });
     expect([response.status, await response.json()]).toEqual([200, { members: [A, B] }]);
     expect(t.calls.finish).toEqual([
-      { kind: "adena", nonce: NONCE, by: A, address: B, proof: PROOF, host: "gnoworld.test", signedAt: T0 - MINUTE },
+      {
+        kind: "adena",
+        nonce: NONCE,
+        by: A,
+        address: B,
+        proof: PROOF,
+        byProof: { kind: "adena", proof: PROOF },
+        host: "gnoworld.test",
+        signedAt: T0 - MINUTE,
+      },
     ]);
   });
 
   it("finishes a command-line link with the pasted file as it is, the address with it", async () => {
     const t = setup();
-    const response = await t.verify({ nonce: NONCE, address: B, file: "{}" }, { who: "a" });
+    const response = await t.verify({ nonce: NONCE, address: B, by: BY, file: "{}" }, { who: "a" });
     expect(response.status).toBe(200);
     expect(t.calls.finish).toEqual([
-      { kind: "cli", nonce: NONCE, by: A, address: B, file: "{}", host: "gnoworld.test", signedAt: T0 - MINUTE },
+      {
+        kind: "cli",
+        nonce: NONCE,
+        by: A,
+        address: B,
+        file: "{}",
+        byProof: { kind: "adena", proof: PROOF },
+        host: "gnoworld.test",
+        signedAt: T0 - MINUTE,
+      },
     ]);
   });
 
   it.each([
     ["a proof and a file together", { ...verifyAdena, file: "{}" }],
     ["neither a proof nor a file", { nonce: NONCE, address: B }],
-    ["a file that is not a string", { nonce: NONCE, address: B, file: { msg: [] } }],
+    ["a file that is not a string", { nonce: NONCE, address: B, by: BY, file: { msg: [] } }],
     ["a code that is no code", { ...verifyAdena, nonce: "short" }],
-    ["a file of 4097 bytes", { nonce: NONCE, address: B, file: "x".repeat(4097) }],
-    ["a file of 2100 letters of two bytes", { nonce: NONCE, address: B, file: "é".repeat(2100) }],
+    ["a file of 4097 bytes", { nonce: NONCE, address: B, by: BY, file: "x".repeat(4097) }],
+    ["a file of 2100 letters of two bytes", { nonce: NONCE, address: B, by: BY, file: "é".repeat(2100) }],
+    ["no proof of the session's account", { nonce: NONCE, address: B, proof: PROOF }],
+    ["the account's proof and file together", { ...verifyAdena, by: { proof: PROOF, file: "{}" } }],
+    ["the account's file of 4097 bytes", { ...verifyAdena, by: { file: "x".repeat(4097) } }],
+    ["the account's proof of the wrong shape", { ...verifyAdena, by: { proof: { signature: "x" } } }],
   ])("refuses %s, nothing finished", async (_, body) => {
     const t = setup();
     const response = await t.verify(body, { who: "a" });
@@ -411,7 +441,9 @@ describe("POST /api/links/verify", () => {
 
   it("accepts a file of exactly 4096 bytes", async () => {
     const t = setup();
-    expect((await t.verify({ nonce: NONCE, address: B, file: "x".repeat(4096) }, { who: "a" })).status).toBe(200);
+    expect((await t.verify({ nonce: NONCE, address: B, by: BY, file: "x".repeat(4096) }, { who: "a" })).status).toBe(
+      200,
+    );
   });
 
   it.each([
@@ -437,16 +469,22 @@ describe("POST /api/links/verify", () => {
     const file = JSON.stringify({ msg: [], note: MARKER });
     for (const script of [{ finish: "proof" }, { finish: "nonce" }, { finish: new Error(`bad ${file}`) }] as const) {
       const t = setup({ script });
-      const response = await t.verify({ nonce: NONCE, address: B, file }, { who: "a" });
+      const response = await t.verify({ nonce: NONCE, address: B, by: BY, file }, { who: "a" });
       expect(await response.text()).not.toContain(MARKER);
       expect(t.lines.join("\n")).not.toContain(MARKER);
     }
     const t = setup();
-    const refused = await t.verify({ nonce: NONCE, address: B, file: MARKER.repeat(400), extra: 1 }, { who: "a" });
+    const refused = await t.verify(
+      { nonce: NONCE, address: B, by: BY, file: MARKER.repeat(400), extra: 1 },
+      { who: "a" },
+    );
     expect(await refused.text()).not.toContain(MARKER);
     expect(t.lines.join("\n")).not.toContain(MARKER);
     const oversize = setup();
-    const big = await oversize.verify({ nonce: NONCE, address: B, file: `${MARKER}${"x".repeat(5000)}` }, { who: "a" });
+    const big = await oversize.verify(
+      { nonce: NONCE, address: B, by: BY, file: `${MARKER}${"x".repeat(5000)}` },
+      { who: "a" },
+    );
     expect(await big.text()).not.toContain(MARKER);
     expect(oversize.lines.join("\n")).not.toContain(MARKER);
   });
@@ -481,10 +519,31 @@ describe("with the real links", () => {
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
     const response = await t.verify(
-      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") },
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
       { who: "a" },
     );
     expect([response.status, await response.json()]).toEqual([200, { members: [A, key.address].toSorted() }]);
+  });
+
+  it("links nothing for a relayed login: B's good file and a fresh session, A's proof by another key (the audit's medium 1)", async () => {
+    const t = setup({ real: true });
+    const [key, relay] = [cliKey(), cliKey()];
+    const code = await issued(t, "a", { kind: "cli", address: key.address });
+    const text = code.memo ?? "";
+    const response = await t.verify(
+      { nonce: code.nonce, address: key.address, file: cliFile(key, text), by: { file: cliFile(relay, text) } },
+      { who: "a" },
+    );
+    expect([response.status, await response.json()]).toEqual([400, { error: "refused" }]);
+    expect(await (await t.get({ who: "a" })).json()).toMatchObject({ members: [], linked: false });
+  });
+
+  it("gives A's block over the same text, which A's key signs", async () => {
+    const t = setup({ real: true, block: cliBlock });
+    const key = cliKey();
+    const response = await t.challenge({ kind: "cli", address: key.address }, { who: "a" });
+    const code = z.object({ memo: z.string(), byBlock: z.string() }).parse(await response.json());
+    expect(code.byBlock).toBe(cliBlock(A, code.memo));
   });
 
   it("refuses a file signed by another key, with no member added", async () => {
@@ -492,7 +551,7 @@ describe("with the real links", () => {
     const [key, other] = [cliKey(), cliKey()];
     const code = await issued(t, "a", { kind: "cli", address: key.address });
     const response = await t.verify(
-      { nonce: code.nonce, address: key.address, file: cliFile(other, code.memo ?? "") },
+      { nonce: code.nonce, address: key.address, file: cliFile(other, code.memo ?? ""), by: byOf("a", code.memo) },
       { who: "a" },
     );
     expect([response.status, await response.json()]).toEqual([400, { error: "refused" }]);
@@ -504,7 +563,7 @@ describe("with the real links", () => {
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
     const response = await t.verify(
-      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") },
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
       { who: "c" },
     );
     expect(response.status).toBe(404);
@@ -514,7 +573,12 @@ describe("with the real links", () => {
     const t = setup({ real: true });
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
-    const body = { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") };
+    const body = {
+      nonce: code.nonce,
+      address: key.address,
+      file: cliFile(key, code.memo ?? ""),
+      by: byOf("a", code.memo),
+    };
     const both = await Promise.all([t.verify(body, { who: "a" }), t.verify(body, { who: "a" })]);
     expect(both.map((r) => r.status).toSorted()).toEqual([200, 404]);
     expect((await t.verify(body, { who: "a" })).status).toBe(404);
@@ -526,7 +590,7 @@ describe("with the real links", () => {
     const code = await issued(t, "a", { kind: "cli", address: key.address });
     t.clock.now += 10 * MINUTE + 1;
     const response = await t.verify(
-      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") },
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
       { who: "a" },
     );
     expect(response.status).toBe(404);
@@ -536,13 +600,21 @@ describe("with the real links", () => {
     const t = setup({ real: true });
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
-    await t.verify({ nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") }, { who: "a" });
+    await t.verify(
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
+      { who: "a" },
+    );
     const [linked, free] = [cliKey(), cliKey()];
     const answers: [number, string][] = [];
     for (const target of [key, free, linked]) {
       const made = await issued(t, "c", { kind: "cli", address: target.address });
       const response = await t.verify(
-        { nonce: made.nonce, address: target.address, file: cliFile(cliKey(), made.memo ?? "") },
+        {
+          nonce: made.nonce,
+          address: target.address,
+          file: cliFile(cliKey(), made.memo ?? ""),
+          by: byOf("c", made.memo),
+        },
         { who: "c" },
       );
       answers.push([response.status, await response.text()]);
@@ -554,7 +626,10 @@ describe("with the real links", () => {
   const linked = async (t: T): Promise<ReturnType<typeof cliKey>> => {
     const key = cliKey();
     const made = await issued(t, "a", { kind: "cli", address: key.address });
-    await t.verify({ nonce: made.nonce, address: key.address, file: cliFile(key, made.memo ?? "") }, { who: "a" });
+    await t.verify(
+      { nonce: made.nonce, address: key.address, file: cliFile(key, made.memo ?? ""), by: byOf("a", made.memo) },
+      { who: "a" },
+    );
     return key;
   };
 
@@ -564,7 +639,7 @@ describe("with the real links", () => {
     const unknown: [number, string][] = [];
     for (const address of [key.address, cliKey().address]) {
       const visitor = `203.0.113.${String(unknown.length + 80)}`;
-      const response = await t.verify({ nonce: NONCE, address, file: "{}" }, { who: "c", visitor });
+      const response = await t.verify({ nonce: NONCE, address, file: "{}", by: BY }, { who: "c", visitor });
       unknown.push([response.status, await response.text()]);
     }
     expect(unknown[0]).toEqual(unknown[1]);
@@ -574,7 +649,10 @@ describe("with the real links", () => {
       const made = await issued(t, "c", { kind: "cli", address: target.address });
       const visitor = `203.0.113.${String(bad.length + 90)}`;
       const file = cliFile(cliKey(), made.memo ?? "");
-      const response = await t.verify({ nonce: made.nonce, address: target.address, file }, { who: "c", visitor });
+      const response = await t.verify(
+        { nonce: made.nonce, address: target.address, file, by: byOf("c", made.memo) },
+        { who: "c", visitor },
+      );
       bad.push([response.status, await response.text()]);
     }
     expect(bad[0]).toEqual(bad[1]);
@@ -586,7 +664,10 @@ describe("with the real links", () => {
     const key = await linked(t);
     const made = await issued(t, "c", { kind: "cli", address: key.address });
     const file = cliFile(key, made.memo ?? "");
-    const response = await t.verify({ nonce: made.nonce, address: key.address, file }, { who: "c" });
+    const response = await t.verify(
+      { nonce: made.nonce, address: key.address, file, by: byOf("c", made.memo) },
+      { who: "c" },
+    );
     expect([response.status, await response.json()]).toEqual([403, { error: "forbidden" }]);
   });
 
@@ -594,7 +675,10 @@ describe("with the real links", () => {
     const t = setup({ real: true });
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
-    await t.verify({ nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") }, { who: "a" });
+    await t.verify(
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
+      { who: "a" },
+    );
     const [linked, free] = [
       await t.challenge({ kind: "cli", address: key.address }, { who: "c" }),
       await t.challenge({ kind: "cli", address: cliKey().address }, { who: "c" }),
@@ -609,7 +693,10 @@ describe("with the real links", () => {
     const t = setup({ real: true });
     const key = cliKey();
     const code = await issued(t, "a", { kind: "cli", address: key.address });
-    await t.verify({ nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? "") }, { who: "a" });
+    await t.verify(
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo ?? ""), by: byOf("a", code.memo) },
+      { who: "a" },
+    );
     expect((await t.unlink({ address: key.address }, { who: "a" })).status).toBe(200);
     expect(await (await t.get({ who: "a" })).json()).toMatchObject({ members: [], linked: false });
   });
@@ -643,8 +730,8 @@ describe("freshness, size and the log (part 4's red pass)", () => {
     const t = setup({ script: { finish: "proof" } });
     const proof = { ...PROOF, signature: { ...PROOF.signature, signature: MARKER } };
     for (const body of [
-      { nonce: NONCE, address: B, proof },
-      { nonce: MARKER, address: B, proof },
+      { nonce: NONCE, address: B, proof, by: BY },
+      { nonce: MARKER, address: B, proof, by: BY },
     ]) {
       const response = await t.verify(body, { who: "a" });
       expect(await response.text()).not.toContain(MARKER);
@@ -726,7 +813,7 @@ describe("with the real links, across the routes (part 4's red pass)", () => {
     const key = cliKey();
     const made = await code(t, { who, address: key.address });
     const done = await t.verify(
-      { nonce: made.nonce, address: key.address, file: cliFile(key, made.memo ?? "") },
+      { nonce: made.nonce, address: key.address, file: cliFile(key, made.memo ?? ""), by: byOf(who, made.memo) },
       { who },
     );
     expect(done.status).toBe(200);
@@ -1021,7 +1108,7 @@ describe("POST /api/links/release/challenge and /release/verify", () => {
         .object({ nonce: z.string(), memo: z.string() })
         .parse(await (await t.challenge({ kind: "cli", address: target.address }, { who })).json());
       const done = await t.verify(
-        { nonce: made.nonce, address: target.address, file: cliFile(target, made.memo) },
+        { nonce: made.nonce, address: target.address, file: cliFile(target, made.memo), by: byOf(who, made.memo) },
         { who },
       );
       expect(done.status).toBe(200);
@@ -1170,8 +1257,12 @@ describe("POST /api/links/release/challenge and /release/verify", () => {
       expect((await t.releaseVerify(asLink)).status).toBe(404);
       const code = await asked(t, key);
       expect(
-        (await t.verify({ nonce: code.nonce, address: key.address, file: cliFile(key, code.memo) }, { who: "a" }))
-          .status,
+        (
+          await t.verify(
+            { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo), by: byOf("a", code.memo) },
+            { who: "a" },
+          )
+        ).status,
       ).toBe(404);
       expect(await (await t.get({ who: "a" })).json()).toMatchObject({ members: [] });
     });

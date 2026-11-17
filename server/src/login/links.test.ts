@@ -77,6 +77,8 @@ const setup = (options: { adena?: Verify; cli?: Verifiers["cli"]; linkCap?: numb
       host: HOST,
       signedAt: clock.now,
       ...(kind === "cli" ? { kind, file: "" } : { kind, proof }),
+      // A signs the same text too (the wallet audit's medium 1): its own proof, unless a test gives another.
+      byProof: { kind: "adena", proof: by.sign(CHAIN, signed) },
       ...over,
     });
   const link = (a: Wallet, b: Wallet) => finish(started(a, b), { by: a, who: b });
@@ -343,7 +345,11 @@ describe("finishLink: whose nonce, spent how", () => {
     const [a, b] = [wallet(), wallet()];
     const made = s.started(a, b);
     await s.finish(made, { by: a, who: b, text: "another text" });
-    expect(seen).toEqual([{ signer: b.address, chainId: CHAIN, data: made.text }]);
+    // The address's proof, then the asking account's own of the same text (the wallet audit's medium 1).
+    expect(seen).toEqual([
+      { signer: b.address, chainId: CHAIN, data: made.text },
+      { signer: a.address, chainId: CHAIN, data: made.text },
+    ]);
   });
 
   it("makes one link when two verifies of one proof arrive at once", async () => {
@@ -363,7 +369,8 @@ describe("finishLink: whose nonce, spent how", () => {
     const results = await Promise.all([s.finish(made, { by: a, who: b }), s.finish(made, { by: a, who: b })]);
     expect(results.filter((r) => r === "nonce")).toHaveLength(1);
     expect(results.filter((r) => typeof r === "object")).toHaveLength(1);
-    expect(calls).toBe(1);
+    // One attempt's two proofs, B's and A's: the second finish spent nothing and verified nothing.
+    expect(calls).toBe(2);
     expect(count(s.db, "links")).toBe(2);
   });
 
@@ -729,6 +736,7 @@ describe("the command-line proof through finishLink (part 3)", () => {
         signedAt: T0,
         kind: "cli",
         file,
+        byProof: { kind: "adena", proof: a.sign(CHAIN, made.text) },
       });
     return { s, a, key, made, finish };
   };
@@ -766,17 +774,19 @@ describe("the command-line proof through finishLink (part 3)", () => {
     const made = s.links.startLink({ by: a.address, kind: "adena", subject: key.address, host: HOST, signedAt: T0 });
     if (typeof made === "string") throw new Error(`no link code: ${made}`);
     const file = cliFile(key, made.text);
-    const request = { nonce: made.nonce, by: a.address, address: key.address, host: HOST, signedAt: T0 };
+    const byProof = { kind: "adena", proof: a.sign(CHAIN, made.text) } as const;
+    const request = { nonce: made.nonce, by: a.address, address: key.address, host: HOST, signedAt: T0, byProof };
     expect(await s.links.finishLink({ ...request, kind: "cli", file })).toBe("nonce");
     expect(count(s.db, "nonces")).toBeGreaterThan(0);
   });
 
-  it("issues no command-line code for a host the chain would encode differently, and an Adena one all the same", () => {
+  // A may prove by the command line whatever B's kind (the wallet audit's medium 1): no code, Adena's either, for such a host.
+  it("issues no code of either kind for a host the chain would encode differently", () => {
     const s = setup();
     const [a, b] = [wallet(), wallet()];
     expect(s.ask(a, b, { kind: "cli", host: "gnoworld.test&x" })).toBe("text");
+    expect(s.ask(a, b, { kind: "adena", host: "gnoworld.test&x" })).toBe("text");
     expect(count(s.db, "nonces")).toBe(0);
-    expect(typeof s.ask(a, b, { kind: "adena", host: "gnoworld.test&x" })).toBe("object");
   });
 });
 
@@ -807,6 +817,7 @@ describe("the members as a list shows them", () => {
       file: "x",
       host: HOST,
       signedAt: s.clock.now,
+      byProof: { kind: "adena", proof: a.sign(CHAIN, made.text) },
     });
     const row = s.links.list(a.address).find(({ address }) => address === key.address);
     expect(row).toEqual({ address: key.address, kind: "cli", linkedAt: T0 + MINUTE });
@@ -843,7 +854,7 @@ describe("the release of a command-line key", () => {
       }: { key: CliKey; signer?: CliKey; memo?: string } & Partial<Parameters<Links["finishRelease"]>[0]>,
     ) => s.links.finishRelease({ nonce, address: key.address, file: cliFile(signer, memo), host: HOST, ...over });
     // `key` linked to `a` by a command-line proof, the way a phishing victim's key is.
-    const linkKey = async (a: Pick<Wallet, "address">, key: CliKey) => {
+    const linkKey = async (a: Wallet | CliKey, key: CliKey) => {
       const made = s.started(a, { address: key.address }, { kind: "cli" });
       const done = await s.links.finishLink({
         kind: "cli",
@@ -853,6 +864,10 @@ describe("the release of a command-line key", () => {
         address: key.address,
         host: HOST,
         signedAt: T0,
+        byProof:
+          "pem" in a
+            ? { kind: "adena", proof: a.sign(CHAIN, made.text) }
+            : { kind: "cli", file: cliFile(a, made.text) },
       });
       expect(typeof done).toBe("object");
     };
@@ -1110,7 +1125,8 @@ describe("the release of a command-line key", () => {
       const s = setupCli();
       const [a, key] = [wallet(), cliKey()];
       const release = s.released(key);
-      const asLink = { by: a.address, address: key.address, host: HOST, signedAt: T0, nonce: release.nonce };
+      const byProof = { kind: "adena", proof: a.sign(CHAIN, release.text) } as const;
+      const asLink = { by: a.address, address: key.address, host: HOST, signedAt: T0, nonce: release.nonce, byProof };
       expect(await s.links.finishLink({ ...asLink, kind: "cli", file: cliFile(key, release.text) })).toBe("nonce");
       const proof = wallet().sign(CHAIN, release.text);
       expect(await s.links.finishLink({ ...asLink, kind: "adena", proof })).toBe("nonce");
@@ -1135,6 +1151,7 @@ describe("the release of a command-line key", () => {
         address: key.address,
         host: HOST,
         signedAt: T0,
+        byProof: { kind: "adena", proof: a.sign(CHAIN, link.text) },
       });
       expect(typeof finished).toBe("object");
       expect(count(s.db, "nonces")).toBe(0);
@@ -1184,5 +1201,89 @@ describe("the release of a command-line key", () => {
       expect(typeof t.ask(wallet(), wallet())).toBe("object");
       expect(t.ask(wallet(), wallet())).toBe("full");
     });
+  });
+});
+
+describe("A signs the link too (the wallet audit's medium 1)", () => {
+  it("links nothing from a fresh session and B's proof alone: A's proof by another key, or of another text, is refused, the code spent", async () => {
+    const s = setup();
+    const [a, b, relay] = [wallet(), wallet(), wallet()];
+    const made = s.started(a, b);
+    const byRelay = { kind: "adena", proof: relay.sign(CHAIN, made.text) } as const;
+    expect(await s.finish(made, { by: a, who: b, byProof: byRelay })).toBe("proof");
+    expect(await s.finish(made, { by: a, who: b })).toBe("nonce");
+    const again = s.started(a, b);
+    const otherText = { kind: "adena", proof: a.sign(CHAIN, `${again.text}.`) } as const;
+    expect(await s.finish(again, { by: a, who: b, byProof: otherText })).toBe("proof");
+    expect(count(s.db, "links")).toBe(0);
+  });
+
+  it("refuses A's signature of the same text for another chain, and B's own signature given as A's", async () => {
+    const s = setup();
+    const [a, b] = [wallet(), wallet()];
+    const made = s.started(a, b);
+    const otherChain = { kind: "adena", proof: a.sign("gnoland-1", made.text) } as const;
+    expect(await s.finish(made, { by: a, who: b, byProof: otherChain })).toBe("proof");
+    const again = s.started(a, b);
+    const asB = { kind: "adena", proof: b.sign(CHAIN, again.text) } as const;
+    expect(await s.finish(again, { by: a, who: b, byProof: asB })).toBe("proof");
+    expect(count(s.db, "links")).toBe(0);
+  });
+
+  it("takes A's proof from the command line: A's key signs the same text as a file, B's by Adena", async () => {
+    const s = setup({ cli: cliVerify });
+    const [a, b] = [cliKey(), wallet()];
+    const made = s.started(a, b);
+    const done = await s.links.finishLink({
+      nonce: made.nonce,
+      by: a.address,
+      address: b.address,
+      host: HOST,
+      signedAt: s.clock.now,
+      kind: "adena",
+      proof: b.sign(CHAIN, made.text),
+      byProof: { kind: "cli", file: cliFile(a, made.text) },
+    });
+    expect(membersOf(done)).toEqual([a.address, b.address].sort());
+  });
+
+  it.each([
+    ["signed by B's key", (_: CliKey, b: CliKey, text: string) => cliFile(b, text)],
+    ["signed for a real chain", (a: CliKey, _: CliKey, text: string) => cliFile(a, text, { doc: { chainId: CHAIN } })],
+  ])("refuses A's file %s, B's own file good", async (_name, fileOf) => {
+    const s = setup({ cli: cliVerify });
+    const [a, b] = [cliKey(), cliKey()];
+    const made = s.started(a, b, { kind: "cli" });
+    const done = await s.links.finishLink({
+      nonce: made.nonce,
+      by: a.address,
+      address: b.address,
+      host: HOST,
+      signedAt: s.clock.now,
+      kind: "cli",
+      file: cliFile(b, made.text),
+      byProof: { kind: "cli", file: fileOf(a, b, made.text) },
+    });
+    expect(done).toBe("proof");
+    expect(count(s.db, "links")).toBe(0);
+  });
+
+  it("refuses A's file where no command-line verifier is given", async () => {
+    const s = setup();
+    const [a, b] = [cliKey(), wallet()];
+    const made = s.started(a, b);
+    const byProof = { kind: "cli", file: cliFile(a, made.text) } as const;
+    const by = { ...wallet(), address: a.address };
+    expect(await s.finish(made, { by, who: b, proof: b.sign(CHAIN, made.text), byProof })).toBe("proof");
+    expect(count(s.db, "links")).toBe(0);
+  });
+
+  it("answers proof, never linked, for B's good proof and A's bad one on a key linked elsewhere", async () => {
+    const s = setup();
+    const [a, b, other] = [wallet(), wallet(), wallet()];
+    await s.link(other, b);
+    const made = s.started(a, b);
+    const byOther = { kind: "adena", proof: other.sign(CHAIN, made.text) } as const;
+    expect(await s.finish(made, { by: a, who: b, byProof: byOther })).toBe("proof");
   });
 });
