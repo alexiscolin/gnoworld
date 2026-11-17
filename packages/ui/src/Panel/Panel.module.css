@@ -103,6 +103,7 @@
     --color-card-hover: color-mix(in srgb, var(--color-text) 6%, var(--plate-ground, var(--color-plate)));
 
     background: var(--_ground);
+    mask-image: var(--plate-mask);
   }
 
   /* raw: under the plate's breakpoint the plate is a block of the page: the bottom nav and the "View in space" pill stand over its last lines */
