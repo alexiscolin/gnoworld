@@ -2,7 +2,7 @@
 // flat at its rim, the home at the heart and the heaviest nearest it; each world a planet on its own orbit; the Earth in the home system,
 // still. Every number comes from a hash of the ids, so the same file always gives the same universe.
 import { EARTH, SHOWN_STATIONS } from "@gnoworld/core";
-import { byNamespace, COLONY_PHASE, colonySizeOf, type CosmosWorld } from "./cosmosWorld.ts";
+import { byNamespace, COLONY_PHASE, fixedSizeOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { HOME_NAMESPACES } from "../cosmosAt.ts";
 import { hashOf } from "./hash.ts";
 import { HEART, placesOf } from "./saucer.ts";
@@ -117,7 +117,7 @@ function systemOf(index: number, id: string, { place, use, home, kept }: Sun): S
 
 // A planet's radius by its use: the smallest an unused world's, a step more each time its use doubles, the largest past that, far
 // enough that busy worlds still differ; the Earth's own, as its hand-made look was sized.
-const SIZE = { smallest: 0.5, perDoubling: 0.36, largest: 3.2, earth: 2.2 } as const;
+const SIZE = { smallest: 0.5, perDoubling: 0.36, largest: 3.2 } as const;
 const sizeOf = (use: number) => Math.min(SIZE.smallest + SIZE.perDoubling * Math.log2(1 + use), SIZE.largest);
 
 type Held = readonly { id: string; use: number }[];
@@ -160,10 +160,7 @@ function orbitsOf(id: string, home: boolean, kept: Kept): { orbits: number[]; re
 // A planet's radius by its use, on a log scale: an unused world small, the busiest the largest, each a fifth larger or smaller by its
 // id so no two stand alike; the Earth's own size.
 const radiusOf = (world: Held[number]) =>
-  GROW *
-  (world.id === EARTH
-    ? SIZE.earth
-    : (colonySizeOf(world.id) ?? sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16))));
+  GROW * (fixedSizeOf(world.id) ?? sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16)));
 
 // The planets of `system`: the file's `worlds`, then the `asked` ones the file lacks, on orbits past them.
 function addPlanets(system: System, kept: Kept, planets: Planet[]): void {

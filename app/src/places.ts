@@ -1,7 +1,7 @@
 // The places the app knows, from the data files (the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
 // request's path, exactly as written: the path's case is part of the address, a trailing slash is not.
-import { placeAt, realmRoute, SHOWN_STATIONS, STATIONS_SHOWN, type Place, type PlaceKind } from "@gnoworld/core";
+import { placeAt, realmRoute, stationShown, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
@@ -171,9 +171,7 @@ function build(source: Source) {
   };
   const everyWorld = listed("world", source.hubs);
   // A station's page stays routable (everyWorld), but is offered as a place only while the switch is on, or when it is shown whatever it says.
-  const worlds = everyWorld.filter(
-    ({ kind, slug }) => STATIONS_SHOWN || kind !== "station" || SHOWN_STATIONS.includes(slug),
-  );
+  const worlds = everyWorld.filter(({ kind, slug }) => stationShown(kind, slug));
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {
