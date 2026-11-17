@@ -7,6 +7,8 @@
       /* layout: the actions a step apart */
       gap: var(--space-2xs);
       overflow: auto hidden;
+      /* layout: the last action keeps the sheet's inset when the row scrolls to its end */
+      padding-inline-end: var(--space-s);
     }
 
     /* The main action takes the room left and never gives its words up; a line too narrow scrolls. */

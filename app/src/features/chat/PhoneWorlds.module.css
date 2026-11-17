@@ -78,8 +78,8 @@
     /* layout: the list's own margin gone */
     margin: 0;
     padding-block: var(--space-2xs) var(--space-3xs);
-    /* layout: the first disc, centred in its item, on the screen's 16 px line */
-    padding-inline: calc(var(--space-s) - (var(--thumb-l) - var(--control-m)) / 2);
+    /* layout: the first item's box on the screen's 16 px line */
+    padding-inline: var(--space-s);
     list-style: none;
     inline-size: max-content;
   }

@@ -7,16 +7,10 @@
     min-block-size: var(--control-m);
   }
 
-  /* The two controls at the start: the large icon in a 44 px target (the icon button's own height, over its small size's), the first
-     starting on the band's inline inset like the place's words above it. */
+  /* The two controls at the start: the large icon in a 44 px target (the icon button's own height, over its small size's), the first's box
+     starting on the band's inline inset. */
   .bar .tools button {
     --_h: var(--control-m);
-  }
-
-  /* The first control's glyph on the band's inset (the 44 px target hangs out by the glyph's side room), as the place's words above it. */
-  .tools {
-    /* layout: the glyph on the band's inset, the target's side room hung out */
-    margin-inline-start: calc((var(--icon-l) - var(--control-m)) / 2);
   }
 
   .tools button > svg {
