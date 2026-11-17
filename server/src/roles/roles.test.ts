@@ -133,6 +133,16 @@ describe("loadRoles", () => {
     expect(gnosh.rules).toEqual({ bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 });
   });
 
+  // Alexis: the same moderators as the Earth's (D13753): its rooms are watched as the Earth's are, the team's, and stay in step with it.
+  it("gives gnosh's colony the Earth's moderators, groups and rules", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    const [gnosh, earth] = [shipped.worlds.get("gnosh-ai"), shipped.worlds.get("earth")];
+    if (gnosh === undefined || earth === undefined) throw new Error("no gnosh-ai or earth in the shipped roles");
+    expect([...gnosh.moderators]).toEqual([...earth.moderators]);
+    expect([...(gnosh.groups ?? new Map())]).toEqual([...(earth.groups ?? new Map())]);
+    expect(gnosh.rules).toEqual(earth.rules);
+  });
+
   it("takes the smallest values each field allows", () => {
     const smallest = { ...RULES, bannedWords: [], linksPerMessage: 0, mentionsPerMessage: 0, linksForNewAccount: 0 };
     const file = {
