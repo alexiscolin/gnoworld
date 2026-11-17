@@ -54,6 +54,8 @@ export class Near {
   #sent = false;
   // The frame's delta, and whether motion is reduced: a planet then comes in at once.
   #fade = { delta: 0, still: true };
+  // Whether a flight runs: the Earth's full maps wait for its end.
+  #flying = false;
 
   /** Whether a planet is still coming in from its skeleton: the scene must go on drawing, or the fade stops where it stands. */
   arriving = false;
@@ -107,9 +109,11 @@ export class Near {
       delta: number;
       still: boolean;
       page?: number;
+      flying?: boolean;
     },
   ): void {
     this.#fade = view;
+    this.#flying = view.flying ?? false;
     this.#page = view.page ?? this.#page;
     this.#seconds = seconds;
     this.#alone = view.alone;
@@ -173,7 +177,7 @@ export class Near {
     if (held?.shown === true) {
       this.#drawnOnce.add(planet.index);
       this.#place(planet, held.drawn, this.#seconds);
-      if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device.maps, this.#device.renderer);
+      if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device.maps, this.#device.renderer, this.#flying);
       const share = step(held, this.#fade);
       held.drawn.setArrive(share);
       this.#coming(planet, held, share);

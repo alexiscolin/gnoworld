@@ -17,14 +17,17 @@ vi.mock("../../afterLoad.ts", () => ({
     then();
   },
 }));
-const earth = vi.hoisted(() => ({ full: 0 }));
+const earth = vi.hoisted(() => ({ full: 0, relief: 0 }));
 vi.mock("../earth/maps.ts", () => ({
   loadEarthMaps: () => Promise.resolve({ day: {}, night: {}, moon: {} }),
   loadFullEarth: () => {
     earth.full += 1;
     return new Promise(() => undefined);
   },
-  loadReliefMaps: () => new Promise(() => undefined),
+  loadReliefMaps: () => {
+    earth.relief += 1;
+    return new Promise(() => undefined);
+  },
 }));
 
 const { Maps } = await import("./maps.ts");
@@ -71,5 +74,31 @@ describe("the Earth's full-size maps", () => {
 
   it("never come to a reader who saves data", async () => {
     expect(await asks({ saveData: true })).toBe(0);
+  });
+
+  const asked = async (go: (maps: InstanceType<typeof Maps>) => void) => {
+    vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
+    [earth.full, earth.relief] = [0, 0];
+    const maps = new Maps("/");
+    go(maps);
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    return [earth.full, earth.relief];
+  };
+
+  it("come with the relief as soon as the Earth's first maps came where it is gone to, before any planet asks them: a dive never waits for them", async () => {
+    expect(
+      await asked((maps) => {
+        maps.earthAhead();
+      }),
+    ).toEqual([1, 1]);
+  });
+
+  it("are not asked where the Earth is only warmed (the galaxy, another world's page): 3.2 MB and their decoded bitmaps for nothing", async () => {
+    expect(
+      await asked((maps) => {
+        maps.earth(false);
+      }),
+    ).toEqual([0, 0]);
   });
 });

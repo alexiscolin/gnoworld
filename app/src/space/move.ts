@@ -144,6 +144,7 @@ export function paint(space: Space, delta: number): void {
     close: closeUp(space),
     delta: delta / 1000,
     still: space.options.still(),
+    flying: rig.flying,
     // How far the sun has gone dim for a page (its gain, eased): 0 where it is drawn, 1 on a page where it is not.
     page: Math.min(1, Math.max(0, (1 - stage.gains.sun.value) / (1 - PAGE.sun))),
   });
