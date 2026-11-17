@@ -204,6 +204,23 @@
     }
   }
 
+  /* A phone: the filter chips and the sort on two lines, never the select over the chips' cut end. */
+  @media (width < 900px) {
+    .filterRow {
+      /* layout: the chips' row over the sort */
+      flex-direction: column;
+      /* layout: each part the row's whole width */
+      align-items: stretch;
+    }
+
+    .filterRow > * {
+      /* layout: each part its own height, none grown or squeezed by the side-by-side rule */
+      flex: none;
+      /* layout: a long row may be narrower than its chips: it scrolls inside */
+      min-inline-size: 0;
+    }
+  }
+
   /* A phone has the results alone. */
   @media (width <= 640px) {
     .body {

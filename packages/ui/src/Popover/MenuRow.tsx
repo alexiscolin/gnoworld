@@ -12,10 +12,20 @@ const doing = (item: MenuItem) =>
         role: item.checked === undefined ? "menuitem" : "menuitemradio",
         "data-tone": item.tone,
         "aria-checked": item.checked,
+        // The name and its chip are two words to a screen reader, not one run together.
+        ...(item.note === undefined ? {} : { "aria-label": `${item.label}, ${item.note}` }),
         onClick: () => {
           item.onSelect();
         },
       };
+
+// A choice's check: its slot, filled for the one chosen; none for a plain act.
+const checkSlot = (checked: boolean | undefined) =>
+  checked === undefined ? null : (
+    <span className={styles["check"]} aria-hidden="true">
+      {checked ? <Icon name="check" /> : null}
+    </span>
+  );
 
 // A row of the menu: an act, a choice (a radio, checked or not) or one yet to come. A function, not a component: the compiler's memo
 // cache of one more component weighed 450 B gzipped on the home's first screen, and the menu's own already holds this JSX's.
@@ -31,6 +41,7 @@ export function row(item: MenuItem) {
     >
       {!waits && item.tone === "danger" ? <Icon name="alert" /> : null}
       {item.icon === undefined ? null : <Icon name={item.icon} />}
+      {waits ? null : checkSlot(item.checked)}
       {item.label}
       {word === undefined ? null : (
         <span className={styles["soon"]}>

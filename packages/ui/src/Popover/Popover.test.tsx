@@ -468,6 +468,20 @@ describe("Menu, a choice among items", () => {
     expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
   });
 
+  it("draws a check on the chosen item alone, hidden from a screen reader (its radio says it)", async () => {
+    await opened([
+      { label: "Onyx", checked: true, onSelect: vi.fn() },
+      { label: "gno.land", checked: false, onSelect: vi.fn() },
+    ]);
+    const rows = screen.getAllByRole("menuitemradio");
+    expect(rows.map((each) => each.querySelector("[aria-hidden='true'] svg") !== null)).toEqual([true, false]);
+  });
+
+  it("names an item with a note by both, apart", async () => {
+    await opened([{ label: "Onyx", note: "Testnet", checked: true, onSelect: vi.fn() }]);
+    expect(screen.getByRole("menuitemradio", { name: "Onyx, Testnet" })).toBeTruthy();
+  });
+
   it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", () => {
     render(
       <Menu

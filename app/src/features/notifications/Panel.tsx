@@ -1,6 +1,7 @@
 // The bell's panel (frames 86, 87): over the dock's column, from under the header to the page's foot. Its title and "Mark all read", the
 // kinds with what is unread in each (All, Messages, Worlds, News), the worlds to filter by, then the lines, the newest first, each going
 // to its place: a page of the site, or off it through the warning. Esc, a click outside or the bell closes it.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { ComingSoon, EmptyState, Panel as Surface, Tabs } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useLocation } from "react-router";
@@ -8,6 +9,7 @@ import { createPortal } from "react-dom";
 import { FOLLOWS_KEPT } from "../../lib/keep/fields.ts";
 import { useHere } from "../../useHere.ts";
 import { useLeaving } from "../../leaving.tsx";
+import { useMedia } from "../chat/index.ts";
 import { useAppStore } from "../../storeContext.tsx";
 import { placeOf, universeAt } from "../events/index.ts";
 import { isUnread, type Item, type NoticeKind } from "./feed.ts";
@@ -101,6 +103,7 @@ export function Panel({
   const { items, read } = useFeed(now, useHere(true));
   const [kind, setKind] = useState<"all" | NoticeKind>("all");
   const [world, setWorld] = useState<string>();
+  const phone = useMedia(PHONE_QUERY);
   const leaving = useLeaving();
   const markRead = useMarkRead(now, items);
   const unread = (of: "all" | NoticeKind) =>
@@ -156,9 +159,12 @@ export function Panel({
           </ol>
         )}
         {/* The chain's own lines (a new realm's signal, a proposal opened or closing) wait for the indexer's events. */}
-        <ComingSoon name="New realms and proposals, from the chain">
-          New realms and proposals, from the chain
-        </ComingSoon>
+        {/* A phone drops it: the greyed line is under the text contrast a small screen needs. */}
+        {phone ? null : (
+          <ComingSoon name="New realms and proposals, from the chain">
+            New realms and proposals, from the chain
+          </ComingSoon>
+        )}
         <p className="meta">What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}

@@ -54,6 +54,8 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
     setAsked(true);
     setOpen(true);
   });
+  // A cold load of the #search address opens it, as the /list redirect does (the hash is the client's alone: no server render).
+  const cold = useEffectEvent(() => hash === SEARCH_HASH);
   useEffect(() => {
     const controller = new AbortController();
     afterLoad(
@@ -83,6 +85,7 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
       },
       { signal: controller.signal },
     );
+    if (cold()) window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
     return () => {
       controller.abort();
     };

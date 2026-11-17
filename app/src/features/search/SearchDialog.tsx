@@ -29,9 +29,6 @@ function intoCards(event: KeyboardEvent<HTMLElement>) {
   card.focus();
 }
 
-// The large sheet on a computer, the whole-screen one on a phone.
-const useSheetWide = () => (useMedia(PHONE_QUERY) ? "screen" : "sheet");
-
 export default function SearchDialog({
   universe,
   open,
@@ -44,7 +41,8 @@ export default function SearchDialog({
   /** The namespace a full Plan's "+N" opens on. */
   start?: string;
 }) {
-  const wide = useSheetWide();
+  const phone = useMedia(PHONE_QUERY);
+  const wide = phone ? "screen" : "sheet";
   const palette = usePalette(universe, open, start);
   // A chip or a namespace on, with no words, lists the places it keeps, not Discover.
   const discovering = palette.query.trim() === "" && palette.filters.size === 0 && palette.namespace === undefined;
@@ -71,7 +69,7 @@ export default function SearchDialog({
     onClose();
   };
   const close = closeFor(false);
-  const { go, chat, copy, copySaid } = useGo(universe, closeFor(true));
+  const { go, chat, copy, copySaid } = useGo(universe, closeFor(true), phone && history.holding);
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };

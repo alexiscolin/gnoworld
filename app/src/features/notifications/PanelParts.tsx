@@ -9,10 +9,12 @@ export function Head({ onMarkAll, onClose }: { onMarkAll: () => void; onClose: (
   return (
     <Cluster justify="between" space="s">
       <h2 className={styles["title"]}>Notifications</h2>
-      <Cluster space="2xs">
-        <Button emphasis="link" size="s" onClick={onMarkAll}>
-          <span className={`label ${String(styles["markAll"])}`}>Mark all read</span>
-        </Button>
+      <Cluster space="2xs" className={styles["actions"]}>
+        <span className={styles["markAllBox"]}>
+          <Button emphasis="link" size="s" onClick={onMarkAll}>
+            <span className={`label ${String(styles["markAll"])}`}>Mark all read</span>
+          </Button>
+        </span>
         <span className={styles["close"]}>
           <IconButton icon="close" label="Close" emphasis="plain" onClick={onClose} />
         </span>

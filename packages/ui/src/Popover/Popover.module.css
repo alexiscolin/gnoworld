@@ -22,7 +22,11 @@
      dynamic viewport's height elsewhere). */
   @media (width < 900px) {
     .panel {
-      max-block-size: min(calc(100% - 2 * var(--space-2xs)), calc(var(--chat-vh) - 2 * var(--space-2xs)));
+      /* The screen's edge: 16 px in, as the page's own gutter (floating.ts reads it, as --_edge). */
+      --_edge: var(--space-s);
+
+      max-inline-size: calc(100% - 2 * var(--_edge));
+      max-block-size: min(calc(100% - 2 * var(--_edge)), calc(var(--chat-vh) - 2 * var(--_edge)));
     }
   }
 
@@ -52,7 +56,7 @@
   }
 
   /* An act with an icon before its words; an irreversible one coral, its alert icon first. */
-  .item:has(svg) {
+  .item:has(> svg) {
     /* layout: the icon and the words on one line, as in a button */
     display: flex;
     /* layout: the icon's distance from its words */
@@ -63,6 +67,11 @@
 
   .item[data-tone="danger"] {
     color: var(--color-danger);
+  }
+
+  /* A choice's check is a phone's: its slot, filled for the one chosen, before the words. */
+  .check {
+    display: none;
   }
 
   /* An act yet to come: ComingSoon's greyed look, its "Soon" at the row's end, no fill under the pointer. */
@@ -90,9 +99,31 @@
       padding: var(--space-2xs);
     }
 
-    .item:has(svg) {
-      /* layout: the icon's distance from its words, wider on a phone */
+    .item:has(> svg),
+    .item[role="menuitemradio"] {
+      /* layout: the icon's (or the check's) distance from its words, wider on a phone */
       gap: var(--space-xs);
+    }
+
+    .item[role="menuitemradio"] {
+      /* layout: the check's slot and the words on one line */
+      display: flex;
+      /* layout: the check centred on the words' line */
+      align-items: center;
+    }
+
+    .check {
+      /* layout: the slot is an icon wide, empty or not, so the words start at one x */
+      display: inline-flex;
+      /* layout: it never shrinks under its icon */
+      flex: none;
+      inline-size: var(--icon-l);
+    }
+
+    /* One text line: a row with no icon or check steps in by their width when a sibling has one. */
+    .panel[data-kind="menu"]:has(.item > svg, .check) .item:not(:has(> svg, .check)) {
+      /* layout: the words start where the icons' rows' words do */
+      padding-inline-start: calc(var(--space-xs) + var(--icon-l) + var(--space-xs));
     }
 
     .note {

@@ -62,12 +62,6 @@
       /* layout: the gap between wrapped rows, for the 24 px tabs */
       row-gap: calc(var(--control-m) - var(--control-xs));
     }
-
-    /* A tab as wide as a finger: a short word ("All") still gives a 44 px box. */
-    .tab,
-    .tabs[data-size="xs"] .tab {
-      min-inline-size: var(--control-m);
-    }
   }
 
   /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */

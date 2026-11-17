@@ -243,6 +243,36 @@ describe("the palette in a phone's history", () => {
     expect(at(box)).toBe("/");
   });
 
+  it("keeps the address's query as it opens and as it closes", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />, "/w/bubble?room=games&chat=full");
+    await openIt(box);
+    expect(at(box)).toBe("/w/bubble#search");
+    expect(searchOf(box)).toBe("?room=games&chat=full");
+    click(button(box, "Close"));
+    await settled(() => !isOpen(box));
+    expect(searchOf(box)).toBe("?room=games&chat=full");
+  });
+
+  it("leaves no #search entry when a search is handed to the chat's", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "hello there");
+    click(all(box, "button").find((each) => each.textContent.startsWith("Search messages for")));
+    await settled(() => !isOpen(box));
+    expect(searchOf(box)).toContain("find=hello+there");
+    click(button(box, "Back"));
+    await settled(() => at(box) === "/");
+  });
+
+  it("opens on a cold load of the #search address", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />, "/#search");
+    await settled(() => isOpen(box));
+    expect(isOpen(box)).toBe(true);
+  });
+
   it("is the phone's whole-screen sheet on a phone, the large sheet on a computer", async () => {
     phone(true);
     const small = await mountInStore(<Page />);

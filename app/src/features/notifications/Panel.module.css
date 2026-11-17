@@ -66,6 +66,24 @@
     .close {
       display: contents;
     }
+
+    /* The head: the title and Close on a line, Close at the screen's corner, "Mark all read" under them. */
+    .actions {
+      /* layout: the actions' parts join the head's own row, so Close can sit beside the title */
+      display: contents;
+    }
+
+    .title {
+      /* layout: the title takes the row's width, Close at its end */
+      flex: 1;
+    }
+
+    .markAllBox {
+      /* layout: Mark all read on its own line, after the title and Close */
+      order: 1;
+      /* layout: and the row's whole width */
+      flex-basis: 100%;
+    }
   }
 
   .title {
