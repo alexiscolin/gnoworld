@@ -111,8 +111,11 @@ describe("the Adena tab", () => {
   it("keeps B's signature, waits for A's own, then posts both", async () => {
     const held = server();
     const box = open();
+    expect(box.textContent).toContain("Switch Adena to the account you want to link, then continue.");
     click(button(box, "Continue"));
     await settled(() => button(box, "Sign in Adena") !== undefined);
+    // The opening sentence is done once a code is there: the next step says what to do (the UX pass).
+    expect(box.textContent).not.toContain("Switch Adena to the account you want to link, then continue.");
     click(button(box, "Sign in Adena"));
     await settled(() => button(box, "Link") !== undefined);
     expect(disabled(button(box, "Link"))).toBe(true);
@@ -140,6 +143,8 @@ describe("the Command line tab", () => {
 
   it("waits for A's own file as well as B's, then posts both", async () => {
     const { held, box } = await ready();
+    // A's own block and paste wait behind "Or sign with gnokey" (the UX pass).
+    expect(button(box, "Or sign with gnokey")).toBeDefined();
     const [b, a] = areas(box);
     typeInto(b, FILE("b"));
     expect(disabled(button(box, "Link"))).toBe(true);

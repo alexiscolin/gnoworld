@@ -17,7 +17,7 @@ export function Stale({ again, children }: { again: { ask: () => void; waiting: 
     <Stack space="s">
       <p role="status">{linkProblem("unauthenticated")}</p>
       {children}
-      <Cluster justify="end">
+      <Cluster>
         <Button emphasis="solid" onClick={again.ask} disabled={again.waiting}>
           Sign in again to confirm
         </Button>

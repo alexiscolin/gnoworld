@@ -224,9 +224,11 @@ test.describe("linked accounts", () => {
     await dialog.getByLabel("Address").fill(other);
     await get.click();
     await expect(dialog.locator("pre").first()).toContainText(`gnokey sign --key KEY # ${other}`);
+    // The logged-in account's own file, which Link waits for (the wallet audit's medium 1), behind "Or sign with gnokey" (the UX pass).
+    const ownWay = dialog.getByRole("button", { name: "Or sign with gnokey" });
+    await ownWay.click();
     await expect(dialog.locator("pre").last()).toContainText("gnokey sign --key MINE #");
-    // The logged-in account's own file, which Link waits for (the wallet audit's medium 1).
-    const mine = dialog.getByLabel("Or paste what your own key's command shows");
+    const mine = dialog.getByLabel("Paste what your own key's command shows");
     await expect(dialog).toContainText("The code works once, for");
     const link = dialog.getByRole("button", { name: "Link", exact: true });
     await expect(link).toBeDisabled();
@@ -234,18 +236,23 @@ test.describe("linked accounts", () => {
     await dialog.getByLabel("Paste what it shows").fill("hello");
     await mine.fill(FILE);
     await link.click();
-    await expect(said(dialog).last()).toContainText("Paste only what `cat link.json` printed");
+    // Said under the paste box, its own error.
+    await expect(
+      dialog.getByText("Paste only what `cat link.json` printed, after the sign line ran.", { exact: true }),
+    ).toBeVisible();
     // A refused file brings a new code at once.
     held.refuse["/api/links/verify"] = { status: 403, error: "refused" };
     await dialog.getByLabel("Paste what it shows").fill(FILE);
     await link.click();
-    await expect(said(dialog).last()).toContainText(`This file is not signed by the key of ${shortAddress(other)}`);
+    const refused = `This file is not signed by the key of ${shortAddress(other)}. Sign with that key. Here is a new code.`;
+    await expect(dialog.getByText(refused, { exact: true })).toBeVisible();
     await expect(dialog.getByLabel("Paste what it shows")).toHaveValue("");
-    // A new code is a new text: the account's own file of the last one is gone with it.
-    await expect(mine).toHaveValue("");
+    // A new code is a new text: the account's own file of the last one is gone with it, its fold shut again.
     held.refuse["/api/links/verify"] = undefined;
     await dialog.getByLabel("Paste what it shows").fill(FILE);
     await expect(link).toBeDisabled();
+    await ownWay.click();
+    await expect(mine).toHaveValue("");
     await mine.fill(FILE);
     await link.click();
     await expect(said(dialog).last()).toContainText(`${shortAddress(other)} is linked.`);
@@ -314,7 +321,7 @@ test.describe("a command-line key's release", () => {
     await dialog.getByRole("button", { name: "Get a code" }).click();
     await expect(dialog.locator("pre")).toContainText(`# ${key}`);
     await dialog.getByLabel("Paste what it shows").fill(FILE);
-    await dialog.getByRole("button", { name: "Link", exact: true }).click();
+    await dialog.getByRole("button", { name: "Release", exact: true }).click();
     await expect(said(dialog)).toContainText(
       `Done. If ${shortAddress(key)} was linked to a gnoworld account, it no longer is.`,
     );

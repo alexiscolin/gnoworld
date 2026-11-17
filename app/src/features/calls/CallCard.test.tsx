@@ -546,13 +546,16 @@ describe("CallCard, the command line's way (D13880)", () => {
     expect(said(withState(state))).not.toContain("maketx");
   });
 
-  it("names an unnamed field by its place, in words a computer alone shows", () => {
+  it("names an unnamed field by its place, inside the fold a computer alone shows (the UX pass)", () => {
     const params = [
       { Name: "cur", Type: realmType() },
       { Name: "", Type: "string" },
     ];
     const box = view({ card: { ...preview, params, texts: ["a\nb"] } });
-    const line = all(box, ".fine-only").find((element) => said(element).startsWith("No command"));
-    expect(said(line ?? box)).toBe("No command for this call: argument 1 holds a line break or a control character.");
+    const fold = all(box, ".fine-only").find((element) => said(element).startsWith("Or run it with gnokey"));
+    expect(fold?.querySelector("button")?.textContent).toBe("Or run it with gnokey");
+    expect(said(fold ?? box)).toMatch(
+      /No command for this call: argument 1 holds a line break or a control character\.$/,
+    );
   });
 });

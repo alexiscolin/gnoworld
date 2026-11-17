@@ -83,7 +83,48 @@ describe("GnokeyLogin", () => {
     click(button(box, "Log in"));
     await settled(() => codes === 2);
     expect(onLoggedIn).not.toHaveBeenCalled();
+    // The why is the paste box's own error, under it (the UX pass), and stays until the paste changes.
+    const paste = one(box, "textarea");
+    expect(paste.getAttribute("aria-invalid")).toBe("true");
+    expect(box.textContent).toContain("This file is not signed by the key of");
     expect(box.textContent).toContain("Here is a new code.");
+    typeInto(paste, FILE);
+    expect(paste.getAttribute("aria-invalid")).toBeNull();
+  });
+
+  it("says a paste that is not the tool's file under the paste box, keeping the code", async () => {
+    let codes = 0;
+    vi.stubGlobal("fetch", () => {
+      codes += 1;
+      return Promise.resolve(Response.json(CODE));
+    });
+    const box = mount(
+      <StoreProvider>
+        <GnokeyLogin open onClose={() => undefined} onLoggedIn={vi.fn()} />
+      </StoreProvider>,
+    );
+    typeInto(one(box, "input"), ADDRESS);
+    click(button(box, "Get a code"));
+    await settled(() => box.textContent.includes(CODE.block));
+    typeInto(one(box, "textarea"), "hello");
+    click(button(box, "Log in"));
+    expect(one(box, "textarea").getAttribute("aria-invalid")).toBe("true");
+    expect(box.textContent).toContain("Paste only what");
+    expect(codes).toBe(1);
+  });
+
+  it("keeps Get a code pressed and in reach while the code is asked: busy, never disabled", () => {
+    vi.stubGlobal("fetch", () => new Promise(() => undefined));
+    const box = mount(
+      <StoreProvider>
+        <GnokeyLogin open onClose={() => undefined} onLoggedIn={vi.fn()} />
+      </StoreProvider>,
+    );
+    typeInto(one(box, "input"), ADDRESS);
+    const get = button(box, "Get a code");
+    click(get);
+    expect(get?.getAttribute("aria-busy")).toBe("true");
+    expect(get).toHaveProperty("disabled", false);
   });
 
   it("makes the account the server names the page's session, and closes", async () => {

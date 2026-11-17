@@ -1,14 +1,13 @@
 // The account that asks a link signs its text too (the wallet audit's medium 1): with Adena switched back to it, or with its
 // command-line key's file. A session alone, relayed by a look-alike site, then links nothing.
 import { shortAddress, type Address } from "@gnoworld/schemas";
-import { Button, Cluster, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Disclosure, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { fileShape, type ByProof } from "../../lib/api/links.ts";
 import { reportedOr } from "../../lib/reported.ts";
 import { WORDS } from "../errors/index.ts";
 import { sayProblem } from "../login/index.ts";
 import { Block } from "./CommandParts.tsx";
-import styles from "./Settings.module.css";
 
 const wallet = () => reportedOr(import("../../lib/adena/adena.ts"), undefined);
 
@@ -25,14 +24,17 @@ async function signAsMe(me: Address, code: { text: string; chainId: string }): P
     : sayProblem(signed);
 }
 
-/** `me`'s own proof of the code's text, handed on as it comes: Adena's, or a file of the tool's shape; undefined while there is none. */
+/** `me`'s own proof of the code's text, handed on as it comes: Adena's, or a file of the tool's shape; undefined while there is none.
+ * Adena's way first, solid until `signed`; the gnokey way behind its fold (the UX pass). */
 export function AsMe({
   me,
   code,
+  signed,
   onBy,
 }: {
   me: Address;
   code: { text: string; byBlock: string; chainId: string };
+  signed: boolean;
   onBy: (by: ByProof | undefined) => void;
 }) {
   const [file, setFile] = useState("");
@@ -50,37 +52,39 @@ export function AsMe({
     }
   };
   return (
-    <div className={styles["clear"]}>
+    <Stack space="xs">
       <Stack space="2xs">
-        <span className="label">Your own signature</span>
-        <p>
-          Sign the same text as {shortAddress(me)} too, the account you are logged in as: in Adena switched back to it,
-          or with its own key below.
-        </p>
-        <Cluster>
-          <Button
-            busy={busy}
-            onClick={() => {
-              sign().catch(reportError);
-            }}
-          >
-            Sign in Adena
-          </Button>
-        </Cluster>
-        <Block
-          block={code.byBlock}
-          file={file}
-          whose="your own key's"
-          paste="Or paste what your own key's command shows"
-          onFile={(next) => {
-            setFile(next);
-            onBy(fileShape(next) ? { file: next } : undefined);
+        <p className="label">Your own signature</p>
+        <p>Switch Adena to {shortAddress(me)}, the account you are logged in as, and sign the same text.</p>
+      </Stack>
+      <Cluster space="xs">
+        <Button
+          emphasis={signed ? "outline" : "solid"}
+          busy={busy}
+          onClick={() => {
+            sign().catch(reportError);
           }}
-        />
-        <p role="status" className="meta">
+        >
+          Sign in Adena
+        </Button>
+        <p role="status" className={said === "" ? "visually-hidden" : undefined}>
           {said}
         </p>
-      </Stack>
-    </div>
+      </Cluster>
+      <Disclosure title="Or sign with gnokey" size="s">
+        <Stack space="m">
+          <Block
+            block={code.byBlock}
+            help={`Replace KEY with the name of your key for ${shortAddress(me)}.`}
+            file={file}
+            paste="Paste what your own key's command shows"
+            onFile={(next) => {
+              setFile(next);
+              onBy(fileShape(next) ? { file: next } : undefined);
+            }}
+          />
+        </Stack>
+      </Disclosure>
+    </Stack>
   );
 }

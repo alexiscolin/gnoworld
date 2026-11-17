@@ -103,9 +103,9 @@ async function finish(ready: Ready & { proof: Proof; by: ByProof }, set: SetStep
 // The one button's words, and whether it waits: for Adena, the server, or the logged-in account's own proof.
 const labelOf = (ready: Ready | undefined): string =>
   ready === undefined ? "Continue" : ready.proof === undefined ? "Sign in Adena" : "Link";
-const busyOf = (step: Step): boolean =>
-  step.at === "busy" ||
-  (step.at === "ready" && (step.waiting === true || (step.proof !== undefined && step.by === undefined)));
+// Pressed while Adena or the server is asked; outline and shut while the next act is the logged-in account's own signature (AsMe's).
+const busyOf = (step: Step): boolean => step.at === "busy" || (step.at === "ready" && step.waiting === true);
+const waitsForMe = (ready: Ready | undefined): boolean => ready?.proof !== undefined && ready.by === undefined;
 
 const statusOf = (step: Exclude<Step, { at: "stale" | "linked" }>): string =>
   step.at === "busy"
@@ -132,11 +132,14 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
   const ready = step.at === "ready" ? step : undefined;
   const status = statusOf(step);
   return (
-    <Stack space="s">
-      <p>Switch to the account you want to link in Adena, then continue. Nothing is sent until you press Link.</p>
+    <Stack space="m">
+      {ready === undefined ? <p>Switch Adena to the account you want to link, then continue.</p> : null}
       {ready === undefined ? null : (
         <Stack space="2xs">
-          <span className="label">Adena will sign this text, for {shortAddress(ready.address)}</span>
+          <p className="meta">
+            <span className="label">Adena will sign this text, for</span>{" "}
+            <span className="data-text">{shortAddress(ready.address)}</span>
+          </p>
           <blockquote className={[code["block"], "fill-box", "data-text"].join(" ")}>{ready.challenge.text}</blockquote>
         </Stack>
       )}
@@ -145,29 +148,34 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
           key={ready.challenge.nonce}
           me={me}
           code={{ text: ready.challenge.text, byBlock: ready.challenge.byBlock, chainId: ready.chainId }}
+          signed={ready.by !== undefined}
           onBy={(by) => {
             setStep((now) => (now.at === "ready" ? { ...now, by } : now));
           }}
         />
       )}
-      <p role="status" className="meta">
-        {status}
-      </p>
-      <Cluster justify="end">
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button
-          emphasis="solid"
-          disabled={busyOf(step)}
-          onClick={() => {
-            const { proof, by } = ready ?? {};
-            if (ready === undefined) begin();
-            else if (proof === undefined) sign(ready, setStep).catch(reportError);
-            else if (by !== undefined) finish({ ...ready, proof, by }, setStep, onLinked).catch(reportError);
-          }}
-        >
-          {labelOf(ready)}
-        </Button>
-      </Cluster>
+      <Stack space="xs">
+        <p role="status" className={status === "" ? "visually-hidden" : undefined}>
+          {status}
+        </p>
+        <Cluster space="2xs">
+          <Button
+            emphasis={waitsForMe(ready) ? "outline" : "solid"}
+            busy={busyOf(step)}
+            disabled={waitsForMe(ready)}
+            onClick={() => {
+              const { proof, by } = ready ?? {};
+              if (ready === undefined) begin();
+              else if (proof === undefined) sign(ready, setStep).catch(reportError);
+              else if (by !== undefined) finish({ ...ready, proof, by }, setStep, onLinked).catch(reportError);
+            }}
+          >
+            {labelOf(ready)}
+          </Button>
+          <Button onClick={onCancel}>Cancel</Button>
+        </Cluster>
+        <p className="meta">Nothing is sent until you press Link.</p>
+      </Stack>
     </Stack>
   );
 }

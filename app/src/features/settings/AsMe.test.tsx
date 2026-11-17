@@ -56,7 +56,7 @@ describe("AsMe", () => {
   it("has Adena sign the same text as the logged-in account, on the code's chain, and hands the proof on", async () => {
     signed.answer = { ok: true, proof: PROOF };
     const onBy = vi.fn();
-    const box = mount(<AsMe me={ME} code={CODE} onBy={onBy} />);
+    const box = mount(<AsMe me={ME} code={CODE} signed={false} onBy={onBy} />);
     click(button(box, "Sign in Adena"));
     await settled(() => onBy.mock.calls.length > 0);
     expect(signed.asked.at(-1)).toEqual({ address: ME, chainId: "gnoland-1", text: CODE.text });
@@ -66,7 +66,7 @@ describe("AsMe", () => {
   it("says which account Adena is on when it is not the logged-in one, and hands nothing on", async () => {
     signed.answer = { ok: false, reason: "mismatch" };
     const onBy = vi.fn();
-    const box = mount(<AsMe me={ME} code={CODE} onBy={onBy} />);
+    const box = mount(<AsMe me={ME} code={CODE} signed={false} onBy={onBy} />);
     click(button(box, "Sign in Adena"));
     await settled(() => box.textContent.includes("Adena is on"));
     expect(box.textContent).toContain(`Adena is on ${shortAddress(OTHER)}, not ${shortAddress(ME)}.`);
@@ -75,7 +75,7 @@ describe("AsMe", () => {
 
   it("shows the block for the account's own key, and hands on its file once it has the tool's shape", () => {
     const onBy = vi.fn();
-    const box = mount(<AsMe me={ME} code={CODE} onBy={onBy} />);
+    const box = mount(<AsMe me={ME} code={CODE} signed={false} onBy={onBy} />);
     expect(box.textContent).toContain(CODE.byBlock);
     typeInto(one(box, "textarea"), "not the file");
     expect(onBy).toHaveBeenLastCalledWith(undefined);
@@ -91,7 +91,7 @@ describe("AsMe", () => {
     });
     signed.asked = [];
     const onBy = vi.fn();
-    const box = mount(<AsMe me={ME} code={CODE} onBy={onBy} />);
+    const box = mount(<AsMe me={ME} code={CODE} signed={false} onBy={onBy} />);
     click(button(box, "Sign in Adena"));
     click(button(box, "Sign in Adena"));
     open();
@@ -104,7 +104,7 @@ describe("AsMe", () => {
   it("hands on one proof at a time: Adena's empties the pasted file, a file pasted after replaces Adena's", async () => {
     signed.answer = { ok: true, proof: PROOF };
     const onBy = vi.fn();
-    const box = mount(<AsMe me={ME} code={CODE} onBy={onBy} />);
+    const box = mount(<AsMe me={ME} code={CODE} signed={false} onBy={onBy} />);
     typeInto(one(box, "textarea"), FILE);
     click(button(box, "Sign in Adena"));
     await settled(() => onBy.mock.lastCall?.[0] !== undefined && "proof" in onBy.mock.lastCall[0]);
