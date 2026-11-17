@@ -153,8 +153,8 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 61823, // 61,567 B measured with the phone sheet's branches (D13719), 256 B ahead
-  HubPlate: 58187, // 57,931 B measured with the phone sheet's branches (D13719), 256 B ahead
+  EarthPlate: 62000, // the owner's cap (D13806): a long figure stays in its cell, read whole (61,896 B measured)
+  HubPlate: 58500, // the owner's cap (D13806): a long figure stays in its cell, read whole (58,233 B measured)
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
