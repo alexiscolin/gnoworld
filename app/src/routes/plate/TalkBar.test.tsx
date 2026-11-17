@@ -36,3 +36,11 @@ it("reads the lines of the room the realm's chat keeps, by its whole id, and nam
   expect(text).toContain("in #memba-appstore-v3");
   expect(text).not.toContain("#memba_appstore_v3");
 });
+
+it("writes a sender that is an account's address short, as the foot does", () => {
+  const { room } = realmRoom(PATH, []);
+  rooms[room] = {
+    lines: [{ kind: "message", from: "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv", text: "hello" }],
+  };
+  expect(barText(room)).toContain("g10gh7…3y5tv: hello");
+});

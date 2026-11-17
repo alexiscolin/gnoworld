@@ -92,7 +92,7 @@ export function Around({ around }: { around: AroundData }) {
           </Cell>
           <Cell span={6}>
             {/* A rule between the graph and its list, so the two halves read apart. */}
-            <div className="rule-start">
+            <div className={["rule-start", styles["list"]].join(" ")}>
               <Stack space="xs">
                 <PagedList
                   key={side}

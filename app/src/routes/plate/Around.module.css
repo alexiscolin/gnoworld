@@ -14,11 +14,27 @@
       /* layout: it keeps its size */
       flex: none;
     }
+
+    /* Row's trail has no align of its own: the count's box is centred on the 44 px row. */
+    span:has(> .note) {
+      /* layout: centred on the row */
+      align-self: center;
+    }
   }
 
   /* The graph draws from this box's own width: a phone's narrow card gives it the card's, never the column's minimum. */
   .graph {
     min-inline-size: 0;
     max-inline-size: 100%;
+  }
+}
+
+@layer utilities {
+  /* Stacked under the graph, a phone's list needs no rule beside it (the utility's own rule-start). */
+  @media (width < 900px) {
+    div.list {
+      border-inline-start: 0;
+      padding-inline-start: 0;
+    }
   }
 }
