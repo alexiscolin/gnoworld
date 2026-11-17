@@ -2,7 +2,7 @@
 // imported first, so its layers' order comes before any component's sheet. Its JavaScript is free
 // of side effects but for its CSS: a bundler may skip this file, so the app imports the sheet too.
 import "./styles.css";
-export { grouped } from "./format.ts";
+export { compact, grouped } from "./format.ts";
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { DayChart, type DayChartProps } from "./ActivityChart/DayChart.tsx";
 export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
