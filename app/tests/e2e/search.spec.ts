@@ -192,13 +192,36 @@ test.describe("⌘K", () => {
       await field(page).fill("b");
       await expect(choices(page).first()).toBeVisible();
       expect((await axeOf(page).analyze()).violations).toEqual([]);
-      // Every box the palette shows keeps 16 px from the viewport's sides (the shell's gutter).
-      const outside = await palette(page).evaluate((dialog, gutter) => {
-        const inner = [...dialog.querySelectorAll("input, [role='option'], button")];
-        return inner
-          .map((element) => element.getBoundingClientRect())
-          .filter((box) => box.width > 0 && (box.left < gutter - 0.5 || box.right > innerWidth - gutter + 0.5)).length;
-      }, 16);
+      // What the palette shows keeps 16 px from the viewport's sides (the shell's gutter). On a phone, what the eye sees: a result's row
+      // runs edge to edge, its content in the gutter; a row of chips scrolls sideways, its first chip in the gutter.
+      const outside = await palette(page).evaluate(
+        (dialog, { gutter, phone }) => {
+          const scroller = (element: Element) => {
+            for (let at = element.parentElement; at !== null && at !== dialog; at = at.parentElement)
+              if (/auto|scroll/.test(getComputedStyle(at).overflowX)) return at;
+            return null;
+          };
+          const shown = phone
+            ? [
+                ...[...dialog.querySelectorAll("input, button")].filter((element) => scroller(element) === null),
+                ...new Set(
+                  [...dialog.querySelectorAll("button")].flatMap(
+                    (button) => scroller(button)?.querySelector("button") ?? [],
+                  ),
+                ),
+                ...[...dialog.querySelectorAll("[role='option']")].flatMap((option) => [
+                  option.firstElementChild ?? option,
+                  option.lastElementChild ?? option,
+                ]),
+              ]
+            : [...dialog.querySelectorAll("input, [role='option'], button")];
+          return shown
+            .map((element) => element.getBoundingClientRect())
+            .filter((box) => box.width > 0 && (box.left < gutter - 0.5 || box.right > innerWidth - gutter + 0.5))
+            .length;
+        },
+        { gutter: 16, phone: width < 900 },
+      );
       expect(outside).toBe(0);
       await field(page).fill("zzz");
       await expect(page.getByText(/no place/i)).toBeVisible();

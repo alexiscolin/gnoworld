@@ -468,9 +468,10 @@ test.describe("updates", () => {
     }
   });
 
-  // The notice is a flash, in the top layer at the top of the screen, however long the page.
+  // The notice is a flash, in the top layer at the top of the screen, however long the page: a computer's, for a phone's is its chat,
+  // a screen that never scrolls (below).
   test("the prompt shows within the screen on a page longer than it", async ({ page, request }) => {
-    await page.setViewportSize({ width: 320, height: 568 });
+    await page.setViewportSize({ width: 1024, height: 568 });
     await open(page);
     const longer = await page.evaluate(() => {
       // Through the CSSOM: the site's policy refuses a style attribute set as text.
@@ -485,6 +486,13 @@ test.describe("updates", () => {
       scrollTo(0, document.documentElement.scrollHeight);
     });
     await expect(notice).toBeInViewport();
+  });
+
+  test("the prompt shows within the screen on a phone's chat", async ({ page, request }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await open(page);
+    await bump(page, request, { site });
+    await expect(noticeOf(page)).toBeInViewport();
   });
 
   test("a new version waits: the prompt shows, and the page changes only after the click", async ({
