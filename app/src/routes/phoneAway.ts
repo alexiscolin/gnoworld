@@ -4,7 +4,7 @@ import { PHONE_QUERY } from "@gnoworld/core";
 import { useEffect } from "react";
 import { redirect, useNavigate } from "react-router";
 import { useMedia } from "../features/chat/useMedia.ts";
-import { recentPaths } from "../lib/recents.ts";
+import { landingPaths } from "../lib/recents.ts";
 import { site } from "../places.ts";
 import { phoneLanding } from "../phoneLanding.ts";
 
@@ -12,7 +12,7 @@ import { phoneLanding } from "../phoneLanding.ts";
  * never asks). */
 export const phoneAway = (home: string) =>
   typeof matchMedia === "function" && matchMedia(PHONE_QUERY).matches
-    ? redirect(phoneLanding(site.universeAt(home), recentPaths()))
+    ? redirect(phoneLanding(site.universeAt(home), landingPaths()))
     : undefined;
 
 /** The same, for a page that was pre-rendered: it hydrates without its client loader running, so a phone goes on from an effect (by a
@@ -22,7 +22,7 @@ export function usePhoneAway(home: string): boolean {
   const navigate = useNavigate();
   useEffect(() => {
     if (phone)
-      Promise.resolve(navigate(phoneLanding(site.universeAt(home), recentPaths()), { replace: true })).catch(
+      Promise.resolve(navigate(phoneLanding(site.universeAt(home), landingPaths()), { replace: true })).catch(
         reportError,
       );
   }, [phone, home, navigate]);

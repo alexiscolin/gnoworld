@@ -4,10 +4,11 @@
 /** Whether the reader asks to save data (a 2G link, ADR-0002 §8): then no player is offered. */
 export function savesData(): boolean {
   if (typeof navigator === "undefined") return false;
+  if (asksToSaveData()) return true;
   const connection: unknown = Reflect.get(navigator, "connection");
   if (typeof connection !== "object" || connection === null) return false;
   const link: unknown = Reflect.get(connection, "effectiveType");
-  return Reflect.get(connection, "saveData") === true || link === "2g" || link === "slow-2g";
+  return link === "2g" || link === "slow-2g";
 }
 
 /** Whether the reader asks to save data themself (the browser's Save-Data), the link's estimate left out: a computer's word (D13721). */

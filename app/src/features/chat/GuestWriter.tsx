@@ -7,7 +7,7 @@ import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useId, useRef, useState, type SubmitEvent } from "react";
 import { pageGuestApi, type Refused } from "../../lib/api/guest.ts";
 import { askFor } from "../../pageAsks.ts";
-import { useComputerNeeded } from "./LogInToWrite.tsx";
+import { useComputerNeeded } from "./computerNeeded.ts";
 import { MessageBox } from "./MessageBox.tsx";
 import { useMedia } from "./useMedia.ts";
 import { roomLabel } from "./names.ts";

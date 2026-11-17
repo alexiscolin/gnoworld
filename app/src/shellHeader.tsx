@@ -11,8 +11,8 @@ import { useDrawnPath } from "./drawnPath.ts";
 import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
-import { useMedia } from "./features/chat/useMedia.ts";
-import { adenaHere, USE_A_COMPUTER } from "./features/login/index.ts";
+import { useComputerNeeded, useMedia } from "./features/chat/index.ts";
+import { USE_A_COMPUTER } from "./features/login/index.ts";
 import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
@@ -26,6 +26,7 @@ function Account({ universe }: { universe: UniverseView }) {
   // A phone's header is one line: the network and the way in are rows of the account's menu, and where Adena is not found (a phone's
   // browser never has it) a guest reads why atop it.
   const phone = useMedia(PHONE_QUERY);
+  const computer = useComputerNeeded();
   return (
     <Cluster space="2xs" wrap={phone ? "no" : "yes"} className={styles["controls"]}>
       <SearchButton className="" emphasis={phone ? "plain" : "outline"} />
@@ -33,7 +34,7 @@ function Account({ universe }: { universe: UniverseView }) {
       <AccountMenu
         universe={universe.id}
         phone={phone}
-        guestNote={phone && !adenaHere() ? USE_A_COMPUTER : undefined}
+        guestNote={computer ? USE_A_COMPUTER : undefined}
         network={phone ? null : <Network name={universe.name} testnet={universe.testnet} inPill />}
       />
     </Cluster>

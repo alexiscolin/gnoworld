@@ -35,4 +35,5 @@ export const CountryChoice = lazy(async () => ({ default: (await import("./Count
 export const SavedDialog = lazy(async () => ({ default: (await import("./SavedDialog.tsx")).SavedDialog }));
 
 export { PersonLink } from "./PersonLinkLazy.tsx";
+export { useComputerNeeded } from "./computerNeeded.ts";
 export { useMedia } from "./useMedia.ts";

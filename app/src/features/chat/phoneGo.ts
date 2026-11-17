@@ -1,12 +1,11 @@
 // A phone is the full chat only: a place's address goes to its full chat (the cosmos's and an ecosystem's go home from their routes'
-// loaders, routes/phoneAway.ts), and the chat's back never lands on a page that sends it straight on again.
+// loaders, routes/phoneAway.ts).
 import { PHONE_QUERY } from "@gnoworld/core";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { fullOnPhone } from "../../fullChat.ts";
-import { rememberPath } from "../../lib/recents.ts";
+import { rememberLanding } from "../../lib/recents.ts";
 import { remembers } from "../../phoneLanding.ts";
-import { site } from "../../places.ts";
 import { useMedia } from "./useMedia.ts";
 
 /** Takes a phone off a place's address for its full chat (fullChat.ts's `fullOnPhone`), by a replace; true while it goes, so the page
@@ -21,24 +20,7 @@ export function usePhoneGo(): boolean {
   }, [to, navigate]);
   // Where a phone opens next time (phoneLanding.ts): the worlds and the Earth it was in, whatever way it came.
   useEffect(() => {
-    if (phone && remembers(pathname)) rememberPath(pathname);
+    if (phone && remembers(pathname)) rememberLanding(pathname);
   }, [phone, pathname]);
   return to !== undefined;
-}
-
-/** Whether the entry before the one in view is this site's: the router writes each entry's index, the first of a tab being 0. */
-export function canGoBack(state: unknown): boolean {
-  return (
-    typeof state === "object" && state !== null && "idx" in state && typeof state.idx === "number" && state.idx > 0
-  );
-}
-
-/** The chat's back on a phone: the browser's back where the entry before is ours, else home, replacing the chat's entry. */
-export function useChatBack(): () => void {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const home = site.universeAt(pathname).home.path;
-  return () => {
-    Promise.resolve(canGoBack(history.state) ? navigate(-1) : navigate(home, { replace: true })).catch(reportError);
-  };
 }

@@ -88,4 +88,33 @@ describe("the wait for idle and in view", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(done).not.toHaveBeenCalled();
   });
+
+  it("without requestIdleCallback, settles after the fallback wait (1.5 s), not before", async () => {
+    vi.useFakeTimers();
+    seen.length = 0;
+    stub();
+    vi.stubGlobal("requestIdleCallback", undefined);
+    const done = vi.fn();
+    whenIdleAndSeen(document.body, new AbortController().signal).then(done, () => undefined);
+    seen[0]?.call([{ isIntersecting: true }]);
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(done).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it("without requestIdleCallback, an abort stops the fallback wait", async () => {
+    vi.useFakeTimers();
+    seen.length = 0;
+    stub();
+    vi.stubGlobal("requestIdleCallback", undefined);
+    const done = vi.fn();
+    const stop = new AbortController();
+    whenIdleAndSeen(document.body, stop.signal).then(done, () => undefined);
+    stop.abort();
+    seen[0]?.call([{ isIntersecting: true }]);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(done).not.toHaveBeenCalled();
+  });
 });
