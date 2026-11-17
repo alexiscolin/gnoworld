@@ -14,23 +14,6 @@ gnoworld is built by Alexis Colin with Claude Code, under a test-first harness: 
 come before the code, every guard of the gate is proven by a planted bypass it must catch, and the
 security-critical code gets its own review. [docs/harness.png](docs/harness.png) shows how.
 
-## Status
-
-- **On chain, nothing is deployed yet.** The app reads gno.land (onyx-1 and gnoland-1) and writes
-  nothing of its own: the calls a visitor signs in Adena, or runs with gnokey, go to other realms.
-- **The satellite realm** ([`gno/r/satellite/`](gno/README.md)) is written and tested locally, not
-  deployed. Its path, `gno.land/r/gnoworld/satellite`, cannot be registered: gno.land's open name
-  registrar (`r/sys/namereg/v0`) takes only names shaped `nym-<5 to 13 letters><3 digits>`, and refuses
-  stems that start with `gno` (among other reserved prefixes and names); any other name needs a GovDAO proposal
-  (`ProposeRegisterUser` in `r/sys/users`). The realm moves to its deployer's
-  address namespace (`gno.land/r/<address>/...`) at its first deploy.
-- **The seal realm** (`r/seal`, [ADR-0001](adr/0001-gnoworld.md) §3), audited and fixed, is out of
-  the tree until it is needed; its last version is at commit `e44037b8` (`git show
-  e44037b8:gno/r/seal/seal.gno`).
-- **Next**, by ADR-0001's rollout: phase 1 puts the social state on chain (a hubs realm, sessions and
-  a sponsor for writes without a wallet popup, profiles on `r/sys/users` names); phase 2 brings
-  private rooms encrypted with MLS, and seals; phase 3 is mainnet, after an external audit.
-
 ## What a visitor sees and does
 
 - Flies through the universe and opens a world to see what it is, who is there and what it does.
