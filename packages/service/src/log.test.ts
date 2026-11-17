@@ -153,7 +153,7 @@ describe("failureOf", () => {
 
   it("gives an Error with no stack, or one that is no text, its name alone", () => {
     const bare = new Error("planted");
-    bare.stack = undefined;
+    Object.defineProperty(bare, "stack", { value: undefined });
     expect(failureOf(bare)).toEqual({ error: "Error" });
     const odd = new Error("planted");
     Object.defineProperty(odd, "stack", { value: 42 });
