@@ -5,11 +5,10 @@
     min-inline-size: 0;
   }
 
-  /* The two controls at the start: the large icon in the 44 px target, its glyph on the band's text edge (the target's own room hangs
-     out of the gutter). */
-  .tools {
-    /* layout: the target's room hangs out of the gutter */
-    margin-inline-start: calc((var(--icon-l) - var(--control-m)) / 2);
+  /* The two controls at the start: the large icon in a 44 px target (the icon button's own height, over its small size's), the first
+     starting on the band's inline inset like the place's words above it. */
+  .bar .tools button {
+    --_h: var(--control-m);
   }
 
   .tools button > svg {

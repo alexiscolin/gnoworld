@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { EARTH } from "@gnoworld/core";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one, settled } from "../../../tests/mount.tsx";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { PhoneBand } from "./PhoneBand.tsx";
@@ -8,6 +8,16 @@ import { PhoneBand } from "./PhoneBand.tsx";
 // The engine, and its gate on gpuCanDraw (MiniSpace.tsx, which makes no context on a device that cannot draw), are MiniSpace's own: here it is a
 // marker that says which world it was given.
 vi.mock("../../MiniSpace.tsx", () => ({ default: ({ world }: { world: string }) => <canvas data-world={world} /> }));
+
+// The gate (planetGate.ts, tested on its own): here its answer is set by each test, and the page is idle and the band in view at once.
+const gate = vi.hoisted(() => ({ allows: true }));
+vi.mock("../../planetGate.ts", () => ({
+  whenIdleAndSeen: () => Promise.resolve(),
+  askPlanet: () => (gate.allows ? Promise.resolve() : undefined),
+}));
+beforeEach(() => {
+  gate.allows = true;
+});
 
 const place = (more: Partial<ChatPlace> = {}): ChatPlace => ({
   slug: "x",
@@ -88,6 +98,14 @@ describe("a phone's place band", () => {
     expect(one(box, "section").querySelector("[data-size]")).not.toBeNull();
     await settled(() => all(box, "canvas").length === 1);
     expect(one(box, "canvas").getAttribute("data-world")).toBe(EARTH);
+  });
+
+  it("draws no engine, only the still, where the gate says never (save-data, 2g, a weak GPU)", async () => {
+    gate.allows = false;
+    const box = draw();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(all(box, "canvas")).toHaveLength(0);
+    expect(one(box, "section").querySelector("[data-size]")).not.toBeNull();
   });
 
   it("keeps a mark (a direct message's trust word) in view, and holds the rooms' row last", () => {

@@ -2,14 +2,14 @@
 // column: PlaceView's MiniSpace with no cosmos), all one button to Info; under it the rooms' row (PhoneHeader.tsx, its `children`). It is the
 // world's own plate (data-world: --color-plate). It folds to a slim row (the room's name, a small planet) while the lines are scrolled up
 // (`folded`, bandFold.ts), and with the rooms' row hidden while a chat field has the focus and on a short window (PhoneBand.module.css). The
-// planet is a big disc at the band's end, its top half showing, the band's foot cropping it; its box never changes size, only its scale, so the fold moves no canvas; the engine's code is asked after the first paint (a lazy
-// import), and MiniSpace makes its WebGL context only where gpuCanDraw says the device can draw, the planet's still standing where it cannot.
+// planet is a big disc at the band's end, its top half showing, the band's foot cropping it; its box never changes size, only its scale, so the fold moves no canvas; the engine's code is asked once the page is idle and the band in view (planetGate.ts), and MiniSpace makes its WebGL context only where gpuCanDraw says the device can draw, the planet's still standing where it cannot.
 import { Cluster, Icon, Kicker, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useId, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { groundOn } from "../../earthGround.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
 import { worldOf } from "./PlaceView.tsx";
+import { askPlanet, whenIdleAndSeen } from "../../planetGate.ts";
 import styles from "./PhoneBand.module.css";
 
 const MiniSpace = lazy(() => import("../../MiniSpace.tsx"));
@@ -23,26 +23,45 @@ function countsOf(talking: number | undefined, present: number | undefined): str
   return said.filter((each) => each !== undefined).join(" · ");
 }
 
-// The planet in its fixed box: its still stands till the engine has drawn, and stays where it cannot draw (no GPU).
+// The planet in its fixed box: its still stands till the engine has drawn, and stays where it cannot draw (no GPU) or must not (the gate,
+// planetGate.ts: the engine is asked once the page is idle and the band in view, never to a reader who saves data).
 function Planet({ place }: { place: ChatPlace }) {
   const [ground] = useState(groundOn);
   const [drawn, setDrawn] = useState(false);
+  const [asked, setAsked] = useState(false);
+  const bandRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (bandRef.current === null) return;
+    const leaving = new AbortController();
+    whenIdleAndSeen(bandRef.current, leaving.signal)
+      .then(() => {
+        if (askPlanet() !== undefined) setAsked(true);
+      })
+      .catch((error: unknown) => {
+        reportError(error);
+      });
+    return () => {
+      leaving.abort();
+    };
+  }, []);
   return (
-    <div className={styles["planet"]} aria-hidden="true">
+    <div ref={bandRef} className={styles["planet"]} aria-hidden="true">
       {drawn ? null : (
         <div className={styles["still"]}>
           <WorldPlanet world={worldOf(place)} fallback="" name={place.name} size="l" decorative />
         </div>
       )}
-      <Suspense fallback={null}>
-        <MiniSpace
-          world={worldOf(place)}
-          ground={ground}
-          onDrawn={() => {
-            setDrawn(true);
-          }}
-        />
-      </Suspense>
+      {asked ? (
+        <Suspense fallback={null}>
+          <MiniSpace
+            world={worldOf(place)}
+            ground={ground}
+            onDrawn={() => {
+              setDrawn(true);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
