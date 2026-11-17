@@ -52,7 +52,7 @@ export interface Login {
     // The host the proof comes from: its challenge's own, or the nonce is not this one's.
     host: string,
   ) => Promise<{ token: string; maxAge: number } | "nonce" | "proof" | "new_account">;
-  // The command line's login (D13880): the same, its proof the file the address's key signed.
+  // The command line's login: the same, its proof the file the address's key signed.
   cliChallenge: (address: Address, domain: string) => Challenge | "full" | "text";
   cliVerify: (request: CliLogin, mayCreate: () => boolean, host: string) => ReturnType<Login["verify"]>;
   session: (token: string | undefined) => Address | undefined;

@@ -14,7 +14,7 @@ import { problemsOf } from "./problems.ts";
 import { depositText, networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
-// Sign in Adena leads where Adena's object is in the page, read without touching it (D254); elsewhere it is the second way,
+// Sign in Adena leads where Adena's object is in the page, read without touching it; elsewhere it is the second way,
 // after the command line's (PR #41's UX review).
 const signLook = (): "solid" | "outline" => ("adena" in globalThis ? "solid" : "outline");
 // The command line's way, a computer's alone and folded while Adena is here: loaded after the card, off the plates' budgets.

@@ -141,7 +141,7 @@
   /* The drawer: the screen's start, its full height, 360 px, on the surface the dock and the plates use, so no word of the page reads
      through it (frames 98 to 100); Close in its top end corner, the page beside it seen whole. */
   .dialog[data-side="start"] {
-    /* raw: 360 px, frame 99 */
+    /* raw: the design's 360 px */
     --_w: 360px;
 
     position: fixed;
@@ -204,7 +204,7 @@
 
   .dialog[data-side="start"] .close {
     position: absolute;
-    /* raw: frame 99's Close, 18 px from the drawer's top */
+    /* raw: the design's Close, 18 px from the drawer's top */
     inset-block-start: 18px;
     /* raw: and 18 px from its end */
     inset-inline-end: 18px;
