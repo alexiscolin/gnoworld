@@ -28,7 +28,8 @@ const POOL = "gno.land/r/gnoswap/pool";
 const POOL1 = "gno.land/r/gnoswap/pool/v1";
 const ROUTER = "gno.land/r/gnoswap/router";
 // Written out, so the job is pinned to the expression itself and not to the builder it calls (core's evalNameOf).
-const evalNameOf = (address: string): string => `gno.land/r/sys/users.ResolveAddress(address("${address}")).Name()`;
+const evalNameOf = (address: string): string =>
+  `gno.land/r/sys/users.func() string { d := ResolveAddress(address("${address}")); if d == nil { return "" }; return d.Name() }()`;
 const NOW = Date.parse("2026-11-01T12:00:00.000Z");
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-worlds-"));
@@ -67,8 +68,8 @@ const callsOf = (counts: Record<string, number>) =>
   );
 const eachCalled = (paths: readonly string[], calls: number) =>
   callsOf(Object.fromEntries(paths.map((path) => [path, calls])));
-const named = (name: string | null): string =>
-  name === null ? "(nil *gno.land/r/sys/users.UserData)" : `("${name}" string)`;
+// What the nil-guarded expression answers: an empty name for an address with no record.
+const named = (name: string | null): string => `("${name ?? ""}" string)`;
 
 const chainRoutes = (paths: string[], over: Routes = {}): Routes => ({
   paths: () => paths.join("\n"),
@@ -157,7 +158,8 @@ describe("runWorlds", () => {
   });
 
   it.each([
-    ["no name registered", named(null), null],
+    ["no name registered, the guard's empty name", named(null), null],
+    ["a nil text, as the unguarded expression's", "(nil *gno.land/r/sys/users.UserData)", null],
     ["a name with markup", '("<script>" string)', null],
     ["a name of 200 characters", `("${"a".repeat(200)}" string)`, null],
     ["a text that is no value", "panic: oops", null],

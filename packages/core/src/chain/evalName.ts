@@ -19,9 +19,12 @@ export function looksLikeAddress(text: string): boolean {
   return new RegExp(`g1[${BECH32}]{8,}`, "i").test(text);
 }
 
-/** The data `vm/qeval` is asked for the name of one address, composed here and never from a path, or null. */
+/** The data `vm/qeval` is asked for the name of one address, composed here and never from a path, or null. An address with no
+ * record answers an empty name: ResolveAddress gives nil for it, which Name, a value method, would panic on. */
 export function evalNameOf(address: string): string | null {
-  return isAddress(address) ? `gno.land/r/sys/users.ResolveAddress(address("${address}")).Name()` : null;
+  return isAddress(address)
+    ? `gno.land/r/sys/users.func() string { d := ResolveAddress(address("${address}")); if d == nil { return "" }; return d.Name() }()`
+    : null;
 }
 
 /** A name as r/sys/users keeps one (its validateName, read on onyx-1: `^[a-z][a-z0-9]*([_-][a-z0-9]+)*$`, 64 at most). */
