@@ -1,6 +1,7 @@
 // What the lint config's parts share (eslint.config.ts composes them).
 // An error swallowed: a catch, or a promise's .catch, that only logs, returns nothing or does
-// nothing. Shared, since a later block's no-restricted-syntax replaces an earlier one's.
+// nothing; and a listener a production build never wires, as silent. Shared, since a later block's no-restricted-syntax
+// replaces an earlier one's.
 const LOG =
   "CallExpression:matches([callee.object.name=/^(console|logger)$/], [callee.object.property.name=/^(console|logger)$/])";
 export const SWALLOWED = [
@@ -26,6 +27,13 @@ export const SWALLOWED = [
   {
     selector: `CallExpression[callee.property.name='catch'] > ArrowFunctionExpression > ${LOG}.body`,
     message: "A .catch that only logs swallows the error.",
+  },
+  {
+    // A production build has no `import.meta.hot`: `hot?.dispose(f())` skips its whole call there, f() with it.
+    selector:
+      "CallExpression[callee.property.name='dispose'][callee.object.property.name='hot'][callee.object.object.type='MetaProperty'] > CallExpression",
+    message:
+      "A production build has no import.meta.hot, so hot?.dispose(f()) never calls f(): make it first (const stop = f()), then pass stop.",
   },
 ];
 // No character class right before `$` in a `u` regex: V8 14.6 (Chromium 156, Node 26) misses a character past the

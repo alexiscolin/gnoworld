@@ -628,6 +628,9 @@ try:
             ("space/__probe__/frame_tested.test.ts", 'import { expect, test } from "vitest";\n\nconst draw = () => [1];\n\ntest("x", () => {\n  expect(draw()).toEqual([1]);\n});\n', None),
             # A page's own `draw` is no frame of the scene.
             ("features/__probe__/frame_elsewhere.ts", onframe("this.seen = [list].length;"), None),
+            # A production build has no import.meta.hot: a call given to its dispose never runs there; a function made first does.
+            ("features/__probe__/hot_dispose_call.ts", "import { isMap, onMap } from \"../../mapView.ts\";\n\nexport function wire(view: (on: boolean) => void): void {\n  import.meta.hot?.dispose(\n    onMap(() => {\n      view(isMap());\n    }),\n  );\n}\n", "no-restricted-syntax: A production build has no import.meta.hot"),
+            ("features/__probe__/hot_dispose_made.ts", "import { isMap, onMap } from \"../../mapView.ts\";\n\nexport function wire(view: (on: boolean) => void): void {\n  const unmapped = onMap(() => {\n    view(isMap());\n  });\n  import.meta.hot?.dispose(unmapped);\n}\n", None),
             # The block replaces the root's list: what that holds still holds in the scene.
             ("space/__probe__/scene_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
             ("space/__probe__/scene_class_at_end.ts", dict((n, c) for n, c, _ in LINT)["class_at_end.ts"], "no-restricted-syntax: A character class right before"),
