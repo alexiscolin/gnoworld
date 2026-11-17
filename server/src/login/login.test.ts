@@ -11,6 +11,9 @@ import { openDatabase } from "@gnoworld/service/db";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_LINK, NONCE_HOST, type Login } from "./login.ts";
 import { verifies, verifyProof, type Verify } from "./verify.ts";
+import { cliFile, cliKey } from "../testing/cliSigner.ts";
+import { cliSafe } from "./cliProof.ts";
+import { migrations } from "../migrations.ts";
 import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -1116,5 +1119,151 @@ describe("the admin console's login", () => {
     expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, made.address]);
     clock.now = T0 + 60 * MINUTE;
     expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, undefined]);
+  });
+});
+
+describe("the command line's login (D13880)", () => {
+  const cliSetup = (options: { nonceCap?: number } = {}) => {
+    const db = openDatabase(":memory:", migrations);
+    opened.push(db);
+    const clock = { now: T0 };
+    const s = { db, clock, login: makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options }) };
+    const key = cliKey();
+    const asked = (address: Address = key.address, host = DOMAIN) => {
+      const made = s.login.cliChallenge(address, host);
+      if (typeof made === "string") throw new Error(`no command-line challenge: ${made}`);
+      return made;
+    };
+    const logIn = (
+      made: { nonce: string; text: string },
+      over: Partial<{ file: string; address: Address; host: string }> = {},
+    ) =>
+      s.login.cliVerify(
+        { nonce: made.nonce, address: over.address ?? key.address, file: over.file ?? cliFile(key, made.text) },
+        anyone,
+        over.host ?? DOMAIN,
+      );
+    return { ...s, key, asked, logIn };
+  };
+
+  it("writes one line of text the command line signs as a memo: the host twice, the nonce, issue and expiry", () => {
+    const { asked } = cliSetup();
+    const made = asked();
+    expect(made.expiresAt).toBe("2026-10-22T12:05:00.000Z");
+    expect(made.text).toBe(
+      `Sign in to gnoworld with gnokey (login, version 1). Sign only if your browser's address bar shows ${DOMAIN}. Domain: ${DOMAIN} Nonce: ${made.nonce} Issued: 2026-10-22T12:00:00.000Z Expires: 2026-10-22T12:05:00.000Z`,
+    );
+    expect(cliSafe(made.text)).toBe(true);
+  });
+
+  it("keeps its nonce apart from a link's and an Adena login's: kind cli, no owner, the address, the bare host", () => {
+    const { db, key, asked } = cliSetup();
+    const made = asked();
+    const row = db
+      .prepare("SELECT chain, kind, owner, subject, host, action FROM nonces WHERE nonce = ?")
+      .get(made.nonce);
+    expect(row).toEqual({
+      chain: "gnoworld-link",
+      kind: "cli",
+      owner: null,
+      subject: key.address,
+      host: DOMAIN,
+      action: null,
+    });
+  });
+
+  it("logs in with the file the key signed, once, creating the account and a token", async () => {
+    const { db, asked, logIn } = cliSetup();
+    const made = asked();
+    const result = await logIn(made);
+    expect(typeof result === "object" ? [result.token.length, result.maxAge] : result).toEqual([43, 90 * 24 * 60 * 60]);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
+    expect(await logIn(made)).toBe("nonce");
+  });
+
+  it.each([2, 50])("logs in exactly once when the same file arrives %i times at once", async (times) => {
+    const { db, asked, logIn } = cliSetup();
+    const made = asked();
+    const results = await Promise.all(Array.from({ length: times }, () => logIn(made)));
+    expect(results.filter((result) => typeof result === "object")).toHaveLength(1);
+    expect(results.filter((result) => result === "nonce")).toHaveLength(times - 1);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
+  });
+
+  it("refuses another host's nonce and another address's without spending them, and an expired one", async () => {
+    const { clock, asked, logIn } = cliSetup();
+    const [made, expired] = [asked(), asked()];
+    const other = cliKey();
+    expect(await logIn(made, { host: "evil.test" })).toBe("nonce");
+    expect(await logIn(made, { address: other.address, file: cliFile(other, made.text) })).toBe("nonce");
+    expect(typeof (await logIn(made))).toBe("object");
+    clock.now += TTL;
+    expect(await logIn(expired)).toBe("nonce");
+  });
+
+  it("refuses a file signed for another chain, over another text, by another key, or not the tool's", async () => {
+    const { key, asked, logIn } = cliSetup();
+    const files = (made: { text: string }) => [
+      cliFile(key, made.text, { doc: { chainId: "onyx-1" } }),
+      cliFile(key, `${made.text} `),
+      cliFile(cliKey(), made.text, {
+        pubKey: { "@type": "/tm.PubKeySecp256k1", value: Buffer.from(key.pub).toString("base64") },
+      }),
+      "not json",
+    ];
+    for (const index of [0, 1, 2, 3]) {
+      const made = asked();
+      expect(await logIn(made, { file: files(made)[index] ?? "" })).toBe("proof");
+    }
+  });
+
+  it("asks before creating an account, and refuses when the limit says no", async () => {
+    const { db, key, asked, login } = cliSetup();
+    const made = asked();
+    const result = await login.cliVerify(
+      { nonce: made.nonce, address: key.address, file: cliFile(key, made.text) },
+      () => false,
+      DOMAIN,
+    );
+    expect(result).toBe("new_account");
+    expect(db.prepare("SELECT count(*) AS n FROM accounts").get()).toEqual({ n: 0 });
+  });
+
+  it("never spends an Adena login's nonce, and Adena's verify never spends its nonce", async () => {
+    const { key, asked, login } = cliSetup();
+    const me = wallet();
+    const adena = challenge(login);
+    expect(
+      await login.cliVerify(
+        { nonce: adena.nonce, address: key.address, file: cliFile(key, adena.text) },
+        anyone,
+        DOMAIN,
+      ),
+    ).toBe("nonce");
+    expect(
+      typeof (await login.verify(
+        { nonce: adena.nonce, address: me.address, proof: me.sign("onyx-1", adena.text) },
+        anyone,
+        DOMAIN,
+      )),
+    ).toBe("object");
+    const cli = asked(me.address);
+    expect(
+      await login.verify({ nonce: cli.nonce, address: me.address, proof: me.sign("onyx-1", cli.text) }, anyone, DOMAIN),
+    ).toBe("nonce");
+  });
+
+  it("counts its nonces against the login's cap, as Adena's login does", () => {
+    const { key, login } = cliSetup({ nonceCap: 2 });
+    expect(typeof login.cliChallenge(key.address, DOMAIN)).toBe("object");
+    expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+    expect(login.cliChallenge(key.address, DOMAIN)).toBe("full");
+    expect(login.challenge("onyx-1", DOMAIN)).toBe("full");
+  });
+
+  it("answers text, never a code the command line cannot sign, for a host the chain would encode differently", () => {
+    const { db, key, login } = cliSetup();
+    expect(login.cliChallenge(key.address, "gnoworld.test&x")).toBe("text");
+    expect(db.prepare("SELECT count(*) AS n FROM nonces").get()).toEqual({ n: 0 });
   });
 });

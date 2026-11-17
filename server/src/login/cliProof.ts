@@ -9,7 +9,7 @@ import { Address, toAddress } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { Expected } from "./verify.ts";
 
-const CLI_CHAIN = "gnoworld-link";
+export const CLI_CHAIN = "gnoworld-link";
 const MAX_FILE = 4096;
 const MAX_MEMO = 2000;
 // secp256k1's group order: a signature whose S is above half of it is malleable, and the chain refuses it.
