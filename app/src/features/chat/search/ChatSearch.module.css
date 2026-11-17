@@ -94,3 +94,12 @@
     color: var(--color-text);
   }
 }
+
+/* A phone's close is a real 44 px square, as the thread's. */
+@layer components {
+  @media (width < 900px) {
+    .head button[aria-label="Close the search"]:enabled {
+      --_h: var(--control-m);
+    }
+  }
+}

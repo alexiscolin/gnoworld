@@ -81,7 +81,7 @@
     }
 
     .dock {
-      padding-block-end: max(calc(var(--space-s) + var(--space-3xs)), env(safe-area-inset-bottom));
+      padding-block-end: max(var(--space-s), env(safe-area-inset-bottom));
     }
 
     /* The composer's edge on the lines' own (the chat's inset), its words a step in. */

@@ -53,3 +53,12 @@
     }
   }
 }
+
+/* A phone's close is a real 44 px square, the width as well as the height (the selector outweighs ui's size rule by its pseudo-class). */
+@layer components {
+  @media (width < 900px) {
+    .head button:enabled {
+      --_h: var(--control-m);
+    }
+  }
+}

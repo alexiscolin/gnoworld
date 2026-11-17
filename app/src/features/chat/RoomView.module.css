@@ -395,3 +395,25 @@
     }
   }
 }
+
+/* A phone's lines on the 16 px line (the header's and the composer's): avatar and words at the chat's inset, not the wide room's 32; the
+   typing line over the list's foot, in the list's own padding, so no band of its own cuts a line; a few lines sit at the composer, not
+   under the band. */
+@layer components {
+  @media (width < 900px) {
+    .fill {
+      --_room: var(--chat-inset);
+    }
+
+    .fill > li:first-child {
+      /* layout: the list's room above its first line goes to the lines' top, so few lines settle at the foot */
+      margin-block-start: auto;
+    }
+
+    .typing {
+      /* layout: pulled up its own height over the list's foot, so it takes no room of its own and no band cuts a line */
+      margin-block: calc(-1 * 1lh) 0;
+      pointer-events: none;
+    }
+  }
+}
