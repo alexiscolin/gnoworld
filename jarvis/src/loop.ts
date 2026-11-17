@@ -1,11 +1,9 @@
-// Jarvis's loop (ADR-0002 §5, "Harness"). It takes one question to an answer through our own small loop
-// instead of the SDK's tool runner, because every call must pass our checks first. The system prompt is
-// frozen for each version and cached. The question and the room's lines go in as untrusted blocks, all
-// under the question's single tag. Each turn reserves budget, calls the model, and settles the cost
-// (model.ts). Then each tool call, at most eight per turn, must pass the allowlist and the tag's check.
-// It runs with the question's words and the question's own cards, and its result is cut short and wrapped.
-// The loop stops at an answer (returned with its cards), at the turn cap, at max_tokens, at a refusal,
-// at an error, at a stop nobody asked for, when the budget runs out, or when the asker has gone.
+// Jarvis's loop (ADR-0002 §5, "Harness") takes one question to an answer. It is our own small loop, not the SDK's tool runner,
+// because every call must pass our checks first. The system prompt is frozen for each version and cached. The question and the
+// room's lines go in as untrusted blocks under the question's single tag. Each turn reserves budget, calls the model and settles
+// the cost (model.ts); then each tool call, at most eight a turn, must pass the allowlist and the tag's check, runs with the
+// question's words and cards, and has its result cut short and wrapped. The loop stops at an answer (with its cards), the turn
+// cap, max_tokens, a refusal, an error, a stop nobody asked for, an empty budget, or when the asker has gone.
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
