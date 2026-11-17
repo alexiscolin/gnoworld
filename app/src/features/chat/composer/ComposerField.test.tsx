@@ -4,7 +4,7 @@ import { $getRoot, $getSelection, $isRangeSelection, $selectAll } from "lexical"
 import { describe, expect, it, vi } from "vitest";
 import { acting, inPage } from "../../../../tests/composer.tsx";
 import { all, one } from "../../../../tests/mount.tsx";
-import { Composer, type ComposerProps } from "./Composer.tsx";
+import { Composer, type ComposerProps } from "../Composer.tsx";
 import rules from "../markdownRules.module.css";
 
 const ROOM = "#bubble/games";

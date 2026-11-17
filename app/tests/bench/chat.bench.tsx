@@ -6,7 +6,7 @@ import { Sidebar } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { bench, describe } from "vitest";
-import { Composer } from "../../src/features/chat/composer/Composer.tsx";
+import { Composer } from "../../src/features/chat/Composer.tsx";
 import { RoomsView } from "../../src/features/chat/rooms/RoomsView.tsx";
 import { RoomView } from "../../src/features/chat/lines/RoomView.tsx";
 

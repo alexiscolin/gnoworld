@@ -8,7 +8,7 @@ import { RoomWriter } from "./Writer.tsx";
 
 // A room's composer that fails as it is drawn (its editor's code, or its chunk) takes the composer's place alone: the page around it,
 // the plate and the room's lines, stays.
-vi.mock("./Composer.tsx", () => ({
+vi.mock("../Composer.tsx", () => ({
   Composer: () => {
     throw new Error("createEditor: nodes[0] QuoteNode is not a constructor that subclasses LexicalNode");
   },

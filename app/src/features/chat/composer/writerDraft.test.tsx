@@ -7,7 +7,7 @@ const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
 // The device's draft of the conversation, and the composer's props as it is given them.
 vi.mock("../../../lib/drafts/page.ts", () => ({ pageDrafts: () => ({ get: () => "fixed", set: () => true }) }));
-vi.mock("./Composer.tsx", () => ({
+vi.mock("../Composer.tsx", () => ({
   Composer: (props: { draft?: string; onDraft?: unknown; fresh?: boolean; gone?: boolean }) => (
     <i
       data-draft={props.draft}

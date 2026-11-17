@@ -5,7 +5,7 @@ import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../../store/index.ts";
 import { ErrorView, errorKind, useWhere } from "../../errors/index.ts";
 import { Composer, renewComposer } from "./composerChunk.ts";
-import type { ComposerProps } from "./Composer.tsx";
+import type { ComposerProps } from "../Composer.tsx";
 import { Failing } from "../Failing.tsx";
 import { LogInToWrite } from "./LogInToWrite.tsx";
 import { roomLabel } from "../rooms/names.ts";

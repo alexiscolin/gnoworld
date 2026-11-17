@@ -2,7 +2,7 @@
 // load the Writer: an account's alone, a visitor's page never asks for its code (the first screen's budget, ADR-0001 §12).
 import { lazy } from "react";
 
-const load = async () => ({ default: (await import("./Composer.tsx")).Composer });
+const load = async () => ({ default: (await import("../Composer.tsx")).Composer });
 /** The composer, as Writer draws it: a live binding, which `renewComposer` replaces. */
 export let Composer = lazy(load);
 

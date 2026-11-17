@@ -9,7 +9,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import "../composer/Composer.tsx";
+import "../Composer.tsx";
 import type { Dms } from "../rooms/Dms.tsx";
 import { RoomView } from "./RoomView.tsx";
 import { roomActs } from "../rooms/roomActs.ts";

@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { takeJarvisQuestions, tellJarvisHere, type JarvisHere } from "../../../jarvisHere.ts";
 import { acting, inPage } from "../../../../tests/composer.tsx";
-import { Composer } from "./Composer.tsx";
+import { Composer } from "../Composer.tsx";
 import { jarvisQuestion } from "./jarvisLine.ts";
 import { suggestions } from "./suggest.ts";
 

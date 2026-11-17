@@ -4,12 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, markup, noMedia, one } from "../../../../tests/mount.tsx";
+import { all, markup, noMedia, one } from "../../../tests/mount.tsx";
 import { Composer, typingOf } from "./Composer.tsx";
-import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./draftHint.ts";
-import { tooFast } from "../link/pace.ts";
-import { refusalAfter } from "./composerHooks.ts";
-import { acting, FIELD, inPage } from "../../../../tests/composer.tsx";
+import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./composer/draftHint.ts";
+import { tooFast } from "./link/pace.ts";
+import { refusalAfter } from "./composer/composerHooks.ts";
+import { acting, FIELD, inPage } from "../../../tests/composer.tsx";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

@@ -5,25 +5,25 @@
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks.
 import { compose, type Composed } from "@gnoworld/core";
-import { composeDraft, DRAFT_COMMANDS } from "./polling.ts";
-import { cardAsked, CARD_COMMANDS } from "./cardCommands.ts";
+import { composeDraft, DRAFT_COMMANDS } from "./composer/polling.ts";
+import { cardAsked, CARD_COMMANDS } from "./composer/cardCommands.ts";
 import { Stack } from "@gnoworld/ui";
 import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
-import { FIELD } from "./composerBox.ts";
-import { useFocusAtStart, useHelp, useRefusal, type Refused } from "./composerHooks.ts";
-import { LinkTool } from "./LinkTool.tsx";
-import { ComposerField, THEME } from "./ComposerField.tsx";
-import { createComposerEditor } from "./markdownEditor.ts";
-import { suggestions } from "./suggest.ts";
-import { useEditing } from "./EditBar.tsx";
-import { useJarvis } from "./JarvisButton.tsx";
-import { MessageBox } from "./MessageBox.tsx";
-import { NameNudge } from "./NameNudge.tsx";
-import { actsOf } from "./acts.ts";
-import { useMemberNames } from "../../names/index.ts";
-import { peopleOf, roomLabel } from "../rooms/names.ts";
-import { useAnswering } from "./ReplyBar.tsx";
-import type { Answered } from "../lines/Replying.tsx";
+import { FIELD } from "./composer/composerBox.ts";
+import { useFocusAtStart, useHelp, useRefusal, type Refused } from "./composer/composerHooks.ts";
+import { LinkTool } from "./composer/LinkTool.tsx";
+import { ComposerField, THEME } from "./composer/ComposerField.tsx";
+import { createComposerEditor } from "./composer/markdownEditor.ts";
+import { suggestions } from "./composer/suggest.ts";
+import { useEditing } from "./composer/EditBar.tsx";
+import { useJarvis } from "./composer/JarvisButton.tsx";
+import { MessageBox } from "./composer/MessageBox.tsx";
+import { NameNudge } from "./composer/NameNudge.tsx";
+import { actsOf } from "./composer/acts.ts";
+import { useMemberNames } from "../names/index.ts";
+import { peopleOf, roomLabel } from "./rooms/names.ts";
+import { useAnswering } from "./composer/ReplyBar.tsx";
+import type { Answered } from "./lines/Replying.tsx";
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */

@@ -13,7 +13,7 @@ import { useThreads } from "../lines/Threading.tsx";
 // failure alone, and the next thread opened asks for it again: a lazy component would keep its failure for good.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const fetched = vi.hoisted(() => ({ count: 0 }));
-vi.mock("./Composer.tsx", async (original) => {
+vi.mock("../Composer.tsx", async (original) => {
   fetched.count += 1;
   if (fetched.count === 1) throw new Error("chunk could not be fetched");
   return original();
