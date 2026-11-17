@@ -35,6 +35,14 @@ function askAhead(
 
 const AT: Vec = { x: 0, y: 0, z: 0 };
 
+/** What a choice is made from: `pxK` world units a pixel at distance 1, the clock, the open system, and whether the flight makes none (madeOnly). */
+export interface Choice {
+  readonly pxK: number;
+  readonly seconds: number;
+  readonly open?: number | undefined;
+  readonly wait?: boolean;
+}
+
 /** Fills `wanted` and `sizes` with the planets of `universe` drawn as themselves from `eye`, `pxK` world units a pixel at distance 1; with
  * `open`, only that system's (-1: none), the others' being asked ahead of `warm`, never drawn. `ahead` gets the open system's planets too
  * small to be drawn as themselves yet, which are made ahead. */
@@ -60,4 +68,14 @@ export function sight(
       else if (px >= WARM_PX) askAhead(planet, { drawn, ahead, warm });
     }
   }
+}
+
+/** Keeps of `wanted` the planets `made` holds alone, and none `ahead`: a flight where the browser compiles no program aside (Firefox has no
+ * KHR_parallel_shader_compile) makes none, which would hold a frame of it while its programs compile; those not made stay their quads. */
+export function madeOnly(
+  { wanted, ahead }: { wanted: Planet[]; ahead: Planet[] },
+  made: ReadonlyMap<number, unknown>,
+): void {
+  wanted.splice(0, Infinity, ...wanted.filter(({ index }) => made.has(index)));
+  ahead.length = 0;
 }

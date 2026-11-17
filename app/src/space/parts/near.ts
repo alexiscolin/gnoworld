@@ -16,7 +16,7 @@ import { Bones } from "./bones.ts";
 import { upgradeStep } from "./upgrade.ts";
 import { warmFrame } from "./warmup.ts";
 import { Warm } from "./warm.ts";
-import { sight } from "./wanted.ts";
+import { madeOnly, sight, type Choice } from "./wanted.ts";
 import type { NearDevice } from "./nearDevice.ts";
 
 // At most this many planets are kept made, more than the ones drawn.
@@ -85,10 +85,11 @@ export class Near {
   }
 
   /** Chooses which planets are drawn as themselves, from `eye`, `pxK` world units a pixel at distance 1, a few times a second; with
-   * `open`, only that system's (-1: none; the others' are asked ahead, never drawn). */
-  choose(universe: Universe, eye: Vec, { pxK, seconds, open }: { pxK: number; seconds: number; open?: number }): void {
+   * `open`, only that system's (-1: none; the others' are asked ahead, never drawn); with `wait`, none made yet. */
+  choose(universe: Universe, eye: Vec, choice: Choice): void {
     const lists = { wanted: this.#wanted, sizes: this.#sizes, ahead: this.#ahead, warm: this.warm };
-    sight(universe, { eye, pxK, seconds, open }, lists);
+    sight(universe, { ...choice, eye }, lists);
+    if (choice.wait === true) madeOnly(lists, this.#held);
     // More made ahead than are kept would be dropped and remade each choose.
     this.#ahead.length = Math.min(this.#ahead.length, KEPT - this.#wanted.length);
     this.#wantedIndex = new Set(this.#wanted.map(({ index }) => index));

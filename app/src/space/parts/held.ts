@@ -3,6 +3,7 @@ import type { PerspectiveCamera, Scene, Texture, WebGLRenderer } from "three";
 import type { Planet } from "../layout.ts";
 import type { Planet as Drawn } from "../planet/planet.ts";
 import type { PlateMask } from "../planet/plateMask.ts";
+import { inBlurPixel } from "../rig/blurred.ts";
 import { mapsOf } from "./mapsOf.ts";
 import type { Warming } from "./warmup.ts";
 
@@ -26,7 +27,7 @@ export interface Held extends Warming {
   arrive: number;
 }
 
-/** `drawn` made into a near planet's keep: its plate set, its maps listed, its group on the stage and its programs compiling. */
+/** `drawn` made into a near planet's keep: its plate set, its maps listed, its group on the stage and its programs compiling, the blur's too. */
 export function holdOf(
   drawn: Drawn,
   planet: Planet,
@@ -54,6 +55,10 @@ export function holdOf(
   };
   drawn.group.visible = false;
   stage.add(drawn.group);
+  // Its programs as the blur draws them too: hidden till it shows, the warm-up at rest (rig/speed.ts) never draws it.
+  inBlurPixel(renderer, () => {
+    renderer.compile(drawn.group, camera, stage);
+  });
   renderer.compileAsync(drawn.group, camera, stage).then(
     () => {
       held.built = true;

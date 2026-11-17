@@ -5,7 +5,7 @@ import { Free } from "./rig/free.ts";
 import { blankPose } from "./rig/pose.ts";
 import { advance, paint } from "./move.ts";
 import { openOf } from "./open.ts";
-import { choose, livelyOf, napOf, stateOf, tick } from "./view.ts";
+import { choose, livelyOf, napOf, stateOf, tick, waitsToMake } from "./view.ts";
 
 // view.ts reads the pointer's media query as it loads.
 vi.hoisted(() => {
@@ -225,5 +225,17 @@ describe("choosing the near planets", () => {
     choose(space, state, 1060);
     expect(near).toHaveBeenCalledTimes(2);
     expect(near.mock.calls[1]?.[2]).toMatchObject({ open: -1 });
+  });
+});
+
+describe("waitsToMake", () => {
+  const renderer = (parallel: boolean) => ({
+    extensions: { has: (name: string) => parallel && name === "KHR_parallel_shader_compile" },
+  });
+
+  it("holds the near planets back in a flight alone, where the browser compiles no program aside", () => {
+    expect(waitsToMake(true, renderer(false) as never)).toBe(true);
+    expect(waitsToMake(false, renderer(false) as never)).toBe(false);
+    expect(waitsToMake(true, renderer(true) as never)).toBe(false);
   });
 });

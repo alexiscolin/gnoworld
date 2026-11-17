@@ -104,9 +104,7 @@ Hosting and running the whole stack: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 - Plans and what comes next: [docs/process/plans/backlog.md](docs/process/plans/backlog.md); the working journal (decisions, review
   findings, plans): [docs/process/](docs/process/README.md)
 
-## License
-
-[Apache-2.0](LICENSE).
+## Credits
 
 Planet textures are from [Solar System Scope](https://www.solarsystemscope.com/textures/),
 CC BY 4.0. The app lists them under Credits.
