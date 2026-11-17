@@ -432,10 +432,12 @@ Each change that adds a resource proves it is released:
 
 ## Budgets the gate checks
 
+A cap moves only by a recorded decision with its reason, never to the latest measure plus a margin.
+
 | Budget | Limit | Where |
 |---|---|---|
-| JavaScript before the first usable screen | 279,143 B gzip on an Earth's or a world's page, 276,255 B on a page with no plate, each 256 B over its measure | `app/tests/e2e/budgets.spec.ts` (ADR-0001 §12 set 150 KB; the caps are the measured sizes) |
-| Total on mobile | 3 MB | ADR-0001 §12 |
+| JavaScript before the first usable screen | 300,000 B gzip, on every page | `app/tests/e2e/budgets.spec.ts`, ADR-0001 §12 (D13801) |
+| Everything a phone downloads, the precache included | 3,300,000 B gzip | `app/tests/e2e/budgets.spec.ts`, ADR-0001 §12 (D13801) |
 | LCP, CLS, TBT (the lab stand-in for INP) on a mid-range mobile profile | 2.5 s, 0.1, 200 ms | ADR-0002 §2. INP itself is measured in the field |
 | Frames while travelling | 60 fps on a mid-range phone | ADR-0001 §12 |
 | Memory after 20 flights | GPU resources at baseline, JS heap within 10% | Above |

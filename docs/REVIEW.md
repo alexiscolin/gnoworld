@@ -113,9 +113,9 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
-   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A branch may raise one
-   chunk's size cap by up to 256 B without asking, never the first screen's: the new cap, its size
-   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
+   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A size cap moves
+   only by a recorded decision with its reason (D13801), never to the latest measure plus a margin:
+   in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
 
 ### A branch's weight by its kind
 

@@ -623,10 +623,14 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
   - the MLS worker loads at the first private room.
 - `?debug` shows frames per second, draw calls and memory. Source maps ship. There is one
   logger.
-- Budgets, proposed and confirmed in phase 0, are checked by Playwright in the gate (§14):
-  - at most 150 KB of compressed JavaScript before the first usable screen;
-  - at most 3 MB in all on mobile, against gno.world's 11.1 MB;
+- Budgets, checked by Playwright in the gate (§14), set in phase 0 by D13801:
+  - at most 300,000 B of gzip JavaScript before the first usable screen, on every page. The first
+    proposal, 150 KB, was never reachable with the 3D scene, the chat and the login on the first
+    screen; the cap holds 6 % over the largest page measured at the decision (282,407 B);
+  - at most 3,300,000 B in all on mobile, the precache included, about 5 % over the measure at the
+    decision, against gno.world's 11.1 MB;
   - 60 fps on a mid-range phone.
+  - A cap moves only by a recorded decision with its reason, never to the latest measure plus a margin.
 
 **PWA rules:**
 - Precache the app's hashed files, its scripts, styles and fonts, and its shell, its pages, their data,
