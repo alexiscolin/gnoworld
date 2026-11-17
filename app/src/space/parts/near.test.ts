@@ -451,3 +451,35 @@ describe("an open system with more small planets than a Near keeps", () => {
     expect(made).toBeLessThanOrEqual(24);
   });
 });
+
+describe("a planet wanted in a flight, where the browser compiles no program aside", () => {
+  it("stays its quad, never made, till the flight has landed", () => {
+    vi.mocked(drawnOf).mockReset();
+    const shown = new Map<number, boolean>();
+    const device = {
+      stage: { add: () => undefined, remove: () => undefined },
+      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      camera: new PerspectiveCamera(),
+      maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
+      planets: { show: (i: number, s: boolean) => shown.set(i, s) },
+      plate: {},
+      lens: { value: 0 },
+    };
+    const system = {
+      place: { x: 0, y: 0, z: 0 },
+      across: { x: 1, y: 0, z: 0 },
+      along: { x: 0, y: 0, z: 1 },
+      reach: 10,
+      planets: [] as unknown[],
+    };
+    system.planets.push({ index: 0, id: "w0", radius: 1, orbit: 0, phase: 0, speed: 0, system });
+    const near = new Near(device as never);
+    // 2/(5*0.01) = 40 px: wanted, but the flight runs.
+    near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0, wait: true });
+    near.tick(0, { alone: -1, close: undefined, delta: 0.016, still: false });
+    expect(drawnOf).not.toHaveBeenCalled();
+    expect(shown.get(0)).not.toBe(false);
+    near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
+    expect(drawnOf).toHaveBeenCalledTimes(1);
+  });
+});

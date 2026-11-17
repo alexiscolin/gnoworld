@@ -25,7 +25,7 @@ export interface State {
   sized: boolean;
   /** When the near planets were last chosen, and what they are chosen by, written each time: a frame makes nothing. */
   chose: number;
-  readonly choosing: { pxK: number; seconds: number; open: number };
+  readonly choosing: { pxK: number; seconds: number; open: number; wait: boolean };
   freed: boolean;
   ticked: number;
   place: Space["place"];
@@ -42,7 +42,7 @@ export const stateOf = (space: Space): State => ({
   freed: false,
   ticked: -1,
   chose: 0,
-  choosing: { pxK: 0, seconds: 0, open: -1 },
+  choosing: { pxK: 0, seconds: 0, open: -1, wait: false },
   place: space.place,
   universe: space.universe,
   numbers: { eye: [0, 0, 0, 0, 0, 0, 1], shown: [] },
@@ -201,6 +201,7 @@ export function choose(space: Space, state: State, now: number): void {
   state.choosing.pxK = space.see.pxK;
   state.choosing.seconds = space.seconds;
   state.choosing.open = open;
+  state.choosing.wait = space.rig.flying && !space.renderer.extensions.has("KHR_parallel_shader_compile");
   state.pxPerSecond = pixelsPerSecond(space);
   state.face = facesShow(space);
   space.stage.near?.choose(space.universe, space.camera.position, state.choosing);
