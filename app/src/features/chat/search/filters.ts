@@ -2,7 +2,7 @@
 // the text to what the server is asked. A filter that names nothing found is `bad`, never a wider search.
 import { Address, SEARCH_Q_MIN } from "@gnoworld/schemas";
 import type { SearchAsk } from "../../../lib/api/search.ts";
-import { roomLabel } from "../names.ts";
+import { roomLabel } from "../rooms/names.ts";
 
 /** Who and what the filters name: the reader, the people of the room, the world's rooms. */
 export interface Who {

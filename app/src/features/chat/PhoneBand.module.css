@@ -9,12 +9,10 @@
     /* the planet's box: its disc (0.72 of it) is the large one, of which the band shows the top half */
     --_disc-box: calc(var(--control-m) * 8);
 
-    /* layout: the planet's box and its crop; the planet under the band's words */
     position: relative;
     isolation: isolate;
     overflow: hidden;
     background: var(--color-plate);
-    /* layout: the lines' own gutter, the notch's side added (S and E), a step over the place and under the rooms' row */
     padding: var(--space-2xs) calc(var(--space-s) + env(safe-area-inset-right)) var(--space-2xs)
       calc(var(--space-s) + env(safe-area-inset-left));
     border-block-end: var(--line-width) solid var(--color-line);
@@ -48,7 +46,6 @@
   }
 
   .text {
-    /* layout: the words take the row and give way at their end */
     flex: 1 1 0;
     min-inline-size: 0;
   }
@@ -65,7 +62,7 @@
   /* The kicker (the design system's Kicker takes no class): its box is the wrapper's, which truncates (the utility): one line, cut with an
      ellipsis, never a second row that moves the name. */
   .kicker > p {
-    /* layout: the words are the wrapper's own inline content, so its ellipsis cuts them */
+    /* The words are the wrapper's own inline content, so its ellipsis cuts them */
     display: contents;
   }
 
@@ -78,7 +75,6 @@
   }
 
   .mark {
-    /* layout: kept whole beside the counts */
     flex: none;
   }
 
@@ -159,19 +155,14 @@
     .band {
       --_planet: var(--control-m);
 
-      /* layout: the place at the start, the rooms' row in the rest */
       display: grid;
-      /* layout: the two parts' shares */
       grid-template-columns: max-content minmax(0, 1fr);
-      /* layout: one line of the band's rows */
       align-items: center;
-      /* layout: one line of the band's rows */
       column-gap: var(--space-l);
       padding-block: var(--space-2xs);
     }
 
     .place {
-      /* layout: the words' own width, the planet being the band's (its end, not this cell's) */
       padding-inline-end: 0;
     }
 

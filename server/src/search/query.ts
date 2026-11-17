@@ -57,7 +57,7 @@ const Count = z.object({ n: z.number() });
 const NEWEST_OF = `SELECT rowid FROM lines WHERE account = ? AND world = ? ORDER BY at DESC, rowid DESC LIMIT ${String(MATCHES_MOST + 1)}`;
 
 // The world's lines come first (a column of the full-text table): one pass gives the newest matches, the rooms and filters are asked of them.
-// ponytail: only the newest MATCHES_MOST matches are searched, so a filter nothing passes costs 5,000 rows; an old line of a common word is
+// ceiling: only the newest MATCHES_MOST matches are searched, so a filter nothing passes costs 5,000 rows; an old line of a common word is
 // missed with a narrow filter (`partial` says so). Upgrade: a partial index on `link`.
 const NEWEST = `SELECT rowid FROM lines_fts WHERE lines_fts MATCH ? ORDER BY rowid DESC LIMIT ${String(MATCHES_MOST + 1)}`;
 const FROM = `FROM json_each(?) j CROSS JOIN lines l ON l.rowid = j.value

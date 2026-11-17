@@ -34,7 +34,7 @@ on the slice's last merge.
    split, not reviewed in more. The last merge of a slice with tier-1 code: propose
    `/code-review ultra` to Alexis (billed per run; Claude cannot start it).
 4. **Reproduce.** Reproduce each finding yourself: a command, or a test seen failing (no agent
-   verifies the reviewers' findings since 2026-11-04). Write every finding to `docs/review/findings.md` with its status and evidence:
+   verifies the reviewers' findings since 2026-11-04). Write every finding to `docs/process/review/findings.md` with its status and evidence:
    `fixed` with its commit, `rejected`, `intended`, `moot` or `asked`, each with its reason; one
    nobody reproduced stays `claimed`.
 5. **Fix high and medium.** Each test first, its commit body naming its finding (`Finding: F012`).
@@ -53,6 +53,6 @@ on the slice's last merge.
    pre-existing: in the code before the branch); the low list; what was dropped, one line each.
 8. **Before the push.** After the last fix, run once every job GitHub will run on the change, `sh scripts/check.sh`
    whole among them (D13186); step 1's run counts when no commit followed it.
-9. **Log.** Append to `docs/review-log.md`: the date, the branch, its rounds, each finding with its
+9. **Log.** Append to `docs/process/review-log.md`: the date, the branch, its rounds, each finding with its
    agent and outcome, the tokens and hours the branch took, and what Alexis caught that the agents
    missed, and commit it. `main` takes the branch through its pull request, merged by Alexis on GitHub (D13165).

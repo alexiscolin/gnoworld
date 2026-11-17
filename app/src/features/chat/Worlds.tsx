@@ -1,4 +1,4 @@
-// The full-screen chat's column of worlds (the video's left edge, frame 80): the picture of each world's real planet at 44 px, the world in
+// The full-screen chat's column of worlds (the design's left edge): the picture of each world's real planet at 44 px, the world in
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
 import { Cluster, Tooltip } from "@gnoworld/ui";
@@ -7,9 +7,9 @@ import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
 import { ErrorView, errorKind } from "../errors/index.ts";
 import { useApp } from "../../storeContext.tsx";
-import { listAhead } from "./roomsListed.ts";
+import { listAhead } from "./rooms/roomsListed.ts";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
-import { UnreadPill } from "./UnreadPill.tsx";
+import { UnreadPill } from "./rooms/UnreadPill.tsx";
 import { WorldsMore } from "./WorldsMore.tsx";
 import styles from "./Worlds.module.css";
 

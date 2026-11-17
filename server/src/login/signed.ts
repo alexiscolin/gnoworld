@@ -1,5 +1,5 @@
 // The single-use nonces a wallet's signature spends (ADR-0002 §4, §6), a login's and an admin change's, each kept with the
-// whole text signed, and the command line's login's (D13880); login.ts makes the session's token of a proved one.
+// whole text signed, and the command line's login's; login.ts makes the session's token of a proved one.
 import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Address, Challenge, VerifyRequest } from "@gnoworld/schemas";
@@ -50,7 +50,7 @@ const statements = (db: DatabaseSync) => ({
   purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
   // Every nonce with no owner, the command line's login's with them: a link's code alone has one, and its own cap.
   countNonces: db.prepare("SELECT count(*) AS n FROM nonces WHERE owner IS NULL"),
-  // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000); the console's calls are few, and
+  // ceiling: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000); the console's calls are few, and
   // the public path keeps the global count, so a flood costs it nothing more.
   countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ? AND kind IS NULL"),
   addNonce: db.prepare(
@@ -95,7 +95,7 @@ export function makeSigned(
   const fresh = (host: string) => {
     const at = now();
     sql.purgeNonces.run(at);
-    // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
+    // ceiling: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
     const pending = console ? sql.countHost.get(host) : sql.countNonces.get();
     if (Count.parse(pending).n >= nonceCap) return "full";
     const [nonce, expiresAt] = [randomBytes(16).toString("base64url"), new Date(at + ttl).toISOString()];

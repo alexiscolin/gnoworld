@@ -1,4 +1,4 @@
-// Choosing another network (D13501): the same place when that network holds it, else its home and a line saying so. The paths are
+// Choosing another network: the same place when that network holds it, else its home and a line saying so. The paths are
 // places.ts's own; a realm is on the other network only if that network's chain says so, read, never guessed from the path.
 import { realmAt } from "../../realmAt.ts";
 import { realmView, universePath, universePrefix, type site as Site, type UniverseView } from "../../places.ts";

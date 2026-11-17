@@ -1,4 +1,4 @@
-// The plate's "First charted by @name" (frame 91), loaded by Arrival.tsx once the stream has told a signal: a chunk of its own,
+// The plate's "First charted by @name", loaded by Arrival.tsx once the stream has told a signal: a chunk of its own,
 // as small as it can be, since a guest's page on any charted world asks for it at once (budgets.spec.ts).
 import type { Signal } from "@gnoworld/schemas";
 import { useApp } from "../../storeContext.tsx";
@@ -8,7 +8,7 @@ import { shortAddress } from "../chat/index.ts";
 export const useFirst = (world: string, kind: Signal["kind"]) =>
   useApp(({ signals }) => signals.find((signal) => signal.world === world && signal.kind === kind));
 
-/** Plain text of the short address, with no name lookup; the end of the description's paragraph, as frame 91 has it. */
+/** Plain text of the short address, with no name lookup; the end of the description's paragraph, as the design has it. */
 export function ChartedBy({ world }: { world: string }) {
   const charted = useFirst(world, "chart");
   return charted === undefined ? null : (

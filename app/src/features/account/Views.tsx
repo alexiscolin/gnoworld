@@ -7,8 +7,9 @@ import { PassportView } from "../passport/index.ts";
 import { SettingsView } from "../settings/index.ts";
 import { useDeviceView, type DeviceView } from "../../deviceViews.ts";
 
-// The release of a command-line key has its own chunk, asked when it is opened.
+// The release of a command-line key and the command line's login have their own chunk, asked when one is opened.
 const ReleaseDialog = lazy(async () => ({ default: (await import("../settings/index.ts")).ReleaseDialog }));
+const KeyLogin = lazy(async () => ({ default: (await import("../settings/index.ts")).GnokeyLoginDialog }));
 
 export function Views({ universe }: { universe: string }) {
   const [open, go] = useDeviceView();
@@ -23,6 +24,7 @@ export function Views({ universe }: { universe: string }) {
       {asked.has("passport") ? <PassportView universe={universe} open={open === "passport"} onClose={close} /> : null}
       {asked.has("settings") ? <SettingsView open={open === "settings"} onClose={close} /> : null}
       {asked.has("release") ? <ReleaseDialog open={open === "release"} onClose={close} /> : null}
+      {asked.has("key-login") ? <KeyLogin open={open === "key-login"} onClose={close} /> : null}
       {asked.has("saved") ? <SavedDialog open={open === "saved"} onClose={close} /> : null}
     </Suspense>
   );

@@ -2,7 +2,7 @@
 // message's, drawn as text and never as markup; the marks are the server's offsets (marks.ts).
 import type { SearchHit } from "@gnoworld/schemas";
 import { clock, moment } from "../../../lib/days.ts";
-import { roomLabel, isAccount } from "../names.ts";
+import { roomLabel, isAccount } from "../rooms/names.ts";
 import { Person } from "../Person.tsx";
 import { pieces } from "./marks.ts";
 import styles from "./ChatSearch.module.css";

@@ -7,14 +7,10 @@ import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, reactMark,
 import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
-// ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 282,407 with the
-// phone mode's shared parts, D13719, D13731).
-const FIRST_SCREEN_JS = 282_663;
-// A page with no plate (the home), exact: its measured size, 256 B ahead (277,691 B with the phone mode's media checks, D13719).
-const PLAIN_FIRST_SCREEN_JS = 277_947;
-const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
-const TOTAL = 3_135_286;
+// ADR-0001 §12's budgets (D13801), gzip, hashed names left out: JavaScript before the first usable screen, on every page, and all a
+// phone downloads with the precache. They move only by the owner's recorded decision, never to a new measure.
+const FIRST_SCREEN_JS = 300_000;
+const TOTAL = 3_300_000;
 
 // A text's hashed names of other files weigh as one fixed string (chunks.ts's HASHED); a file that is no text weighs its own bytes.
 const compressed = (page: Page, urls: readonly string[]) =>
@@ -313,7 +309,7 @@ function holdTimers() {
     waiting = waiting.filter(({ set, args }) => stillHeld(set, args));
     for (const { go } of going) go();
   };
-  // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (later.ts, the bell's watch). A frame and
+  // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (afterLoad.ts, the bell's watch). A frame and
   // a shorter timer run, as React's own that shows a boundary's content once its code came. Not the 2,500 ms of useSpace.ts's
   // FIRST_SCREEN_MS: the gate's browsers draw no space, so that wait is how the chat of a page that holds space is let in.
   Reflect.set(window, "__letShortGo", () => {
@@ -564,7 +560,7 @@ for (const [path, charted] of [...WEIGHED.map((each) => [each, false] as const),
     ).toEqual([]);
     await controlled(page);
     for (const cached of (await cacheContents(page)).paths) all.add(new URL(cached, page.url()).href);
-    expect(await compressed(page, firstScreen)).toBeLessThanOrEqual(firstScreenCap(path));
+    expect(await compressed(page, firstScreen)).toBeLessThanOrEqual(FIRST_SCREEN_JS);
     expect(await compressed(page, [...all])).toBeLessThanOrEqual(TOTAL);
     const holdingThree = await page.evaluate(
       async ([list, mark]) => {

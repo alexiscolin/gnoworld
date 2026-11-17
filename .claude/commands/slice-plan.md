@@ -1,9 +1,9 @@
 ---
-description: Turn a backlog slice into its plan in docs/plans/, before any code. Writes the plan and stops.
+description: Turn a backlog slice into its plan in docs/process/plans/, before any code. Writes the plan and stops.
 argument-hint: "<slice number>"
 ---
 
-Write `docs/plans/slice-$ARGUMENTS.md` from the slice's row in `docs/plans/backlog.md`, and
+Write `docs/process/plans/slice-$ARGUMENTS.md` from the slice's row in `docs/process/plans/backlog.md`, and
 the ADR sections it names. Read only what the slice touches. At most 80 lines, in this order:
 
 1. **Done when:** the row's acceptance tests, word for word, then any the plan adds.

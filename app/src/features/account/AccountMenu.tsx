@@ -1,5 +1,5 @@
-// The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout; frames 6 and 17): logged out, the way in,
-// Connect Adena, beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
+// The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout): logged out, the way in,
+// Connect (its menu: Adena or the command line), beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
 // that holds the passport, the saved messages, the settings, a name to pick and the way out. The name shown, its dialog and the menu's code
 // come after the first screen, never with it.
 import { shortAddress, type Address } from "@gnoworld/schemas";
@@ -21,7 +21,7 @@ const NameLabel = lazy(async () => ({ default: (await import("../names/index.ts"
 const LinkedNotice = lazy(async () => ({ default: (await import("./LinkedNotice.tsx")).LinkedNotice }));
 const PickName = lazy(async () => ({ default: (await import("../names/index.ts")).PickName }));
 
-// The account's pill (frame 17): its face and its short address, on the menu's trigger before and after its code comes.
+// The account's pill: its face and its short address, on the menu's trigger before and after its code comes.
 function AccountPill({
   address,
   universe,

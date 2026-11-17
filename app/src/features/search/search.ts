@@ -71,7 +71,7 @@ function rank(entries: readonly Entry[], text: string, { keep, note }: Pick<Ask,
     else found.push(scored);
   }
   if (found.length < SHOWN / 5 && text.length >= 4) {
-    // ponytail: past this many names a few letters off the pass stops: the best 50 come from the first ones, and the count says "more".
+    // ceiling: past this many names a few letters off the pass stops: the best 50 come from the first ones, and the count says "more".
     for (const entry of missed) {
       if (found.length >= FUZZY_CAP) break;
       const scored = scoredOf(entry, text, { fuzzy: true, note });

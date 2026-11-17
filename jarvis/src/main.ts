@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "@gnoworld/service/db";
 import { stop } from "@gnoworld/service/http";
-import { logger, type Log } from "@gnoworld/service/log";
+import { failureOf, logger, type Log } from "@gnoworld/service/log";
 import { makeBudget, type Budget } from "./budget.ts";
 import { loadJarvisConfig, loadServed } from "./config.ts";
 import { makeDigests } from "./digest.ts";
@@ -147,7 +147,7 @@ async function closeAll(): Promise<void> {
 
 // A stop that failed leaves loudly: its error's name logged, never its message, and the process ended.
 const failed = (error: unknown): void => {
-  log("jarvis_stop_failed", { error: error instanceof Error ? error.name : typeof error });
+  log("jarvis_stop_failed", failureOf(error));
   process.exit(1);
 };
 // SIGTERM from the container's runtime, SIGINT from a terminal: one drain, however many arrive. Set before jarvis says

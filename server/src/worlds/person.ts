@@ -5,7 +5,7 @@
 import { labelName } from "@gnoworld/core";
 import { Address, type ApiError } from "@gnoworld/schemas";
 import { PERSON_CAPS, PERSON_MAX_BYTES, PersonCardData, Worlds } from "@gnoworld/schemas/indexer";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import { type Context, Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
@@ -110,7 +110,7 @@ export function peopleRoutes({ db, worlds, balance, proxy, log, now, perSecond =
       return c.body(text, 200, { "content-type": "application/json" });
     } catch (error) {
       // The name alone: a row may hold a stranger's text.
-      log("person_failed", { error: error instanceof Error ? error.name : "unknown" });
+      log("person_failed", failureOf(error));
       return fail(c, "internal", 500);
     }
   });

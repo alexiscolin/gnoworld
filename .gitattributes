@@ -1,5 +1,5 @@
 # Each track appends its rows to both ledgers: a merge keeps both sides' lines (D13408). A row both sides changed is kept
 # twice: check_docs refuses it where the row starts with its id; a decision row with no id, and a row one side deleted while the
 # other changed it, pass unseen.
-docs/decisions.md merge=union
-docs/review/findings.md merge=union
+docs/process/decisions.md merge=union
+docs/process/review/findings.md merge=union

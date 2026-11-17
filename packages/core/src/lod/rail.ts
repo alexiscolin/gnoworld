@@ -61,7 +61,7 @@ const ahead = (lower: Held, upper: Held) =>
 
 // Those shown before in their order, the others after them as ranked, people before callers; then a world goes above the one over it only
 // when clearly ahead in its group.
-// ponytail: neighbours swapped till none is clearly ahead of the one above it, 24 worlds at most, so at most 276 swaps.
+// ceiling: neighbours swapped till none is clearly ahead of the one above it, 24 worlds at most, so at most 276 swaps.
 function steady(chosen: readonly Held[], shown: ReadonlyMap<string, number>): Held[] {
   const at = (held: Held) => shown.get(held.world.id) ?? Number.POSITIVE_INFINITY;
   const ranked = new Map(chosen.map((held, rank) => [held, rank]));
@@ -101,7 +101,7 @@ function sectionsOf(asks: readonly RailAsk[]): Map<RailSection, RailAsk[]> {
 }
 
 // The first `most` of `ranked` that have a title, in its order: a world only an address names is left out, and none is titled once `most`
-// are kept. ponytail: till then each is tried, so a file of 20,000 worlds only addresses name tries them all, about 40 ms measured,
+// are kept. ceiling: till then each is tried, so a file of 20,000 worlds only addresses name tries them all, about 40 ms measured,
 // once a minute at most.
 function kept(ranked: readonly RailAsk[], section: RailSection, most: number): Held[] {
   const held: Held[] = [];

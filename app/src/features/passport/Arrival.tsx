@@ -1,4 +1,4 @@
-// A place's arrival (frames 23, 37, 93, 104): its first visit stamps the passport and says so in the top centre's pill,
+// A place's arrival: its first visit stamps the passport and says so in the top centre's pill,
 // "Stamped · GovDAO / 2 stamps in your passport", with the passport a press away; a world this device charted first says "First to chart",
 // as the scene wakes it. The expedition's line ("Today's expedition · 1 of 3") stands in the same pill, never a second one, and alone for a place
 // already stamped (slots.tsx). One pill at a time: the shell's (topPill.tsx).

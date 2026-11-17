@@ -106,7 +106,7 @@ function missingIn(stated: DigestFacts, said: DigestFacts, sources: Sources): Mi
   );
   if (stated.room) missing.push({ kind: "room", value: "@room" });
   check("argument", stated.pieces, (value) => value === sources.realm || piece(coreOf(value)));
-  // ponytail: each form looks its function up in the realm's list, 50 forms at most (the schema's blocks).
+  // ceiling: each form looks its function up in the realm's list, 50 forms at most (the schema's blocks).
   for (const action of stated.actions) {
     if (action.realm !== sources.realm) missing.push({ kind: "realm", value: action.realm });
     else if (!checkProposal(action, sources.functions).ok) missing.push({ kind: "function", value: action.function });

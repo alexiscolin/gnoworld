@@ -1,7 +1,7 @@
 // The name of an account on one chain, read live from r/sys/users with the block it was read at, and the name the page shows:
 // mainnet's, else Onyx's, else the short address. The expressions are fixed ones over an address the schema proved (as
 // server/src/door/names.ts does), built by evalCall.ts's `userCall`. `ResolveAddress` gives nil for a
-// missing or deleted record, which `.Name()` would panic on, so `IsDeleted` is asked first (a nil receiver answers true).
+// missing or deleted record: `IsDeleted` is asked first (a nil receiver answers true), then the nil-guarded name.
 import { isName } from "@gnoworld/core";
 import { readHeight } from "@gnoworld/chain/node";
 import { Address, shortAddress } from "@gnoworld/schemas";
@@ -22,7 +22,7 @@ export interface Named {
 // A name as r/sys/users keeps one (core's `isName`): legacy names such as `aeddi` pass, so `nym-` is not assumed. Text a node sent
 // that is not of this form is never shown.
 
-// The record is asked about first: a missing or deleted one has no name to ask for, and its `Name` would panic.
+// The record is asked about first: a missing or deleted one has no name to ask for.
 async function nameOf(rpc: string, account: string, options: ReadOptions): Promise<ChainRead<string | null>> {
   const deleted = await readUser(rpc, { account, call: "IsDeleted" }, options);
   if (!deleted.ok) return deleted;

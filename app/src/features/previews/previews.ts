@@ -1,5 +1,5 @@
 // The previews' shared parts: the captures' file, kept a page however many places ask, the universe whose pages it holds, and a
-// path written as the video writes it.
+// path written as the design writes it.
 import type { Previews } from "@gnoworld/schemas/indexer";
 import { queryOptions } from "@tanstack/react-query";
 import { Unread, queryClient, quietUnread } from "../../lib/query/client.ts";

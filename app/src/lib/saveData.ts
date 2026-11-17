@@ -11,7 +11,7 @@ export function savesData(): boolean {
   return link === "2g" || link === "slow-2g";
 }
 
-/** Whether the reader asks to save data themself (the browser's Save-Data), the link's estimate left out: a computer's word (D13721). */
+/** Whether the reader asks to save data themself (the browser's Save-Data), the link's estimate left out: a computer's word. */
 export function asksToSaveData(): boolean {
   if (typeof navigator === "undefined") return false;
   const connection: unknown = Reflect.get(navigator, "connection");

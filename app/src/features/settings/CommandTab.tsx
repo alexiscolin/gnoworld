@@ -1,4 +1,4 @@
-// The command-line way to link a key or to release one (D13880): the address, the block the server composed (shown as it came,
+// The command-line way to link a key, to release one or to log in: the address, the block the server composed (shown as it came,
 // never built here), the file the tool wrote pasted back. A code lives its flow's time, once; a refusal brings a new code at once.
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { Disclosure, Stack } from "@gnoworld/ui";
@@ -10,6 +10,8 @@ import { AddressBox, blocked, Block, EndGroup, Submit } from "./CommandParts.tsx
 import { ask, asMeOf, link, proofOf, unsigned, type Code, type Flow, type Say, type Step } from "./commandSteps.ts";
 import { Linked, Stale } from "./LinkStates.tsx";
 import { useSignInAgain } from "./useSignInAgain.ts";
+
+export type { Flow } from "./commandSteps.ts";
 
 // The steps a code brings: the block to run and the box to paste into, the logged-in account's own signature for a link, and what the
 // command signs, on demand.
@@ -71,7 +73,7 @@ function usePaste() {
   return { file, error, setFile, setError, onFile };
 }
 
-function CommandFlow({
+export function CommandFlow({
   flow,
   onDone,
   onCancel,

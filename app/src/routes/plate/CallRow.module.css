@@ -21,7 +21,6 @@
   }
 
   .name {
-    /* layout: a heading's own margin, which the browser gives it, taken off */
     margin: 0;
     font: var(--font-card-title);
   }

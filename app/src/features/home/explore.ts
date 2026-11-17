@@ -1,6 +1,6 @@
 // Where "Go explore" goes (ADR-0002 §1, "the live moment if one is near, otherwise the expedition"; ADR-0003 §3): the world with the most
 // people now when it holds a crowd, by the server's presence read as the click comes, never the Earth; else today's next stop, with its pill
-// (frame 18); else, the day's stops all reached, the busiest world, or the Earth when nobody is anywhere or the server does not say.
+//; else, the day's stops all reached, the busiest world, or the Earth when nobody is anywhere or the server does not say.
 // A chunk of its own, asked at the click: the first screen holds none of it.
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { FlashMessage } from "@gnoworld/ui";
@@ -16,7 +16,7 @@ export interface ExplorePlaces {
   readonly worlds: readonly { readonly slug: string; readonly path: string }[];
   readonly universe?: string | undefined;
   readonly passportAt?: ((path: string) => void) | undefined;
-  /** The shell's top pill, which the expedition's raises (frame 18); handed by the hero, whose chunk holds it already. */
+  /** The shell's top pill, which the expedition's raises; handed by the hero, whose chunk holds it already. */
   readonly raise?: ((message: FlashMessage) => void) | undefined;
 }
 

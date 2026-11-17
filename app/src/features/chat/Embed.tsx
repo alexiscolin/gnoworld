@@ -6,7 +6,7 @@ import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
-import { useFocusKept } from "./focusKept.ts";
+import { useFocusKept } from "./lines/useFocusKept.ts";
 
 export interface EmbedProps {
   embed: Player;

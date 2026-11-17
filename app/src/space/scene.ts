@@ -111,7 +111,7 @@ export class Space {
     if (!on) this.touch();
   }
 
-  /** Space drawn under nothing: no page covers it, nor the full chat (features/chat/full.ts marks the root), unless the view is the chat's own. */
+  /** Space drawn under nothing: no page covers it, nor the full chat (features/chat/dock/fullState.ts marks the root), unless the view is the chat's own. */
   get seen(): boolean {
     return !this.covered && (this.options.inChat === true || !chatHides());
   }

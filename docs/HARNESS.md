@@ -3,7 +3,7 @@
 The harness is everything around Claude Code that keeps the code it writes correct, safe and
 cheap: what Claude reads, what it may do, the checks every change goes through, the reviews,
 and the tests that prove those checks work. This file says what runs today; why each piece is
-there lives in `docs/decisions.md`, the findings ledger and the review log, by its id.
+there lives in `docs/process/decisions.md`, the findings ledger and the review log, by its id.
 
 Three ideas run through it:
 - **A claim is not evidence.** A review's finding counts once a command or a failing test
@@ -32,8 +32,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its own range of finding numbers
-  (so two branches side by side never take the same ones), makes its worktree and brief, opens its session in a herdr pane through one
-  script that alone leaves the sandbox (`~/.claude/skills/herdr-branch/scripts/open.sh`), merges each finished branch into
+  (so two branches side by side never take the same ones), makes its worktree and brief, opens its session through a script that opens a terminal pane,
+  the one that leaves the sandbox (`open.sh`, outside the repository), merges each finished branch into
   the slice's integration branch, reads GitHub's gate, runs the slice's last `/pre-merge`, with the `design-reviewer` once more over every 3D view, then the dream.
   The worktrees live beside the main checkout, in its "-wt" folder (`<main checkout>-wt/`, D13415), which no branch session's
   sandbox writes: the chief's session starts with that folder added (`claude --add-dir <main checkout>-wt` in the main checkout,
@@ -57,7 +57,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
   `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,
-  `docs/decisions.md`, the ledger, a state file per branch and one shared learnings file.
+  `docs/process/decisions.md`, the ledger, a state file per branch and one shared learnings file.
 - **The dream** (`/dream <slice>`, `.claude/commands/dream.md`), at each slice's end, keeps a
   dated copy of the memory, then the `dreamer` agent (read only, no shell) reads the agents' reports, the learnings,
   the review log, the ledger and the handoff (never transcripts) and proposes rule, memory, test
@@ -67,7 +67,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 
 ## A change, from plan to merge
 
-1. **Plan.** `/slice-plan <n>` writes the slice's plan in `docs/plans/`; the owner approves it.
+1. **Plan.** `/slice-plan <n>` writes the slice's plan in `docs/process/plans/`; the owner approves it.
 2. **Tests first.** The failing tests, seen failing; the `test-auditor`'s red pass, once per
    branch, never on a fixer's tests; the commit that brings the tests and their code carries
    `Red-pass: <findings fixed>`.
@@ -209,7 +209,7 @@ baseline on `main`, so review alone holds it until the slice merges.
 ## Reviews and findings
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
-goes into `docs/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
+goes into `docs/process/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
 `rejected`, `intended`, `moot`, `asked`) and its evidence; a fixed one names its commit. Reviews
 grep the ledger for their diff's paths and ids, never read it whole, so a rejected claim is not
 raised again and a fixed one that comes back is a regression. A flaky test that passed on its second
@@ -305,7 +305,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   the chief's session, which adds the folder, is held by the twins there, by one spelling (no link on the way), and above the
   trees by the instructions' rules. The folder's own `.claude` is closed whole: an added folder's skills, commands and agents
   load into the session that adds it. `scripts/worktree.sh` makes a tree there alone, the folder read
-  from git's common folder, a caller's git folders dropped; herdr's `open.sh` opens a branch only in a folder there that is no link
+  from git's common folder, a caller's git folders dropped; the pane script `open.sh` opens a branch only in a folder there that is no link
   and that the main checkout's `git worktree list` names.
 - **What a session holding the twins cannot write in another worktree:** everything closed in its own tree,
   in every worktree under `gnoworld-wt/`. By command: `CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`, `scripts/`,
@@ -416,7 +416,7 @@ costs context in every session.
 - **A glob holds no folder at its `*`, so a command still rewrites a sibling** (high). The sandbox refuses a rename of a
   rule's fixed part and of a literal rule's folders, not of the folder a `*` stands for: a command can move a whole worktree out
   of `gnoworld-wt/`, write its closed files there and move it back (probed on `packages/core`, whose `package.json` only a glob
-  holds; the section `siblings` prints it as a known gap), or plant a whole folder there for herdr's `open.sh`, which opens a
+  holds; the section `siblings` prints it as a known gap), or plant a whole folder there for the pane script `open.sh`, which opens a
   session in any folder of the branch's name. In the worktrees' folder no branch session's command reaches a sibling, and `open.sh`
   opens a folder git made there alone. It stays open for the chief's own session, whose `--add-dir` gives it that folder: a
   folder there moves out and back by its commands (the live probe prints it). And the file tools of a session without the write block
@@ -442,7 +442,7 @@ costs context in every session.
   `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha from the chief's message.
 - **In bypass mode the file tools write the programs that run outside the sandbox** (claimed, the writes not run):
   `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then other tools' folders and a
-  package manager's (the hooks' `python3`); herdr's `open.sh`, the hooks and the owner's scripts call programs by name; no deny
+  package manager's (the hooks' `python3`); the pane script `open.sh`, the hooks and the owner's scripts call programs by name; no deny
   names those folders, nor `~/.claude/skills/` (the two excluded scripts) or `~/Library/LaunchAgents/`. Closing them is the owner's
   user settings' to do.
 - **Claude Code's memory stays open:** the auto memory every gnoworld session loads, the chief's included
@@ -459,7 +459,7 @@ costs context in every session.
   the owner sets it back with no session running. The reports folders it names are working directories of every
   gnoworld session, to the sandbox too: their commands write each other's reports.
 - **Two commands leave the sandbox** by the owner's user settings (`sandbox.excludedCommands`): the captures' `fetch.sh` and
-  herdr's `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
+  the pane script `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
 - **A commit no hook sees**: a cherry-pick, a rebase, git's plumbing, or a merge the owner concludes on GitHub runs no
   hook of this clone; guard.py refuses the first three typed in a command, never run from a script file .
   GitHub's changes job, from the base, is the wall: a harness file no commit declares, and a path this disk may read as another, are
@@ -558,5 +558,5 @@ costs context in every session.
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets, run by hand |
 | `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in GitHub's build job; the Mac's pinned binary's checksum |
-| `docs/review/findings.md`, `docs/review-log.md` | every finding; what the owner caught and missed, each branch's cost |
+| `docs/process/review/findings.md`, `docs/process/review-log.md` | every finding; what the owner caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

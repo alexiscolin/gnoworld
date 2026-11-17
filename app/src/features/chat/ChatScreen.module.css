@@ -1,9 +1,9 @@
 /* The chat's screen: docked in the slot the page's plate leaves it, or full bleed over the page, and what stands under the
-   lines, which never scrolls with them. The inset is the lines' own: the video's 32 px (frame 66), 24 in the dock (frame
-   26), a phone's gutter. */
+   lines, which never scrolls with them. The inset is the lines' own: the design's 32 px, 24 in the dock, a phone's
+   gutter. */
 @layer components {
   .screen {
-    /* layout: the screen fills the slot the page gives it, and the regions scroll alone, the page none */
+    /* The screen fills its slot; the regions scroll alone, never the page */
     block-size: 100%;
     /* the chat fades in over its skeleton (Loading.tsx) */
     animation: arrive calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) backwards;
@@ -30,7 +30,7 @@
     }
   }
 
-  /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is. */
+  /* Full bleed over the page, the design, below a flash that stays, as the page is. */
   .screen[data-full] {
     position: fixed;
     inset: var(--flash-room) 0 0;
@@ -56,8 +56,8 @@
     --chat-head: calc(var(--control-m) + 2 * var(--space-s));
   }
 
-  /* Full bleed on a wide screen, the arrival's pill stands in its band's empty centre (frame 73), under the site's header: the lines
-     keep their place under the band (frame 66). */
+  /* Full bleed on a wide screen, the arrival's pill stands in its band's empty centre, under the site's header: the lines
+     keep their place under the band. */
   :root:has(.screen[data-full]) {
     --banner-top: calc(
       var(--flash-room) + var(--banner-under) +
@@ -76,7 +76,7 @@
     padding-block-start: var(--banner-room);
   }
 
-  /* The dock: what the slot (320 under 1400 px, the video's 360) holds beside the scene, at the video's 24 px inset. */
+  /* The dock: what the slot (320 under 1400 px, the design's 360) holds beside the scene, at the design's 24 px inset. */
   .screen:not([data-full]) {
     --chat-inset: var(--space-m);
   }
@@ -86,7 +86,6 @@
   .screen:not([data-full]) [data-region="header"] {
     /* raw: the crumbs' row's middle, 27 px and half its 24 px under the plate's top (ui Panel's plate), less half this row */
     padding-block-start: calc(27px + 12px - var(--control-s) / 2);
-    /* layout: the name a step off the band's line, as frame 38 */
     padding-block-end: var(--space-s);
   }
 
@@ -151,7 +150,6 @@
     }
 
     .topWaiting {
-      /* layout: reserved room, nothing drawn */
       display: block;
       block-size: var(--phone-band);
     }
@@ -160,7 +158,6 @@
        its room is kept while its code comes. --phone-worlds is what MessageBox's field cap counts. Nothing while a chat field has the focus
        (the keyboard takes the foot), nor on a short window, where the rooms' drawer holds the worlds and the lines keep their height. */
     .worlds {
-      /* layout: the foot of the conversation, never squeezed */
       flex: none;
       min-block-size: var(--phone-worlds);
     }

@@ -4,7 +4,7 @@ import { PlanetThumb, type PlanetThumbProps } from "@gnoworld/ui";
 import { hubWorldOf } from "@gnoworld/core";
 import { useEffect } from "react";
 import { pictureOf } from "./lib/worldPictures.ts";
-import { useWorldPicture } from "./worldThumbs.ts";
+import { useWorldPicture } from "./useWorldPicture.ts";
 
 // The pictures this tab has drawn: loaded once, in memory, so a column drawn again (the dock's, then the full chat's) shows them in its first
 // frame, never an empty box till the file is decoded again. A few at once: the column is a shelf the reader scrolls.

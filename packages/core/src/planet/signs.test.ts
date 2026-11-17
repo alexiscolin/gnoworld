@@ -421,7 +421,7 @@ describe("a sign keeps its meaning and varies its form", () => {
   });
 });
 
-// The numbers docs/decisions.md gives, stated apart from the code: a change to one is a change to what a stage means.
+// The numbers docs/process/decisions.md gives, stated apart from the code: a change to one is a change to what a stage means.
 describe("what the signs are worth", () => {
   const at = (vitality: number, present: number, fresh = false) => worldSigns(DAO, "ice", { vitality, present, fresh });
 
@@ -479,7 +479,7 @@ describe("a seed", () => {
     expect(crowded?.signal).toBeGreaterThan(quiet?.signal ?? 1);
   });
 
-  // docs/decisions.md: a seed's end is an event, for the world wakes, on its first visit or at its seventh day: no ramp hides it.
+  // docs/process/decisions.md: a seed's end is an event, for the world wakes, on its first visit or at its seventh day: no ramp hides it.
   it("ends in one step, the wake's: the last day of a seed and the first of a world", () => {
     const seed = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: true });
     const woken = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: false });

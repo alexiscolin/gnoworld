@@ -126,7 +126,7 @@ export class Signs {
       });
   }
 
-  // ponytail: each pick reads every followed room's lines, 100 rooms of 200 at most, on a line and once a second, never on a frame; the Earth
+  // ceiling: each pick reads every followed room's lines, 100 rooms of 200 at most, on a line and once a second, never on a frame; the Earth
   // holds a few side rooms, and only the lines young enough for a bubble are parsed for mentions.
   #pick(): void {
     const { store, ground, rules, world } = this.#deps;

@@ -1,0 +1,12 @@
+/* A direct message's page: "not encrypted" in amber, caution's colour, its lock in the line before the words
+   (DESIGN-SYSTEM.md, colours and "Trust, shown in words"). */
+@layer components {
+  .caution {
+    color: var(--color-warm);
+  }
+
+  .caution svg {
+    display: inline-block;
+    vertical-align: text-bottom;
+  }
+}

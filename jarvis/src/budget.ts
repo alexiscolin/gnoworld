@@ -1,9 +1,9 @@
-// The hard stop on what Jarvis spends (ADR-0002 §5, D41): a model call reserves its worst cost before it starts, by
+// The hard stop on what Jarvis spends (ADR-0002 §5): a model call reserves its worst cost before it starts, by
 // one statement that adds it only if the day's spent and reserved sums leave room under the cap, so calls running at
 // once never pass it together; then it settles its real cost. A UTC day for questions, another for translations,
-// kept in jarvis's own file (D45) so a restart never begins the day again at zero; a hold never settled is spent at
-// its worst once its deadline passes (D62). The alerts are values the loop logs (D63, D64). The caps live in the file
-// too, seeded once and changed at once by an admin (D173).
+// kept in jarvis's own file so a restart never begins the day again at zero; a hold never settled is spent at
+// its worst once its deadline passes. The alerts are values the loop logs. The caps live in the file
+// too, seeded once and changed at once by an admin.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { transaction } from "@gnoworld/service/db";
@@ -28,7 +28,7 @@ CREATE INDEX budget_holds_by_day ON budget_holds (kind, day);
 CREATE INDEX budget_holds_by_deadline ON budget_holds (deadline);
 `;
 
-// The day's caps, in nano-dollars: the settings' first values, then an admin's (D173).
+// The day's caps, in nano-dollars: the settings' first values, then an admin's.
 export const BUDGET_CAPS = `
 CREATE TABLE budget_caps (
   kind TEXT PRIMARY KEY CHECK (kind IN ('ask', 'translate')),
@@ -71,7 +71,7 @@ export function makeBudget(
   db: DatabaseSync,
   { caps, holdMs, now }: { caps: Record<Kind, number>; holdMs: number; now: () => number },
 ): Budget {
-  // openDatabase's NORMAL may lose the last commits to a power cut in WAL mode, and with them settles (F5180).
+  // openDatabase's NORMAL may lose the last commits to a power cut in WAL mode, and with them settles.
   db.exec("PRAGMA synchronous = FULL");
   const Held = z.object({ id: z.number() });
   const Taken = z.object({ kind: z.enum(["ask", "translate"]), day: z.string(), worst: z.number() });

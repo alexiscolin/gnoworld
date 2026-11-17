@@ -3,7 +3,7 @@
   .pill {
     inset-block-start: 0;
     inset-inline-start: 0;
-    /* layout: the name and the people here a small step apart (the row's own, row-center, is set in labels.ts) */
+    /* Small step between the name and the people here (the row's own, row-center, is set in labels.ts) */
     gap: var(--space-3xs);
     padding: var(--space-3xs) var(--space-2xs);
     border: var(--line-width) solid var(--color-line);
@@ -20,7 +20,6 @@
 
   /* On the home's first screen a world's name stands under its disc, centred, in the Earth tag's size and face. */
   .under {
-    /* layout: a wider step between the name and the people here, as the Earth tag's */
     gap: var(--space-xs);
     padding: var(--space-2xs) var(--space-s);
     border-color: var(--color-line-strong);

@@ -6,12 +6,10 @@
   }
 
   .row {
-    /* layout: a step between the lead, the words and what trails (icon-text-meta or text-meta, pointer) */
     gap: var(--space-xs);
     /* raw: the card's width and 8 px more each side's half, so the hover fill reaches past the words */
     inline-size: calc(100% + var(--space-s));
     min-block-size: var(--fn-row-h);
-    /* layout: this row's own arrangement */
     margin-inline: calc(var(--space-2xs) * -1);
     padding-inline: var(--space-2xs);
     border: 0;
@@ -28,11 +26,8 @@
 
   /* A section of a column: its name in the label's capitals, the chevron before it, the control at the end a sibling of the button. */
   .head {
-    /* layout: the name and its control at the two ends */
     display: flex;
-    /* layout: the name and the control share the line's middle */
     align-items: center;
-    /* layout: the name and its control at the two ends */
     justify-content: space-between;
   }
 
@@ -41,14 +36,12 @@
   }
 
   .disclosure[data-look="section"] .head .row {
-    /* layout: the chevron first, then the name, the button no wider than they are */
     display: flex;
-    /* layout: the chevron and the name a hair apart */
     gap: var(--space-3xs);
     inline-size: auto;
     block-size: auto;
     min-block-size: var(--control-xs);
-    /* layout: the section's button takes no negative margin, unlike a row's */
+    /* The section's button takes no negative margin, unlike a row's */
     margin-inline: 0;
     padding-inline: 0;
     color: inherit;
@@ -75,7 +68,6 @@
   }
 
   .trail {
-    /* layout: what trails and the chevron a step apart */
     gap: var(--space-2xs);
     white-space: nowrap;
   }
@@ -93,15 +85,12 @@
   }
 
   .body {
-    /* layout: this row's own arrangement */
     display: grid;
-    /* layout: this row's own arrangement */
     grid-template-rows: 0fr;
     transition: grid-template-rows var(--motion-slow) var(--ease-standard);
   }
 
   .body[data-open] {
-    /* layout: this row's own arrangement */
     grid-template-rows: 1fr;
   }
 
@@ -111,7 +100,7 @@
     min-block-size: 0;
     /* Room inside the clip for a focus ring at the body's edges, as .scroll-row does: a field or a Copy there keeps its whole ring. */
     padding-inline: calc(var(--focus-width) + var(--focus-offset));
-    /* layout: the room taken back outside, so the body keeps its place */
+    /* The room taken back outside, so the body keeps its place */
     margin-inline: calc(-1 * (var(--focus-width) + var(--focus-offset)));
     overflow: hidden;
     visibility: hidden;

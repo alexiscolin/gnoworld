@@ -89,7 +89,7 @@ function Main({
   );
 }
 
-/** An item of a column of places, the video's rooms and direct messages: a link, or a button that acts, on a pill that fills
+/** An item of a column of places, the design's rooms and direct messages: a link, or a button that acts, on a pill that fills
  * cream when it is the one in view. */
 export function NavItem({ children, current = false, lead, badge, meta, href, onClick, soon }: NavItemProps) {
   const face = (

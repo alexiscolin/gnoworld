@@ -16,7 +16,7 @@ export const HISTORY_PAGE = 2_000;
 /** The most requests one read makes, each a page, halvings and blocks alone included. */
 export const HISTORY_MAX_PAGES = 500;
 /** The most characters one read takes in all, so a broken indexer cannot run the server past its memory: 24 times onyx-1's whole chain, about
- * 170,000 transactions. ponytail: past it the read gives up; the next step reads only above the last pass's height, keeping each realm's
+ * 170,000 transactions. ceiling: past it the read gives up; the next step reads only above the last pass's height, keeping each realm's
  * callers. */
 export const HISTORY_READ_BYTES = 32 * 1024 * 1024;
 const HISTORY_MS = 20_000;

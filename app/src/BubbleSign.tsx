@@ -4,7 +4,7 @@ import { countryName, centreOf, cutText, regionAt, type Bubble } from "@gnoworld
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { lazy, Suspense, type ComponentProps } from "react";
 import rules from "../data/bubbles.json" with { type: "json" };
-import { roomHref, roomLabel } from "./features/chat/names.ts";
+import { roomHref, roomLabel } from "./features/chat/rooms/names.ts";
 import { spotOf } from "./features/universe/spot.ts";
 import { followed } from "./lib/followed.ts";
 import styles from "./EarthSigns.module.css";

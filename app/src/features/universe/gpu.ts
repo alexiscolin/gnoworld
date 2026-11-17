@@ -34,10 +34,10 @@ export function gpuCanDraw(): boolean {
 }
 
 // Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone or a reader who saves data
-// on "View in space" (a phone draws no such button, D13711, and keeps the offer if its window widens); any other at once. A phone draws no
+// on "View in space" (a phone draws no such button, and keeps the offer if its window widens); any other at once. A phone draws no
 // space, so it never makes the probe's WebGL2 context.
 export function offerOf(): SceneOffer {
   const phone = matchMedia(PHONE_QUERY).matches;
-  // A computer waits for its reader's own Save-Data alone; a phone for a 2G estimate too (D13721).
+  // A computer waits for its reader's own Save-Data alone; a phone for a 2G estimate too.
   return sceneOffer({ weak: !phone && !gpuCanDraw(), phone, savesData: phone ? savesData() : asksToSaveData() });
 }

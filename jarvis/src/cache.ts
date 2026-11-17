@@ -1,7 +1,7 @@
 // What jarvis's two caches share (10k; ADR-0002 §4 and §5: one translation and one digest serve every reader): their
 // tables in its file, each row counting its bytes, a table held under its bound by dropping its oldest rows made, never
-// the one just written (D191); and one making for the readers who ask for the same thing at once, which stops once none
-// of them waits (D192).
+// the one just written; and one making for the readers who ask for the same thing at once, which stops once none
+// of them waits.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 
@@ -50,11 +50,11 @@ export function boundOf(db: DatabaseSync, table: "translations" | "digests", max
       `DELETE FROM ${table} WHERE rowid = (SELECT rowid FROM ${table} WHERE rowid <> ? ORDER BY made, rowid LIMIT 1) RETURNING bytes`,
     ),
   };
-  // The table's bytes, read once, then kept by each write and drop: jarvis alone writes its file (D45).
+  // The table's bytes, read once, then kept by each write and drop: jarvis alone writes its file.
   let total = Bytes.parse(sql.sum.get()).bytes;
   const wrote = (written: Written): void => {
     total += written.bytes - written.replaced;
-    // ponytail: one indexed delete a row dropped, as many as one write's bytes push out.
+    // ceiling: one indexed delete a row dropped, as many as one write's bytes push out.
     while (total > maxBytes) {
       const dropped = sql.oldest.get(written.rowid);
       if (dropped === undefined) return;
@@ -76,7 +76,7 @@ interface Making<T> {
 /** One making a key for every reader who asks for it while it runs, each answered `gone` once its own signal fires;
  * the making's signal fires once none of its readers waits, unless it `finishes`: then it runs on, shared, to be kept. */
 export function together<T>({ finishes = false }: { finishes?: boolean } = {}) {
-  // ponytail: one entry a making in flight, as many as the requests jarvis serves at once.
+  // ceiling: one entry a making in flight, as many as the requests jarvis serves at once.
   const running = new Map<string, Making<T>>();
   const start = (key: string, work: (signal: AbortSignal) => Promise<T>): Making<T> => {
     const stop = new AbortController();

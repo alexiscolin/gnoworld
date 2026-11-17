@@ -2,8 +2,8 @@
 
 The look and the rules every screen follows. Values come from the approved prototype
 (`docs/prototype`), reduced to one token and one component for every CSS rule, script style, icon
-and screen of the recorded tour (`docs/design/coherence.md`). The UX, UI and design-systems review
-of the first designs is in `docs/design/review-2a.md`. Nothing in the style changes without the
+and screen of the recorded tour (`docs/process/design/coherence.md`). The UX, UI and design-systems review
+of the first designs is in `docs/process/design/review-2a.md`. Nothing in the style changes without the
 owner's approval.
 
 ## Principles
@@ -402,7 +402,7 @@ component with its CSS Module, documented by its props.
 | `LinkProvider` | `pages`, the paths the app routes | Hands every link of the design system the page's own link, for the site's own paths; a link that must `reload` the document stays a plain anchor |
 
 Not built, each when it is needed: `Table` and `Checkbox` (the admin console). A message is an assembly of the chat feature
-(`app/src/features/chat/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
+(`app/src/features/chat/lines/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
 slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
 **Rich cards in the chat.** Every interactive structure of a room is one `Card`:
@@ -592,11 +592,8 @@ never the choice written again.
     - a token that does not exist, a token nothing uses, and a module class nothing uses;
     - a primitive read outside the token file;
     - a private property read outside its module;
-  - **compositions, not blocks, do layout:** `check_css.py` refuses `display: flex` or
-    `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
-    outer `margin`, in a block's module. A block that truly needs one (an icon beside a
-    label) says why in a `/* layout: … */` comment, and the gate prints the count of those
-    exceptions so review sees it grow (converted screen by screen);
+  - **compositions first for layout:** a layout a composition already gives (`Stack`, `Cluster`, `Center`...) is taken
+    from it, which review checks; a block may lay out its own parts with no comment (D13804);
   - **no copied rules:** the same set of three or more declarations in two modules fails
     `check_css.py`; it becomes a composition, a utility or a `composes`;
   - a class a component names (`styles.x`, `styles["x"]`) that its module lacks fails
@@ -609,7 +606,7 @@ never the choice written again.
 
 ## Not rebuilt
 
-These are kept out on purpose (`docs/design/coherence.md`, "Not to rebuild"):
+These are kept out on purpose (`docs/process/design/coherence.md`, "Not to rebuild"):
 - **The prototype's dead UI:** the side card, the old Jarvis panel, the toast, the top and
   bottom bars, the evolutions board, the range slider, avatar upload.
 - **Its invented timers:** the pot and its countdown (ADR-0002 §8, row 2).

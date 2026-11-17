@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount as bare, one } from "../../../tests/mount.tsx";
 import { ChatHeader } from "./ChatHeader.tsx";
-import { FullProvider } from "./full.ts";
+import { FullProvider } from "./dock/fullState.ts";
 
 // A computer's window: the full chat's close goes back to the page (a phone goes back as the browser does, phoneGo.test.tsx).
 window.matchMedia = (query: string) =>

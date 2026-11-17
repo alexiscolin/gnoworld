@@ -7,7 +7,7 @@ import { LATIN_FONTS } from "@gnoworld/ui/fonts";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 import { RouteError } from "./features/errors/index.ts";
-import { WRITTEN } from "./drawnPath.ts";
+import { WRITTEN } from "./useDrawnPath.ts";
 import { markFullEarly } from "./fullChat.ts";
 import { Shell } from "./shell.tsx";
 

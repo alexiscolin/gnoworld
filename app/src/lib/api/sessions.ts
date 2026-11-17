@@ -1,4 +1,4 @@
-// The login's one call the first screen never makes, "Log out my other sessions" (D13601), apart from lib/api/login.ts:
+// The login's one call the first screen never makes, "Log out my other sessions", apart from lib/api/login.ts:
 // only the settings import it, so it rides in their chunk, not the shell's (the world pages' first-screen budget,
 // app/tests/e2e/budgets.spec.ts).
 import { z } from "../jitless.ts";

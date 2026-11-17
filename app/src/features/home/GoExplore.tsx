@@ -1,4 +1,4 @@
-// "Go explore" (ADR-0003 §3; frame 4's filled call): its address is the Earth's, which a new tab opens; a plain click asks where to go (the
+// "Go explore" (ADR-0003 §3; the design's filled call): its address is the Earth's, which a new tab opens; a plain click asks where to go (the
 // live moment, else today's next stop: explore.ts; while a tag is lit, its worlds in turn) and goes there through the router, so the flight
 // takes the page from the cosmos to that world. A click with a key held, or with another button, is the browser's.
 import { Icon } from "@gnoworld/ui";

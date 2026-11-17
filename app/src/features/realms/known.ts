@@ -5,10 +5,10 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { isUnread, queryClient, quietUnread } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
-import { knownOf, type Known } from "../../knownOf.ts";
+import { knownOf, type Known } from "../../realmKnown.ts";
 import type { Realm, RealmSource } from "./useRealm.ts";
 
-export type { Known } from "../../knownOf.ts";
+export type { Known } from "../../realmKnown.ts";
 
 // The realm's page read, its code in a chunk of its own; out of the hook, where the React Compiler takes no import().
 const readPage = (source: RealmSource) => {

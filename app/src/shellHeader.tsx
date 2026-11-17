@@ -1,5 +1,5 @@
 // The header: the logo at the left; in the middle where one is, Galaxy, System and World, each named by the place it leads to, that world's
-// chat, and beside them how one looks at it, Space or Map (shellWays.tsx); at the right the network ("Testnet" when it is one), the search,
+// chat, and beside them how one looks at it, Space or Map (headerPills.tsx); at the right the network ("Testnet" when it is one), the search,
 // the bell and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
 // the page written at /, which must hydrate as the path's own. The bars stay over the full chat, which they open and close.
 import { PHONE_QUERY } from "@gnoworld/core";
@@ -7,17 +7,17 @@ import { Chip, Cluster, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { useWoken } from "./features/home/clock.ts";
-import { useDrawnPath } from "./drawnPath.ts";
+import { useDrawnPath } from "./useDrawnPath.ts";
 import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
 import { useComputerNeeded } from "./features/chat/computerNeeded.ts";
-import { useMedia } from "./features/chat/useMedia.ts";
+import { useMedia } from "./features/chat/dock/useMedia.ts";
 import { USE_A_COMPUTER } from "./features/login/index.ts";
 import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
-import { ChatWay, levelsOf, useSeenPlaces, Ways, type Level } from "./shellWays.tsx";
+import { ChatWay, levelsOf, useSeenPlaces, Ways, type Level } from "./headerPills.tsx";
 import { BellSlot } from "./slots.tsx";
 import { useApp } from "./storeContext.tsx";
 import styles from "./shellHeader.module.css";

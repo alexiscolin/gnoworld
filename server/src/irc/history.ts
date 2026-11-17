@@ -94,7 +94,7 @@ export function histories(
     if (batch === undefined || batch.fetch || batch.room !== state.page) return;
     // A full page may have more after it, from its last line's millisecond, which may hold more. A
     // page all in that one millisecond goes past it.
-    // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
+    // ceiling: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
     const more = batch.lines >= PAGE && batch.last !== "";
     const back = more ? earlier(batch.last) : "";
     after(s, batch.room, more ? (back === state.after.get(batch.room) ? batch.last : back) : undefined);

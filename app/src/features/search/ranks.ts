@@ -7,7 +7,7 @@ const top = (values: readonly (number | null)[]): number | null => {
   return some.length === 0 ? null : Math.max(...some);
 };
 
-// ponytail: callers add up across realms, so one caller of two realms counts twice; the file holds no per-world callers.
+// ceiling: callers add up across realms, so one caller of two realms counts twice; the file holds no per-world callers.
 function together(name: string, path: string, rows: readonly StoreRow[]): Rank | undefined {
   if (rows.length === 0) return undefined;
   return {

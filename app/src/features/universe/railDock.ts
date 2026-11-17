@@ -110,7 +110,7 @@ function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, ai
 }
 
 /** Grows the planets of `list`'s links, each by the `--_mag` written on it (ui's PlanetThumb), and shifts the list as a dock's, until
- * `signal` ends; and tells `cut` whether the column holds more than it shows, whose foot then fades (frame 4). */
+ * `signal` ends; and tells `cut` whether the column holds more than it shows, whose foot then fades. */
 export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean) => void): void {
   // The column the list scrolls in: a list with none is no rail's.
   const scroller = list.parentElement;

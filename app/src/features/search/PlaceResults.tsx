@@ -1,7 +1,7 @@
 // The palette's results: groups of rows, each a place's picture, its name with the letters the query matched, and its marks.
 import { Avatar, Chip, Cluster, Icon, PlanetThumb } from "@gnoworld/ui";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
-import { afterDwell } from "../../intent.ts";
+import { afterDwell } from "../../afterDwell.ts";
 import { warmWorld } from "../universe/index.ts";
 import styles from "./SearchDialog.module.css";
 import type { SearchItem, SearchResult } from "./types.ts";

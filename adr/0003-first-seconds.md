@@ -6,8 +6,8 @@
 | Date | 2026-11-03 |
 | Author | Alexis Colin; drafted by Claude, slice 7's chief, and written into the repository by branch 7o |
 | Builds on | [ADR-0001](0001-gnoworld.md) §6 (presence) and §7 (levels and navigation); [ADR-0002](0002-validated-prototype.md) §1 (the concepts: "Go explore", the daily expedition, the passport). Decisions of 2026-10-19 (the view "Cosmos"), 2026-10-21 (every world has its main room), 2026-11-01 (a world is a product), 2026-11-02 (the arrival) |
-| Evidence | The review page with four proposals, a newcomer panel and a playable demo: claude.ai/artifact/1LwVAoNA7rjSxusA1qog39; the draft ADR, version 6: claude.ai/artifact/Szj5G7uct5pgMrnVuXKEL7 |
-| Verified | **2026-11-03, by the chief:** `app/src/routes/home.tsx:15`; `app/src/features/home/Hero.tsx:1-2` and `:23`; `app/src/features/universe/signals.ts:13-25`; `packages/schemas/src/presence.ts:22`; `docs/decisions.md` lines 85, 147, 530, 559; ADR-0002 lines 124 and 210–212; the prototype's `app.js:4189` and `:4198`; the video's frames 1 and 4.<br>**2026-11-03, by 7o, at `6585eba6`:** the home is the cosmos page (`home.tsx:15`); its two actions are "Go explore" to the Earth and "See the list" (`Hero.tsx:46`, `:50`); a page's change between two places in space asks the scene to fly there (`features/universe/flown.ts:52`), so a link is the one call a flight needs; the device keeps a world's visit only when a seed wakes (`scene/world/feed.ts:96`, `scene/world/reading.ts:113`), and the Earth's page keeps none; the labels' layer is hidden from readers and takes no pointer (`scene/cosmos/labels.ts:67`, `labels.module.css:23`); presence names a world by its roles file's slug (`packages/schemas/src/presence.ts:16`); frames 2 and 4 show the hero through the opening, with "Go explore" filled and "Join the chat" beside it |
+| Evidence | The review page with four proposals, a newcomer panel and a playable demo, a private design page; the draft ADR, version 6, another |
+| Verified | **2026-11-03, by the chief:** `app/src/routes/home.tsx:15`; `app/src/features/home/Hero.tsx:1-2` and `:23`; `app/src/features/universe/signals.ts:13-25`; `packages/schemas/src/presence.ts:22`; `docs/process/decisions.md` lines 85, 147, 530, 559; ADR-0002 lines 124 and 210–212; the prototype's `app.js:4189` and `:4198`; the video's frames 1 and 4.<br>**2026-11-03, by 7o, at `6585eba6`:** the home is the cosmos page (`home.tsx:15`); its two actions are "Go explore" to the Earth and "See the list" (`Hero.tsx:46`, `:50`); a page's change between two places in space asks the scene to fly there (`features/universe/flown.ts:52`), so a link is the one call a flight needs; the device keeps a world's visit only when a seed wakes (`scene/world/feed.ts:96`, `scene/world/reading.ts:113`), and the Earth's page keeps none; the labels' layer is hidden from readers and takes no pointer (`scene/cosmos/labels.ts:67`, `labels.module.css:23`); presence names a world by its roles file's slug (`packages/schemas/src/presence.ts:16`); frames 2 and 4 show the hero through the opening, with "Go explore" filled and "Join the chat" beside it |
 
 ## Summary
 
@@ -210,7 +210,7 @@ Where the decision left a choice, 7o made it as follows; each can be changed on 
 
 ## Questions answered
 
-Alexis answered them on 2026-11-03 ("Oui, tes recos", then "Les deux" for the audience).
+Alexis answered them on 2026-11-03 (yes to Claude's recommendations, then both for the audience).
 
 | # | Question | Answer |
 |---|---|---|
@@ -224,7 +224,7 @@ Alexis answered them on 2026-11-03 ("Oui, tes recos", then "Les deux" for the au
 ## References
 
 - [ADR-0001](0001-gnoworld.md) §6 and §7; [ADR-0002](0002-validated-prototype.md) §1, lines 124 and 210–212
-- [docs/decisions.md](../docs/decisions.md), lines 85, 147, 530 and 559
+- [docs/process/decisions.md](../docs/process/decisions.md), lines 85, 147, 530 and 559
 - The video's frames 1, 2 and 4; the prototype's `docs/prototype/source/app.js:4189` and `:4198`
-- The review page and its demo: claude.ai/artifact/1LwVAoNA7rjSxusA1qog39
+- The review page and its demo: a private design page
 - The design system: [docs/DESIGN-SYSTEM.md](../docs/DESIGN-SYSTEM.md)

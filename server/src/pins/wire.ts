@@ -3,7 +3,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PINS_MAX } from "@gnoworld/schemas";
 import { lineOf, type Link, type Said } from "../irc/link.ts";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import { mayRead, staffOf, type Typed } from "../rooms/types.ts";
 import { makePins, type Pins } from "./pins.ts";
 
@@ -34,7 +34,7 @@ export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log }: Part
       onRedact: pins.drop,
       onIn: (room: string): void => {
         pins.check(room).catch((error: unknown) => {
-          log("pins_unchecked", { room, error: error instanceof Error ? error.name : "unknown" });
+          log("pins_unchecked", { room, ...failureOf(error) });
         });
       },
     },

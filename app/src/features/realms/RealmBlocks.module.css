@@ -2,9 +2,7 @@
    plate's small scale, lists, code, quotes, notices and tables; a form drawn as a read-only list. */
 @layer components {
   .page {
-    /* layout: blocks one under the other, in the page's own step; the blocks are the reader's, not compositions */
     display: grid;
-    /* layout: the step between those lines */
     gap: var(--space-s);
     overflow-wrap: anywhere;
   }
@@ -39,7 +37,6 @@
 
   /* A title opens a section: a little air above it, below the rhythm of the page's paragraphs. */
   .page > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
-    /* layout: air above a title that opens a section */
     margin-block-start: var(--space-2xs);
   }
 
@@ -57,40 +54,31 @@
   }
 
   .page li + li {
-    /* layout: the step between two items */
     margin-block-start: var(--space-3xs);
   }
 
   /* Columns side by side, each at least three of the widest steps wide, so a narrow plate stacks them. */
   .columns {
-    /* layout: the columns share the row */
     display: grid;
-    /* layout: and wrap under the one before when narrower than three of the widest steps */
     grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-2xl) * 3), 1fr));
-    /* layout: the step between columns */
     gap: var(--space-m);
   }
 
   .columns > * {
-    /* layout: a column's blocks one under the other; its width is the grid's */
     display: grid;
-    /* layout: the step between those blocks */
     gap: var(--space-xs);
-    /* layout: the blocks sit at the top of a column */
     align-content: start;
   }
 
   /* The forms the page's text pointed to, one under the other, after the text. */
   .forms {
-    /* layout: the forms one under the other */
     display: grid;
-    /* layout: the step between them */
     gap: var(--space-s);
   }
 
   /* A thematic break: the strong line token across the column, two lines thick. */
   .page hr {
-    /* layout: the browser's auto side margins shrink a grid item to nothing: the rule spans the column */
+    /* The browser's auto side margins shrink a grid item to nothing: the rule spans the column */
     margin-inline: 0;
     inline-size: 100%;
     block-size: calc(var(--line-width) * 2);
@@ -104,7 +92,6 @@
   }
 
   .page li[data-task] > input {
-    /* layout: the step between the box and the words */
     margin-inline-end: var(--space-2xs);
   }
 
@@ -119,7 +106,6 @@
 
   .page [data-image] svg {
     vertical-align: middle;
-    /* layout: the step between the mark and the words */
     margin-inline-end: var(--space-3xs);
   }
 
@@ -133,13 +119,9 @@
 
   /* gnoweb's alert as the design system's notice: neutral with the info icon, caution amber with the warning one. */
   .notice {
-    /* layout: the icon beside what the notice says */
     display: grid;
-    /* layout: the icon's column, then the words */
     grid-template-columns: auto minmax(0, 1fr);
-    /* layout: the step between them */
     gap: var(--space-2xs);
-    /* layout: the icon sits at the first line */
     align-items: start;
     padding: var(--space-xs) var(--space-s);
     border: var(--line-width) solid var(--color-line);
@@ -153,9 +135,7 @@
   }
 
   .noticeBody {
-    /* layout: what the notice says, one block under the other */
     display: grid;
-    /* layout: the step between those blocks */
     gap: var(--space-2xs);
   }
 
@@ -164,7 +144,7 @@
   }
 
   .page pre {
-    /* layout: a grid item scrolls inside its column, a long row never widens the plate */
+    /* A grid item scrolls inside its column, so a long row never widens the plate */
     min-inline-size: 0;
     overflow: auto;
     padding: var(--space-xs);
@@ -228,9 +208,7 @@
   }
 
   .form {
-    /* layout: a description list of fields, one under the other */
     display: grid;
-    /* layout: the step between those lines */
     gap: var(--space-2xs);
   }
 
@@ -239,7 +217,6 @@
   }
 
   .form dd {
-    /* layout: a field's lines one under the other */
     display: grid;
     padding-inline-start: var(--space-xs);
     font: var(--font-meta);

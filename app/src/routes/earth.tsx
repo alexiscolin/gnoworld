@@ -1,4 +1,4 @@
-// A universe's Earth, its general chat's plate (frames 37 to 42): where people speak from, who is talking, the activity, "Say hi in #general",
+// A universe's Earth, its general chat's plate: where people speak from, who is talking, the activity, "Say hi in #general",
 // the latest on gno.land and the links out; /earth for the default universe, /net/<id>/earth for each.
 import { EARTH as EARTH_ID } from "@gnoworld/core";
 import { Kicker, Panel } from "@gnoworld/ui";
@@ -7,13 +7,13 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { chatPlace, EARTH_CHAT as EARTH, EARTH_KICKER, PlateFrame } from "../features/chat/index.ts";
 import { PlaceChat } from "../features/chat/PlaceChat.tsx";
 import { chunked } from "../features/chat/Failing.tsx";
-import { DOCKED } from "../features/chat/useMedia.ts";
+import { DOCKED } from "../features/chat/dock/useMedia.ts";
 import { ErrorView, errorKind, isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
-import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
+import { earthMeta, failedPageMeta, missingUniverseMeta } from "../pageMeta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";

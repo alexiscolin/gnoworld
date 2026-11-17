@@ -10,7 +10,7 @@ const RPC = "https://rpc.onyx.testnets.gno.land:443";
 const NOW = new Date("2026-11-06T06:00:00.000Z");
 const USERS = "gno.land/r/sys/users";
 const DELETED = `${USERS}.ResolveAddress("${ACCOUNT}").IsDeleted()`;
-const NAME = `${USERS}.ResolveAddress("${ACCOUNT}").Name()`;
+const NAME = `${USERS}.func() string { d := ResolveAddress(address("${ACCOUNT}")); if d == nil { return "" }; return d.Name() }()`;
 
 const expressionOf = (url: string): string | undefined => {
   const hex = /data=0x([0-9a-f]*)/.exec(url)?.[1];

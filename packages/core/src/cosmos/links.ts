@@ -44,7 +44,7 @@ export function neighboursOf(worlds: readonly LinkedWorld[], id: string): Neighb
   if (self === undefined) return [];
   const calls = new Set(importsOf(self.realms, held));
   const called = new Set<number>();
-  // ponytail: one pass over every import the file names, as linksOf's.
+  // ceiling: one pass over every import the file names, as linksOf's.
   worlds.forEach(({ realms }, from) => {
     if (from !== at && importsOf(realms, held).includes(at)) called.add(from);
   });

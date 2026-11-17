@@ -1,11 +1,11 @@
 // The welcome card's place in the shell: its chunk is asked once the page rests, at a first visit of a logged-out reader, on a
-// page of space (the home, the Earth, a world, a realm) and not in a computer's full chat (a phone is always in one: D13729); the first screen holds only this.
+// page of space (the home, the Earth, a world, a realm) and not in a computer's full chat (a phone is always in one); the first screen holds only this.
 import { lazy, Suspense, useState } from "react";
 import { PHONE_QUERY } from "@gnoworld/core";
 import { useLocation } from "react-router";
 import { asksFull, holdsChat } from "../../fullChat.ts";
 import { useMedia } from "../chat/index.ts";
-import { useAfterLoad } from "../../later.ts";
+import { useAfterLoad } from "../../afterLoad.ts";
 import { site } from "../../places.ts";
 import { useApp } from "../../storeContext.tsx";
 import { unseen } from "./seen.ts";

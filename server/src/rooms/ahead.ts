@@ -3,7 +3,7 @@
 // for the route too and again only when the job has written it anew. One pass at a time; a pass that did not finish is made again by
 // the next check, even for the same file; stopping ends a wait at once.
 import { realmRoom } from "@gnoworld/core";
-import type { Log } from "@gnoworld/service/log";
+import { failureOf, type Log } from "@gnoworld/service/log";
 import { remember } from "../remember.ts";
 import { worldsListing, type Listing } from "../worlds/known.ts";
 import type { Rooms } from "./create.ts";
@@ -98,7 +98,7 @@ export function aheadRooms(options: AheadOptions): Ahead {
       if (stopper.signal.aborted) return Promise.resolve();
       running ??= pass()
         .catch((error: unknown) => {
-          log("rooms_ahead_failed", { error: error instanceof Error ? error.name : "unknown" });
+          log("rooms_ahead_failed", failureOf(error));
         })
         .finally(() => {
           running = undefined;

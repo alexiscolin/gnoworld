@@ -1,7 +1,7 @@
 import type { MetaArgs, RouteObject } from "react-router";
 import { describe, expect, test } from "vitest";
 import { render, routeError } from "../../tests/render.tsx";
-import { realmMeta } from "../meta.ts";
+import { realmMeta } from "../pageMeta.ts";
 import { clientLoader, ErrorBoundary, meta } from "./realm.tsx";
 
 const route = (path: string): RouteObject => ({

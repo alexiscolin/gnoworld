@@ -15,9 +15,7 @@
     --_at: var(--space-3xs);
     --_time: calc(var(--motion-base) * var(--motion-scale));
 
-    /* layout: the knob stands over the track */
     position: relative;
-    /* layout: the track's own width, never grown or shrunk by its row */
     flex: none;
   }
 
@@ -36,7 +34,6 @@
     display: block;
     inline-size: var(--_w);
     block-size: var(--control-xs);
-    /* layout: a checkbox's own margin taken off */
     margin: 0;
     border: var(--line-width) solid var(--_edge);
     border-radius: var(--radius-pill);

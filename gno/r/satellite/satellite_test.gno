@@ -12,7 +12,7 @@ import (
 	"gno.land/p/nt/uassert/v0"
 )
 
-// Addresses derived from paths: valid, and no key behind them.
+// Addresses derived from paths. They are valid, and no key stands behind them.
 var (
 	adm   = chain.PackageAddress("gno.land/r/test/owner")
 	mod   = chain.PackageAddress("gno.land/r/test/operator")
@@ -22,16 +22,16 @@ var (
 	self  = chain.PackageAddress("gno.land/r/gnoworld/satellite")
 )
 
-// The tests' own numbers, never the realm's constants, so a changed constant fails them.
+// The tests use their own numbers, never the realm's constants, so that changing a constant makes them fail.
 const (
 	t0     = 1800000000 // 2027-01-15 08:00:00 UTC, when every test starts
 	oneDay = 86400
 	p0     = 2000000 // ugnot a day at deploy
 )
 
-// fresh puts the realm as a deploy by adm leaves it, with renting opened and
-// mod named operator, at t0. Every test starts with it, so none depends on
-// another's state. It sets no caller: testing.SetRealm only holds in
+// fresh puts the realm in the state a deploy by adm leaves it, except that renting is open
+// and mod is the operator, and sets the time to t0. Every test starts with it, so none depends
+// on another test's state. It sets no caller, because testing.SetRealm only holds in
 // the test function that calls it.
 func fresh() {
 	rentals, payers, holds = avl.Tree{}, avl.Tree{}, avl.Tree{}
@@ -47,16 +47,16 @@ func at(sec int) {
 	testing.SetContext(ctx)
 }
 
-// pay sends n ugnot with the next call, credited to the realm before it runs,
-// as the chain does.
+// pay sends n ugnot with the next call, and credits them to the realm before the call
+// runs, as the chain does.
 func pay(n int) {
 	coins := chain.Coins{{"ugnot", int64(n)}}
 	testing.SetOriginSend(coins)
 	testing.IssueCoins(self, coins)
 }
 
-// offer sends coins with a call that must be refused: a refused call's
-// credit is reverted on chain, so it is not credited here.
+// offer sends coins with a call that must be refused. On the chain, the credit of a
+// refused call is reverted, so the coins are not credited here.
 func offer(coins chain.Coins) { testing.SetOriginSend(coins) }
 
 func bal(a address) int { return int(banker.NewReadonlyBanker().GetCoin(a, "ugnot")) }
@@ -97,7 +97,7 @@ func TestRentNeedsExactlyThePriceInOneUgnotCoin(cur realm, t *testing.T) {
 	uassert.Equal(t, 2, rentals.Size())
 }
 
-// A realm between the wallet and Rent could spend the coins sent first, and so
+// A realm between the wallet and Rent could spend the coins first, and so
 // could a `maketx run` script (NewCodeRealm takes no run path: runtime.NewRealm).
 func TestRentFromCodeRefused(cur realm, t *testing.T) {
 	fresh()
@@ -112,11 +112,11 @@ func TestRentFromCodeRefused(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, rentals.Size())
 }
 
-// A rent is the message's own call, as unsafe.OriginSend's doc asks beside
-// IsUserCall. A realm holding `var Rent = satellite.Rent` gets the coins of a call
-// to it, while IsUserCall still holds in Rent; the keeper refuses that message,
-// as no code of the paid realm read them, a check its own comment calls no
-// access-control boundary. Here a wallet's call reaches Rent through a closure.
+// A rent must be the message's own call, as the documentation of unsafe.OriginSend asks
+// next to IsUserCall. A realm that holds `var Rent = satellite.Rent` receives the coins of a call
+// to it, while IsUserCall still holds in Rent. The keeper refuses that message because
+// no code of the paid realm read the coins, although its own comment says this check
+// is not an access-control boundary. Here a wallet's call reaches Rent through a closure.
 func TestRentNotTheMessagesOwnCallRefused(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -157,7 +157,7 @@ func TestRentWorldIsASlugOfFortyBytesAtMost(cur realm, t *testing.T) {
 	}
 	uassert.Equal(t, 0, rentals.Size())
 
-	// The alphabet's four ends, a hyphen inside, one byte, forty bytes.
+	// The four ends of the alphabet, a hyphen inside, one byte and forty bytes.
 	for i, w := range []string{"a", "az09-z", strings.Repeat("ab-", 13) + "a", "9"} {
 		if i == 3 {
 			testing.SetRealm(testing.NewUserRealm(bob))
@@ -182,7 +182,7 @@ func TestRentTextIsOneToFortyCodePointsWithNoControl(cur realm, t *testing.T) {
 	}
 	uassert.Equal(t, 0, rentals.Size())
 
-	// One code point, forty of two bytes each, forty of one, and spaces kept.
+	// One code point, forty code points of two bytes each, forty of one byte each, and spaces kept.
 	good := []string{"a", strings.Repeat("é", 40), strings.Repeat("z", 40), " hello  big world "}
 	who := []address{alice, alice, alice, bob}
 	for i, text := range good {
@@ -194,11 +194,12 @@ func TestRentTextIsOneToFortyCodePointsWithNoControl(cur realm, t *testing.T) {
 	}
 }
 
-// No text steers or hides what it shows. Render's sanitizer strips bidi and
+// No text may steer or hide what it shows. Render's sanitizer strips bidi and
 // zero-width characters only in part, and the Rent event carries the text raw.
-// Refused: control, format (bidi marks, zero-width, word joiner, soft hyphen,
-// tags), line and paragraph separators, other default-ignorable code points
-// (Hangul fillers, the grapheme joiner). Built from code points: never raw in a source.
+// These are refused: control characters, format characters (bidi marks, zero-width
+// characters, word joiner, soft hyphen, tags), line and paragraph separators, and other
+// default-ignorable code points (Hangul fillers, the grapheme joiner). The test builds
+// them from code points and never writes them raw in the source.
 func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -211,7 +212,7 @@ func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	}
 	uassert.Equal(t, 0, rentals.Size())
 
-	// A variation selector shows: emoji keep it.
+	// A variation selector is visible, because emoji keep it.
 	heart := string(rune(0x2764)) + string(rune(0xfe0f))
 	pay(p0)
 	Rent(cross(cur), "mars", heart, 1)
@@ -219,8 +220,8 @@ func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	uassert.Equal(t, heart, got)
 }
 
-// A satellite shows something: spaces, marks and the Braille blank alone
-// are no text (a lone variation selector, U+180B and U+2800 included).
+// A satellite must show something. A text of only spaces, marks and the Braille blank
+// is refused, including a lone variation selector, U+180B and U+2800.
 func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -238,7 +239,7 @@ func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	uassert.Equal(t, " a ", got)
 }
 
-// Three live satellites per address; an ended one no longer counts, and
+// An address may have three live satellites. An ended one no longer counts, and
 // the next rent closes it.
 func TestRentFourthLiveSatelliteRefused(cur realm, t *testing.T) {
 	fresh()
@@ -254,7 +255,7 @@ func TestRentFourthLiveSatelliteRefused(cur realm, t *testing.T) {
 	pay(p0)
 	Rent(cross(cur), "mars", "hello", 1)
 
-	// The one-day rental is live until its last second, and ended at the next.
+	// The one-day rental is live until its last second, and it has ended by the next second.
 	at(t0 + oneDay - 1)
 	testing.SetRealm(testing.NewUserRealm(alice))
 	offer(chain.Coins{{"ugnot", p0}})
@@ -264,12 +265,12 @@ func TestRentFourthLiveSatelliteRefused(cur realm, t *testing.T) {
 	Rent(cross(cur), "venus", "hello", 1)
 	uassert.False(t, rentals.Has(worlds(3)[0]))
 	uassert.Equal(t, worlds(3)[1]+" "+worlds(3)[2]+" venus", payers.Get(alice.String()))
-	uassert.Equal(t, 3*p0+7*p0+p0+p0, held) // alice's three live, and bob's ended mars until it is closed
+	uassert.Equal(t, 3*p0+7*p0+p0+p0, held) // alice's three live rentals, and bob's ended mars until it is closed
 	offer(chain.Coins{{"ugnot", p0}})
 	uassert.AbortsWithMessage(t, cur, "too many live satellites for this address", func() { Rent(cross(cur), "jupiter", "hello", 1) })
 }
 
-// Closing one of three rentals leaves the other two counted.
+// Closing one of three rentals leaves the other two still counted.
 func TestCloseKeepsThePayersOtherRentals(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -289,7 +290,7 @@ func TestCloseKeepsThePayersOtherRentals(cur realm, t *testing.T) {
 	uassert.AbortsWithMessage(t, cur, "too many live satellites for this address", func() { Rent(cross(cur), "venus", "hello", 1) })
 }
 
-// Two rents of one world in one block give one rental.
+// Two rents of one world in one block produce only one rental.
 func TestOneSatellitePerWorld(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -333,7 +334,7 @@ func TestRentalEndsAfterItsDays(cur realm, t *testing.T) {
 	uassert.False(t, ok)
 }
 
-// Anyone closes an ended rental; storage then holds nothing of it.
+// Anyone can close an ended rental, and storage then holds nothing of it.
 func TestCloseFreesAnEndedRental(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -352,7 +353,7 @@ func TestCloseFreesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, rentals.Size())
 	uassert.Equal(t, 0, payers.Size())
 	uassert.Equal(t, 0, held)
-	uassert.Equal(t, p0, bal(self)) // earned, now free to withdraw
+	uassert.Equal(t, p0, bal(self)) // earned, and now free to withdraw
 	uassert.AbortsWithMessage(t, cur, "no rental on this world", func() { Close(cross(cur), "mars") })
 
 	testing.SetRealm(testing.NewUserRealm(bob))
@@ -363,7 +364,7 @@ func TestCloseFreesAnEndedRental(cur realm, t *testing.T) {
 	uassert.True(t, ok)
 }
 
-// A rent on a world whose rental ended closes it in place.
+// A rent on a world whose rental has ended closes that rental in place.
 func TestRentClosesAnEndedRentalInPlace(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -383,7 +384,7 @@ func TestRentClosesAnEndedRentalInPlace(cur realm, t *testing.T) {
 	uassert.Equal(t, "mars", payers.Get(bob.String()))
 }
 
-// Renting again one's own ended world closes it once, not twice.
+// Renting an ended world of one's own again closes the old rental once, not twice.
 func TestRentAgainOwnEndedWorld(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -417,7 +418,7 @@ func TestTakedownByOwnerOrOperatorOnly(cur realm, t *testing.T) {
 	_, _, _, ok := Rental("mars")
 	uassert.False(t, ok)
 
-	at(t0 + 3*oneDay) // the first rental's paid end
+	at(t0 + 3*oneDay) // the end the first rental was paid for
 	testing.SetRealm(testing.NewUserRealm(alice))
 	pay(3 * p0)
 	Rent(cross(cur), "mars", "hello", 3)
@@ -425,13 +426,13 @@ func TestTakedownByOwnerOrOperatorOnly(cur realm, t *testing.T) {
 	Takedown(cross(cur), "mars", "r2")
 	_, _, _, ok = Rental("mars")
 	uassert.False(t, ok)
-	uassert.Equal(t, p0, held) // the second rental's day begun: the first was closed by it
+	uassert.Equal(t, p0, held) // the second rental's first day has begun, and the first rental was closed by it
 }
 
-// A takedown ends the rental now, kept for its days begun, rather than
-// deleting it: gno refunds a storage deposit to whoever frees the bytes, so the
-// one taking it down would earn the payer's. Whoever closes it gets the deposit,
-// as for any rental that ended: anyone, or the payer's own next rent.
+// A takedown ends the rental now and keeps it for the days that began, instead of
+// deleting it. Gno refunds a storage deposit to whoever frees the bytes, so the
+// one taking it down would otherwise earn the payer's deposit. Whoever closes the rental
+// gets the deposit, as with any rental that ended: anyone, or the payer's own next rent.
 func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -443,12 +444,12 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(mod))
 	Takedown(cross(cur), "mars", "r1")
 	Takedown(cross(cur), "venus", "r2")
-	uassert.Equal(t, 2*p0, bal(alice)) // a day not begun each
+	uassert.Equal(t, 2*p0, bal(alice)) // one day that has not begun, for each rental
 	uassert.True(t, rentals.Has("mars"))
 	_, _, _, ok := Rental("mars")
 	uassert.False(t, ok)
 	uassert.Equal(t, "No satellite over this world.\n", Render("mars"))
-	uassert.Equal(t, 4*p0, held) // two days begun each, until closed
+	uassert.Equal(t, 4*p0, held) // two days that have begun for each rental, held until closed
 
 	at(t0 + 3*oneDay) // the end it was paid for
 	testing.SetRealm(testing.NewUserRealm(carol))
@@ -463,8 +464,8 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, "jupiter", payers.Get(alice.String()))
 }
 
-// A taken-down world stays empty until the end it was paid for, its payer
-// included, who could else put the text taken down back at once.
+// A taken-down world stays empty until the end it was paid for, and that includes its payer.
+// Otherwise the payer could put the text that was taken down back at once.
 func TestTakedownKeepsTheWorldEmptyFromItsPayerToo(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -485,9 +486,9 @@ func TestTakedownKeepsTheWorldEmptyFromItsPayerToo(cur realm, t *testing.T) {
 	uassert.Equal(t, "again", text)
 }
 
-// Until the end it was paid for, a taken-down rental is closed by its
-// payer only, who so gets its storage deposit back: the one taking it down, like
-// anyone else, waits for that end, as for any rental.
+// Until the end it was paid for, only the payer can close a taken-down rental, and so
+// gets its storage deposit back. The one who took it down, like anyone else, must wait
+// for that end, as with any rental.
 func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -509,21 +510,21 @@ func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	uassert.Equal(t, 4*p0, held)
 
 	testing.SetRealm(testing.NewUserRealm(alice))
-	Close(cross(cur), "mars") // its payer, before that end
+	Close(cross(cur), "mars") // by its payer, before that end
 	uassert.Equal(t, 2*p0, held)
-	offer(chain.Coins{{"ugnot", p0}}) // the world stays empty after that close (D13507)
+	offer(chain.Coins{{"ugnot", p0}}) // the world stays empty after that close
 	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
 
 	at(t0 + 3*oneDay) // venus's paid end: anyone may close it now
 	testing.SetRealm(testing.NewUserRealm(carol))
 	Close(cross(cur), "venus")
-	uassert.False(t, holds.Has("venus")) // its hold ended at that second: removed with the record
+	uassert.False(t, holds.Has("venus")) // its hold ended at that second, so it is removed with the record
 	uassert.Equal(t, 0, held)
 	uassert.Equal(t, 0, rentals.Size())
 }
 
-// D13507, the first way round the hold: the payer closes its taken-down rental
-// before the end it was paid for (it may, for its deposit) and rents the world
+// The first way to get around the hold: the payer closes its taken-down rental
+// before the end it was paid for (it may, to get its deposit back) and rents the world
 // again at once with the same text.
 func TestTakedownHoldSurvivesThePayersClose(cur realm, t *testing.T) {
 	fresh()
@@ -538,17 +539,17 @@ func TestTakedownHoldSurvivesThePayersClose(cur realm, t *testing.T) {
 	offer(chain.Coins{{"ugnot", p0}})
 	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) })
 
-	at(t0 + 3*oneDay) // the paid end: the world is free again
+	at(t0 + 3*oneDay) // the paid end has come, so the world is free again
 	pay(p0)
 	Rent(cross(cur), "mars", "again", 1)
 	_, text, _, ok := Rental("mars")
 	uassert.True(t, ok)
 	uassert.Equal(t, "again", text)
-	uassert.False(t, holds.Has("mars")) // a passed hold goes when the world is rented again
+	uassert.False(t, holds.Has("mars")) // a hold that has passed is removed when the world is rented again
 }
 
-// D13507, the second way round: renting another world closes the payer's
-// ended rentals, the taken-down one among them, and with it the hold.
+// The second way to get around the hold: renting another world closes the payer's
+// ended rentals, including the taken-down one, and its hold goes with it.
 func TestTakedownHoldSurvivesThePayersNextRent(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -571,8 +572,8 @@ func TestTakedownHoldSurvivesThePayersNextRent(cur realm, t *testing.T) {
 	uassert.True(t, ok)
 }
 
-// A world taken down, rented again once its hold passed, then taken down
-// again holds to its second paid end, never to the first hold's.
+// A world is taken down, then rented again once its hold has passed, then taken down
+// again. It is held until its second paid end, never until the first hold's end.
 func TestSecondTakedownHoldsToItsOwnEnd(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
@@ -580,7 +581,7 @@ func TestSecondTakedownHoldsToItsOwnEnd(cur realm, t *testing.T) {
 	Rent(cross(cur), "mars", "hello", 1)
 	testing.SetRealm(testing.NewUserRealm(mod))
 	Takedown(cross(cur), "mars", "r1")
-	at(t0 + oneDay) // the first hold has passed
+	at(t0 + oneDay) // the first hold has passed by now
 	testing.SetRealm(testing.NewUserRealm(alice))
 	pay(3 * p0)
 	Rent(cross(cur), "mars", "again", 3)
@@ -600,7 +601,7 @@ func TestSecondTakedownHoldsToItsOwnEnd(cur realm, t *testing.T) {
 	uassert.Equal(t, "third", text)
 }
 
-// A taken-down record closed after its paid end, not only at that second,
+// A taken-down record that is closed after its paid end, not only at that second,
 // takes its passed hold with it.
 func TestCloseAfterTheHoldRemovesIt(cur realm, t *testing.T) {
 	fresh()
@@ -615,7 +616,7 @@ func TestCloseAfterTheHoldRemovesIt(cur realm, t *testing.T) {
 	uassert.False(t, holds.Has("mars"))
 }
 
-// The whole days not yet begun come back to the payer at once; the day
+// The whole days that have not begun yet come back to the payer at once. The day
 // under way counts as begun from its first second.
 func TestTakedownRefundsTheWholeDaysNotBegun(cur realm, t *testing.T) {
 	for _, c := range []struct{ days, after, refund int }{
@@ -635,11 +636,11 @@ func TestTakedownRefundsTheWholeDaysNotBegun(cur realm, t *testing.T) {
 		Rent(cross(cur), "mars", "hello", c.days)
 		at(t0 + c.after)
 		testing.SetRealm(testing.NewUserRealm(mod))
-		before, kept := bal(alice), bal(self)-c.days*p0 // the banker lives the whole test, past fresh()
+		before, kept := bal(alice), bal(self)-c.days*p0 // the banker lasts for the whole test, beyond fresh()
 		Takedown(cross(cur), "mars", "r1")
 		uassert.Equal(t, c.refund, bal(alice)-before)
 		uassert.Equal(t, c.days*p0-c.refund, bal(self)-kept)
-		uassert.Equal(t, c.days*p0-c.refund, held) // the days begun, until the rental is closed
+		uassert.Equal(t, c.days*p0-c.refund, held) // the days that have begun, held until the rental is closed
 	}
 }
 

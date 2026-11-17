@@ -7,7 +7,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { HOME_SYSTEM, isHome } from "../../cosmosAt.ts";
 import { asksFull } from "../../fullChat.ts";
 import type { Place } from "../../space/place.ts";
-import { warmView } from "../../plateWarm.ts";
+import { warmView } from "../../warmView.ts";
 import { useHere } from "../../useHere.ts";
 import { enterPage, newPage } from "./arrival.ts";
 import { ghost } from "./rise.ts";
@@ -79,7 +79,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       Promise.resolve(navigate(href)).catch(reportError);
     });
     // A world's page (the Earth's, a world's, a realm's) has a plate, which may come after this: its arrival waits for it.
-    // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (fullMove.ts).
+    // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (useFullMove.ts).
     if (!flying()) enterPage(pages.cameAfter === FULL_PAGE, sameKind());
     // The planet's circle as the page lays its box out (a page's parts come late: the page's changes are watched till it comes), and as it moves.
     const watching = new ResizeObserver(hold);
@@ -132,7 +132,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       stop();
     };
   }, []);
-  // The plate's code and the worlds in view's files, asked ahead once the first screen stands, and the links' intent (plateWarm.ts).
+  // The plate's code and the worlds in view's files, asked ahead once the first screen stands, and the links' intent (warmView.ts).
   useEffect(() => (firstScreenDone ? warmView({ kind, id }) : undefined), [firstScreenDone, kind, id]);
   return firstScreenDone;
 }

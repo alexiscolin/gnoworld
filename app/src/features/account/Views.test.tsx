@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, settled } from "../../../tests/mount.tsx";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { modals, mount, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Views } from "./Views.tsx";
 
@@ -22,5 +22,19 @@ describe("the device's views", () => {
     );
     await settled(() => document.body.textContent.includes("Saved messages"));
     expect(document.body.textContent).toContain("Saved on this device only.");
+  });
+
+  beforeAll(modals);
+
+  it("opens the command line's login (D13880) at #key-login, a link to it opening it too", async () => {
+    mount(
+      <MemoryRouter initialEntries={["/earth#key-login"]}>
+        <StoreProvider>
+          <Views universe="onyx" />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    await settled(() => document.querySelector("dialog[open]")?.textContent.includes("Log in with gnokey") === true);
+    expect(document.querySelector("dialog[open]")?.textContent).toContain("Your key signs a code offline");
   });
 });

@@ -2,7 +2,7 @@
 // header's note and the account menu.
 import { PHONE_QUERY } from "@gnoworld/core";
 import { adenaHere } from "../login/index.ts";
-import { useMedia } from "./useMedia.ts";
+import { useMedia } from "./dock/useMedia.ts";
 
 /** Whether a phone lacks Adena. False while hydrating, as the server drew it. */
 export const useComputerNeeded = (): boolean => useMedia(PHONE_QUERY) && !adenaHere();

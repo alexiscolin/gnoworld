@@ -1,7 +1,7 @@
 // What the bar and the suggestions do to the field, each telling the composer that the draft was worked on (`edited`).
 import type { LexicalEditor } from "lexical";
-import { JARVIS_MENTION } from "../jarvisLine.ts";
-import { lastWord } from "../complete.ts";
+import { JARVIS_MENTION } from "./jarvisLine.ts";
+import { lastWord } from "./complete.ts";
 import { applyLink, formatSelection, replaceWordBeforeCaret, startWith } from "./commands.ts";
 import type { Format } from "./kinds.ts";
 

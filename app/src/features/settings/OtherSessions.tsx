@@ -1,4 +1,4 @@
-// Settings, Accounts: "Log out my other sessions" (ADR-0002 §4, a login revocable in the settings, D13601): busy while the server
+// Settings, Accounts: "Log out my other sessions" (ADR-0002 §4, a login revocable in the settings): busy while the server
 // is asked, then one line, done or the failure in the words the linked accounts use (but a session that ended says its own).
 import { Button, Cluster } from "@gnoworld/ui";
 import { useState } from "react";

@@ -1,4 +1,4 @@
-// A command to copy, read as typed (D13880): the command line's block in settings, and a call card's command, drawn one way: the block
+// A command to copy, read as typed: the command line's block in settings, and a call card's command, drawn one way: the block
 // from the content's start to its end, and under it a row with its help and its Copy, whose end is the block's (the UX pass). What a
 // copy came to is its own: the button's words, and a status beside it for a screen reader, as a field has its own.
 import { Button, Cluster, Stack } from "@gnoworld/ui";

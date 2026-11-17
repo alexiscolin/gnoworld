@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
-import { knownOf } from "../../knownOf.ts";
+import { knownOf } from "../../realmKnown.ts";
 import { useKnown } from "./known.ts";
 import type { Realm, RealmSource, realmPageQuery } from "./useRealm.ts";
 

@@ -1,4 +1,4 @@
-// The real Ergo's tests of an owner's hide (F13332): the chat as main starts it, and the moderation routes on its own line read and
+// The real Ergo's tests of an owner's hide: the chat as main starts it, and the moderation routes on its own line read and
 // REDACT, as roles/wire.ts mounts them. The moderator holds a right in #bubble/games alone, as an account holds one in the Earth room it
 // made: none over the lines of #bubble.
 import type { Address } from "@gnoworld/schemas";

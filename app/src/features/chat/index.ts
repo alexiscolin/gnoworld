@@ -1,10 +1,10 @@
 // The chat: a world's rooms by section, a room's lines and people, the page's link to Ergo.
 import { lazy } from "react";
 
-export { chatHeld, DockedChatHost, FullChatHost } from "./fullHost.tsx";
-export { LOADING } from "./Loading.tsx";
+export { chatHeld, DockedChatHost, FullChatHost } from "./dock/FullChatHost.tsx";
+export { LOADING } from "./dock/Loading.tsx";
 export { PlateFrame } from "./PlateFrame.tsx";
-export { roomsChanged } from "./roomsListed.ts";
+export { roomsChanged } from "./rooms/roomsListed.ts";
 export {
   BOT,
   dmHref,
@@ -16,23 +16,23 @@ export {
   roomWorld,
   shortAddress,
   whoIs,
-} from "./names.ts";
+} from "./rooms/names.ts";
 
 /** The chat's drawing of marks, paragraphs, code and lists, for a realm's page. Loaded on asking, never by the barrel:
  * a static re-export put the Markdown reader in every world page's first screen (budgets.spec.ts, accountLater.spec.ts). */
 export async function drawing() {
-  const { ANONYMOUS, block, drawInlines } = await import("./Message.tsx");
+  const { ANONYMOUS, block, drawInlines } = await import("./lines/Message.tsx");
   return { reader: ANONYMOUS, block, inlines: drawInlines };
 }
 export type Drawing = Awaited<ReturnType<typeof drawing>>;
 export { chatPlace, EARTH_CHAT, EARTH_KICKER } from "./place.ts";
-export { composerBox, focusComposer } from "./composerBox.ts";
-export { sheetHref, useInPageSheet, useSheetClose } from "./placePage.ts";
+export { composerBox, focusComposer } from "./composer/composerBox.ts";
+export { sheetHref, useInPageSheet, useSheetClose } from "./phone/placePage.ts";
 
 // The settings' country and the account menu's saved messages, each in a chunk asked when its dialog opens: a static export put
 // them in every world page's first screen.
-export const CountryChoice = lazy(async () => ({ default: (await import("./CountryChoice.tsx")).CountryChoice }));
-export const SavedDialog = lazy(async () => ({ default: (await import("./SavedDialog.tsx")).SavedDialog }));
+export const CountryChoice = lazy(async () => ({ default: (await import("./rooms/CountryChoice.tsx")).CountryChoice }));
+export const SavedDialog = lazy(async () => ({ default: (await import("./rooms/SavedDialog.tsx")).SavedDialog }));
 
 export { PersonLink } from "./PersonLinkLazy.tsx";
-export { useMedia } from "./useMedia.ts";
+export { useMedia } from "./dock/useMedia.ts";

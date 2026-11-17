@@ -1,4 +1,4 @@
-// A country's pill on the globe (frames 39, 43 to 55; ADR-0002 §1): its last hour of public lines against the hour before. The activity API
+// A country's pill on the globe (ADR-0002 §1): its last hour of public lines against the hour before. The activity API
 // counts rooms and knows no country, and the tag lives on each line, so the page counts what it holds. A sign means real data: few lines
 // make no trend.
 import type { BubbleMessage } from "./types.ts";

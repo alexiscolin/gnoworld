@@ -1,0 +1,34 @@
+/* The room's pins above its lines: one line a pin, the first three, a "+N" for the rest; never past three lines. */
+@layer components {
+  .bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-3xs);
+    margin-inline: var(--chat-inset);
+    margin-block-start: var(--space-xs);
+    padding-block-end: var(--space-3xs);
+    border-block-end: var(--line-width) solid var(--color-line);
+    color: var(--color-text-muted);
+    font: var(--font-ui);
+  }
+
+  .pins {
+    /* The first column may shrink under its line's cut */
+    min-inline-size: 0;
+    max-block-size: calc(3 * var(--control-xs));
+    overflow: hidden auto;
+  }
+
+  .pin {
+    display: grid;
+    grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
+    place-items: center start;
+    column-gap: var(--space-2xs);
+    block-size: var(--control-xs);
+  }
+
+  .who {
+    font-weight: 500;
+  }
+}

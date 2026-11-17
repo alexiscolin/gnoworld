@@ -10,7 +10,7 @@ import universes from "../data/universes.json" with { type: "json" };
 import { cosmosAt, trimmed } from "./cosmosAt.ts";
 import { holdsChat } from "./fullChat.ts";
 import { placesFrom } from "./dataPlaces.ts";
-import type { PinnedRow } from "./pinned.ts";
+import type { PinnedRow } from "./pinnedCalls.ts";
 
 /** A world or an ecosystem: what the site shows of it, with its one address. */
 export interface Listed {

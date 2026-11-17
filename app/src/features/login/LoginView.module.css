@@ -20,7 +20,7 @@
   }
 
   @media (width < 900px) {
-    /* layout: the way in's box takes no room in the header's row; its status region stays for a screen reader */
+    /* The way in's box takes no room in the header's row; its status region stays for a screen reader */
     .way {
       display: contents;
     }

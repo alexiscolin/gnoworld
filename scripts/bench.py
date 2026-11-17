@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory() as where:
         report = json.load(f)
 measures = [b for file in report.get("files", []) for group in file.get("groups", []) for b in group.get("benchmarks", [])]
 if not measures:
-    sys.exit("bench.py: no bench ran: each budget of docs/plans/ has a `*.bench.ts(x)`")
+    sys.exit("bench.py: no bench ran: each budget of docs/process/plans/ has a `*.bench.ts(x)`")
 problems = []
 # Each bench the sources name by a literal is in the report (check_regressions.py holds the sources' own list in place).
 named = {m.group(2) for p in listed(pathlib.Path("."), {".ts", ".tsx"}) if BENCH_FILE.search(p.name) for m in BENCH.finditer(p.read_text())}

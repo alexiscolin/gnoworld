@@ -1,4 +1,4 @@
-// The bell's panel (frames 86, 87): over the dock's column, from under the header to the page's foot. Its title and "Mark all read", the
+// The bell's panel: over the dock's column, from under the header to the page's foot. Its title and "Mark all read", the
 // kinds with what is unread in each (All, Messages, Worlds, News), the worlds to filter by, then the lines, the newest first, each going
 // to its place: a page of the site, or off it through the warning. Esc, a click outside or the bell closes it.
 import { PHONE_QUERY } from "@gnoworld/core";

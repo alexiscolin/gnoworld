@@ -8,12 +8,12 @@ import { expectFollowAndShare } from "../../tests/plateButtons.ts";
 import { noMedia, noObservers } from "../../tests/mount.tsx";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
-import { ChainCard } from "../features/chat/ChainCard.tsx";
-import { callsIn } from "../features/chat/chainEntries.ts";
-import { ChainCallsContext, ChainPlaceContext } from "../features/chat/chainThread.ts";
-import { useVerdicts } from "../features/chat/useVerdicts.ts";
+import { ChainCard } from "../features/chat/lines/ChainCard.tsx";
+import { callsIn } from "../features/chat/lines/chainEntries.ts";
+import { ChainCallsContext, ChainPlaceContext } from "../features/chat/lines/chainThread.ts";
+import { useVerdicts } from "../features/chat/lines/useVerdicts.ts";
 import { useAppStore } from "../storeContext.tsx";
-import { failedWorldMeta, worldMeta } from "../meta.ts";
+import { failedWorldMeta, worldMeta } from "../pageMeta.ts";
 import { site } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 

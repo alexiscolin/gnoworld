@@ -1,0 +1,24 @@
+/* The rooms' sections (ui's Disclosure names each), and the small grey note under the direct messages. */
+@layer components {
+  .note {
+    margin-block-start: var(--space-xs);
+  }
+
+  /* The column's list fills its height (the fill-column utility), so the reader's shortcuts stand at its foot. */
+  .nav > * {
+    flex: 1 0 auto;
+  }
+
+  .saved {
+    margin-block-start: auto;
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+}
+
+@layer components {
+  /* The place the keyboard goes to when what it was on is gone: no ring around the whole list. */
+  .nav:focus {
+    outline: none;
+  }
+}

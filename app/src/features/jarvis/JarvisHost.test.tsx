@@ -7,7 +7,7 @@ import { askJarvis, tellJarvisHere, useJarvisItems, type JarvisHere } from "../.
 import { askFor } from "../../pageAsks.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, drawer, modals, one, settled } from "../../../tests/mount.tsx";
-import { JarvisSlot } from "../chat/jarvisEntries.tsx";
+import { JarvisSlot } from "../chat/lines/jarvisEntries.tsx";
 import { JarvisListener } from "./JarvisListener.tsx";
 
 // The page's asks "jarvis" and "jarvis-catch-up" add Jarvis's cards for the room the chat told, to the account that asked.

@@ -19,12 +19,12 @@ import { chatFigures, hourWidgets, statusOf } from "./figures.ts";
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
-// A world's page's capture (frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
+// A world's page's capture, its own chunk too: the captures' file and the page's drawing come after the first screen.
 const Preview = lazy(async () => ({ default: (await import("../../features/previews/Preview.tsx")).Preview }));
 
 type World = ReturnType<typeof site.world>;
 
-// What only a hub has: its site, its proposals and pinned calls, and the capture of its page, last, as frame 26 draws it.
+// What only a hub has: its site, its proposals and pinned calls, and the capture of its page, last, as the design draws it.
 function HubExtras({
   world,
   universe,

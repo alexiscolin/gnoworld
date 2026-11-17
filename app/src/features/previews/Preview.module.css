@@ -1,5 +1,5 @@
-/* A page's capture as a card: on a world's plate, the page small at the start and its words beside it (frame 26); under a chat line,
-   the page as wide as the line and its words under it (frames 104, 107). The card's button covers the whole card, the page included (ui's
+/* A page's capture as a card: on a world's plate, the page small at the start and its words beside it; under a chat line,
+   the page as wide as the line and its words under it. The card's button covers the whole card, the page included (ui's
    `covers`); the compositions lay it out. */
 @layer components {
   .card {
@@ -40,13 +40,9 @@
 
   /* The card's words, one under the other on a plate. Its press covers the card (`covers`), its corners the card's. */
   .open {
-    /* layout: the words one under the other, each as wide as itself */
     display: grid;
-    /* layout: the step between those words, in its one column */
     gap: var(--space-2xs);
-    /* layout: each word at the start */
     justify-items: start;
-    /* layout: the words packed in the middle of the card's height, a step apart, as frame 26 sets them */
     align-content: center;
     border-radius: var(--radius-m);
     text-align: start;

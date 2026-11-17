@@ -12,7 +12,7 @@ vi.mock("../planet/maps.ts", async (original) => ({
     }),
 }));
 vi.mock("../quality.ts", () => ({ lowQuality: () => false }));
-vi.mock("../../later.ts", () => ({
+vi.mock("../../afterLoad.ts", () => ({
   afterLoad: (then: () => void) => {
     then();
   },

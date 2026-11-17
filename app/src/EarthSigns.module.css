@@ -101,15 +101,11 @@
   }
 
   .bubble {
-    /* layout: the face beside the words, in one row that never wraps */
     display: grid;
-    /* layout: the frames' face, the rest to the words */
     grid-template-columns: var(--control-xs) minmax(0, 1fr);
-    /* layout: a step between the two */
     column-gap: var(--space-xs);
-    /* layout: the face at the top, beside the head */
     align-items: start;
-    /* raw: frame 47's bubble, 258 px wide */
+    /* raw: the design's bubble, 258 px wide */
     inline-size: 258px;
     border-radius: var(--radius-box);
     border: var(--line-width) solid var(--color-line-strong);
@@ -161,38 +157,31 @@
   }
 
   .who {
-    /* layout: the initial at the disc's middle */
     display: grid;
-    /* layout: the same */
     place-items: center;
     block-size: var(--control-xs);
     font: var(--font-meta);
   }
 
   .words {
-    /* layout: a line under the head */
     margin-block: var(--space-3xs) 0;
     color: var(--color-text);
-    /* raw: frame 47's words, 13 px */
+    /* raw: the design's words, 13 px */
     font: 400 0.8125rem/1.35 var(--family-sans);
     overflow-wrap: anywhere;
   }
 
   .head {
-    /* raw: frame 55's head, mono 10 px */
+    /* raw: the design's head, mono 10 px */
     font: 400 var(--text-2xs)/1.3 var(--family-mono);
     /* raw: the same, 7.2 px a letter */
     letter-spacing: 0.12em;
   }
 
   .headRow {
-    /* layout: the name and place on the left, wrapping under themselves; the room's pill whole at the top right */
     display: grid;
-    /* layout: the same */
     grid-template-columns: minmax(0, 1fr) auto;
-    /* layout: the pill's words on the name's first line */
     align-items: baseline;
-    /* layout: a small step before the pill */
     column-gap: var(--space-3xs);
     overflow-wrap: anywhere;
   }
@@ -215,7 +204,7 @@
   .ping::after {
     content: "";
     position: absolute;
-    /* raw: frame 47's ring, 20 px out */
+    /* raw: the design's ring, 20 px out */
     inset: -20px;
     border: var(--line-width) solid var(--color-mine);
     /* one ring, as a person speaks */
@@ -240,7 +229,7 @@
   }
 
   .rings {
-    /* raw: frame 52's ring, 20 px out */
+    /* raw: the design's ring, 20 px out */
     inset: -20px;
     border: var(--line-width) solid currentcolor;
     /* raw: the frames' faint fill */
@@ -253,7 +242,7 @@
   }
 
   .dot {
-    /* raw: frame 52's dot, 5 px out */
+    /* raw: the design's dot, 5 px out */
     inset: -5px;
     background: currentcolor;
     /* raw: its glow, which stays small: no blinding light */
@@ -270,19 +259,19 @@
 
     to {
       opacity: 0;
-      /* raw: to frame 55's 62 px, as it fades */
+      /* raw: to the design's 62 px, as it fades */
       transform: scale(1.6);
     }
   }
 
   .pill {
     position: absolute;
-    /* raw: frame 52's place, 38 px over the point */
+    /* raw: the design's place, 38 px over the point */
     inset-block-start: -38px;
     /* raw: and 20 px right of it */
     inset-inline-start: 20px;
     padding-inline: var(--space-2xs);
-    /* raw: frame 52's 11 px mono, in a pill 20 px high */
+    /* raw: the design's 11 px mono, in a pill 20 px high */
     font: 500 0.6875rem/20px var(--family-mono);
   }
 
@@ -290,13 +279,9 @@
     position: absolute;
     /* raw: at its point's height, its dot on the point: half the chip up, and the dot's place left */
     transform: translate(-12px, -50%);
-    /* layout: the dot before the name, on one line */
     display: inline-grid;
-    /* layout: the same */
     grid-template-columns: auto auto;
-    /* layout: the same */
     column-gap: var(--space-3xs);
-    /* layout: the same */
     place-items: center;
     block-size: var(--control-xs);
     border: var(--line-width) solid var(--color-line-strong);

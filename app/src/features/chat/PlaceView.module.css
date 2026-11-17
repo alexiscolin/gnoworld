@@ -19,15 +19,13 @@
   }
 
   .fold {
-    /* layout: the row's height is what eases, from nothing to the box's own */
+    /* The row's height is what eases, from nothing to the box's own */
     display: grid;
-    /* layout: the row's height is what eases, from nothing to the box's own */
     grid-template-rows: 0fr;
     transition: grid-template-rows calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
   .view[data-shown] .fold {
-    /* layout: the row's height is what eases, from nothing to the box's own */
     grid-template-rows: 1fr;
   }
 

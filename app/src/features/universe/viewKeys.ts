@@ -1,4 +1,4 @@
-// The key of space's views, heard while the header's ways stand (shellWays.tsx): V toggles the Map, space seen from above.
+// The key of space's views, heard while the header's ways stand (headerPills.tsx): V toggles the Map, space seen from above.
 import { useEffect } from "react";
 import { keyHeld } from "../../space/keyHeld.ts";
 import { toggleMap } from "../../mapView.ts";

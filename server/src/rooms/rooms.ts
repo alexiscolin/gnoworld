@@ -40,7 +40,7 @@ const EARTH_WINDOW_MS = 30 * 24 * 60 * 60_000;
 /** Where the window starts at `now`: a public room made after it counts (create.ts), one made at or before it is past. */
 export const earthWindowStart = (now: number): number => now - EARTH_WINDOW_MS;
 
-// The rooms kept in the lists and the bot's channels (D13676): every room but an archived room of the Earth made at or before the
+// The rooms kept in the lists and the bot's channels: every room but an archived room of the Earth made at or before the
 // window's start, whose row and name stay. Each branch reads an index (create.ts's ROOM_LISTING_INDEXES), so the cost follows the
 // live rooms and the window's, never every row ever made.
 /** The rooms listed as of a window start (one parameter), in no order: an ORDER BY made the planner scan every row by name. */

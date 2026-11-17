@@ -1,6 +1,6 @@
 import { IconButton, Sidebar, Skeleton, Stack } from "@gnoworld/ui";
 import { useEffect, useRef } from "react";
-import styles from "./Thread.module.css";
+import styles from "./lines/Thread.module.css";
 
 // The panel's place while its code comes, or when it could not: a word and Close, which a narrow room needs, as the
 // room is hidden while a thread is open. While it comes (`busy`) the word is for a screen reader alone, and the panel's
