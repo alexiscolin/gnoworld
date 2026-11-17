@@ -14,7 +14,7 @@ import urllib.request
 
 URL = "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk"
 SEVERE = {"moderate", "high", "critical"}
-# One advisory let through, on one package at or under one version, until a date; past it the audit fails again.
+# One advisory let through, on one package at or under one version, until a date (D13757); past it the audit fails again.
 # GHSA-fc5q-39xc-vjpf (picomatch <= 4.0.7, a ReDoS on globs like +(*)) has no fixed version published, 4.0.7 the latest.
 # Only build and test tools lock picomatch, reading our own globs: vite, vitest, knip, tinyglobby, fdir,
 # @rollup/pluginutils, @rolldown/plugin-babel; no production dependency of any workspace reaches it.
