@@ -4,6 +4,29 @@ How the code is laid out, which way dependencies point, and the rules that keep 
 safe and leak-free. The decisions behind it are in [ADR-0001](../adr/0001-gnoworld.md) §12–14
 and [ADR-0002](../adr/0002-validated-prototype.md).
 
+## Words of the house
+
+The product's own words (world, realm, dust, station, moon) are ADR-0002's. The code and the docs also use these:
+
+| Word | Meaning |
+|---|---|
+| plate | The panel over the scene that shows one place, the Earth, a world or a realm: its hero, talk bar, figures and calls (`app/src/routes/plate/`) |
+| door | The server's gateway to Jarvis: its routes under `/api/jarvis`, quotas, kept answers and admin API (`server/src/door/`) |
+| tier 1 | The security-critical code [REVIEW.md](REVIEW.md) lists, read whole and mutation-tested |
+| the gate | The checks a change passes: `scripts/check.sh` at each commit, GitHub's gate on each pull request |
+| planted bypass | A fault planted on purpose that a guard's test must catch, to prove the guard works |
+| red pass, green pass | The review of a branch's failing tests before any code, and of the tests once the code passes them |
+| the night | The nightly run on GitHub: the slow and display tests, more journeys, StrykerJS and the harness's mutants |
+| slice | One step of the backlog, with its plan |
+| chief | The Claude Code session that plans a slice, cuts it into parts, briefs them and merges them |
+| part | One branch of a slice, run by its own Claude Code session in its own worktree |
+| workshop | `pnpm workshop`: the app and a local backend, to try a design live ([DEVELOPMENT.md](DEVELOPMENT.md)) |
+| ping-pong | A design session in the workshop: the owner looks, Claude retouches live, and the batch lands later, tested |
+| pose | The owner's word for landing the commits validated in the workshop (`/pose`) |
+| dream | At a slice's end, a read-only agent reads its evidence and proposes rules, memories and checks for the owner to accept |
+| twins | The copies of the project's sandbox rules, with this machine's paths, that the hook installer writes into each Claude Code profile |
+| land | The owner's command that pushes a session's branch to GitHub and opens its pull request (`scripts/land.py`) |
+
 ## The pieces
 
 ```
