@@ -8,11 +8,11 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 280,971 with the
-// phone mode's shared parts, D13719).
-const FIRST_SCREEN_JS = 281_227;
-// A page with no plate (the home), exact: its measured size, 256 B ahead.
-const PLAIN_FIRST_SCREEN_JS = 276_255;
+// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 282,407 with the
+// phone mode's shared parts, D13719, D13731).
+const FIRST_SCREEN_JS = 282_663;
+// A page with no plate (the home), exact: its measured size, 256 B ahead (277,691 B with the phone mode's media checks, D13719).
+const PLAIN_FIRST_SCREEN_JS = 277_947;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -157,8 +157,8 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 61062, // 60,806 B measured with the narrow plate's fixes (D13701), 256 B ahead
-  HubPlate: 57414, // 57,158 B measured with the narrow plate's fixes (D13701), 256 B ahead
+  EarthPlate: 61823, // 61,567 B measured with the phone sheet's branches (D13719), 256 B ahead
+  HubPlate: 58187, // 57,931 B measured with the phone sheet's branches (D13719), 256 B ahead
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
