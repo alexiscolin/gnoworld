@@ -167,6 +167,39 @@ describe("failureOf", () => {
     expect(failureOf(thrown).stack ?? "").not.toContain("planted");
   });
 
+  it("keeps no line after the error's text that is no frame: a cause a library appends, a stack written again", () => {
+    const appended = new Error("x");
+    appended.stack = `${String(appended.stack)}\nCaused by: Error: planted-token-5f2b`;
+    expect(failureOf(appended).stack).not.toContain("planted");
+    const rewritten = new Error("x");
+    Object.defineProperty(rewritten, "stack", { value: "Error: x\n    at real (a.ts:1:1)\nplanted-token-5f2b" });
+    expect(failureOf(rewritten)).toEqual({ error: "Error", stack: "at real (a.ts:1:1)" });
+  });
+
+  it("writes no stack for an error that has no frame, and no name past 64 characters", () => {
+    const limit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 0;
+    const frameless = new Error("x");
+    Error.stackTraceLimit = limit;
+    expect(failureOf(frameless)).toEqual({ error: "Error" });
+    const long = new Error("x");
+    long.name = "N".repeat(65);
+    expect(failureOf(long).error).toBe("Error");
+    long.name = "N".repeat(64);
+    expect(failureOf(long).error).toBe("N".repeat(64));
+  });
+
+  it("skips the error's own text by Error's toString, whatever a subclass's says", () => {
+    class Terse extends Error {
+      override toString(): string {
+        return "terse";
+      }
+    }
+    const thrown = new Terse("planted-token-5f2b\n    at planted (a.ts:1:1)");
+    expect(failureOf(thrown).stack).toMatch(/^at /);
+    expect(failureOf(thrown).stack).not.toContain("planted");
+  });
+
   it("gives a thrown value that is no Error its type alone", () => {
     expect(failureOf("planted-token-5f2b")).toEqual({ error: "string" });
     expect(failureOf(undefined)).toEqual({ error: "undefined" });
