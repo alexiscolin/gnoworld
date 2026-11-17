@@ -30,6 +30,7 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isParagraphNode,
   $isTextNode,
   TextNode,
   createEditor,
@@ -72,10 +73,13 @@ const PLAIN: TextMatchTransformer = {
     if (!$isTextNode(node) || node.getFormat() !== 0) return null;
     const before = node.getPreviousSibling();
     if ($isTextNode(before) && before.getFormat() !== 0) return null;
+    // A `*` that starts a paragraph keeps its backslash: bare, with a space after it, it opens a list (a quote's or an item's
+    // first `*` is the reader's text either way).
+    const lineStart = before === null && $isParagraphNode(node.getParent());
     return node
       .getTextContent()
       .replaceAll(/[*~`]/g, (mark: string, at: number, text: string) =>
-        mark === "*" && isolated(text, at) ? mark : `\\${mark}`,
+        mark === "*" && isolated(text, at) && !(lineStart && at === 0) ? mark : `\\${mark}`,
       )
       .replaceAll(INTRAWORD, "\\_");
   },
