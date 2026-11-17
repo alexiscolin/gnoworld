@@ -257,7 +257,10 @@ describe("an answer's buttons", () => {
       click(call);
       const card = nth(all(box, "article"), 1);
       expect(inputs(card).map((input) => input.value)).toEqual(["15", "YES"]);
-      expect(card.textContent).not.toMatch(/\d\s*ugnot/);
+      // The command line's way (D13880) prints the fee and the deposit cap in ugnot, and sends no coin.
+      const command = card.querySelector(".fine-only")?.textContent ?? "";
+      expect(card.textContent.replace(command, "")).not.toMatch(/\d\s*ugnot/);
+      expect(command).not.toContain("-send");
       expect(touched).not.toHaveBeenCalled();
     } finally {
       Reflect.deleteProperty(globalThis, "adena");

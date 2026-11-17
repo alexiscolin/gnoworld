@@ -3,20 +3,28 @@
 // way out; once signed, the wait, the landing in a block and the result. Every state is words with its next step, and the
 // result says done only from the chain's answer, which the course puts in the card (signCall.ts).
 import { callFields } from "@gnoworld/core";
+import type { Address } from "@gnoworld/schemas";
 import { Button, Card, Field, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
 import { CallStatus } from "./CallStatus.tsx";
+import { CommandLine } from "./CommandLine.tsx";
 import { problemsOf } from "./problems.ts";
 import { depositText, networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
+// Whether Adena's object is in the page, without reading it: the card touches no wallet before a signature (D254). With none, the
+// command line's way leads (PR #41's UX review).
+const adenaInPage = (): boolean => "adena" in globalThis;
+// Sign in Adena leads where Adena is; elsewhere it is the second way, after the command.
+const signLook = (): "solid" | "outline" => (adenaInPage() ? "solid" : "outline");
+
 export interface CallCardProps {
   card: Card_;
-  /** The universe's chain: what the call is signed for. */
-  network: { name: string; chainId: string };
+  /** The universe's chain: what the call is signed for, and its node, which the command line's way names. */
+  network: { name: string; chainId: string; rpc: string };
   /** The fee line, already worded as an estimate (fee.ts). */
   fee: string;
   onEdit: (index: number, text: string) => void;
@@ -27,8 +35,9 @@ export interface CallCardProps {
   level?: 2 | 3 | 4 | undefined;
   /** The call's name, its title when it has one (a pinned action's label); else its function. */
   title?: string | undefined;
-  /** The login the signature needs: logged out, the card's first button is the login itself. Left out, the account is taken as in. */
-  login?: { signedIn: boolean; onLogIn: () => void } | undefined;
+  /** The login the signature needs: logged out, the card's first button is the login itself. Left out, the account is taken as in.
+   * `as`, the account logged in, signs the command line's way. */
+  login?: { signedIn: boolean; as?: Address | undefined; onLogIn: () => void } | undefined;
 }
 
 /** A fact of a card: its label, then its value (a pair of a definition list). */
@@ -115,7 +124,7 @@ function Actions({ card, onSign, onCancel, onRetry, login }: Omit<CallCardProps,
     return (
       <Card.Actions>
         <span className="fine-only">
-          <Button emphasis="solid" disabled={stuck} onClick={onSign}>
+          <Button emphasis={signLook()} disabled={stuck} onClick={onSign}>
             Sign in Adena
           </Button>
         </span>
@@ -192,6 +201,7 @@ export function CallCard({
             ))
           : null}
         <CallStatus card={card} />
+        {preview ? <CommandLine card={card} network={network} as={login?.as} open={!adenaInPage()} /> : null}
         {preview ? <p className="meta coarse-only">To sign, use a computer.</p> : null}
       </Card.Body>
       <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} login={login} />

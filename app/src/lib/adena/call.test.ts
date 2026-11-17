@@ -148,8 +148,8 @@ const params = (request: CallRequest, universe = ONYX) => [
         },
       },
     ],
-    gasFee: 1_000_000,
-    gasWanted: 10_000_000,
+    gasFee: 50_000,
+    gasWanted: 50_000_000,
     networkInfo: { chainId: universe.chainId, rpcUrl: universe.rpc },
   },
   { isVisibleResult: false },
@@ -183,12 +183,12 @@ describe("callContract: the way through", () => {
     expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
-  it("uses the SDK's default gas and fee, and pins the transaction to the universe's chain and node", async () => {
+  it("uses the gas and the fee at the chain's price, and pins the transaction to the universe's chain and node", async () => {
     const adena = new Fake();
     await callContract(adena, REQUEST, ONYX);
     expect(sent(adena)[0]?.args[0]).toMatchObject({
-      gasWanted: 10_000_000,
-      gasFee: 1_000_000,
+      gasWanted: 50_000_000,
+      gasFee: 50_000,
       networkInfo: { chainId: "onyx-1", rpcUrl: ONYX.rpc },
     });
   });

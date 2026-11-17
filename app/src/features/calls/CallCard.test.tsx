@@ -38,7 +38,7 @@ const view = (over: Partial<CallCardProps> = {}) =>
   markup(
     <CallCard
       card={preview}
-      network={{ name: "Onyx", chainId: "onyx-1" }}
+      network={{ name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" }}
       fee="≈ 0.05 GNOT, an estimate"
       onEdit={() => undefined}
       onSign={() => undefined}
@@ -185,8 +185,8 @@ describe("CallCard, the preview", () => {
     expect(all(box, "input")[0]?.getAttribute("aria-invalid")).toBeNull();
   });
 
-  it("offers 'Sign in Adena' and 'Cancel'", () => {
-    expect(buttons(view())).toEqual(["Sign in Adena", "Cancel"]);
+  it("offers 'Sign in Adena' and 'Cancel', after the command line's way folded (D13880)", () => {
+    expect(buttons(view())).toEqual(["Or run it with gnokey", "Sign in Adena", "Cancel"]);
   });
 
   it("tells a phone to use a computer to sign (it reads and fills, it signs on a computer)", () => {
@@ -315,7 +315,14 @@ describe("CallCard, its buttons and fields call their handlers", () => {
     return { onEdit: vi.fn(), onSign: vi.fn(), onCancel: vi.fn(), onRetry: vi.fn() };
   }
   const mounted = (state: Card["state"], on = handlers()) => ({
-    box: mount(<CallCard card={{ ...preview, state }} network={{ name: "Onyx", chainId: "onyx-1" }} fee="x" {...on} />),
+    box: mount(
+      <CallCard
+        card={{ ...preview, state }}
+        network={{ name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" }}
+        fee="x"
+        {...on}
+      />,
+    ),
     on,
   });
   const only = (on: ReturnType<typeof handlers>, name: keyof ReturnType<typeof handlers>) => {
@@ -507,5 +514,112 @@ describe("CallCard, its title", () => {
 
   it("is the function when no name is given", () => {
     expect(all(view(), "h3").map((h) => said(h))).toEqual(["SetBio"]);
+  });
+});
+
+describe("CallCard, the command line's way (D13880)", () => {
+  const way = (box: HTMLElement) => all(box, ".fine-only").find((element) => said(element).includes("maketx call"));
+
+  it("prints the call as a command to copy, on a computer only, with the card's realm, function and arguments", () => {
+    const box = view();
+    const printed = way(box);
+    expect(printed).toBeDefined();
+    expect(said(printed ?? box)).toContain(
+      "maketx call -pkgpath 'gno.land/r/demo/profile' -func 'SetBio' -args 'hello' -args '3'",
+    );
+    expect(said(printed ?? box)).toContain("-chainid 'onyx-1' -remote 'https://rpc.onyx.testnets.gno.land:443'");
+    expect(all(box, ".coarse-only").some((element) => said(element).includes("maketx"))).toBe(false);
+  });
+
+  // PR #41's security review: fish reads a backslash inside single quotes as an escape; PowerShell and cmd quote otherwise.
+  it("names the shells the command is written for, bash and zsh", () => {
+    expect(said(way(view()) ?? view())).toContain("Run it in bash or zsh");
+  });
+
+  // PR #41's UX review: the page never sees a command run by hand, and the command pays its own fee.
+  it("says what the command pays, and that the page will not see it", () => {
+    expect(said(way(view()) ?? view())).toContain(
+      "It sends the call and pays 0.05 GNOT; gnoworld will not see it, so do not also sign in Adena.",
+    );
+  });
+
+  it("names the logged-in account's address where the key goes, and asks for no edit", () => {
+    const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const printed = said(
+      way(view({ login: { signedIn: true, as: Address.parse(me), onLogIn: () => undefined } })) ?? view(),
+    );
+    expect(printed).toMatch(new RegExp(`-remote 'https://rpc\\.onyx\\.testnets\\.gno\\.land:443' ${me}`));
+    expect(printed).not.toContain("KEY");
+  });
+
+  it("asks for the key's name when no account is logged in", () => {
+    expect(said(way(view()) ?? view())).toContain("Run it in bash or zsh, KEY replaced by your key's name.");
+  });
+
+  // PR #41's UX review: a computer without Adena has the command line's way alone.
+  it("opens the command and draws Sign in Adena as a second way when Adena is not in the page", () => {
+    const box = view();
+    expect(
+      all(box, "button")
+        .find((b) => said(b) === "Or run it with gnokey")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      all(box, "button")
+        .find((b) => said(b) === "Sign in Adena")
+        ?.getAttribute("data-emphasis"),
+    ).toBe("outline");
+  });
+
+  it("keeps the command folded and Sign in Adena solid when Adena is in the page", () => {
+    vi.stubGlobal("adena", { AddEstablish: () => undefined });
+    const box = view();
+    vi.unstubAllGlobals();
+    expect(
+      all(box, "button")
+        .find((b) => said(b) === "Or run it with gnokey")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      all(box, "button")
+        .find((b) => said(b) === "Sign in Adena")
+        ?.getAttribute("data-emphasis"),
+    ).toBe("solid");
+  });
+
+  it("prints no command for an argument holding a backslash, and says why", () => {
+    const box = view({ card: { ...preview, texts: ["x\\", "3"] } });
+    expect(said(box)).not.toContain("maketx");
+    expect(said(box)).toContain(
+      "No command for this call: bio holds a backslash, which some shells read as an escape.",
+    );
+  });
+
+  it("prints no command for an argument a terminal would run as two lines, and says which", () => {
+    const box = view({ card: { ...preview, texts: ["one\ntwo", "3"] } });
+    expect(said(box)).not.toContain("maketx");
+    expect(said(box)).toContain("No command for this call: bio holds a line break or a control character.");
+  });
+
+  it.each([
+    { kind: "signing" },
+    { kind: "landing", hash: HASH },
+    { kind: "done", hash: HASH, height: 7, value: "" },
+    { kind: "failed", reason: "failed" },
+  ] as const)("prints none once out of the preview: $kind", (state) => {
+    expect(said(withState(state))).not.toContain("maketx");
+  });
+
+  it("names an unnamed field by its place, inside the fold a computer alone shows (the UX pass)", () => {
+    const params = [
+      { Name: "cur", Type: realmType() },
+      { Name: "", Type: "string" },
+    ];
+    const box = view({ card: { ...preview, params, texts: ["a\nb"] } });
+    const fold = all(box, ".fine-only").find((element) => said(element).startsWith("Or run it with gnokey"));
+    expect(fold?.querySelector("button")?.textContent).toBe("Or run it with gnokey");
+    expect(said(fold ?? box)).toMatch(
+      /No command for this call: argument 1 holds a line break or a control character\. Remove it to get a command\.$/,
+    );
   });
 });

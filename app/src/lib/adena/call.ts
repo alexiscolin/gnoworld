@@ -18,6 +18,7 @@ import {
   type Failed,
 } from "./answers.ts";
 import { MAX_DEPOSIT } from "./deposit.ts";
+import { GAS_FEE, GAS_WANTED } from "./gas.ts";
 import { serially } from "./queue.ts";
 
 export type CallResult =
@@ -28,10 +29,6 @@ export interface Universe {
   name: string;
   rpc: string;
 }
-
-// The SDK's default gas and fee (bin/index.js:2452; gno-js-client's default fee, in ugnot): the card shows the fee as an estimate.
-const GAS_WANTED = 10_000_000;
-const GAS_FEE = 1_000_000;
 
 type Need = (name: Method, ...args: unknown[]) => Promise<Answered>;
 interface Wallet {
