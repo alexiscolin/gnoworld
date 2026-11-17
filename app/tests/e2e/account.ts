@@ -7,7 +7,14 @@ import { expect, hydrated, test } from "./fixtures.ts";
 export const accountPill = (page: Page) => page.getByRole("button", { name: /Your account/ });
 
 /** The header's Connect button for a reader logged out (the welcome card holds another named alike, so it is read in the banner). */
-export const connectButton = (page: Page) => page.getByRole("banner").getByRole("button", { name: /^Connect Adena/ });
+export const connectButton = (page: Page) =>
+  page.getByRole("banner").getByRole("button", { name: "Connect", exact: true });
+
+/** Starts Adena's login as a reader does (D13881): Connect, then Adena in its menu. */
+export async function connectAdena(page: Page): Promise<void> {
+  await connectButton(page).click();
+  await page.getByRole("menuitem", { name: "Adena", exact: true }).click();
+}
 
 /** Logs in with the page's Adena at a computer's width, the page's size given back after: a phone's header keeps Connect in its menu
  * and a phone opens into a chat. */
@@ -17,7 +24,7 @@ export async function connectAtComputer(page: Page): Promise<void> {
   if (narrow) await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
   await hydrated(page);
-  await connectButton(page).click();
+  await connectAdena(page);
   await expect(accountPill(page)).toBeVisible();
   if (narrow) await page.setViewportSize(size);
 }

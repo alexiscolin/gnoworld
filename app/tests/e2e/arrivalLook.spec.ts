@@ -1,5 +1,5 @@
 import { adena } from "./adena.ts";
-import { accountPill, connectButton } from "./account.ts";
+import { accountPill, connectAdena } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 
@@ -27,7 +27,7 @@ async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Pr
   await page.route("**/api/signals/chart", (route) => route.fulfill({ json: { world: "bubble", first: true } }));
   await page.goto("/w/bubble");
   await hydrated(page);
-  await connectButton(page).click();
+  await connectAdena(page);
   await expect(accountPill(page)).toBeVisible();
 }
 

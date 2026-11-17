@@ -113,7 +113,11 @@ const click = (label: string) => {
 beforeAll(() => {
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   // jsdom has no popover API, which an icon button's tooltip asks for as it mounts.
-  Object.assign(HTMLElement.prototype, { togglePopover: () => true });
+  Object.assign(HTMLElement.prototype, {
+    togglePopover: () => true,
+    showPopover: () => undefined,
+    hidePopover: () => undefined,
+  });
 });
 const reported = vi.fn();
 beforeEach(() => {
@@ -141,7 +145,11 @@ async function loggedIn() {
   const adena = wallet();
   const { store } = mountControl();
   await sessionIs(store, { kind: "out" });
-  click("Connect Adena");
+  // Connect's menu comes with its first press (D13881): its Adena starts the login.
+  click("Connect");
+  await vi.waitFor(() => {
+    click("Adena");
+  });
   await sessionIs(store, { kind: "in", address: ADDRESS });
   return { paths, adena, store };
 }

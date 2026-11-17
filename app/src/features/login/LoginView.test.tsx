@@ -53,7 +53,14 @@ const said = (html: string) =>
     .trim();
 const view = (over: Partial<LoginViewProps> = {}) =>
   renderToStaticMarkup(
-    <LoginView session={{ kind: "out" }} step="idle" problem={undefined} onLogIn={() => undefined} {...over} />,
+    <LoginView
+      session={{ kind: "out" }}
+      step="idle"
+      problem={undefined}
+      onLogIn={() => undefined}
+      onKey={() => undefined}
+      {...over}
+    />,
   );
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => said(m[1] ?? ""));
 
@@ -65,9 +72,11 @@ describe("LoginView", () => {
     expect(said(html)).toBe("");
   });
 
-  it("offers one pill, Connect Adena, to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
+  it("offers one pill, Connect (D13881), to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
     const html = view();
-    expect(buttons(html)).toEqual(["Connect Adena"]);
+    expect(buttons(html)).toEqual(["Connect"]);
+    // A computer's alone: a phone's words hold no Connect, so no menu of ways in.
+    expect(html).toMatch(/<span class="[^"]*computer[^"]*"><span class="pill-group"><button[^>]*>Connect<\/button>/);
     expect(said(html)).toContain("To log in, use a computer; once logged in you can write from here.");
     expect(said(html)).not.toContain("To speak");
   });

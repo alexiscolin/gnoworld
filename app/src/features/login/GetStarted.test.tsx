@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { button, click, drawer, mount, settled } from "../../../tests/mount.tsx";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { button, choose, click, drawer, mount, popovers, settled } from "../../../tests/mount.tsx";
 import { GetStarted } from "./GetStarted.tsx";
 import { LoginControl } from "./LoginControl.tsx";
 import { askGetStarted, GET_STARTED } from "./getStartedAsk.ts";
@@ -23,6 +23,9 @@ function connectOnceAdenaCame(box: HTMLElement, logIn: ReturnType<typeof vi.fn>)
   expect(logIn).toHaveBeenCalledTimes(1);
 }
 
+// jsdom has no popover API, which the Connect menu opens with: the journeys see it.
+beforeAll(popovers);
+
 describe("get started", () => {
   it("opens when the login found no Adena, shows Connect when Adena appears, and logs in", async () => {
     const logIn = vi.fn();
@@ -39,7 +42,8 @@ describe("get started", () => {
     await settled(() => box.querySelector("dialog[open]") !== null);
     click(button(box, "Continue as a guest"));
     await settled(() => box.querySelector("dialog[open]") === null);
-    click(button(box, "Install Adena"));
+    // The stopped login's button opens Connect's menu: its Adena opens the steps again (D13881).
+    await choose(box, "Install Adena", "Adena");
     await settled(() => box.querySelector("dialog[open]") !== null);
     const fine = mount(
       <LoginControl login={{ session: out, step: "idle", problem: undefined, chat: "off" }} logIn={vi.fn()} />,
@@ -156,5 +160,24 @@ describe("the dialog Get started, opened and closed from the control", () => {
     draw(<LoginControl login={none} logIn={vi.fn()} />);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(isOpen(document.body)).toBe(false);
+  });
+});
+
+describe("the header's Connect (D13881)", () => {
+  it("asks the page for the command line's login from its gnokey row", async () => {
+    const heard = vi.fn();
+    window.addEventListener("gnoworld:key-login", heard);
+    const box = mount(
+      <LoginControl login={{ session: out, step: "idle", problem: undefined, chat: "off" }} logIn={vi.fn()} />,
+    );
+    await choose(box, "Connect", "gnokey");
+    expect(heard).toHaveBeenCalledOnce();
+    window.removeEventListener("gnoworld:key-login", heard);
+  });
+
+  it("offers no gnokey in Get started any more: Connect's menu holds it", async () => {
+    const box = mount(<LoginControl login={missing} logIn={vi.fn()} />);
+    await settled(() => box.querySelector("dialog[open]") !== null);
+    expect(button(box, "Log in with gnokey")).toBeUndefined();
   });
 });

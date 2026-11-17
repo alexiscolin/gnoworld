@@ -83,6 +83,29 @@ describe("the account's menu", () => {
     });
   });
 
+  // PR #41's UX review: under 900 px a computer's header has no Connect; its menu holds the command line's way, a touch phone's none.
+  it("on a narrow computer offers Log in with gnokey after Connect Adena, and on a touch phone none", () => {
+    const pointer = (fine: boolean) => {
+      Reflect.set(globalThis, "matchMedia", (query: string) => ({
+        matches: fine && query === "(pointer: fine)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }));
+    };
+    try {
+      pointer(true);
+      const computer = mount(
+        <Opened address={undefined} lead={null} onLogOut={() => undefined} onConnect={() => undefined} phone />,
+      );
+      expect(items(computer).slice(0, 2)).toEqual(["Connect Adena", "Log in with gnokey"]);
+      pointer(false);
+      const touch = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} phone />);
+      expect(items(touch)).not.toContain("Log in with gnokey");
+    } finally {
+      Reflect.deleteProperty(globalThis, "matchMedia");
+    }
+  });
+
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
@@ -191,16 +214,23 @@ const buttonsOf = (box: HTMLElement) =>
   [...box.querySelectorAll("button")].map((each) => each.getAttribute("aria-label") ?? each.textContent.trim());
 
 describe("the header's account", SLOW, () => {
-  it("logged out: one Connect Adena beside the device's menu, the session read once, a press starting the login once", async () => {
+  it("logged out: one Connect beside the device's menu (D13881), the session read once, its Adena starting the login once", async () => {
     api.me.mockResolvedValue({ ok: true, value: { address: null } });
     adena.connect.mockClear();
     const box = await mountMenu();
     await vi.waitFor(() => {
-      expect(buttonsOf(box)).toEqual(["Menu", "Connect Adena"]);
+      expect(buttonsOf(box)).toEqual(["Menu", "Connect"]);
     }, SOON);
     expect(api.me).toHaveBeenCalledTimes(1);
     act(() => {
-      [...box.querySelectorAll("button")].find((each) => each.textContent === "Connect Adena")?.click();
+      [...box.querySelectorAll("button")].find((each) => each.textContent === "Connect")?.click();
+    });
+    // Connect's menu: the burger's own component, two ways in.
+    await vi.waitFor(() => {
+      expect(items(box)).toEqual(["Adena", "gnokey"]);
+    }, SOON);
+    act(() => {
+      [...box.querySelectorAll("button")].find((each) => each.textContent === "Adena")?.click();
     });
     await vi.waitFor(() => {
       expect(adena.connect).toHaveBeenCalledTimes(1);
@@ -209,7 +239,13 @@ describe("the header's account", SLOW, () => {
       box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
     });
     await vi.waitFor(() => {
-      expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
+      // The device's own menu, apart from Connect's, which stays in the page once drawn.
+      expect(items(box.querySelector<HTMLElement>("[aria-label='Your device']") ?? box)).toEqual([
+        "JarvisSoon",
+        "Passport",
+        "Settings",
+        "Release a key",
+      ]);
     }, SOON);
   });
 
@@ -225,10 +261,10 @@ describe("the header's account", SLOW, () => {
     await vi.waitFor(() => {
       expect(pill?.querySelector("[aria-hidden='true']")).not.toBeNull();
     }, SOON);
-    expect(buttonsOf(box)).not.toContain("Connect Adena");
+    expect(buttonsOf(box)).not.toContain("Connect");
     await logOutThrough(box);
     await vi.waitFor(() => {
-      expect(buttonsOf(box)).toContain("Connect Adena");
+      expect(buttonsOf(box)).toContain("Connect");
     }, SOON);
     expect(api.logout).toHaveBeenCalledTimes(1);
   });
@@ -273,7 +309,7 @@ describe.each([
     const named = (name: string) =>
       [...box.querySelectorAll("button")].find((each) => each.textContent.trim() === name);
     await vi.waitFor(() => {
-      expect(box.textContent).toContain(address === null ? "Connect Adena" : "g1jg8m…vsqf5");
+      expect(box.textContent).toContain(address === null ? "Connect" : "g1jg8m…vsqf5");
     }, SOON);
     expect(box.querySelector("button button")).toBeNull();
     act(() => {
