@@ -445,9 +445,10 @@
      stacking. */
   .fill {
     position: absolute;
-    /* raw: the fill as tall as a link, 34 px, in the 44 px pill */
-    inset-block: 5px;
-    inset-inline-start: 0;
+    /* As tall as a link, so the pill's edge is the same step all round (control-bar's padding, inside its rule). */
+    inset-block: calc((var(--_bar) - var(--round-h)) / 2 - var(--line-width));
+    /* --_fill-x counts from the pill's outer edge (viewsIndicator.ts); the fill stands inside its rule */
+    inset-inline-start: calc(var(--line-width) * -1);
     /* raw: under the links, above the pill's own glass */
     z-index: -1;
     inline-size: var(--_fill-w, 0);
