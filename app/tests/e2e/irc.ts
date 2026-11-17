@@ -5,7 +5,7 @@ import { z } from "zod";
 import { adena } from "./adena.ts";
 import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { accountPill, connectButton } from "./account.ts";
+import { accountPill, connectAdena } from "./account.ts";
 
 // Each step is a line sent once a received line matches its pattern ("" waits for none).
 export type Step = readonly [after: string, line: string];
@@ -59,7 +59,7 @@ export async function logIn(page: Page, as = ""): Promise<string> {
   await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
-  await connectButton(page).click();
+  await connectAdena(page);
   await expect(accountPill(page)).toBeVisible();
   const named = `/__wallet?as=${encodeURIComponent(as)}`;
   const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());

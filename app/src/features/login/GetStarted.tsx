@@ -37,11 +37,9 @@ export interface GetStartedProps {
   onClose: () => void;
   /** The header's own login. */
   onConnect: () => void;
-  /** The command line's login (D13880), offered to a computer only. */
-  onCommandLine: () => void;
 }
 
-export function GetStarted({ open, onClose, onConnect, onCommandLine }: GetStartedProps) {
+export function GetStarted({ open, onClose, onConnect }: GetStartedProps) {
   const found = useAdena(open);
   const firefox = navigator.userAgent.includes("Firefox/");
   return (
@@ -83,9 +81,6 @@ export function GetStarted({ open, onClose, onConnect, onCommandLine }: GetStart
             Connect
           </Button>
         ) : null}
-        <span className="fine-only">
-          <Button onClick={onCommandLine}>Log in with gnokey</Button>
-        </span>
         <Button onClick={onClose}>Continue as a guest</Button>
       </Cluster>
     </Dialog>

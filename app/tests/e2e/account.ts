@@ -7,7 +7,14 @@ import { expect, test } from "./fixtures.ts";
 export const accountPill = (page: Page) => page.getByRole("button", { name: /Your account/ });
 
 /** The header's Connect button for a reader logged out (the welcome card holds another named alike, so it is read in the banner). */
-export const connectButton = (page: Page) => page.getByRole("banner").getByRole("button", { name: /^Connect Adena/ });
+export const connectButton = (page: Page) =>
+  page.getByRole("banner").getByRole("button", { name: "Connect", exact: true });
+
+/** Starts Adena's login as a reader does (D13881): Connect, then Adena in its menu. */
+export async function connectAdena(page: Page): Promise<void> {
+  await connectButton(page).click();
+  await page.getByRole("menuitem", { name: "Adena" }).click();
+}
 
 /** Settings, opened from the account's menu (its pill, or the button given), and its dialog. */
 export async function openSettings(page: Page, menu: Locator = accountPill(page)): Promise<Locator> {

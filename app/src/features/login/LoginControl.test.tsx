@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { button, click, mount, settled } from "../../../tests/mount.tsx";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { button, choose, click, mount, popovers, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { pageClock, type SessionDeps } from "./logIn.ts";
 import { Account } from "./testing/Account.tsx";
@@ -65,6 +65,9 @@ function drawn(strict = false) {
   return root;
 }
 
+// jsdom has no popover API, which the Connect menu opens with (D13881): the journeys see it.
+beforeAll(popovers);
+
 describe("the login control", () => {
   it("reads the session as it starts, logs in with the page's Adena at a click, and out", async () => {
     flow.knowSession.mockImplementation((deps) => {
@@ -78,12 +81,12 @@ describe("the login control", () => {
         <Account />
       </StoreProvider>,
     );
-    await settled(() => button(box, "Connect Adena") !== undefined);
+    await settled(() => button(box, "Connect") !== undefined);
     const deps = depsOf(flow.knowSession.mock.calls[0]);
     expect(deps.store).toBeDefined();
     expect(deps.api).toBeDefined();
     expect(flow.adena.pageAdena).not.toHaveBeenCalled();
-    click(button(box, "Connect Adena"));
+    await choose(box, "Connect", "Adena");
     await settled(() => flow.logIn.mock.calls.length > 0);
     expect(flow.logIn).toHaveBeenCalledWith("the page's Adena", {
       ...deps,
@@ -182,11 +185,11 @@ describe("the login control", () => {
         <Account />
       </StoreProvider>,
     );
-    await settled(() => button(box, "Connect Adena") !== undefined);
-    click(button(box, "Connect Adena"));
+    await settled(() => button(box, "Connect") !== undefined);
+    await choose(box, "Connect", "Adena");
     await settled(() => reported.mock.calls.length > 0);
     expect(reported).toHaveBeenCalledWith(new Error("refused"));
-    expect(button(box, "Connect Adena")).toBeDefined();
+    expect(button(box, "Connect")).toBeDefined();
   });
 });
 
@@ -225,8 +228,8 @@ describe("a login whose wallet code cannot be fetched", () => {
           <Account />
         </StoreProvider>,
       );
-      await settled(() => button(box, "Connect Adena") !== undefined);
-      click(button(box, "Connect Adena"));
+      await settled(() => button(box, "Connect") !== undefined);
+      await choose(box, "Connect", "Adena");
       await settled(() => button(box, "Reload the page") !== undefined);
       expect(reported).toHaveBeenCalled();
       expect(flow.logIn).not.toHaveBeenCalled();

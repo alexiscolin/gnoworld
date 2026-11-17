@@ -1,6 +1,6 @@
 import { controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { violations } from "./axe.ts";
-import { accountPill, connectButton } from "./account.ts";
+import { accountPill, connectAdena } from "./account.ts";
 import { adena } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { UPDATING } from "./sites.ts";
@@ -144,7 +144,7 @@ for (const width of WIDTHS) {
           await adena(page);
           await page.reload();
           await hydrated(page);
-          await connectButton(page).click();
+          await connectAdena(page);
           await expect(accountPill(page)).toBeVisible();
           if (path !== "/") {
             await page.goto(`${UPDATING}${path}`);

@@ -119,6 +119,13 @@ export function click(element: HTMLElement | undefined): void {
   });
 }
 
+/** Presses the menu button `trigger`, waits for its item `item` (a menu's code may come with the first press), and presses it. */
+export async function choose(box: ParentNode, trigger: string, item: string): Promise<void> {
+  click(button(box, trigger));
+  await settled(() => button(box, item) !== undefined);
+  click(button(box, item));
+}
+
 /** `element` rendered to static markup and read back as DOM, for what needs no events and no effects (a component whose
  * effects jsdom cannot run, such as the composer's popover). */
 export function markup(element: ReactElement): HTMLElement {

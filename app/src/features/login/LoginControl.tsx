@@ -102,6 +102,9 @@ export function LoginControl({
               }
             : logIn
         }
+        onKey={() => {
+          askFor("key-login");
+        }}
         network={network}
       />
       {drawn ? (
@@ -114,10 +117,6 @@ export function LoginControl({
             onConnect={() => {
               setOpen(false);
               logIn();
-            }}
-            onCommandLine={() => {
-              setOpen(false);
-              askFor("key-login");
             }}
           />
         </Suspense>

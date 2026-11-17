@@ -1,5 +1,5 @@
 import { adena } from "./adena.ts";
-import { accountPill, connectButton } from "./account.ts";
+import { accountPill, connectAdena } from "./account.ts";
 import { axeOf } from "./axe.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
@@ -36,7 +36,7 @@ async function arriveAs(page: Page, as: string, path = "/w/govdao"): Promise<unk
   await page.goto(path);
   await hydrated(page);
   const call = answered(page, "POST", "/api/signals/chart");
-  await connectButton(page).click();
+  await connectAdena(page);
   const answer: unknown = await (await call).json();
   await expect(accountPill(page)).toBeVisible();
   return answer;
