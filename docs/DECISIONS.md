@@ -27,8 +27,9 @@ day-to-day log of every decision, the review findings and the plans are the proc
 7. **Reads of the chain are free and go through gno's own query surfaces** (`vm/qrender`, `vm/qeval`, `vm/qfuncs`, `vm/qfile`),
    the chain id checked first, every answer size-capped and schema-checked. *Why:* no indexer of our own to run, and a node's
    answer is untrusted input. *Where:* `packages/chain/src/read.ts`.
-8. **Every `vm/qeval` expression is built in one reviewed place,** from literals a schema proved. *Why:* a node runs any
-   expression it is sent, so the builder is the defence. *Where:* `app/src/lib/chain/evalCall.ts`, `packages/core/src/chain/`.
+8. **Every `vm/qeval` expression is built by reviewed, tested builders,** from literals a pattern or a schema proved. *Why:* a
+   node runs any expression it is sent, so the builder is the defence. *Where:* `app/src/lib/chain/evalCall.ts`,
+   `packages/core/src/chain/`.
 9. **Phase 0 writes nothing of its own on chain;** the satellite realm comes first, then the hubs, profiles and sessions of
    phase 1. *Why:* the simplest hub that works, before the chain holds social state. *Where:* ADR-0001 §1 and Rollout, the README's
    Status.
@@ -62,10 +63,10 @@ day-to-day log of every decision, the review findings and the plans are the proc
     type is a promise only when something checks it. *Where:* `packages/schemas/`, CLAUDE.md.
 19. **Strict TypeScript:** no `any`, no `@ts-ignore`, no non-null assertion. *Why:* the compiler then catches what review would
     miss. *Where:* `tsconfig.base.json`, `eslint.config.ts`.
-20. **CSS Modules with CUBE CSS and a design system of tokens and components;** no Tailwind. *Why:* layout lives in shared
+20. **CSS Modules with CUBE CSS and a design system of tokens and components;** no Tailwind. *Why:* shared layouts live in
     compositions, values in tokens, and one formatter settles style. *Where:* `docs/DESIGN-SYSTEM.md`, `packages/ui/`.
 21. **The stack is hardened by default:** each service's way out goes through an egress allowlist, images are pinned by digest
-    and distroless where they can be, with CPU and memory caps; the page's CSP allows only the hashes of its own scripts.
+    and distroless where they can be, with CPU and memory caps; the page's CSP runs the site's own scripts and, inline, only those whose hash it names.
     *Why:* nothing relies on the code being private. *Where:* `deploy/compose.yaml`, `docs/OPERATIONS.md`, `app/src/csp.ts`.
 22. **Login is a signed one-time challenge;** the server keeps only a hash of each session token. *Why:* a stolen database
     gives no session. *Where:* `server/src/login/`.
