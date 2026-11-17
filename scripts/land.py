@@ -132,7 +132,9 @@ def listing(work, cache, base, tip, branch, remote):
     names = ap.touched(work, "", cache, base, tip)
     if any("\n" in n for n in names):
         raise ap.Refused("a file name holds a newline, which would print as a line of this listing of its own")
-    runs = ap.runs(names)
+    # What runs once pushed is the tip's tree, against GitHub's main it holds: a merge of main brings main's own workflows, none of
+    # the branch's (F13465).
+    runs = ap.runs([n for n in g("diff", "--no-renames", "--name-only", "-z", base, tip).split("\0") if n])
     out.append("WORKFLOW FILES, which run on GitHub once pushed: " + ", ".join(runs) if runs else "workflow files: none")
     if not remote:
         out.append(f"on GitHub: a new branch {branch}")
