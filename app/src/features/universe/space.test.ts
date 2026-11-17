@@ -7,6 +7,8 @@ const flies = vi.hoisted(() => ({ on: false }));
 // Set once the engine's chunk has come and the page has made its Space.
 const made = vi.hoisted(() => ({ on: false }));
 const fed = vi.hoisted(() => vi.fn());
+// The Map as the page holds it, the listeners the page gave it, and every view the engine was told.
+const map = vi.hoisted(() => ({ on: false, heard: [] as (() => void)[], viewed: [] as boolean[] }));
 vi.mock("./moonRooms.ts", () => ({ feedMoons: fed, stopMoons: stopped }));
 vi.mock("../../space/scene.ts", () => ({
   Space: class {
@@ -17,7 +19,9 @@ vi.mock("../../space/scene.ts", () => ({
     universe = undefined;
     rig = { flying: false };
     stage = {};
-    view = () => undefined;
+    view = (on: boolean) => {
+      map.viewed.push(on);
+    };
     go() {
       return flies.on;
     }
@@ -30,7 +34,13 @@ vi.mock("../../space/scene.ts", () => ({
 vi.mock("../../earthGround.ts", () => ({ attach: () => undefined }));
 vi.mock("../../lenses.ts", () => ({ lightSpace: () => () => undefined }));
 vi.mock("./spaceHook.ts", () => ({ exposeSpace: () => undefined }));
-vi.mock("../../mapView.ts", () => ({ isMap: () => false, onMap: () => () => undefined }));
+vi.mock("../../mapView.ts", () => ({
+  isMap: () => map.on,
+  onMap: (listener: () => void) => {
+    map.heard.push(listener);
+    return () => undefined;
+  },
+}));
 vi.mock("../../worldsFile.ts", () => ({ worldsFile: () => new Promise(() => undefined) }));
 vi.mock("./arrival.ts", () => ({ enterPage: () => undefined, landTags: () => undefined, waitTags: () => undefined }));
 
@@ -111,5 +121,28 @@ describe("release", () => {
     document.body.append(box);
     syncFlown();
     expect(box.dataset["flown"]).toBe("flying");
+  });
+});
+
+// The Map's listener reaches the engine: a picked Map is told to it. (A production build has no hot module, where
+// `import.meta.hot?.dispose(onMap(…))` skipped onMap with its call; the lint refuses that shape, lint/shared.config.ts.)
+describe("the Map", () => {
+  it("is told to the engine when it is picked", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    const { offer, show } = await import("./space.ts");
+    offer.state = "taken";
+    show({ kind: "universe" }, () => undefined);
+    await vi.waitFor(() => {
+      expect(made.on).toBe(true);
+    });
+    expect(map.heard).toHaveLength(1);
+    map.on = true;
+    for (const listener of map.heard) listener();
+    expect(map.viewed.at(-1)).toBe(true);
+    map.on = false;
   });
 });
