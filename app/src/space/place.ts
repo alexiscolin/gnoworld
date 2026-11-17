@@ -1,4 +1,5 @@
 // Where space is asked to be: the home's system, the universe, a namespace's system, or a world's planet.
+import { EARTH } from "@gnoworld/core";
 import type { Planet, System, Universe } from "./layout.ts";
 
 export type Place =
@@ -21,3 +22,7 @@ export function systemAt(universe: Universe | undefined, place: Place | undefine
   if (place.kind === "home") return universe?.home;
   return place.kind === "system" ? universe?.bySystem.get(place.id) : planetAt(universe, place)?.system;
 }
+
+/** Whether going to `place` brings the Earth close: the home's first screen, or the Earth's own page. */
+export const bringsEarth = (place: Place): boolean =>
+  place.kind === "home" || (place.kind === "world" && place.id === EARTH);

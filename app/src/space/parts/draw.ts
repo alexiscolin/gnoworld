@@ -18,7 +18,9 @@ export function drawnOf(
 ): Drawn | undefined {
   if (planet.id === EARTH) {
     const earth = maps.earth(page);
-    return earth === undefined ? undefined : earthPlanet(earth, sphere);
+    // Made from the full maps once they came, it goes to the GPU whole before it shows, no swap left; made ahead, it asks none.
+    const full = maps.fullCame;
+    return earth === undefined ? undefined : earthPlanet(full === undefined ? earth : { ...earth, ...full }, sphere);
   }
   const world = worldOf(planet.id);
   if (SHOWN_STATIONS.includes(planet.id)) return colonyBody({ ...world.look, ...COLONY_AXIS });

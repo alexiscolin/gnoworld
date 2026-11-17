@@ -4,6 +4,7 @@
 import { EARTH } from "@gnoworld/core";
 import { fastLink } from "../../lib/saveData.ts";
 import type { Planet, System, Universe, Vec } from "../layout.ts";
+import { bringsEarth, planetAt, systemAt, type Place } from "../place.ts";
 import { namesFor } from "../planet/generated.ts";
 import type { Maps } from "./maps.ts";
 
@@ -37,24 +38,16 @@ export class Warm {
     for (const planet of system?.planets ?? []) this.planet(planet, true);
   }
 
-  /** A place is gone to: its planet, its system's planets, or from the galaxy the nearest systems' planets. */
-  place({
-    planet,
-    system,
-    universe,
-    eye,
-  }: {
-    planet: Planet | undefined;
-    system: System | undefined;
-    universe: Universe;
-    eye: Vec;
-  }): void {
-    this.planet(planet, true);
-    if (system !== undefined) {
-      this.system(system);
-      return;
+  /** A place is gone to: its planet, its system's planets, or from the galaxy the nearest systems' planets; then, where it brings the
+   * Earth close, the Earth's full maps, after the worlds', which its first maps counted as the page's own would hold back. */
+  place({ place, universe, eye }: { place: Place; universe: Universe; eye: Vec }): void {
+    const system = systemAt(universe, place);
+    this.planet(planetAt(universe, place), true);
+    if (system !== undefined) this.system(system);
+    else {
+      const away = (from: System) => Math.hypot(from.place.x - eye.x, from.place.y - eye.y, from.place.z - eye.z);
+      for (const near of [...universe.systems].sort((a, b) => away(a) - away(b)).slice(0, SYSTEMS)) this.system(near);
     }
-    const away = (from: System) => Math.hypot(from.place.x - eye.x, from.place.y - eye.y, from.place.z - eye.z);
-    for (const near of [...universe.systems].sort((a, b) => away(a) - away(b)).slice(0, SYSTEMS)) this.system(near);
+    if (bringsEarth(place)) this.#maps.earthAhead();
   }
 }
