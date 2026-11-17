@@ -8,6 +8,7 @@ const renderer = {
   getDrawingBufferSize: (size: Vector2) => size.set(64, 64),
   setRenderTarget: () => undefined,
   render: () => undefined,
+  getContext: () => ({ getContextAttributes: () => ({ antialias: true }) }) as unknown as WebGL2RenderingContext,
 };
 const [stage, camera] = [new Scene(), new PerspectiveCamera()];
 

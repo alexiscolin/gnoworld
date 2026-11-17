@@ -3,7 +3,6 @@
 import {
   BufferGeometry,
   Float32BufferAttribute,
-  HalfFloatType,
   Mesh,
   OrthographicCamera,
   PlaneGeometry,
@@ -13,7 +12,7 @@ import {
   type Texture,
   Vector2,
   Vector3,
-  WebGLRenderTarget,
+  type WebGLRenderTarget,
   type PerspectiveCamera,
   type WebGLRenderer,
 } from "three";
@@ -22,6 +21,7 @@ import type { Disposer } from "../disposer.ts";
 import type { Rig } from "./rig.ts";
 import { BLUR_FRAGMENT, BLUR_VERTEX, DUST_FRAGMENT, DUST_VERTEX } from "./speedShaders.ts";
 import { ADDITIVE } from "../additive.ts";
+import { blurTarget } from "./blurred.ts";
 
 // The blur's strength by the stage's speed (its moves over its distance, a second): none under 0.8, all from 3.2; at most half,
 // reaching 14 % of the way to the centre at its strongest.
@@ -33,7 +33,7 @@ const RISE = 0.12;
 const FALL = 0.2;
 const OFF = 0.004;
 const GONE = 1e-3;
-// How long after the blur's last frame its target is freed: 250 MB of GPU memory at a Retina size.
+// How long after the blur's last frame its target is freed: 40 MB of GPU memory at a Retina size.
 const FREE_MS = 10_000;
 const DUST = 700;
 
@@ -119,10 +119,6 @@ export class Speed {
     this.#map.value = null;
   }
 
-  #made(): WebGLRenderTarget {
-    return new WebGLRenderTarget(this.#size.x, this.#size.y, { type: HalfFloatType, samples: 4 });
-  }
-
   /** Whether the frame goes through the blur's pass, which grades it anew. */
   get through(): boolean {
     return this.#strength >= OFF;
@@ -130,13 +126,13 @@ export class Speed {
 
   /** Draws `stage` through `camera`, blurred while fast: false where no blur runs and the caller draws it as it does. */
   draw(
-    renderer: Pick<WebGLRenderer, "getDrawingBufferSize" | "setRenderTarget" | "render">,
+    renderer: Pick<WebGLRenderer, "getDrawingBufferSize" | "setRenderTarget" | "render" | "getContext">,
     stage: Scene,
     camera: PerspectiveCamera,
   ): boolean {
     if (this.#strength < OFF) return false;
     renderer.getDrawingBufferSize(this.#size);
-    const target = (this.#target ??= this.#made());
+    const target = (this.#target ??= blurTarget(renderer, this.#size.x, this.#size.y));
     this.#map.value = target.texture;
     if (target.width !== this.#size.x || target.height !== this.#size.y) target.setSize(this.#size.x, this.#size.y);
     this.#look.project(camera);
