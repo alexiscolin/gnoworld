@@ -31,6 +31,25 @@ describe("followViewport", () => {
     expect(box.style.getPropertyValue("--chat-vtop")).toBe("64px");
   });
 
+  // The keyboard's pan moves the screen's top at once; only the header's fold eases (ChatScreen.module.css).
+  it("marks the box panned while the visual viewport is scrolled, and unmarks it at the signal", () => {
+    const viewport = fake(800, 0);
+    const box = document.createElement("div");
+    const stop = new AbortController();
+    followViewport(box, viewport, stop.signal);
+    expect(box.dataset["panned"]).toBeUndefined();
+    Object.assign(viewport, { offsetTop: 64 });
+    viewport.dispatchEvent(new Event("scroll"));
+    expect(box.dataset["panned"]).toBe("");
+    Object.assign(viewport, { offsetTop: 0 });
+    viewport.dispatchEvent(new Event("scroll"));
+    expect(box.dataset["panned"]).toBeUndefined();
+    Object.assign(viewport, { offsetTop: 12 });
+    viewport.dispatchEvent(new Event("resize"));
+    stop.abort();
+    expect(box.dataset["panned"]).toBeUndefined();
+  });
+
   it("stops at the signal and leaves the box's properties unset, so the CSS falls back to dvh", () => {
     const viewport = fake(800, 0);
     const box = document.createElement("div");

@@ -118,8 +118,8 @@
     }
 
     /* A field's focus gives the header's room to the chat: its top slides up over it, short, as the band folds (PhoneBand.module.css).
-       Once arrived: the sheet that places it may come after its first draw, and it would slide over the header then. */
-    .screen[data-full][data-arrived] {
+       Once arrived (its sheet may come after its first draw, and it would slide over the header then), never while the keyboard pans. */
+    .screen[data-full][data-arrived]:not([data-panned]) {
       transition: inset-block-start calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
     }
 

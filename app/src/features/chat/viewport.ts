@@ -18,6 +18,9 @@ export function followViewport(
   if (viewport === null || viewport === undefined) return;
   const set = () => {
     for (const [name, value] of Object.entries(viewportVars(viewport))) box.style.setProperty(name, value);
+    // Panned by the keyboard: the screen's top follows at once, never eased (ChatScreen.module.css).
+    if (viewport.offsetTop > 0) box.dataset["panned"] = "";
+    else delete box.dataset["panned"];
   };
   set();
   viewport.addEventListener("resize", set, { signal });
@@ -25,6 +28,7 @@ export function followViewport(
   signal.addEventListener("abort", () => {
     box.style.removeProperty("--chat-vh");
     box.style.removeProperty("--chat-vtop");
+    delete box.dataset["panned"];
   });
 }
 
