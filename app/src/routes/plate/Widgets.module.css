@@ -11,7 +11,6 @@
 
   /* The squares of a row are one height: each fills its cell. */
   .widgets > * > * > * {
-    /* layout: the card fills the cell the grid stretched */
     block-size: 100%;
   }
 
@@ -22,7 +21,6 @@
   }
 
   .value small {
-    /* layout: the unit a small step after the value */
     padding-inline-start: var(--space-2xs);
     color: var(--color-text-muted);
     font: var(--font-reading);
@@ -31,14 +29,11 @@
 
   /* A square's detail is held shut and out of reach while closed; it opens with the card's own move, not a move of its own. */
   .fold {
-    /* layout: one row, whose height is the detail's */
     display: grid;
-    /* layout: shut */
     grid-template-rows: 0fr;
   }
 
   .fold[data-open] {
-    /* layout: open to the detail's own height */
     grid-template-rows: 1fr;
   }
 
@@ -50,7 +45,7 @@
   /* A phone's closed fold takes no room: the Card's Stack step above it goes with it (a computer unchanged). */
   @media (width < 900px) {
     .fold:not([data-open]) {
-      /* layout: gives back the Stack step above the shut fold */
+      /* Gives back the Stack step above the shut fold */
       margin-block-start: calc(-1 * var(--space-s));
     }
   }
@@ -61,13 +56,9 @@
   @media (width < 900px) {
     @container plate (max-width: 37.5rem) {
       span.value:has(> small) {
-        /* layout: the figure and its unit, the unit under the figure when the square is narrow */
         display: inline-flex;
-        /* layout: wraps under the figure */
         flex-wrap: wrap;
-        /* layout: on the figure's baseline */
         align-items: baseline;
-        /* layout: the unit's step from the figure */
         column-gap: var(--space-2xs);
         white-space: normal;
         text-overflow: clip;

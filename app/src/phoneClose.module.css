@@ -7,7 +7,7 @@
       --_line: var(--color-line-strong);
 
       border-radius: var(--radius-pill);
-      /* layout: the glyph's side room hangs the box past the head's gutter */
+      /* The glyph's side room hangs the box past the head's gutter */
       margin-inline-end: calc((var(--icon-m) - var(--control-m)) / 2);
     }
   }

@@ -2,9 +2,7 @@
    is cream. */
 @layer components {
   .tabs {
-    /* layout: the tabs sit in one segmented row */
     display: inline-flex;
-    /* layout: a long row wraps rather than push the page sideways */
     flex-wrap: wrap;
     padding: var(--space-3xs);
     border-radius: var(--radius-pill);
@@ -12,9 +10,7 @@
   }
 
   .tabs[data-fill] {
-    /* layout: this row's own arrangement */
     display: flex;
-    /* layout: this row's own arrangement */
     flex-wrap: nowrap;
   }
 
@@ -54,12 +50,10 @@
   /* A phone's finger (utilities.css, .hit): wrapped rows keep the gap the 44 px boxes need, so no box covers the row above. */
   @media (width < 900px) {
     .tabs {
-      /* layout: the gap between wrapped rows */
       row-gap: calc(var(--control-m) - var(--control-s));
     }
 
     .tabs[data-size="xs"] {
-      /* layout: the gap between wrapped rows, for the 24 px tabs */
       row-gap: calc(var(--control-m) - var(--control-xs));
     }
   }
@@ -82,7 +76,6 @@
 
   /* The proposal's count follows its word by a space, not a control's gap. */
   .tabs .tab:has(.figure) {
-    /* layout: the count follows its word by a space */
     gap: var(--space-3xs);
   }
 

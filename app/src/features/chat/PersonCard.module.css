@@ -27,7 +27,6 @@
   /* An account's window stands at one height from the top, not centred: what it reads late grows or shrinks it at its foot, its head and
      tabs never move. */
   dialog:has(.address) {
-    /* layout: a step under the page's header, the foot free */
     margin-block: var(--space-2xl) auto;
   }
 }

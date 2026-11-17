@@ -14,7 +14,7 @@
     inset-inline-end: var(--_edge);
     /* raw: over the labels' layer (0) and the canvas (-1), as the flight panel is */
     z-index: 1;
-    /* layout: the footprint less the rail's own edge (x 1,585 to 1,703 at 1,728 px) */
+    /* The footprint less the rail's own edge (x 1,585 to 1,703 at 1,728 px) */
     inline-size: calc(var(--_footprint) - var(--_edge));
     border-radius: var(--radius-l);
     /* raw: the panels' night over the scene, darker than the flight panel's glass: the design's column dims the suns behind it */
@@ -26,7 +26,6 @@
     /* raw: the panel down to 1,058 px of 1,080 at most, its 22 px of air kept; less the 52 px of See all under the
        column */
     max-block-size: calc(100vb - 120px - 52px);
-    /* layout: the planets scroll inside the panel, which keeps its edge */
     overflow: auto;
     /* raw: a planet the dock or the scroll moves past the panel's top fades over 12 px, under its edge */
     mask-image: linear-gradient(transparent, #000 12px);
@@ -39,11 +38,8 @@
   }
 
   .worlds {
-    /* layout: the planets one under the other */
     display: flex;
-    /* layout: the planets one under the other */
     flex-direction: column;
-    /* layout: a list with no margin of its own */
     margin: 0;
     /* raw: the design's first planet 18 px under the panel's top, with no view tabs above it; the last one a larger step above the panel's foot */
     padding: 18px 0 var(--space-l);
@@ -51,25 +47,18 @@
   }
 
   .foot {
-    /* layout: See all in the middle of the column, under the last planet */
     display: grid;
-    /* layout: See all in the middle of the column */
     justify-items: center;
     /* raw: See all's own 52 px under the column: the column's max height leaves it */
     block-size: 52px;
-    /* layout: See all in the middle of its 52 px */
     align-content: center;
   }
 
   .world {
-    /* layout: the planet over its name, both in the middle of the column */
     display: grid;
-    /* layout: both in the middle of the column */
     justify-items: center;
-    /* layout: the planet and its name at the top of their place */
     align-content: start;
     /* raw: the design's 9 px from a planet to its name's letters, 8 px less the name's leading */
-    /* layout: the planet and its name apart */
     row-gap: 8px;
     /* raw: the design's 98 px from one planet's middle to the next */
     min-block-size: 98px;
@@ -77,7 +66,7 @@
   }
 
   .name {
-    /* layout: two lines at most, as the design's KYOTO BUILDERS; a longer name is cut there */
+    /* Two lines at most, as the design's KYOTO BUILDERS; a longer name is cut there */
     max-block-size: 2lh;
     max-inline-size: calc(100% - var(--space-s));
     overflow: hidden;

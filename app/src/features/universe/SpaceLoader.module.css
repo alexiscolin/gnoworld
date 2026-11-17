@@ -23,9 +23,7 @@
     inset-block-start: var(--space-s);
     inset-inline-start: var(--space-s);
     block-size: var(--control-m);
-    /* layout: the logo in the middle of its row, as the header centres it */
     display: flex;
-    /* layout: and across it */
     align-items: center;
     color: var(--color-text);
   }

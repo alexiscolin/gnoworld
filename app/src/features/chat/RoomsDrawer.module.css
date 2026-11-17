@@ -1,22 +1,17 @@
 /* A phone's rooms drawer, on ui's side drawer: the title row stays, the rooms and the worlds scroll under it. */
 @layer components {
   .drawer {
-    /* layout: the title over a body that takes the height left and scrolls alone */
     display: grid;
-    /* layout: the title's own height, the body the rest */
     grid-template-rows: auto minmax(0, 1fr);
     block-size: 100%;
   }
 
   .title {
-    /* layout: no margin of the paragraph's own */
     margin: 0;
-    /* layout: level with Close, which the drawer draws at its top end corner (ui's Dialog) */
+    /* Level with Close, which the drawer draws at its top end corner (ui's Dialog) */
     min-block-size: calc(var(--control-m) + 2 * var(--space-s));
     padding-inline: var(--space-m);
-    /* layout: the name centred on the row's line */
     display: flex;
-    /* layout: the name centred on the row's line */
     align-items: center;
     border-block-end: var(--line-width) solid var(--color-line);
     font: var(--font-title-room);
@@ -54,7 +49,6 @@
     /* The worlds under the rooms, their section a step below the last; the row of worlds at the chat's foot holds them while it shows,
        so the drawer lists them on a short window alone (PhoneWorlds is hidden under 500 px tall, ChatScreen.module.css). */
     .worlds {
-      /* layout: a step under the rooms */
       margin-block-start: var(--space-m);
     }
 

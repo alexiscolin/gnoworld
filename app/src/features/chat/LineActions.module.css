@@ -5,7 +5,6 @@
     position: absolute;
     /* astride the row's top edge, as Slack's: half over the row, so the pointer reaches it without leaving the row */
     inset-block-start: calc(-1 * var(--space-s));
-    /* layout: at the row's far end, as Slack's, over the line's time */
     inset-inline-end: var(--space-s);
     border: var(--line-width) solid var(--color-line-strong);
     /* room for More's focus ring inside the frame, which it would paint over */
@@ -14,22 +13,17 @@
     background: var(--color-surface);
     box-shadow: var(--shadow-popover);
     white-space: nowrap;
-    /* layout: one row of controls of one height, every icon and emoji centred the same way */
     display: inline-flex;
-    /* layout: centred on one line */
     align-items: center;
   }
 
   /* More's holder draws no box where the bar is the desktop's. */
   .more {
-    /* layout: no box of its own on the desktop's bar */
     display: contents;
   }
 
   .bar button {
-    /* layout: an emoji is centred in its square as an icon is */
     align-items: center;
-    /* layout: the same, across */
     justify-content: center;
   }
 
@@ -58,16 +52,13 @@
        first button at the row's start, each button snapping whole. */
     .bar {
       max-inline-size: calc(100% - 2 * var(--space-2xs));
-      /* layout: one row, whatever its width */
       flex-wrap: nowrap;
-      /* layout: the bar's own scroll, its start pinned */
       overflow: auto hidden;
       scroll-snap-type: x proximity;
     }
 
     .bar button {
       scroll-snap-align: start;
-      /* layout: a button keeps its 44 px whatever the row holds */
       flex-shrink: 0;
     }
 
@@ -85,9 +76,7 @@
     .more {
       position: sticky;
       inset-inline-end: 0;
-      /* layout: the one button, kept whole at the bar's end */
       display: inline-flex;
-      /* layout: never shrunk by the scroll */
       flex: none;
       border-inline-start: var(--line-width) solid var(--color-line);
       background: var(--color-surface);

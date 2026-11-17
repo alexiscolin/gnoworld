@@ -2,7 +2,7 @@
    fading out as the chat is drawn under it. */
 @layer components {
   .shape {
-    /* layout: the full chat's own place (ChatScreen.module.css), over the chat while it fades in */
+    /* Same place as the full chat (ChatScreen.module.css), over the chat while it fades in */
     position: fixed;
     inset: var(--flash-room) 0 0;
     /* raw: over the chat's own layer, which is 3 */
@@ -41,9 +41,7 @@
   }
 
   .conversation {
-    /* layout: the lines over the composer, which stays at the foot */
     display: grid;
-    /* layout: the lines take what the composer leaves */
     grid-template-rows: 1fr auto;
     block-size: 100%;
   }

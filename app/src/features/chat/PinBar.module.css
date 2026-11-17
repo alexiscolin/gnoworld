@@ -1,17 +1,11 @@
 /* The room's pins above its lines: one line a pin, the first three, a "+N" for the rest; never past three lines. */
 @layer components {
   .bar {
-    /* layout: the pins and the "+N" side by side: the pins take the width, the count its own */
     display: grid;
-    /* layout: the pins take the width, the count its own */
     grid-template-columns: minmax(0, 1fr) auto;
-    /* layout: the pins and the count start on one line */
     align-items: start;
-    /* layout: a step between them */
     gap: var(--space-3xs);
-    /* layout: the rule under the pins stops at the lines' inset, as the lines do */
     margin-inline: var(--chat-inset);
-    /* layout: the pin stands off the header's rule */
     margin-block-start: var(--space-xs);
     padding-block-end: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
@@ -20,21 +14,16 @@
   }
 
   .pins {
-    /* layout: the list takes the width and holds three lines at most; the rest scrolls inside it */
-    /* layout: the first column may shrink under its line's cut */
+    /* The first column may shrink under its line's cut */
     min-inline-size: 0;
     max-block-size: calc(3 * var(--control-xs));
     overflow: hidden auto;
   }
 
   .pin {
-    /* layout: the pin's icon, its line and its Unpin in one row of one height */
     display: grid;
-    /* layout: the line takes what the icon and Unpin leave */
     grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
-    /* layout: level, each at its column's start */
     place-items: center start;
-    /* layout: a step between them */
     column-gap: var(--space-2xs);
     block-size: var(--control-xs);
   }

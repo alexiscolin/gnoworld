@@ -3,7 +3,7 @@
 @layer components {
   .flash {
     inset: var(--space-m) 0 auto;
-    /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
+    /* The top layer places a popover in the middle; the flash goes to the top, centred */
     margin: 0 auto;
     inline-size: fit-content;
     /* The page's gutter on both sides, never edge to edge on a phone. */

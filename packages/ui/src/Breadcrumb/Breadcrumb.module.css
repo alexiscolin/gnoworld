@@ -7,9 +7,7 @@
     --tracking-caps: 0.08em;
     --color-text-muted: color-mix(in oklab, var(--color-text) 70%, transparent);
 
-    /* layout: the dot and the steps share a line */
     display: flex;
-    /* layout: the dot and the steps' words share a middle */
     align-items: center;
   }
 
@@ -27,21 +25,16 @@
   .trail ol {
     padding-inline-start: 0;
     list-style: none;
-    /* layout: the list's own margin, which the browser gives it, taken off; the chevrons space the steps */
     margin: 0;
-    /* layout: the arrangement the prototype and the frames draw */
     gap: 0;
   }
 
   /* The chevron between the steps: the design system's, turned to point on. */
   .step {
-    /* layout: the arrangement the prototype and the frames draw */
     display: inline-flex;
-    /* layout: the chevron centred on its box, wider than it */
     justify-content: center;
     /* raw: the advance of the "›" it replaced, measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
     inline-size: 0.4284em;
-    /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-2xs);
     opacity: 0.6;
     rotate: -90deg;
@@ -58,9 +51,7 @@
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */
   .trail :is(a, .back) {
     transition: color var(--motion-fast) var(--ease-standard);
-    /* layout: a step's words centred in its 24 px target */
     display: inline-flex;
-    /* layout: a step's words centred in its 24 px target */
     align-items: center;
     min-block-size: var(--control-xs);
     color: inherit;
@@ -76,9 +67,7 @@
 
   /* The arrow back: the design system's arrow turned round, which turns with the text's direction, a step before the words. */
   .arrow {
-    /* layout: the icon in the step's line */
     display: inline-flex;
-    /* layout: a step between the arrow and the words */
     margin-inline-end: var(--space-3xs);
     rotate: 180deg;
   }

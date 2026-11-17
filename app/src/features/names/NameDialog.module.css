@@ -18,7 +18,6 @@
   }
 
   .state {
-    /* layout: a state's words keep the dialog's width and break where they must */
     overflow-wrap: anywhere;
   }
 

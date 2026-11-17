@@ -23,20 +23,15 @@
       --_inset: var(--space-s);
 
       max-inline-size: none;
-      /* layout: the plate and the foot in one column */
       display: flex;
-      /* layout: stacked */
       flex-direction: column;
-      /* layout: the plate and the foot a step apart */
       row-gap: var(--space-s);
       /* The sheet's box reaches the screen's edges by one inset, inside its clip, where the plate's fill ends. */
-      /* layout: out to the screen's edge */
       margin-inline: calc(-1 * var(--_inset));
       padding-inline: var(--_inset);
     }
 
     .sheet [data-look="plate"] {
-      /* layout: the fill out to the screen's edge */
       margin-inline: calc(-1 * var(--_inset));
     }
 
@@ -73,7 +68,6 @@
     .swipe dialog > * {
       /* raw: the narrow plate's own width, Panel's 37.5 rem container query, less the sheet's two insets */
       max-inline-size: calc(37.5rem - 2 * var(--space-s));
-      /* layout: the column centred */
       margin-inline: auto;
     }
   }
@@ -86,10 +80,8 @@
   /* The textures' credit at the sheet's foot: a plain muted link-look button, a 44 px row. */
   .credits {
     min-block-size: var(--control-m);
-    /* layout: the credits right under the links */
     margin-block-start: calc(-1 * var(--space-s));
     color: var(--color-text-muted);
-    /* layout: the credits' words on the foot's left line, as wide as they are */
     align-self: flex-start;
   }
 }

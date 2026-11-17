@@ -19,7 +19,6 @@
 
   /* The tags on one line that scrolls across on a phone (the design system's scroll-row), sharing a middle. */
   .row {
-    /* layout: they share a middle */
     align-items: center;
   }
 
@@ -30,9 +29,7 @@
 
   .tag,
   .more > button {
-    /* layout: a tag keeps its width, the row scrolling instead */
     flex: none;
-    /* layout: the tag's parts apart */
     gap: var(--space-2xs);
     block-size: var(--control-m);
     padding-inline: var(--space-xs);
@@ -47,7 +44,6 @@
 
   /* More's menu, its trigger a tag of the row. */
   .more {
-    /* layout: its trigger an item of the row */
     display: contents;
   }
 

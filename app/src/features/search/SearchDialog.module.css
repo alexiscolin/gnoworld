@@ -4,11 +4,8 @@
   .palette {
     /* the dialog's surface keeps a line whole: the words wrap here, and a row's name cuts itself */
     white-space: normal;
-    /* layout: the field on top, the sheet's body under it */
     display: grid;
-    /* layout: the body takes the room left */
     grid-template-rows: auto minmax(0, 1fr);
-    /* layout: the palette's own arrangement */
     row-gap: var(--space-s);
     /* raw: the sheet's height, which the body scrolls inside */
     block-size: min(680px, 80dvb);
@@ -16,21 +13,16 @@
   }
 
   .body {
-    /* layout: the results beside the preview */
     display: grid;
-    /* layout: the results take the room, the preview Discover's detail's measure, so the filters and the sort hold one line */
+    /* Results take the room; the preview is Discover's detail measure, so the filters and the sort hold one line */
     grid-template-columns: minmax(0, 1fr) var(--column-l);
     min-block-size: 0;
   }
 
   .left {
-    /* layout: the chips, the results in the room left, the hints */
     display: grid;
-    /* layout: the results take the room left */
     grid-template-rows: auto minmax(0, 1fr) auto;
-    /* layout: one column the width of the region, whatever a row's words are */
     grid-template-columns: minmax(0, 1fr);
-    /* layout: the palette's own arrangement */
     row-gap: var(--space-xs);
     min-inline-size: 0;
     min-block-size: 0;
@@ -38,14 +30,11 @@
   }
 
   .head {
-    /* layout: the kinds, then the chips and the sort */
     display: grid;
-    /* layout: the palette's own arrangement */
     row-gap: var(--space-2xs);
   }
 
   .results {
-    /* layout: the list fills the room left and scrolls inside it */
     display: grid;
     min-block-size: 0;
   }
@@ -56,7 +45,6 @@
   }
 
   .more {
-    /* layout: a line of its own under the rows */
     margin: 0;
     padding: var(--space-xs);
   }
@@ -67,13 +55,9 @@
   }
 
   .row {
-    /* layout: the planet, the words, the marks */
     display: grid;
-    /* layout: the words take the room */
     grid-template-columns: auto minmax(0, 1fr) auto;
-    /* layout: the palette's own arrangement */
     place-items: center start;
-    /* layout: the palette's own arrangement */
     gap: var(--space-xs);
     padding: var(--space-2xs) var(--space-xs);
     border-radius: var(--radius-m);
@@ -92,7 +76,6 @@
   }
 
   .words {
-    /* layout: the name over its line */
     display: grid;
     min-inline-size: 0;
   }
@@ -133,14 +116,10 @@
   }
 
   .preview {
-    /* layout: the portrait, then its words and actions, from the top */
     display: grid;
-    /* layout: the palette's own arrangement */
     align-content: start;
-    /* layout: the preview's column is its width, whatever its words are */
     grid-template-columns: minmax(0, 1fr);
 
-    /* layout: the palette's own arrangement */
     gap: var(--space-s);
     min-inline-size: 0;
     overflow: auto;
@@ -158,29 +137,22 @@
   }
 
   .title {
-    /* layout: the palette's own arrangement */
     margin: 0;
   }
 
   .description {
-    /* layout: the palette's own arrangement */
     margin: 0;
     color: var(--color-text-muted);
   }
 
   .stats {
-    /* layout: the people, then the lines a day */
     display: flex;
-    /* layout: the palette's own arrangement */
     gap: var(--space-s);
-    /* layout: the paragraph's own margin goes */
     margin: 0;
   }
 
   .lines {
-    /* layout: the last lines, one under the other, in a box */
     display: grid;
-    /* layout: the palette's own arrangement */
     gap: var(--space-xs);
     padding: var(--space-xs);
     border-radius: var(--radius-m);
@@ -207,16 +179,14 @@
   /* A phone: the filter chips and the sort on two lines, never the select over the chips' cut end. */
   @media (width < 900px) {
     .filterRow {
-      /* layout: the chips' row over the sort */
       flex-direction: column;
-      /* layout: each part the row's whole width */
       align-items: stretch;
     }
 
     .filterRow > * {
-      /* layout: each part its own height, none grown or squeezed by the side-by-side rule */
+      /* Each part keeps its own height, none grown or squeezed by the side-by-side rule */
       flex: none;
-      /* layout: a long row may be narrower than its chips: it scrolls inside */
+      /* A long row may be narrower than its chips: it scrolls inside */
       min-inline-size: 0;
     }
   }
@@ -224,7 +194,6 @@
   /* A phone has the results alone, in one column (a landscape phone included: the preview needs 900 px). */
   @media (width < 900px) {
     .body {
-      /* layout: the palette's own arrangement */
       grid-template-columns: minmax(0, 1fr);
     }
 
@@ -237,19 +206,18 @@
     }
 
     .head {
-      /* layout: the head's one track is the screen's width, so the chip rows scroll inside it (their end fades), not past it */
+      /* The head's one track is the screen's width, so the chip rows scroll inside it (their end fades), not past it */
       grid-template-columns: minmax(0, 1fr);
     }
 
     .results {
-      /* layout: the rows end the list, so the hand-off follows the last row and the keyboard does not cover it */
+      /* The rows end the list, so the hand-off follows the last row and the keyboard does not cover it */
       align-content: start;
     }
 
     /* One left edge: the kickers, the leads and the trails on the sheet's 16 px inset, every row's words after one 32 px lead, the
        chosen row's fill out to the screen's edges. */
     .listbox {
-      /* layout: the list out to the screen's edges, by the sheet's inset */
       margin-inline: calc(-1 * var(--space-s));
     }
 
@@ -258,21 +226,18 @@
     }
 
     .row {
-      /* layout: a lead of one width for a planet, a face and a room's #, so the words share one line */
+      /* A lead of one width for a planet, a face and a room's #, so the words share one line */
       grid-template-columns: var(--thumb-s) minmax(0, 1fr) auto;
       padding-inline: var(--space-s);
       border-radius: 0;
     }
 
     .row > :first-child {
-      /* layout: a smaller lead (a room's #) centred in its column */
       justify-self: center;
     }
 
     .handOff {
-      /* layout: the hand-off's row edge to edge, as the list's */
       inline-size: calc(100% + 2 * var(--space-s));
-      /* layout: out to the screen's edges, as the list */
       margin-inline: calc(-1 * var(--space-s));
     }
   }
@@ -280,7 +245,6 @@
   /* A phone tall enough shows the sort on a line of its own under the kinds, never beside them. */
   @media (width < 900px) and (height >= 500px) {
     .head > :first-child > :last-child {
-      /* layout: the sort a line of its own */
       flex-basis: 100%;
     }
   }

@@ -21,7 +21,6 @@
 
     /* A row of them that wraps leaves no lone link on a row far from the rest. */
     :has(> li > a.out) {
-      /* layout: the wrapped rows a step apart */
       row-gap: var(--space-2xs);
     }
   }

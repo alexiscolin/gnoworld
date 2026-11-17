@@ -5,12 +5,11 @@
     color: var(--color-signal);
     font: var(--font-meta);
     white-space: nowrap;
-    /* layout: a small step after the line's last word, more than a space */
     margin-inline-start: var(--space-3xs);
   }
 
   .mark svg {
-    /* layout: the reset draws an svg as a block; inside the line's words the icon stays on the mark's line */
+    /* The reset draws an svg as a block; inline-block keeps the icon on the mark's line inside the words */
     display: inline-block;
     /* raw: the small icon's middle on the meta's middle, inside the line's words */
     vertical-align: -0.125em;

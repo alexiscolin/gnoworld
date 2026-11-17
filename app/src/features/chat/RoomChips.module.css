@@ -1,7 +1,6 @@
 /* The dock's rooms as a row of pills: ui's Chip at the design's 27 px, the one in view cream, a count after its name. */
 @layer components {
   .row {
-    /* layout: kept to its own height above the lines, at the lines' inset, a step of its own fill under the pills */
     flex: none;
     padding: var(--space-xs) var(--chat-inset);
     /* held over the lines that scroll up under it by `held-top` (utilities.css): none shows through the pills */
@@ -19,7 +18,7 @@
   }
 
   .row li {
-    /* layout: a pill keeps its width, so a row too narrow sends the last ones out (data-away), never two lines */
+    /* A pill keeps its width: a row too narrow sends the last ones out (data-away), never two lines */
     flex: none;
   }
 
@@ -28,12 +27,11 @@
   }
 
   li[data-make] {
-    /* layout: the new room's plus at the row's far end */
     margin-inline-start: auto;
   }
 
   .row ul {
-    /* layout: one line whatever the rooms' number; what does not fit waits out of the flow */
+    /* One line whatever the rooms' number; what does not fit waits out of the flow */
     overflow: hidden;
   }
 
@@ -50,7 +48,7 @@
 @layer components {
   @media (width < 900px) {
     .row ul {
-      /* layout: the width cut as before, the 44 px boxes over and under the pills kept */
+      /* Width cut as before, the 44 px boxes over and under the pills kept */
       overflow: clip visible;
     }
 

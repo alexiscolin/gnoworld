@@ -149,7 +149,6 @@
   /* A phone's cell holds no wider than its columns: a long legend or row wraps or is cut in its card, never carried past it. */
   @media (width < 900px) {
     .grid[data-cols="12"] > [data-span] {
-      /* layout: the cell may shrink below its content's minimum */
       min-inline-size: 0;
     }
   }

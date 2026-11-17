@@ -2,13 +2,9 @@
    its end, the reader's own edged in mint. */
 @layer components {
   .bar {
-    /* layout: the fill behind the answer and its share */
     position: relative;
-    /* layout: the answer at the start, its share at the end */
     display: grid;
-    /* layout: the answer at the start, its share at the end */
     grid-template-columns: 1fr auto;
-    /* layout: the one row of words on the bar's middle */
     align-content: center;
     inline-size: 100%;
     /* raw: the design's bar, 36 px high */
@@ -27,7 +23,6 @@
   .fill {
     --_share: 0%;
 
-    /* layout: the share of the bar from its start, behind its words */
     position: absolute;
     inset: 0 auto 0 0;
     inline-size: var(--_share);
@@ -35,14 +30,11 @@
   }
 
   .answer {
-    /* layout: over the fill */
     position: relative;
-    /* layout: at the bar's start, as the design */
     justify-self: start;
   }
 
   .share {
-    /* layout: over the fill */
     position: relative;
     font-variant-numeric: tabular-nums;
   }

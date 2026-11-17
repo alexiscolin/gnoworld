@@ -4,9 +4,7 @@
 @layer components {
   .row {
     position: relative;
-    /* layout: the scrolling list, "All" its first item */
     display: flex;
-    /* layout: both start at the row's top, so the planets line up */
     align-items: flex-start;
     border-block-start: var(--line-width) solid var(--color-line);
     padding-block-end: env(safe-area-inset-bottom);
@@ -18,7 +16,6 @@
     --_from: 0px;
     /* raw: no fade till the row has more beyond that end */
     --_to: 0px;
-    /* layout: the row's whole width, narrower than its list */
     flex: 1;
     min-inline-size: 0;
     overflow: auto hidden;
@@ -47,7 +44,7 @@
     inset-block-start: calc(var(--space-xs) + var(--control-m) / 2);
     inset-inline-end: var(--space-s);
     translate: 0 -50%;
-    /* layout: the design system's chevron points down; turned to point toward the end, either way of reading */
+    /* The design system's chevron points down; turned toward the end, either reading direction */
     rotate: calc(-90deg * var(--dir));
     color: var(--color-text);
     visibility: hidden;
@@ -71,14 +68,11 @@
   }
 
   .list {
-    /* layout: one line of worlds a step apart; the first clears the screen's edge, the ring has room above and below */
     display: flex;
-    /* layout: a step between the worlds */
     gap: var(--space-2xs);
-    /* layout: the list's own margin gone */
     margin: 0;
     padding-block: var(--space-xs) var(--space-2xs);
-    /* layout: the first disc, centred in its item, on the screen's 16 px line */
+    /* Puts the first disc, centred in its item, on the screen's 16 px line */
     padding-inline: calc(var(--space-s) - (var(--thumb-l) - var(--control-m)) / 2);
     list-style: none;
     inline-size: max-content;
@@ -103,7 +97,7 @@
   /* The planet's box (the column's 44 px, Worlds.module.css), centred in the item; the pill stands at its corner. */
   .disc {
     position: relative;
-    /* layout: centred in the item by its text-align, the pill standing off its corner */
+    /* Centred in the item by its text-align, the pill standing off its corner */
     display: inline-block;
     vertical-align: top;
     inline-size: var(--control-m);
@@ -113,7 +107,7 @@
 
   /* "All" is a grid (the utility that centres its icon), so a block: centred in its item as the planets' inline discs are. */
   .all {
-    /* layout: a block in its item, centred as the planets' inline discs are by the item's text-align */
+    /* A block in its item, centred as the planets' inline discs are by the item's text-align */
     margin-inline: auto;
   }
 
@@ -125,7 +119,6 @@
 
   .name {
     display: block;
-    /* layout: the name under its planet */
     margin-block-start: var(--space-2xs);
   }
 

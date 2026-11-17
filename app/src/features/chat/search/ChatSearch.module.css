@@ -50,18 +50,13 @@
   }
 
   .row {
-    /* layout: the head over the words */
     display: grid;
-    /* layout: a step between the head and the words */
     gap: var(--space-3xs);
   }
 
   .top {
-    /* layout: who and where at the start, the time at the end */
     display: flex;
-    /* layout: the time at the far end */
     justify-content: space-between;
-    /* layout: a step between them */
     gap: var(--space-2xs);
   }
 

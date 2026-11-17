@@ -1,7 +1,6 @@
 /* A guest's place of the composer: inside the composer's own box (MessageBox.module.css), its words and the way in. */
 @layer components {
   .inner {
-    /* layout: across the box's three columns */
     grid-column: 1 / -1;
     padding: var(--space-s);
   }
@@ -19,7 +18,6 @@
   /* A phone's way in: one line, Connect Adena small at its end; its 44 px target is the hit box small buttons take (utilities.css). */
   @media (width < 900px) {
     .way {
-      /* layout: the note gives way, the control keeps its width */
       min-inline-size: 0;
     }
   }

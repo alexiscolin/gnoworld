@@ -2,15 +2,12 @@
    what is around it. The page lays it out only once space is on: until then the plate stands whole and no room is kept. */
 @layer components {
   .globe {
-    /* layout: what stands round the planet (the proposal's ring) is placed from its box */
     position: relative;
     display: none;
     /* raw: the ring reaches 1.106 radii of the globe, and keeps a step of space from the window's edge */
     inline-size: min(calc((100vi - 2 * var(--space-s)) / 1.106), 56vb);
     aspect-ratio: 1;
-    /* layout: over the plate, clear of the header */
     margin-block: var(--space-xl) var(--space-l);
-    /* layout: centred in the page, over the plate */
     margin-inline: auto;
     pointer-events: none;
   }
@@ -87,7 +84,6 @@
       inset-block-start: calc(var(--_middle) - var(--_radius));
       inset-inline-start: calc(var(--_x) - var(--_radius));
       inline-size: calc(2 * var(--_radius));
-      /* layout: fixed in the free area, it keeps no margin of its own */
       margin: 0;
     }
 

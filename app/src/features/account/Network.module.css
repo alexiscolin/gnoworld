@@ -2,9 +2,7 @@
 @layer components {
   .network,
   .inPill {
-    /* layout: the name, the icon and the chip on a line */
     display: inline-flex;
-    /* layout: they share a middle */
     align-items: center;
     color: var(--color-text-muted);
     font: var(--font-ui);
@@ -27,14 +25,12 @@
 
   @media (width >= 900px) {
     .inPill {
-      /* layout: the name, the icon and the chip on a line */
       display: inline-flex;
     }
 
     /* The thin divider the pill's control and the network share. */
     .inPill::before {
       content: "";
-      /* layout: as high as the chip beside the name */
       block-size: 1lh;
       border-inline-start: var(--line-width) solid var(--color-line-strong);
     }
@@ -46,13 +42,11 @@
 
   /* The warning icon and its chip on a line (the with-icon utility), off the network's name. */
   .caution {
-    /* layout: the arrangement the prototype and the frames draw */
     margin-inline-start: var(--space-2xs);
     color: var(--color-warm);
   }
 
   .inPill .caution {
-    /* layout: the pill's end, as the button's own padding */
     margin-inline-end: var(--space-s);
   }
 }

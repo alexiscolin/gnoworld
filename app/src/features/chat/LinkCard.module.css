@@ -10,7 +10,7 @@
   }
 
   .picture {
-    /* layout: an image sits on its line's baseline, leaving a gap under it */
+    /* An image on the baseline leaves a gap under it */
     vertical-align: top;
     inline-size: 100%;
     block-size: auto;

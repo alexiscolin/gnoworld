@@ -2,12 +2,9 @@
    line at its right, then two actions of 52 px; a block in the page on a phone and on a screen too short to hold it over the page. */
 @layer components {
   .hero {
-    /* layout: the kicker, the number and the row, one under the other */
     display: flex;
-    /* layout: the arrangement the prototype and the frames draw */
     flex-direction: column;
     /* raw: 22 px between them (the prototype's #hero) */
-    /* layout: the arrangement the prototype and the frames draw */
     gap: 22px;
     /* raw: the number's 88 px to 176 px, 11vi between (the prototype's #hero .num); a system's name keeps its room */
     --_size: clamp(88px, 11vi, 176px);
@@ -20,14 +17,10 @@
 
   /* The number or a system's name, its line at its right at its foot; under it where there is no room. */
   .head {
-    /* layout: the number and its line on one row, the line under it when the row is full */
     display: flex;
-    /* layout: the line wraps under the name it has no room beside */
     flex-wrap: wrap;
-    /* layout: the line at the number's foot */
     align-items: flex-end;
     /* raw: the line 28 px off the number, the prototype's between the line and the actions; 22 px under it, the hero's */
-    /* layout: the arrangement the prototype and the frames draw */
     gap: 22px 28px;
   }
 
@@ -36,7 +29,6 @@
     /* raw: the name's letters, counted by the page; ten where it counts none */
     --_chars: 10;
 
-    /* layout: a heading with no margin of its own */
     margin-block: 0;
     font-family: var(--family-sans);
     /* raw: 56 px to 112 px, 7vi between, under a thousand pixels shared among its letters */
@@ -51,7 +43,6 @@
   }
 
   .hero p {
-    /* layout: a paragraph with no margin of its own: the hero spaces it */
     margin-block: 0;
   }
 
@@ -67,17 +58,13 @@
 
   /* At the number's right: the line over the actions. */
   .beside {
-    /* layout: the line over the actions */
     display: flex;
-    /* layout: the line over the actions */
     flex-direction: column;
-    /* layout: the line a step over the actions */
     gap: var(--space-s);
   }
 
   /* Who is here, live: the mint of "ONLINE", larger than a kicker, a dot beating slowly beside it; still under reduced motion. */
   .online {
-    /* layout: the dot a step from the words */
     gap: var(--space-2xs);
     color: var(--color-mine);
     /* raw: 13 px mono, a step over the kicker's, tracked as the design's word */
@@ -121,31 +108,23 @@
   /* The page's heading is the line's count, inline in it, in the line's own size: no margin, no heading size (ADR-0003, 2a). */
   .heading {
     display: inline;
-    /* layout: a heading with no margin of its own, inline in the line */
     margin-block: 0;
     font: inherit;
     letter-spacing: inherit;
   }
 
   .actions {
-    /* layout: the two actions side by side */
     display: flex;
     /* raw: 10 px between them (the prototype's #hero .cta) */
-    /* layout: the arrangement the prototype and the frames draw */
     gap: 10px;
   }
 
   .action {
-    /* layout: the label and its arrow in a row, centred */
     display: inline-grid;
-    /* layout: the label and its arrow in a row */
     grid-auto-flow: column;
-    /* layout: the label and its arrow share a middle */
     align-items: center;
-    /* layout: the content in the middle of the action */
     justify-content: center;
     /* raw: 10 px between the label and its arrow (the prototype's #hero .cta .link) */
-    /* layout: the arrangement the prototype and the frames draw */
     gap: 10px;
     /* raw: the action is 52 px tall, 48 on a phone (the prototype's #hero .cta .link, lines 543 and 772) */
     block-size: 52px;
@@ -170,7 +149,6 @@
   }
 
   .worlds {
-    /* layout: the list stands off the hero above it when the page holds them in a column */
     margin-block-start: var(--space-s);
     /* "View in space" stands over a phone's foot: the last link scrolls above it. */
     padding-block-end: calc(var(--space-xl) + var(--control-m) + var(--space-s));
@@ -180,7 +158,6 @@
   .worlds ul {
     padding-inline-start: 0;
     list-style-type: none;
-    /* layout: the list's own margin, which the browser gives it, taken off */
     margin-block: 0;
   }
 
@@ -192,7 +169,7 @@
 
   /* ADR-0003, 2d: the list's kicker, over its first link. */
   .worlds > p {
-    /* layout: the kicker's own line, its first link's line box under it (mock-ups 2 to 4: 13 px between) */
+    /* The kicker's own line, its first link's line box under it (mock-ups 2 to 4: 13 px between) */
     margin-block: 0;
     color: var(--color-text-muted);
   }
@@ -267,7 +244,7 @@
     }
 
     .worlds {
-      /* layout: no offset from the hero: the list is fixed at the top, the hero at the foot */
+      /* No offset from the hero: the list is fixed at the top, the hero at the foot */
       margin-block-start: 0;
       padding-block-end: 0;
       position: fixed;

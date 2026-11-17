@@ -64,9 +64,7 @@
     position: absolute;
     inset-block-start: calc(-1 * var(--space-3xs));
     inset-inline-end: calc(-1 * var(--space-3xs));
-    /* layout: the figure centred in the pill */
     display: grid;
-    /* layout: the figure centred in the pill */
     place-items: center;
     block-size: var(--size-counter);
     min-inline-size: var(--size-counter);
@@ -80,7 +78,7 @@
 
   .remove {
     position: absolute;
-    /* layout: the planet's corner, past its ring, which stands 3 px off */
+    /* The planet's corner, past its ring, which stands 3 px off */
     inset-block-start: calc(-1 * var(--space-2xs));
     inset-inline-end: calc(-1 * var(--space-2xs));
     opacity: 0;
@@ -95,7 +93,6 @@
   .rule {
     /* raw: half a planet's width */
     inline-size: 22px;
-    /* layout: centred in the column, a step from the planets round it */
     margin: var(--space-xs) auto;
     border: 0;
     border-block-start: calc(2 * var(--line-width)) solid var(--color-line);
@@ -104,7 +101,6 @@
   /* The textures' credit at the column's foot, in the label style, muted; its padding makes a target of 24 px at least. */
   .credits {
     display: block;
-    /* layout: pushed to the column's foot */
     margin-block-start: auto;
     inline-size: 100%;
     padding-block: var(--space-2xs);
@@ -130,7 +126,6 @@
 
   .rowBody {
     font: var(--font-ui);
-    /* layout: the control's height, whatever the name's line */
     min-block-size: var(--control-m);
     padding-inline: var(--space-s);
   }
@@ -145,7 +140,6 @@
 
   /* The planet a small control's size, not the column's 44 px */
   .row .planet {
-    /* layout: it keeps its size beside the name that gives way */
     flex-shrink: 0;
     inline-size: var(--control-s);
     block-size: var(--control-s);
@@ -154,7 +148,6 @@
   /* The pill ends the row instead of hanging off a planet's corner. */
   .row .pill {
     position: static;
-    /* layout: at the row's end */
     margin-inline-start: auto;
   }
 

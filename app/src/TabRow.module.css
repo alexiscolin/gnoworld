@@ -2,7 +2,7 @@
    not read yet keep the height of what comes. */
 @layer components {
   .tabs {
-    /* layout: the tabs stay at the row's end, even when they wrap under the figures */
+    /* Tabs stay at the row's end even when they wrap under the figures */
     margin-inline-start: auto;
   }
 

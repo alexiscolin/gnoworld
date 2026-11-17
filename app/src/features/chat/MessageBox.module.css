@@ -3,22 +3,19 @@
   /* The composer's one box (the design.58.01, prototype index.html:196-224): three rows, the format bar, the field and the
      foot. The field draws no edge of its own; its label is for assistive technology alone, the placeholder's job. */
   .box {
-    /* layout: three rows on one grid, so the field's words, which the field draws itself, sit in the foot's row */
+    /* Three rows on one grid so the field's own words sit in the foot's row */
     display: grid;
-    /* layout: the box's own width says how much of the format bar fits */
     container-type: inline-size;
-    /* layout: the words that take what is left, Send */
     grid-template-columns: minmax(0, 1fr) auto;
     border-radius: var(--radius-box);
     background: var(--color-fill);
-    /* layout: the box's words' inset from its edge, 16 px, or what its dock gives (QuickActions.module.css), which also widens the box past the dock's inset */
+    /* The words' inset from the box edge: 16 px, or what the dock gives (QuickActions.module.css), which also widens the box */
     --_in: var(--box-in);
-    /* layout: out past the column's inset by what the dock gives, none in a thread's */
     margin-inline: calc(-1 * var(--box-bleed));
   }
 
   .box:has(.suggestions) {
-    /* layout: the box anchors the suggestions that stand above it, out of its rows */
+    /* Anchors the suggestions that stand above the box, out of its rows */
     position: relative;
   }
 
@@ -36,9 +33,8 @@
 
   /* The format bar: small, in a row of its own under a rule. */
   .format {
-    /* layout: across the box's three columns, on its first row */
     grid-column: 1 / -1;
-    /* layout: the field's words' inset less the first tool's own, so the tools stand on the words' line, the rule between them and the field */
+    /* The words' inset less the first tool's own, so the tools stand on the words' line */
     margin-inline: calc(var(--_in) - var(--space-2xs));
     padding-block: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
@@ -55,14 +51,13 @@
   /* The field's wrapper and the field's own column dissolve, so its box and its words are the grid's. */
   .field,
   .field > div {
-    /* layout: the field's parts join the box's grid */
+    /* The field's parts join the box's grid */
     display: contents;
   }
 
   .box [role="textbox"],
   .box [role="textbox"] + [aria-hidden="true"],
   .box .field textarea {
-    /* layout: across the box, on the second row, two lines high until it grows */
     grid-area: 2 / 1 / auto / -1;
     min-block-size: calc(2lh + var(--space-s));
     padding-block: var(--space-xs) var(--space-3xs);
@@ -75,18 +70,14 @@
 
   /* What the field says of the draft, or why it cannot go (the design system's FieldWords, in this wrapper), at the foot's end, before Send. */
   .words {
-    /* layout: in the foot's row, against Send */
     grid-area: 3 / 1;
-    /* layout: against Send, level with it */
     place-self: center end;
-    /* layout: a step from the box's edge and from Send */
     margin-inline: var(--space-2xs);
   }
 
   /* The suggestions over the box, across it. Out of the grid's flow: as a grid item they took the first row, which pushed the format bar
      under the foot and gave that row the list's height. */
   .suggestions {
-    /* layout: above the box's top edge, a step from it, as wide as the box */
     position: absolute;
     inset-inline: 0;
     inset-block-end: calc(100% + var(--space-2xs));
@@ -96,15 +87,11 @@
 
   /* The quick actions' / at the foot's start, level with Send. */
   .acts {
-    /* layout: the foot's row, at its start, the field's words at its end */
     grid-area: 3 / 1;
-    /* layout: level with Send */
     place-self: center start;
-    /* layout: the quick actions' / and the Jarvis button side by side */
     display: flex;
-    /* layout: level with each other */
     align-items: center;
-    /* layout: the field's words' inset less the button's own, so its / stands on the words' line */
+    /* The words' inset less the button's own, so its / stands on the words' line */
     margin: var(--space-3xs) 0 var(--space-2xs) calc(var(--_in) - var(--space-2xs));
   }
 
@@ -120,14 +107,12 @@
 
   /* Send: IconButton's solid, round, at the foot's end; its arrow points up, as the design's does. */
   .send {
-    /* layout: the foot's row, its last column */
     grid-area: 3 / 2;
-    /* layout: a step from the box's edge and from the words beside it */
     margin: var(--space-3xs) var(--space-2xs) var(--space-2xs) 0;
   }
 
   .send svg {
-    /* layout: the arrow points up; the icon's own points along the text */
+    /* The arrow points up; the icon's own points along the text */
     rotate: -90deg;
   }
 }
@@ -153,7 +138,6 @@
     }
 
     .acts:has(> .fold) {
-      /* layout: the foot's controls in a row, as the quick actions' own */
       display: flex;
     }
 
@@ -195,12 +179,10 @@
     /* Send's step from the box's end and foot is the same focused or at rest, so it never moves as the box takes the focus; the foot's
        controls centre on it. */
     .send {
-      /* layout: the foot's step in */
       margin: var(--space-3xs) var(--space-xs) var(--space-xs) 0;
     }
 
     .acts {
-      /* layout: the same foot as Send's */
       margin-block-end: var(--space-xs);
     }
 
@@ -225,16 +207,12 @@
 
     /* An error or a count of the draft has a row of its own, which the foot's controls never share (Line 1 is too long by N bytes). */
     .words {
-      /* layout: under the foot, across the box, from the words' inset */
       grid-area: 4 / 1 / auto / -1;
-      /* layout: at the start of its row */
       place-self: center start;
-      /* layout: from the words' inset, a step off the box's end */
       margin-inline: var(--_in) var(--space-2xs);
     }
 
     .words > p {
-      /* layout: a step off the foot, and the box's edge below */
       margin-block: 0 var(--space-2xs);
     }
 
@@ -294,16 +272,12 @@
     .box:not(:focus-within) [role="textbox"],
     .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
     .box:not(:focus-within) .field textarea {
-      /* layout: beside Send, not over its row */
       grid-area: 2 / 1;
     }
 
     .box:not(:focus-within) .send {
-      /* layout: Send beside the field, level with it, its edge a step in */
       grid-area: 2 / 2;
-      /* layout: level with the field's foot, where its last line is */
       align-self: end;
-      /* layout: the same step in from the box's end and its foot, inside its edge */
       margin: 0 var(--space-xs) var(--space-xs) 0;
     }
 
@@ -318,16 +292,12 @@
     }
 
     [data-guest] .box:focus-within :is([role="textbox"], .field textarea) {
-      /* layout: beside Send, in the one row */
       grid-area: 2 / 1;
     }
 
     [data-guest] .box:focus-within .send {
-      /* layout: beside the field */
       grid-area: 2 / 2;
-      /* layout: level with its last line */
       align-self: end;
-      /* layout: the rest's step in */
       margin: 0 var(--space-xs) var(--space-xs) 0;
     }
   }
@@ -338,7 +308,6 @@
     .box [role="textbox"] + [aria-hidden="true"],
     .box .field textarea {
       min-block-size: calc(1lh + var(--space-s) + var(--space-2xs));
-      /* layout: beside Send, not over its row: the box is one row high */
       grid-area: 2 / 1;
     }
 
@@ -346,20 +315,16 @@
     .box:not(:focus-within) .send,
     .box:focus-within .send,
     [data-guest] .box:focus-within .send {
-      /* layout: a step from the box's top and foot, the one line level with it */
       margin: var(--space-2xs) var(--space-2xs) var(--space-2xs) 0;
     }
 
     .box [role="textbox"],
     .box .field textarea {
-      /* layout: level with Send */
       align-self: center;
     }
 
     .send {
-      /* layout: Send beside the field, level with the box's foot, so the foot's row of its own is gone */
       grid-area: 2 / 2;
-      /* layout: against the box's foot */
       align-self: end;
     }
   }

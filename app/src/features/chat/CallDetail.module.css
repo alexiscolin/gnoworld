@@ -1,13 +1,12 @@
 @layer components {
   .detail {
-    /* layout: the panel sets the width; a long value wraps inside it */
+    /* The panel sets the width; min-inline-size 0 lets a long value wrap inside it */
     min-inline-size: 0;
   }
 
   .data {
     font: var(--font-data);
     color: var(--color-text);
-    /* layout: a long unbroken value wraps inside the panel */
     overflow-wrap: anywhere;
   }
 

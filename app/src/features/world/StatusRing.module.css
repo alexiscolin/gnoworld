@@ -7,7 +7,7 @@
     overflow: visible;
     pointer-events: none;
     fill: none;
-    /* layout: the arcs start at the top and go clockwise */
+    /* The arcs start at the top and go clockwise */
     rotate: -90deg;
   }
 

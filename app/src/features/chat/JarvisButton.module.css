@@ -2,7 +2,6 @@
    as it comes. */
 @layer components {
   .jarvis {
-    /* layout: beside the quick actions' button in the foot's row */
     display: inline-flex;
     animation: jarvis-in var(--motion-base) ease-out;
   }

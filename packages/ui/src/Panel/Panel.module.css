@@ -109,7 +109,6 @@
   /* raw: under the plate's breakpoint the plate is a block of the page: the bottom nav and the "View in space" pill stand over its last lines */
   @media (width < 1280px) {
     .panel[data-look="plate"] {
-      /* layout: room under its last line for them */
       padding-block-end: var(--space-2xl);
     }
   }
@@ -119,7 +118,7 @@
     .panel[data-look="plate"] {
       border: 0;
       border-radius: 0;
-      /* layout: out to the screen's edges, past the page column's gutter (shell.tsx's Center, its default step) */
+      /* Out to the screen's edges, past the page column's gutter (shell.tsx's Center, its default step) */
       margin-inline: calc(-1 * var(--space-s));
     }
 

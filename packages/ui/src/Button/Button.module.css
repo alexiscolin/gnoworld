@@ -164,7 +164,6 @@
   }
 
   .square {
-    /* layout: the icon sits in the middle of its square */
     justify-content: center;
     position: relative;
     min-inline-size: var(--_h);

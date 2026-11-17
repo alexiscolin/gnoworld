@@ -2,17 +2,13 @@
    centred (the prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). The quick actions are the composer's +. */
 @layer components {
   .bar {
-    /* layout: the pills side by side, sharing the row; no composition lets each child grow by its own width */
     display: flex;
-    /* layout: the pills that do not fit go to a line of their own, never off the dock */
     flex-wrap: wrap;
-    /* layout: a step between the pills */
     gap: var(--space-2xs);
     padding-block-end: var(--space-s);
   }
 
   .pinned > * {
-    /* layout: each pill grows from its words' width to share what the row has left */
     flex: 1 0 auto;
     block-size: var(--control-s);
     padding-inline: var(--space-xs);
@@ -30,13 +26,11 @@
 
   /* A world's pinned actions come from another feature's code, a button or a link: the row gives each the pill's look. */
   .pinned {
-    /* layout: the pinned pills are the row's own children */
     display: contents;
   }
 
   /* A pinned action of more fields is a link to the realm view: its words centred and coloured as a button's. */
   .pinned > a {
-    /* layout: the words in the middle of the pill, as a button sets them */
     align-content: center;
     text-align: center;
     color: inherit;
@@ -49,7 +43,7 @@
     padding-block: var(--space-s) calc(var(--space-s) + var(--space-3xs));
     padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);
-    /* layout: the composer's box, wider than the dock's inset: a step off the edge, its words (not its edge) on the lines' left (MessageBox.module.css) */
+    /* The composer box, wider than the dock's inset: its words (not its edge) on the lines' left (MessageBox.module.css) */
     --box-bleed: calc(var(--chat-inset) - var(--space-2xs));
     --box-in: calc(max(var(--chat-inset), var(--space-l)) - var(--space-2xs) - var(--line-width));
   }
@@ -70,13 +64,12 @@
 
     /* The pills stay on one line that scrolls across inside the bar (no bar drawn), never a second row. */
     .bar {
-      /* layout: one line, the cut pill saying there is more */
       flex-wrap: nowrap;
       overflow: auto hidden;
       /* Room inside the clip for a pill's focus ring, taken back outside. */
       padding-inline: var(--space-3xs);
       padding-block-start: var(--space-3xs);
-      /* layout: the room above given back, so the bar keeps its place */
+      /* Gives back the room above, so the bar keeps its place */
       margin: calc(-1 * var(--space-3xs)) calc(-1 * var(--space-3xs)) 0;
     }
 

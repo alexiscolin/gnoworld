@@ -57,11 +57,8 @@
 
   /* An act with an icon before its words; an irreversible one coral, its alert icon first. */
   .item:has(> svg) {
-    /* layout: the icon and the words on one line, as in a button */
     display: flex;
-    /* layout: the icon's distance from its words */
     gap: var(--space-2xs);
-    /* layout: the icon centred on the words' line */
     align-items: center;
   }
 
@@ -80,9 +77,8 @@
   }
 
   .soon {
-    /* layout: the chip at the row's end, after the words */
     margin-inline-start: auto;
-    /* layout: a gap off the words, kept where the row is as wide as its words */
+    /* A gap off the words, kept where the row is as wide as its words */
     padding-inline-start: var(--space-s);
   }
 
@@ -101,33 +97,28 @@
 
     .item:has(> svg),
     .item[role="menuitemradio"] {
-      /* layout: the icon's (or the check's) distance from its words, wider on a phone */
       gap: var(--space-xs);
     }
 
     .item[role="menuitemradio"] {
-      /* layout: the check's slot and the words on one line */
       display: flex;
-      /* layout: the check centred on the words' line */
       align-items: center;
     }
 
     .check {
-      /* layout: the slot is an icon wide, empty or not, so the words start at one x */
+      /* The slot is an icon wide, empty or not, so the words start at one x */
       display: inline-flex;
-      /* layout: it never shrinks under its icon */
       flex: none;
       inline-size: var(--icon-l);
     }
 
     /* One text line: a row with no icon or check steps in by their width when a sibling has one. */
     .panel[data-kind="menu"]:has(.item > svg, .check) .item:not(:has(> svg, .check)) {
-      /* layout: the words start where the icons' rows' words do */
+      /* The words start where the icons' rows' words do */
       padding-inline-start: calc(var(--space-xs) + var(--icon-l) + var(--space-xs));
     }
 
     .note {
-      /* layout: the rule under the note, apart from the first row */
       margin-block-end: var(--space-3xs);
       border-block-end: var(--line-width) solid var(--color-line);
     }
@@ -143,7 +134,6 @@
       .item:not([role="menuitemradio"]) + .item[role="menuitemradio"],
       .item[role="menuitemradio"] + .item:not([role="menuitemradio"]) {
         position: relative;
-        /* layout: room for the rule between the group and its neighbour */
         margin-block-start: calc(2 * var(--space-3xs) + var(--line-width));
       }
 
@@ -163,9 +153,8 @@
     .panel[data-kind="menu"] {
       --_w: calc(2 * var(--popover-w));
 
-      /* layout: two columns of rows, so no row is cut on a short screen */
+      /* Two columns of rows, so no row is cut on a short screen */
       columns: 2;
-      /* layout: the gap parts the groups */
       column-gap: var(--space-2xs);
     }
 
@@ -180,7 +169,6 @@
 
   .separator {
     block-size: var(--line-width);
-    /* layout: the rule apart from the rows on either side */
     margin-block: var(--space-3xs);
     background: var(--color-line);
   }

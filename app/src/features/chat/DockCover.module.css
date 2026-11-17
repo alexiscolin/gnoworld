@@ -2,7 +2,6 @@
    a fade out once the chat is settled. */
 @layer components {
   .cover {
-    /* layout: over the dock's whole box, the chat under it */
     position: absolute;
     inset-block: 0;
     inset-inline: 0;

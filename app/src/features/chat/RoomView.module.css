@@ -3,13 +3,10 @@
 @layer components {
   /* The conversation: a column that fills its region, the list in it scrolling alone (.fill) over the composer. */
   .main {
-    /* layout: the conversation fills the region the frame gives it, a column whose list is the only part that scrolls */
     display: flex;
-    /* layout: takes the region's height */
     flex-grow: 1;
-    /* layout: the pins, the lines and the composer one under the other */
     flex-direction: column;
-    /* layout: lets the column shrink below its content, so the list scrolls and the page does not */
+    /* Lets the column shrink below its content, so the list scrolls and the page does not */
     min-block-size: 0;
   }
 
@@ -26,21 +23,17 @@
   /* The bar asks the list's own width, not the page's (LineActions); the lines a step apart, as the design's are. */
   .lines {
     container-type: inline-size;
-    /* layout: the lines one under the other, a step apart, on the list itself, which a composition cannot name or label */
     display: flex;
-    /* layout: one under the other */
     flex-direction: column;
-    /* layout: no gap: each line holds its own room (its padding), so the pointer crosses from one to the next and to its bar without leaving a row */
+    /* No gap: each line holds its own padding, so the pointer crosses between lines and bar without leaving a row */
     gap: 0;
   }
 
   /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
      the page; the thread's list keeps its own height. */
   .fill {
-    /* layout: a list's own margin and marks, taken off as the reset takes a paragraph's */
     margin: 0;
     list-style: none;
-    /* layout: takes what the pins above and the composer below leave */
     flex: 1;
     min-block-size: 0;
     overflow: auto;
@@ -60,9 +53,8 @@
     /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (nine
        small controls and its inset) and the times' column it keeps clear, so the bar covers no word and no time. */
     --_gutter: calc(9 * var(--control-xs) + var(--chat-times));
-    /* layout: the line holds its bar (LineActions), placed over its end */
     position: relative;
-    /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
+    /* Room for the focus ring, drawn outside the line, which the scrolling list would clip */
     margin-inline: calc(var(--focus-width) + var(--focus-offset));
     padding-inline-end: var(--_gutter);
     /* a row to point at, as Slack's: its own room above and below its words, which the fill and the bar's overlap hold */
@@ -86,13 +78,9 @@
 
   /* A line's foot: its reactions at the start, its thread's chip at the end, on one row; no row when it holds neither. */
   .foot {
-    /* layout: the two on one row, the chips wrapping where they are many */
     display: flex;
-    /* layout: the same */
     flex-wrap: wrap;
-    /* layout: the same */
     align-items: center;
-    /* layout: a small step between the chips */
     gap: var(--space-3xs);
   }
 
@@ -101,13 +89,11 @@
   }
 
   .thread {
-    /* layout: at the line's end */
     margin-inline-start: auto;
   }
 
   /* The foot reaches the row's end, through the room the line keeps for its bar: the thread's chip under the time, not mid-row. */
   .lines > li > .foot {
-    /* layout: the same */
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
@@ -121,26 +107,23 @@
   /* A line that goes on its author's group (LineView's `grouped`): close under the one before it, a head of marks only; its time
      waits at the row's end under the heads' times, shown as the line is pointed at or holds the focus. */
   .lines > li[data-grouped] {
-    /* layout: nothing: a line of the group sits on its row's padding alone */
     margin-block-start: 0;
   }
 
   /* A line that opens a group stands a step under the one before it, as the design's lines do: the step less the two paddings. */
   .lines > li:not([data-grouped]) {
-    /* layout: the step the design puts between lines, less the paddings of the two rows */
     margin-block-start: calc(var(--space-s) - var(--space-3xs) * 2);
   }
 
   .lines > li:first-child {
-    /* layout: the first line takes no step: the list's padding is its room */
     margin-block-start: 0;
   }
 
   .groupTime {
     position: absolute;
-    /* layout: at the row's far end, where its head's time stands, so every time of the room is in one column */
+    /* At the row's far end, where its head's time stands, so every time is in one column */
     inset-inline-end: 0;
-    /* layout: on the text's first line, which the row's padding and the text's hair put under the row's top */
+    /* On the text's first line, which the row's padding and the text's hair put under the row's top */
     inset-block-start: calc(var(--space-3xs) + var(--space-3xs) / 2);
     color: var(--color-text-muted);
     /* the head's own time in mono on a line twice its size, the chat's text line within a pixel, so it stands on the text's first line */
@@ -156,7 +139,6 @@
   }
 
   .lines > li:last-child {
-    /* layout: room below the newest line for its focus ring */
     margin-block-end: calc(var(--focus-width) + var(--focus-offset));
   }
 
@@ -197,9 +179,7 @@
     translate: 0 1px;
     /* raw: the frames' 22 px box, held whatever the font's metrics make of two letters (a runner's mono was a pixel narrower) */
     inline-size: 22px;
-    /* layout: the letters centred in it, as a grid's one cell */
     display: grid;
-    /* layout: the cell's middle */
     justify-items: center;
   }
 
@@ -222,27 +202,22 @@
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
      bar, as the divider's rule does (the bar covers it only while pointed at). */
   .head {
-    /* layout: runs over the room kept for the bar */
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
   .head .time {
-    /* layout: the far end of the head's row */
     margin-inline-start: auto;
     /* the design's time in mono (the prototype's #chatList li em) */
     font: var(--text-2xs)/1 var(--family-mono);
   }
 
   [data-line-text] {
-    /* layout: the text a hair under its head, as the design sets it */
     margin-block-start: calc(var(--space-3xs) / 2);
   }
 
   /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
   .mark > svg {
-    /* layout: the icon sits in the line of words, as a letter would, not on a row of its own */
     display: inline-block;
-    /* layout: the step between the icon and the word */
     margin-inline-end: var(--space-3xs);
     vertical-align: text-bottom;
   }
@@ -280,9 +255,8 @@
      whole in its title. */
   .typing {
     padding-inline: var(--chat-inset);
-    /* layout: one line of this font, which no token names */
+    /* One line of this font, which no token names */
     min-block-size: 1lh;
-    /* layout: a step above and below, parting the line from the last message and the format bar */
     margin-block: var(--space-2xs);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -292,35 +266,27 @@
   /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
      in the label style and a rule running on, so the times stay in one column. */
   .divider {
-    /* layout: the word and its rule side by side, the rule taking what the word leaves */
     display: flex;
-    /* layout: a step between the word and its rule */
     gap: var(--space-2xs);
-    /* layout: the rule runs the line's whole width, over the room kept for its bar, which the row holds none of */
+    /* The rule runs the line's whole width, over the room kept for its bar, which this row holds none of */
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
   /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view. */
   .lines > li.day {
     /* held at the top over its day's lines by `held-top` (utilities.css) */
-    /* layout: no step above, which a held label would leave open to the lines under it */
+    /* No step above, which a held label would leave open to the lines under it */
     margin-block-start: 0;
-    /* layout: the word and its rule side by side, the rule taking what the word leaves */
     display: flex;
-    /* layout: a step between the word and its rule */
     column-gap: var(--space-2xs);
-    /* layout: a line's own room above and below, and none at its end for a bar */
     padding-inline-end: 0;
-    /* layout: the same, none at its end for a bar */
     margin-inline-end: 0;
     color: var(--color-text-muted);
   }
 
   .lines > li.day::after {
     content: "";
-    /* layout: the rule on the word's line */
     align-self: center;
-    /* layout: the rule takes the row's rest */
     flex: 1;
     border-block-start: var(--line-width) solid var(--color-line);
   }
@@ -328,10 +294,8 @@
   /* A poll's bars run the line's whole width, over the room kept for its bar, as the design draws them. */
   /* A line's translation, under its words: the text's own size and ink, a rule at its start and a step in, no box. */
   .translation {
-    /* layout: a step under the original, the rule drawn at the start of the translation alone */
     margin-block-start: var(--space-3xs);
     border-inline-start: var(--line-width) solid var(--color-line-strong);
-    /* layout: the words a step in from the rule */
     padding-inline-start: var(--space-s);
   }
 
@@ -340,17 +304,14 @@
   }
 
   .wide {
-    /* layout: over the room kept for the line's bar */
     margin-inline-end: calc(-1 * var(--_gutter));
-    /* layout: a card or a poll stands a step under its author's name, not against it */
     margin-block-start: var(--space-2xs);
   }
 
   .divider::after {
     content: "";
-    /* layout: the rule on the word's line (not the row's align-items: Popover's danger item holds the three alike) */
+    /* Rule on the word's line (not the row's align-items: Popover's danger item holds the three alike) */
     align-self: center;
-    /* layout: the rule takes the row's rest */
     flex: 1;
     border-block-start: var(--line-width) solid var(--color-new-line);
   }
@@ -378,12 +339,12 @@
 @layer components {
   @media (width < 900px) {
     .lines > li:not([data-grouped], :first-child) {
-      /* layout: the design's step between lines is the head's own room above, below */
+      /* The design's step between lines is the head's own room above and below */
       margin-block-start: 0;
     }
 
     .lines > li:not([data-grouped]) .head {
-      /* layout: what the 44 px box lacks above the name's line, less the row's own padding */
+      /* What the 44 px box lacks above the name's line, less the row's own padding */
       padding-block-start: max(var(--space-3xs), calc(var(--control-m) - 1lh - var(--space-3xs)));
     }
   }
@@ -420,12 +381,12 @@
     }
 
     .fill > li:first-child {
-      /* layout: the list's room above its first line goes to the lines' top, so few lines settle at the foot */
+      /* The list's room above its first line goes to the lines' top, so few lines settle at the foot */
       margin-block-start: auto;
     }
 
     .typing {
-      /* layout: pulled up its own height over the list's foot, so it takes no room of its own and no band cuts a line */
+      /* Pulled up its own height over the list's foot, so it takes no room and no band cuts a line */
       margin-block: calc(-1 * 1lh) 0;
       pointer-events: none;
     }

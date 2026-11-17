@@ -101,13 +101,9 @@
   }
 
   .bubble {
-    /* layout: the face beside the words, in one row that never wraps */
     display: grid;
-    /* layout: the frames' face, the rest to the words */
     grid-template-columns: var(--control-xs) minmax(0, 1fr);
-    /* layout: a step between the two */
     column-gap: var(--space-xs);
-    /* layout: the face at the top, beside the head */
     align-items: start;
     /* raw: the design's bubble, 258 px wide */
     inline-size: 258px;
@@ -161,16 +157,13 @@
   }
 
   .who {
-    /* layout: the initial at the disc's middle */
     display: grid;
-    /* layout: the same */
     place-items: center;
     block-size: var(--control-xs);
     font: var(--font-meta);
   }
 
   .words {
-    /* layout: a line under the head */
     margin-block: var(--space-3xs) 0;
     color: var(--color-text);
     /* raw: the design's words, 13 px */
@@ -186,13 +179,9 @@
   }
 
   .headRow {
-    /* layout: the name and place on the left, wrapping under themselves; the room's pill whole at the top right */
     display: grid;
-    /* layout: the same */
     grid-template-columns: minmax(0, 1fr) auto;
-    /* layout: the pill's words on the name's first line */
     align-items: baseline;
-    /* layout: a small step before the pill */
     column-gap: var(--space-3xs);
     overflow-wrap: anywhere;
   }
@@ -290,13 +279,9 @@
     position: absolute;
     /* raw: at its point's height, its dot on the point: half the chip up, and the dot's place left */
     transform: translate(-12px, -50%);
-    /* layout: the dot before the name, on one line */
     display: inline-grid;
-    /* layout: the same */
     grid-template-columns: auto auto;
-    /* layout: the same */
     column-gap: var(--space-3xs);
-    /* layout: the same */
     place-items: center;
     block-size: var(--control-xs);
     border: var(--line-width) solid var(--color-line-strong);

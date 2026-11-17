@@ -12,15 +12,13 @@
   @container plate (max-width: 37.5rem) {
     .pills {
       position: static;
-      /* layout: the step to the lede, 16 px as every step inside the top */
       margin-block-end: var(--space-s);
     }
 
     /* Under the title the status comes first, then the rank (the proposal's phone), each chip whole: the row wraps, never a chip. */
     .pillRow {
-      /* layout: the proposal's phone order */
+      /* The proposal's phone order */
       flex-flow: row-reverse wrap;
-      /* layout: packed to the start of the row */
       justify-content: flex-end;
     }
 

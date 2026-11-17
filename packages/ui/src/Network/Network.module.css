@@ -83,7 +83,6 @@
 
   /* The arrow back: the design system's arrow turned round, as the breadcrumb's. */
   .back {
-    /* layout: the icon in the legend's line */
     display: inline-flex;
     rotate: 180deg;
   }

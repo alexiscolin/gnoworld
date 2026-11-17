@@ -55,7 +55,6 @@
 
     /* The box's room, taken as margin so wrapped rows and a scroll-row, which clips its block axis, keep the whole 44 px box. */
     :is(button, a).chip:not([data-size="chip"]) {
-      /* layout: the room of the 44 px box above and below the pill */
       margin-block: calc((var(--control-m) - var(--_h)) / 2);
     }
   }

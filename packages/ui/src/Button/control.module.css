@@ -2,11 +2,8 @@
    properties. At no specificity, so a control's own rule wins wherever the sheets load. */
 @layer components {
   :where(.pill) {
-    /* layout: an icon or a count sits beside the words */
     display: inline-flex;
-    /* layout: an icon or a count sits beside the words */
     align-items: center;
-    /* layout: an icon or a count sits beside the words */
     gap: var(--space-2xs);
     min-block-size: var(--_h);
     /* Words that wrap keep clear of the edge; one line stays at the control's height. */

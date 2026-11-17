@@ -1,13 +1,11 @@
 /* A paged list: its filter and sort on one row, rows told apart by a hairline, its count and "Show more" at the foot. */
 @layer components {
   .filter {
-    /* layout: the filter takes the row's room, no narrower than a column */
     flex: 1;
     min-inline-size: var(--column-2xs);
   }
 
   .rows {
-    /* layout: a list's own margin and padding, which the browser gives it, taken off: the card's Stack spaces it */
     margin-block: 0;
     padding: 0;
     list-style: none;

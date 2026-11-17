@@ -18,12 +18,10 @@
   /* raw: under 44 rem four figures leave a cell under 7 rem, where "addresses" and "Imported by" break: two a row, as on a narrow plate */
   @container plate (max-width: 44rem) {
     .band > * {
-      /* layout: the cells' own padding is the space between rows */
       row-gap: 0;
     }
 
     .band .cell {
-      /* layout: half the row */
       grid-column: span 6;
     }
 
@@ -57,7 +55,6 @@
   }
 
   .value small {
-    /* layout: the unit stands a step off its figure */
     margin-inline-start: var(--space-2xs);
     color: var(--color-text-muted);
     font: var(--font-reading);
@@ -86,7 +83,6 @@
     position: absolute;
     inset-inline-end: 0;
     inline-size: var(--space-2xs);
-    /* layout: the dot centred on the line's last point */
     margin: calc(var(--space-3xs) * -1) calc(var(--space-3xs) * -1) 0 0;
     background: var(--color-text);
   }
@@ -96,7 +92,6 @@
     position: absolute;
     inset-inline: auto 0;
     inline-size: var(--space-2xs);
-    /* layout: the ring centred on the line's last point, as the dot is */
     margin: calc(var(--space-3xs) * -1) calc(var(--space-3xs) * -1) 0 0;
     outline: var(--line-width) solid var(--color-text);
     opacity: 0;

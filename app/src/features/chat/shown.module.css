@@ -6,7 +6,6 @@
   }
 
   .caution svg {
-    /* layout: the lock sits in the line of words, as a letter would */
     display: inline-block;
     vertical-align: text-bottom;
   }
