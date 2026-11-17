@@ -42,8 +42,12 @@ test.describe("on a computer's screen", () => {
     await expect.poll(() => scripts.filter((url) => COLONY.test(url)).length, SLOW).toBe(1);
   });
 
-  test("stands the colony in its page's circle, as a world's", async ({ page }) => {
+  // A planet's page frames it larger than the window; the colony's page stands it whole beside the plate, as the preview has it.
+  test("stands the colony whole in its page's circle, not framed larger than the window as a planet is", async ({ page }) => {
+    await visit(page, "/w/bubble");
+    await expect(page.locator("[data-globe]")).toHaveAttribute("data-framing", "imposing");
     await visit(page, "/w/gnosh-ai?test-gpu");
+    await expect(page.locator("[data-globe]")).not.toHaveAttribute("data-framing");
     await expect(page.locator("h1")).toHaveText("gnosh.ai", SLOW);
     await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
     await expect.poll(async () => (await flightOf(page)).id, SLOW).toBe("gnosh-ai");

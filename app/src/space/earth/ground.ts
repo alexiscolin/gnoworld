@@ -135,7 +135,7 @@ export class EarthGround {
     const normal = this.#normalOf(hull === undefined ? held.ground : held.out, angle, this.#normal);
     const point =
       hull === undefined ? this.#point.copy(normal) : this.#normalOf(held.at, angle, this.#point);
-    point.multiplyScalar(this.#radius).add(this.#centre);
+    point.multiplyScalar(this.#radius * (hull?.scale ?? 1)).add(this.#centre);
     const away = Math.hypot(eye.x - point.x, eye.y - point.y, eye.z - point.z) || 1;
     this.#cosine = (normal.x * (eye.x - point.x) + normal.y * (eye.y - point.y) + normal.z * (eye.z - point.z)) / away;
     return seen.project(point, this.#on) && this.#cosine > CLEAR && !hull?.blocks(point, eye);

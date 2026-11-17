@@ -150,3 +150,23 @@ describe("the colony's hull, drawn in the code", () => {
     expect(lit(Math.round(height * 0.8))).toBe(0);
   });
 });
+
+describe("the colony framed close on its page", () => {
+  const look = { lean: 0, tilt: 0 } as never;
+
+  // Its page stands it beside the plate, not larger than the window (placeFrame.tsx); wider than its sphere, it stands smaller there,
+  // whole (the preview's), and eases there and back: nothing jumps.
+  it("stands at 0.7 of its size framed close, easing there and back, and tells its hull's share", async () => {
+    const { ColonyBody } = await import("./gnoshColony.ts");
+    const body = new ColonyBody(look);
+    body.setClose(1);
+    const first = body.hull.scale;
+    expect(first).toBeLessThan(1);
+    expect(first).toBeGreaterThan(0.9);
+    for (let frame = 0; frame < 200; frame += 1) body.setClose(1);
+    expect(body.hull.scale).toBeCloseTo(0.7, 2);
+    for (let frame = 0; frame < 200; frame += 1) body.setClose(0);
+    expect(body.hull.scale).toBeCloseTo(1, 2);
+    body.dispose();
+  });
+});

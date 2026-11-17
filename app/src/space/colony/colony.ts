@@ -72,6 +72,9 @@ export function colonyOf(): Colony {
     near,
     far,
     reach,
+    get scale() {
+      return spin.scale.x;
+    },
     anchorAt: (index, point, normal) => {
       const { at, out } = ANCHORS[index] ?? { at: [0, 0, 0], out: [0, 1, 0] };
       point.set(...at).applyMatrix4(lod.matrixWorld);

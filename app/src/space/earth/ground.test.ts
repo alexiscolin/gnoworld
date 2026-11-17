@@ -355,6 +355,7 @@ describe("a colony's marks", () => {
       out.set(0, 0, 1);
     }),
     blocks: vi.fn(() => false),
+    scale: 1,
   });
 
   it("stands a mark on the hull point its spot gives, facing the eye, as long as nothing of the colony stands before it", () => {
@@ -375,6 +376,26 @@ describe("a colony's marks", () => {
     hull.blocks.mockReturnValue(true);
     ground.place(planet("gnosh-ai"), still, seen);
     expect(placed.at(-1)?.[2]).toBe(false);
+  });
+
+  // On its page the colony stands smaller than its planet's radius (gnoshColony.ts's setClose): its marks stand where its hull is then.
+  it("stands a mark at the share of the planet's radius the hull stands at", () => {
+    const ground = new EarthGround(
+      () => ({ lean: 0, tilt: 0 }),
+      () => true,
+    );
+    ground.hull = {
+      anchorFor: (_ground: Vector3, at: Vector3, out: Vector3) => {
+        at.set(0, 0.8, 0.6);
+        out.set(0, 0.6, 0.8);
+      },
+      blocks: () => false,
+      scale: 0.5,
+    };
+    const placed: [number, number, boolean][] = [];
+    ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
+    ground.place(planet("gnosh-ai"), { seconds: -kept() / SPIN, step: 0.1 }, seen);
+    expect(placed.at(-1)?.[1]).toBeCloseTo(0.4, 6);
   });
 
   it("turns its marks with the colony: a quarter turn on, the point has moved with the hull and faces away", () => {

@@ -45,4 +45,6 @@ export interface Eye {
 export interface Hull {
   anchorFor(ground: Vector3, at: Vector3, out: Vector3): void;
   blocks(point: Vec, eye: Vec): boolean;
+  /** The share of its planet's radius it stands at now: less on its page, framed close. */
+  readonly scale: number;
 }

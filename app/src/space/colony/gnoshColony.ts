@@ -13,6 +13,9 @@ const SUN = 3.2;
 const LIGHT_AT = 6;
 // raw: the shadows' box round the colony, in its radii (its spine reaches 1.3), and their map's side
 const SHADOW = { box: 1.7, map: 2048 } as const;
+// raw: its size framed close on its page, a share of its sphere's (the preview's), and the share of the way it eases there each frame
+const PAGE = 0.7;
+const EASE = 0.06;
 // What a world does that the colony has no part for.
 const none = (): void => undefined;
 
@@ -26,6 +29,7 @@ export class ColonyBody implements Drawn {
   readonly #lamp = new DirectionalLight(0xfff3e2, SUN);
   readonly #back = new Quaternion();
   #size = 0;
+  #close = 0;
 
   constructor(look: PlanetLook) {
     this.look = look;
@@ -56,6 +60,12 @@ export class ColonyBody implements Drawn {
     camera.updateProjectionMatrix();
   }
 
+  // Framed close on its page, it eases down to PAGE of its size, whole in the page's circle, and back as the page goes.
+  setClose(share: number): void {
+    this.#close += (share - this.#close) * EASE;
+    this.#colony.spin.scale.setScalar(1 - (1 - PAGE) * this.#close);
+  }
+
   setTime(seconds: number): void {
     // The ground's own turn, the Earth's kept day with it (earth/ground.ts turns a mark by the same): the spine is the pole.
     this.#colony.spin.rotation.y = -(seconds * SPIN + kept());
@@ -69,7 +79,6 @@ export class ColonyBody implements Drawn {
   readonly setDepth = none;
   readonly setLimb = none;
   readonly setFar = none;
-  readonly setClose = none;
   readonly setPlate = none;
   readonly setSigns = none;
 
