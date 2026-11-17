@@ -22,6 +22,14 @@ const SEGMENTS = 128;
 /** The orbits' colour and their strength at full, which the Map's links share (links.ts). */
 export const ORBIT_COLOUR = [0.75, 0.78, 0.9] as const;
 export const ORBIT_GAIN = 0.13;
+// raw: how many orbits a system draws at their full strength, and the least share of it any keeps
+const CLEAR_ORBITS = 12;
+const LEAST_CROWD = 0.5;
+
+/** The share of their light a system's orbits keep: a crowded system's each fainter, so that together they stay lines and never a grey
+ * disc, but never under half, or a large system's are too pale to read (D13756). */
+export const orbitCrowd = (planets: number): number =>
+  Math.max(LEAST_CROWD, Math.min(1, Math.sqrt(CLEAR_ORBITS / Math.max(planets, 1))));
 // The orbit round a planet framed close: its radius in the planet's, how high the eye stands over its plane (sin 5°: nearly edge
 // on, its near side passing low over the planet, its far side behind it), how it leans across the view, its strength, and its moment.
 const ROUND = { radii: 1.25, over: 0.087, lean: -0.3, gain: 0.2, ease: 0.3 } as const;
