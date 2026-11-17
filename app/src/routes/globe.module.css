@@ -66,9 +66,10 @@
     }
 
     /* Close, larger than the window, lit at three quarters: the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
-       height capping it past 16:10; drawn 100 px left of that centre (D13732). Cropped by the window's edges, its limb reaches a little
-       under the plate's content, and the dock stands over it as dark glass. */
-    .globe[data-framing] {
+       height capping it past 16:10; drawn 55 px left of that centre (D13735). Cropped by the window's edges, its limb reaches a little
+       over the plate's content, in front of it, and the dock stands over it as dark glass. */
+    .globe[data-framing],
+    .globe[data-framing] + * {
       /* raw: the study's centre, across */
       --_study-x: 76vi;
       /* raw: the study's centre, down */
@@ -76,8 +77,8 @@
       /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; held so that, at the study's centre, the disc's limb,
          drawn 1.04 radii out (measured), would stand a step (--space-m) right of the plate's content edge */
       --_radius: min(37vi, 59vb, (var(--_study-x) - var(--_start) - var(--space-m)) / 1.04);
-      /* raw: Alexis's 100 px left of the study's centre, the same size (D13732): the limb up to 76 px under the content's edge */
-      --_x: calc(var(--_study-x) - 100px);
+      /* raw: Alexis's 55 px left of the study's centre, the same size (D13735): the limb up to 31 px over the content's edge */
+      --_x: calc(var(--_study-x) - 55px);
     }
 
     .globe {
@@ -94,6 +95,16 @@
     .globe:is([data-earth="drawn"], [data-world="drawn"]) + * {
       --plate-fill: hidden;
       --plate-ground: var(--color-plate-scene);
+    }
+
+    /* The framed planet stands in front of the plate (D13735): the plate is masked by its disc, its limb 1.04 radii out, in the plate's
+       own box (from the page's edge, under the dock's top). A mask only hides: the plate's controls under it still take clicks and keys. */
+    .globe[data-framing]:is([data-earth="drawn"], [data-world="drawn"]) + * {
+      --plate-mask: radial-gradient(
+        circle calc(var(--_radius) * 1.04) at calc(var(--_x) - var(--page-edge)) calc(var(--_middle) - var(--dock-top)),
+        transparent 99.5%,
+        currentColor 100%
+      );
     }
   }
 
