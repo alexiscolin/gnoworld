@@ -1,7 +1,7 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Fetcher } from "./http.ts";
-import { fileShape, FILE_MAX_BYTES, linksApi } from "./links.ts";
+import { FILE_MAX_BYTES, fileShape, linksApi } from "./links.ts";
 
 // The browser's client of the linked accounts (server/src/login/linkRoutes.ts, mounted at /api/links): each answer read through its schema.
 const A = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -20,6 +20,8 @@ const PROOF = {
   signed: { chain_id: "onyx-1", account_number: "0", sequence: "0", fee: { amount: [], gas: "0" }, msgs: [], memo: "" },
   signature: { pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A".repeat(44) }, signature: "A".repeat(88) },
 };
+// The proof of the account that asks the link: Adena's here, or a file (the wallet audit's medium 1).
+const BY = { proof: PROOF };
 
 const server = (answer: { status: number; json?: unknown }) => {
   const sent: { url: string; init: RequestInit }[] = [];
@@ -60,7 +62,13 @@ describe("the linked accounts, from the server", () => {
   });
 
   it("asks an Adena code for the account to link, and reads the server's text", async () => {
-    const answer = { nonce: NONCE, text: "Link ...", expiresAt: EXPIRES, chainId: "onyx-1" };
+    const answer = {
+      nonce: NONCE,
+      text: "Link ...",
+      expiresAt: EXPIRES,
+      chainId: "onyx-1",
+      byBlock: "cat > link.json",
+    };
     const { api, sent } = server({ status: 200, json: answer });
     expect(await api.adenaChallenge(B)).toEqual({ ok: true, value: answer });
     expect(sent[0]?.url).toBe("/api/links/challenge");
@@ -69,14 +77,23 @@ describe("the linked accounts, from the server", () => {
   });
 
   it("asks a command-line code, and keeps the block the server composed", async () => {
-    const answer = { nonce: NONCE, memo: "memo", block: "cat > link.json", expiresAt: EXPIRES };
+    const answer = {
+      nonce: NONCE,
+      memo: "memo",
+      block: "cat > link.json",
+      byBlock: "cat > me.json",
+      expiresAt: EXPIRES,
+      chainId: "onyx-1",
+    };
     const { api, sent } = server({ status: 200, json: answer });
     expect(await api.cliChallenge(B)).toEqual({ ok: true, value: answer });
     expect(bodyOf(sent[0])).toEqual({ kind: "cli", address: B });
   });
 
   it.each([
-    ["no block", { nonce: NONCE, memo: "m", expiresAt: EXPIRES }],
+    ["no block", { nonce: NONCE, memo: "m", byBlock: "b", expiresAt: EXPIRES, chainId: "onyx-1" }],
+    ["no block for the account itself", { nonce: NONCE, memo: "m", block: "b", expiresAt: EXPIRES, chainId: "onyx-1" }],
+    ["no chain", { nonce: NONCE, memo: "m", block: "b", byBlock: "b", expiresAt: EXPIRES }],
     ["an empty block", { nonce: NONCE, memo: "m", block: "", expiresAt: EXPIRES }],
     ["a block of 9 KiB", { nonce: NONCE, memo: "m", block: "x".repeat(9000), expiresAt: EXPIRES }],
     ["a nonce that is none", { nonce: "short", memo: "m", block: "b", expiresAt: EXPIRES }],
@@ -87,30 +104,41 @@ describe("the linked accounts, from the server", () => {
 
   it("posts Adena's proof with its code and address, and reads the members", async () => {
     const { api, sent } = server({ status: 200, json: { members: [A, B] } });
-    expect(await api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF })).toEqual({
+    expect(await api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF, by: BY })).toEqual({
       ok: true,
       value: { members: [A, B] },
     });
     expect(sent[0]?.url).toBe("/api/links/verify");
-    expect(bodyOf(sent[0])).toEqual({ nonce: NONCE, address: B, proof: PROOF });
+    expect(bodyOf(sent[0])).toEqual({ nonce: NONCE, address: B, proof: PROOF, by: BY });
   });
 
   it("posts the pasted file as it is, its address and its code", async () => {
     const { api, sent } = server({ status: 200, json: { members: [A, B] } });
-    await api.verifyFile({ nonce: NONCE, address: B, file: '{"msg":[]}' });
-    expect(bodyOf(sent[0])).toEqual({ nonce: NONCE, address: B, file: '{"msg":[]}' });
+    await api.verifyFile({ nonce: NONCE, address: B, file: '{"msg":[]}', by: BY });
+    expect(bodyOf(sent[0])).toEqual({ nonce: NONCE, address: B, file: '{"msg":[]}', by: BY });
   });
 
   it("sends no file over 4 KiB, counted in bytes", async () => {
     const { api, sent } = server({ status: 200, json: { members: [A, B] } });
     const big = "é".repeat(FILE_MAX_BYTES / 2 + 1);
-    expect(await api.verifyFile({ nonce: NONCE, address: B, file: big })).toEqual({ ok: false, reason: "refused" });
+    expect(await api.verifyFile({ nonce: NONCE, address: B, file: big, by: BY })).toEqual({
+      ok: false,
+      reason: "refused",
+    });
+    expect(await api.verifyFile({ nonce: NONCE, address: B, file: "{}", by: { file: big } })).toEqual({
+      ok: false,
+      reason: "refused",
+    });
+    expect(await api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF, by: { file: big } })).toEqual({
+      ok: false,
+      reason: "refused",
+    });
     expect(sent).toHaveLength(0);
   });
 
   it("refuses a link the server says is done without the account asked", async () => {
     const { api } = server({ status: 200, json: { members: [A] } });
-    expect(await api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF })).toEqual({
+    expect(await api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF, by: BY })).toEqual({
       ok: false,
       reason: "malformed",
     });
@@ -122,11 +150,12 @@ describe("the linked accounts, from the server", () => {
         nonce: NONCE,
         address: B,
         proof: PROOF,
+        by: BY,
       }),
     ).toEqual({ ok: false, reason: "malformed" });
     const eleven = { members: Array.from({ length: 11 }, () => B) };
     expect(
-      await server({ status: 200, json: eleven }).api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF }),
+      await server({ status: 200, json: eleven }).api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF, by: BY }),
     ).toEqual({ ok: false, reason: "malformed" });
   });
 
@@ -165,11 +194,11 @@ describe("the linked accounts, from the server", () => {
   ] as const)("reads a verify's %i as %s, for Adena's proof and for the file alike", async (status, error) => {
     const answer = { ok: false, reason: error, body: { error } };
     expect(
-      await server({ status, json: { error } }).api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF }),
+      await server({ status, json: { error } }).api.verifyAdena({ nonce: NONCE, address: B, proof: PROOF, by: BY }),
     ).toEqual(answer);
-    expect(await server({ status, json: { error } }).api.verifyFile({ nonce: NONCE, address: B, file: "{}" })).toEqual(
-      answer,
-    );
+    expect(
+      await server({ status, json: { error } }).api.verifyFile({ nonce: NONCE, address: B, file: "{}", by: BY }),
+    ).toEqual(answer);
   });
 });
 
@@ -197,9 +226,13 @@ describe("the shape of a pasted file", () => {
 // The chain the server checks the signature for comes with the Adena code, so the page can compare it with Adena's network before Sign.
 describe("an Adena code's chain", () => {
   it.each([
-    ["no chain", { nonce: NONCE, text: "t", expiresAt: EXPIRES }],
-    ["an empty chain", { nonce: NONCE, text: "t", expiresAt: EXPIRES, chainId: "" }],
-    ["a chain of 51 characters", { nonce: NONCE, text: "t", expiresAt: EXPIRES, chainId: "x".repeat(51) }],
+    ["no chain", { nonce: NONCE, text: "t", expiresAt: EXPIRES, byBlock: "b" }],
+    ["an empty chain", { nonce: NONCE, text: "t", expiresAt: EXPIRES, chainId: "", byBlock: "b" }],
+    [
+      "a chain of 51 characters",
+      { nonce: NONCE, text: "t", expiresAt: EXPIRES, chainId: "x".repeat(51), byBlock: "b" },
+    ],
+    ["no block for the account itself", { nonce: NONCE, text: "t", expiresAt: EXPIRES, chainId: "onyx-1" }],
   ])("refuses a code with %s", async (_name, json) => {
     expect(await server({ status: 200, json }).api.adenaChallenge(B)).toEqual({ ok: false, reason: "malformed" });
   });

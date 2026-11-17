@@ -1,23 +1,28 @@
 // The Adena way to link an account: Adena is switched to the account to link, the server's text is shown in words,
-// Adena signs it for that account, and the server answers with the identity's members. Adena's own answer for a wrong account is told with the
-// account it is on.
-import { shortAddress, type Address, type Challenge } from "@gnoworld/schemas";
-import { Button, Cluster, Stack } from "@gnoworld/ui";
+// Adena signs it for that account, the logged-in account signs it too (AsMe), and the server answers with the identity's members. Adena's own
+// answer for a wrong account is told with the account it is on.
+import { shortAddress, type Address, type Proof } from "@gnoworld/schemas";
+import { Button, Stack } from "@gnoworld/ui";
 import { useState } from "react";
-import { pageLinksApi } from "../../lib/api/links.ts";
+import { pageLinksApi, type AdenaChallenge, type ByProof } from "../../lib/api/links.ts";
 import { reportedOr } from "../../lib/reported.ts";
 import { WORDS } from "../errors/index.ts";
 import { sayProblem } from "../login/index.ts";
 import { Linked, Stale } from "./LinkStates.tsx";
+import { AsMe } from "./AsMe.tsx";
+import { EndGroup } from "./CommandParts.tsx";
 import { LINKED_ELSEWHERE, linkProblem, notSigned } from "./linkWords.ts";
 import { useSignInAgain } from "./useSignInAgain.ts";
-import styles from "./Settings.module.css";
+import code from "../../CodeBlock.module.css";
 
 interface Ready {
   at: "ready";
   address: Address;
   chainId: string;
-  challenge: Challenge;
+  challenge: AdenaChallenge;
+  // The account's proof, kept until the logged-in account's own comes, and that one.
+  proof?: Proof;
+  by?: ByProof | undefined;
   said?: string;
   waiting?: true;
 }
@@ -65,8 +70,8 @@ async function start(me: Address, set: SetStep): Promise<void> {
   }
 }
 
-// Has Adena sign the server's text for the account chosen, then posts the proof.
-async function sign({ address, chainId, challenge }: Ready, set: SetStep, onLinked: () => void): Promise<void> {
+// Has Adena sign the server's text for the account chosen, and keeps the proof for the logged-in account's own.
+async function sign({ address, chainId, challenge }: Ready, set: SetStep): Promise<void> {
   set({ at: "ready", address, chainId, challenge, waiting: true });
   const adena = await wallet();
   if (adena === undefined) {
@@ -84,17 +89,47 @@ async function sign({ address, chainId, challenge }: Ready, set: SetStep, onLink
     set({ at: "ready", address, chainId, challenge, said });
     return;
   }
-  const done = await pageLinksApi().verifyAdena({ nonce: challenge.nonce, address, proof: signed.proof });
+  set({ at: "ready", address, chainId, challenge, proof: signed.proof });
+}
+
+// Posts both proofs.
+async function finish(ready: Ready & { proof: Proof; by: ByProof }, set: SetStep, onLinked: () => void): Promise<void> {
+  const { address, challenge, proof, by } = ready;
+  set({ ...ready, waiting: true });
+  const done = await pageLinksApi().verifyAdena({ nonce: challenge.nonce, address, proof, by });
   set(done.ok ? { at: "linked", address } : refusedVerify(done.reason, address));
   if (done.ok) onLinked();
 }
+
+// The one button's words, and whether it waits: for Adena, the server, or the logged-in account's own proof.
+const labelOf = (ready: Ready | undefined): string =>
+  ready === undefined ? "Continue" : ready.proof === undefined ? "Sign in Adena" : "Link";
+// Pressed while Adena or the server is asked; outline and shut while the next act is the logged-in account's own signature (AsMe's).
+const busyOf = (step: Step): boolean => step.at === "busy" || (step.at === "ready" && step.waiting === true);
+const waitsForMe = (ready: Ready | undefined): boolean => ready?.proof !== undefined && ready.by === undefined;
 
 const statusOf = (step: Exclude<Step, { at: "stale" | "linked" }>): string =>
   step.at === "busy"
     ? step.doing
     : step.at === "ready" && step.waiting === true
-      ? "Waiting for Adena…"
+      ? step.proof === undefined
+        ? "Waiting for Adena…"
+        : "Checking…"
       : (step.said ?? "");
+
+// The text the account to link signs, and once it has, that it did (PR #41's UX review).
+function ToSign({ ready }: { ready: Ready }) {
+  return (
+    <Stack space="2xs">
+      <p className="meta">
+        <span className="label">Adena will sign this text, for</span>{" "}
+        <span className="data-text nowrap">{shortAddress(ready.address)}</span>
+      </p>
+      <blockquote className={[code["block"], "fill-box", "data-text"].join(" ")}>{ready.challenge.text}</blockquote>
+      {ready.proof === undefined ? null : <p className="meta">Signed by {shortAddress(ready.address)}.</p>}
+    </Stack>
+  );
+}
 
 export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: () => void; onCancel: () => void }) {
   const [step, setStep] = useState<Step>({ at: "idle" });
@@ -110,35 +145,44 @@ export function AdenaTab({ me, onLinked, onCancel }: { me: Address; onLinked: ()
       </Stale>
     );
   const ready = step.at === "ready" ? step : undefined;
-  const busy = step.at === "busy" || ready?.waiting === true;
   const status = statusOf(step);
   return (
-    <Stack space="s">
-      <p>Switch to the account you want to link in Adena, then continue. Nothing is sent until you press Sign.</p>
-      {ready === undefined ? null : (
-        <Stack space="2xs">
-          <span className="label">Adena will sign this text, for {shortAddress(ready.address)}</span>
-          <blockquote className={[styles["block"], "fill-box", "data-text"].join(" ")}>
-            {ready.challenge.text}
-          </blockquote>
-        </Stack>
-      )}
-      <p role="status" className="meta">
-        {status}
-      </p>
-      <Cluster justify="end">
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button
-          emphasis="solid"
-          disabled={busy}
-          onClick={() => {
-            if (ready === undefined) begin();
-            else sign(ready, setStep, onLinked).catch(reportError);
+    <Stack space="m">
+      {ready === undefined ? <p>Switch Adena to the account you want to link, then continue.</p> : null}
+      {ready === undefined ? null : <ToSign ready={ready} />}
+      {ready?.proof === undefined ? null : (
+        <AsMe
+          key={ready.challenge.nonce}
+          me={me}
+          code={{ text: ready.challenge.text, byBlock: ready.challenge.byBlock, chainId: ready.chainId }}
+          first="adena"
+          next={ready.by === undefined}
+          onBy={(by) => {
+            setStep((now) => (now.at === "ready" ? { ...now, by } : now));
           }}
-        >
-          {ready === undefined ? "Continue" : "Sign in Adena"}
-        </Button>
-      </Cluster>
+        />
+      )}
+      <EndGroup
+        said={status}
+        submit={
+          <Button
+            emphasis={waitsForMe(ready) ? "outline" : "solid"}
+            busy={busyOf(step)}
+            disabled={waitsForMe(ready)}
+            onClick={() => {
+              const { proof, by } = ready ?? {};
+              if (ready === undefined) begin();
+              else if (proof === undefined) sign(ready, setStep).catch(reportError);
+              else if (by !== undefined) finish({ ...ready, proof, by }, setStep, onLinked).catch(reportError);
+            }}
+          >
+            {labelOf(ready)}
+          </Button>
+        }
+        onCancel={onCancel}
+        code={undefined}
+        note="Nothing is sent until you press Link."
+      />
     </Stack>
   );
 }
