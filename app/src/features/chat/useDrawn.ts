@@ -1,7 +1,7 @@
 import type { RoomList } from "@gnoworld/schemas";
 import { useState } from "react";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { shownRoom } from "./names.ts";
+import { shownRoom } from "./rooms/names.ts";
 
 /** What the chat draws: a world's place, its rooms and the room in view. */
 interface Drawn {

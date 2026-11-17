@@ -4,7 +4,7 @@
 import type { ReactNode } from "react";
 import { Panel } from "@gnoworld/ui";
 import { chatHeld, LOADING, PlateFrame } from "../features/chat/index.ts";
-import { DOCKED, useMedia } from "../features/chat/useMedia.ts";
+import { DOCKED, useMedia } from "../features/chat/dock/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { StatusRing } from "../features/world/StatusRing.tsx";
 import type { Ring } from "../features/world/statusRing.ts";

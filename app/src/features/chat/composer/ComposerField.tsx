@@ -5,7 +5,7 @@
 import { FieldWords, Listbox } from "@gnoworld/ui";
 import type { LexicalEditor } from "lexical";
 import { useId } from "react";
-import boxStyles from "../MessageBox.module.css";
+import boxStyles from "./MessageBox.module.css";
 import rules from "../markdownRules.module.css";
 import styles from "./ComposerField.module.css";
 import type { Suggestion } from "./suggest.ts";

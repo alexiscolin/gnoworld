@@ -1,8 +1,8 @@
 // The link's side of opening a room at a found message: the jump asked, its window given to the store, the way back.
 import type { IrcMessage } from "@gnoworld/core";
 import type { createAppStore } from "../../../store/index.ts";
-import { HISTORY_LINES } from "../history.ts";
-import type { ChatLink } from "../linkTypes.ts";
+import { HISTORY_LINES } from "../link/history.ts";
+import type { ChatLink } from "../link/linkTypes.ts";
 import { Jumps } from "./jump.ts";
 
 export class Jumping {

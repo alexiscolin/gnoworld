@@ -27,7 +27,7 @@ export function useGo(universe: UniverseView, close: () => void, replace = false
     };
   }, [copySaid]);
   const pathOf = (item: SearchItem): string => {
-    // The chat of the world in view, else the Earth's, opened on the words (features/chat/Searching.tsx).
+    // The chat of the world in view, else the Earth's, opened on the words (features/chat/search/Searching.tsx).
     if (item.kind === "messages")
       return fullChatHref(
         `${holdsChat(location.pathname) ? location.pathname : universe.earth.path}?find=${encodeURIComponent(item.find ?? "")}`,

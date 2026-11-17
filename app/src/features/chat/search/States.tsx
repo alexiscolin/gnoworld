@@ -4,7 +4,7 @@ import { Button, Chip, Cluster, Stack } from "@gnoworld/ui";
 import { ErrorView, errorKind } from "../../errors/index.ts";
 import { isUnread } from "../../../lib/query/client.ts";
 import { pageRecent } from "../../../lib/keep/recent.ts";
-import { roomLabel } from "../names.ts";
+import { roomLabel } from "../rooms/names.ts";
 import { dropFilter, parseFind } from "./filters.ts";
 import type { ChatSearchProps } from "./ChatSearch.tsx";
 import type { useChatSearch } from "./useChatSearch.ts";

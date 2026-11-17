@@ -8,8 +8,8 @@ import { canCopy, copyAddress } from "../../lib/copy.ts";
 import { site } from "../../places.ts";
 import { useShownName } from "../names/index.ts";
 import { countryName } from "./Country.tsx";
-import { asksFull } from "./full.ts";
-import { dmParams, isAccount, shortAddress } from "./names.ts";
+import { asksFull } from "./dock/fullState.ts";
+import { dmParams, isAccount, shortAddress } from "./rooms/names.ts";
 import { PersonBody } from "./PersonBody.tsx";
 import styles from "./PersonCard.module.css";
 

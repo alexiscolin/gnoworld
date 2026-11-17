@@ -5,7 +5,7 @@ import { labelName, PHONE_QUERY, worldIdOf } from "@gnoworld/core";
 import { data, useLoaderData, useLocation, type MetaArgs } from "react-router";
 import { Arrival } from "../features/passport/Later.tsx";
 import { ErrorView, RouteError, useWhere } from "../features/errors/index.ts";
-import { useMedia } from "../features/chat/useMedia.ts";
+import { useMedia } from "../features/chat/dock/useMedia.ts";
 import { useKnown } from "../features/realms/known.ts";
 import { useWorldsFile } from "../worldsFile.ts";
 import { PlaceFrame } from "./placeFrame.tsx";

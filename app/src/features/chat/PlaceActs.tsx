@@ -3,7 +3,7 @@
 // video call and the events first, then the people, then the search (`LEAVING`); the expand button never leaves (ChatHeader.tsx).
 import { ComingSoon, IconButton, Menu, type IconName } from "@gnoworld/ui";
 import { createContext, use } from "react";
-import { useControlSize } from "./full.ts";
+import { useControlSize } from "./dock/fullState.ts";
 
 /** One of the place's buttons, in the order they stand: `onSelect` none says it is greyed, to come. */
 export interface Act {

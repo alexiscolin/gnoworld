@@ -101,7 +101,7 @@ export function realmTalk(realm: string, worlds: Parameters<typeof realmRoom>[1]
 }
 
 // The realm's chat: its room, made on the first open (useRoomMade), in its world. The same element docks beside the
-// page or stands alone, full (full.ts).
+// page or stands alone, full (fullState.ts).
 function useRealmChat({ realm, chain }: RealmAt, known: boolean) {
   const universe = site.universeAt(useLocation().pathname);
   const { namespace: owner, name } = realmName(realm);

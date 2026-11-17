@@ -4,7 +4,7 @@ import { PHONE_QUERY } from "@gnoworld/core";
 import { LinkProvider, type PageLinkProps } from "@gnoworld/ui";
 import { createContext, use, type ReactNode } from "react";
 import { Link } from "react-router";
-import { useMedia } from "./features/chat/useMedia.ts";
+import { useMedia } from "./features/chat/dock/useMedia.ts";
 import { fullChatHref } from "./fullChat.ts";
 import { isPagePath } from "./pagePath.ts";
 

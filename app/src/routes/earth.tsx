@@ -7,7 +7,7 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { chatPlace, EARTH_CHAT as EARTH, EARTH_KICKER, PlateFrame } from "../features/chat/index.ts";
 import { PlaceChat } from "../features/chat/PlaceChat.tsx";
 import { chunked } from "../features/chat/Failing.tsx";
-import { DOCKED } from "../features/chat/useMedia.ts";
+import { DOCKED } from "../features/chat/dock/useMedia.ts";
 import { ErrorView, errorKind, isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";

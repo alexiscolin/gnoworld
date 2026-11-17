@@ -7,31 +7,31 @@ import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import type { ChatHeaderProps } from "./ChatHeader.tsx";
-import { ChatTop } from "./ChatTop.tsx";
+import { ChatTop } from "./phone/ChatTop.tsx";
 import { PlaceActs, placeActs } from "./PlaceActs.tsx";
 import { PlaceBar } from "./PlaceView.tsx";
 import { usePeople } from "./usePeople.tsx";
-import { useColumns } from "./columns.ts";
+import { useColumns } from "./dock/columns.ts";
 import { chunked } from "./Failing.tsx";
-import { asksFull, FullProvider, useFull, useFullMark } from "./full.ts";
-import { useFullMove } from "./fullMove.ts";
-import { keyOf } from "./stillScreen.ts";
-import { useSwapMove } from "./swapMove.ts";
-import { FullButton } from "./FullButton.tsx";
+import { asksFull, FullProvider, useFull, useFullMark } from "./dock/fullState.ts";
+import { useFullMove } from "./dock/useFullMove.ts";
+import { keyOf } from "./dock/stillScreen.ts";
+import { useSwapMove } from "./dock/useSwapMove.ts";
+import { FullButton } from "./dock/FullButton.tsx";
 import { warmPictures } from "../../WorldPlanet.tsx";
 import { Info } from "./Info.tsx";
-import { roomsOf } from "./roomsOf.tsx";
-import { useSearching, type SearchInput } from "./Searching.tsx";
-import type { Pinned } from "./QuickActions.tsx";
+import { roomsOf } from "./rooms/roomsOf.tsx";
+import { useSearching, type SearchInput } from "./search/Searching.tsx";
+import type { Pinned } from "./composer/QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
 import type { ChatWorld } from "./place.ts";
-import { DOCKED, useMedia } from "./useMedia.ts";
-import type { useThreads } from "./Threading.tsx";
+import { DOCKED, useMedia } from "./dock/useMedia.ts";
+import type { useThreads } from "./lines/Threading.tsx";
 import { useWorldsOf } from "./chatWorlds.tsx";
 import styles from "./ChatScreen.module.css";
 
 // A phone's row of worlds at the chat's foot, its code asked once the window is a phone's. Its place is reserved by the wrapper (ChatScreen.module.css).
-const PhoneWorlds = chunked(async () => ({ default: (await import("./PhoneWorlds.tsx")).PhoneWorlds }), {
+const PhoneWorlds = chunked(async () => ({ default: (await import("./phone/PhoneWorlds.tsx")).PhoneWorlds }), {
   waiting: null,
   failed: () => null,
 });
@@ -145,7 +145,7 @@ function closeChat(place: ChatPlace, navigate: ReturnType<typeof useNavigate>) {
   else place.close();
 }
 
-// The screen's fade-in (ChatScreen.module.css) is its first draw's: a screen taken to another page's dock (fullHost.tsx) is drawn again by
+// The screen's fade-in (ChatScreen.module.css) is its first draw's: a screen taken to another page's dock (FullChatHost.tsx) is drawn again by
 // the browser, and its fade would play once more over the room it holds. Marked, not stripped: a phone's screen eases its top.
 function arrived({ currentTarget, target }: SyntheticEvent<HTMLElement>) {
   if (currentTarget !== target) return;
@@ -183,7 +183,7 @@ export function ChatScreen(props: ChatScreenProps) {
   // The place's buttons stand in the planet's bar where the info panel shows, else in the header.
   const buttons = <PlaceActs acts={placeActs(searching.act, here.ask)} />;
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
-  // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: fullMove.ts).
+  // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: useFullMove.ts).
   const columns = { ...useColumns(), band: bar.wide };
   const rooms = narrow ? roomsOf({ unread, rail, phone, modes }, worlds.rows) : undefined;
   const header = (

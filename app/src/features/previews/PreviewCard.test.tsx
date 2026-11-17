@@ -126,7 +126,7 @@ describe("PreviewCard", () => {
     expect(dialog.querySelector("script, img, iframe, form")).toBeNull();
   });
 
-  // Under a line, the card sits in the room's list, whose arrows move between lines (lineFocus.ts): a key in the open capture is its own.
+  // Under a line, the card sits in the room's list, whose arrows move between lines (useLineFocus.ts): a key in the open capture is its own.
   it("keeps the keys pressed in the open capture from the list it sits in", () => {
     const list = vi.fn();
     const box = mount(

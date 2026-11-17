@@ -12,7 +12,7 @@ import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
 import { useComputerNeeded } from "./features/chat/computerNeeded.ts";
-import { useMedia } from "./features/chat/useMedia.ts";
+import { useMedia } from "./features/chat/dock/useMedia.ts";
 import { USE_A_COMPUTER } from "./features/login/index.ts";
 import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";

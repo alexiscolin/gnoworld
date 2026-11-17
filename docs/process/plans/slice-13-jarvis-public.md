@@ -44,7 +44,7 @@ First limit: the rows (cap 5,000 or 16 Mo like `jarvis_kept`, oldest out) and th
 
 ## Tests, by level (write first, see them fail)
 Unit: `server/src/door/said.test.ts` (new), `server/src/irc/lines.test.ts`, `server/src/door/lines.test.ts`, `server/src/door/ask.test.ts`,
-`app/src/features/chat/jarvisEntries.test.tsx`. Route: `server/src/door/said.test.ts` (GET: 200 member, 404 non-reader, 404 unknown/taken).
+`app/src/features/chat/lines/jarvisEntries.test.tsx`. Route: `server/src/door/said.test.ts` (GET: 200 member, 404 non-reader, 404 unknown/taken).
 Component: `app/src/features/jarvis/JarvisSaid.test.tsx`. Journey: none tonight. Failing first:
 1. `lines.test.ts` "relayForm accepts jarvis/bot and no other nick with a slash" and "a guest cannot relay as jarvis/bot".
 2. `said.test.ts` the five threat tests above, plus "an answered personal question is relayed once under jarvis/bot and kept by msgid" and
@@ -58,7 +58,7 @@ Component: `app/src/features/jarvis/JarvisSaid.test.tsx`. Journey: none tonight.
 - `server/src/door/said.ts` new T1 (judge, limit, relay, keep); `door/ask.ts` T1 (hook after an answered `question`); `door/mount.ts` (route, wire);
   `door/lines.ts` (skip the bot, drop on taken); `chat.ts`/`main` wire for the `relay`, the table (`KEPT_TABLES` sibling) and the expiry.
 - `packages/schemas/src/jarvis.ts` (the read route's reply reuses `JarvisAnswer`, none new).
-- `app/src/features/chat/jarvisEntries.tsx`, `Person.tsx` (the nick drawn as Jarvis), `app/src/features/jarvis/JarvisSaid.tsx` new, `app/src/lib/api/` read hook.
+- `app/src/features/chat/lines/jarvisEntries.tsx`, `Person.tsx` (the nick drawn as Jarvis), `app/src/features/jarvis/JarvisSaid.tsx` new, `app/src/lib/api/` read hook.
 - `docs/process/decisions.md` (a row per default below). No `ergo/` file nor `deploy/` change: relaymsg is already on for the bot.
 
 ## Branches

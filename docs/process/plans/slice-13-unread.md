@@ -55,7 +55,7 @@ First limit: the index scan on a very busy room (stopped at 100) and 500 rows an
 
 ## Files
 Create: `packages/schemas/src/unread.ts`; `server/src/unread/{store,routes}.ts` (+ tests); `app/src/lib/api/unread.ts`;
-`app/src/features/chat/useUnread.ts`. Change: `server/src/migrations.ts` (append `UNREAD_TABLES`; `migrations.test.ts` hash), `server/src/chat.ts` or `main.ts`
+`app/src/features/chat/rooms/useUnread.ts`. Change: `server/src/migrations.ts` (append `UNREAD_TABLES`; `migrations.test.ts` hash), `server/src/chat.ts` or `main.ts`
 (mount), `app/src/features/chat/{Worlds.tsx,link.ts}` (pill from `Badge`, forward echoed places), retention tick for expiry. Tier 1 (docs/REVIEW.md): none
 (no change to `guard.ts`, `limit.ts`, `config.ts`, `server/src/login/`, `app/src/lib/ergo/`; `limiter` and `sessionOf` are used as they are). The route
 reads accounts and rights, so it gets the `security-reviewer` by choice. The pill's look is Alexis's, live; no pixel test.

@@ -79,7 +79,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       Promise.resolve(navigate(href)).catch(reportError);
     });
     // A world's page (the Earth's, a world's, a realm's) has a plate, which may come after this: its arrival waits for it.
-    // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (fullMove.ts).
+    // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (useFullMove.ts).
     if (!flying()) enterPage(pages.cameAfter === FULL_PAGE, sameKind());
     // The planet's circle as the page lays its box out (a page's parts come late: the page's changes are watched till it comes), and as it moves.
     const watching = new ResizeObserver(hold);

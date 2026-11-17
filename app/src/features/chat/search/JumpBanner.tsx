@@ -4,7 +4,7 @@ import { Button, Icon, Sidebar } from "@gnoworld/ui";
 import { useEffect, useState, type RefObject } from "react";
 import { useApp, useAppStore } from "../../../storeContext.tsx";
 import { jumpingOf } from "./jumping.ts";
-import type { ChatLink } from "../linkTypes.ts";
+import type { ChatLink } from "../link/linkTypes.ts";
 import { readingWords } from "./jump.ts";
 import styles from "./JumpBanner.module.css";
 

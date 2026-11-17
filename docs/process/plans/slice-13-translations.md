@@ -58,7 +58,7 @@ First limit: jarvis's translation budget, then the model's concurrency (4 making
 Create: `packages/schemas/src/translations.ts`; `server/src/translations/{store,flow,routes}.ts` (+ tests); `app/src/lib/api/translations.ts`;
 `app/src/lib/stream/translationFeed.ts`. Change: `server/src/migrations.ts` (append `TRANSLATION_TABLES`, never edit one; `migrations.test.ts` hash),
 `server/src/chat.ts` (pass hook after `passed`, as `thenCards`), `server/src/stream/{stream,query}.ts` (event, `language` parameter, language set),
-`server/src/door/{mount,translate,lines}.ts` (delete the route and `line`), `app/src/roomTranslations.ts` (replaced), `app/src/features/chat/LineTranslation.tsx`
+`server/src/door/{mount,translate,lines}.ts` (delete the route and `line`), `app/src/roomTranslations.ts` (replaced), `app/src/features/chat/lines/LineTranslation.tsx`
 and `translationItem.ts` (read the store). Tier 1 (docs/REVIEW.md): none of the table's paths by name; `server/src/door/` is treated as tier 1 by
 D13067 and is not in the table (Alexis to add it), so the door deletions get the red pass and the `security-reviewer`; `server/src/limit.ts`,
 `guard.ts`, `config.ts` are read, not changed (breaker uses `limiter` as is). Everything else tier 2; no tier 3.

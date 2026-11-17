@@ -2,7 +2,7 @@
 // eye, as the design draw it, its name to a reader and a screen reader. Any client may write anything there:
 // what is no country draws nothing and counts for none.
 import type { Line } from "@gnoworld/core";
-import styles from "./RoomView.module.css";
+import styles from "./lines/RoomView.module.css";
 
 const REGIONS = new Intl.DisplayNames("en", { type: "region", fallback: "none" });
 // What the browser names and the table of countries does not: old codes, unions, test regions. The table stays out of these lines' chunk, every

@@ -6,9 +6,9 @@ import { Sidebar } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { bench, describe } from "vitest";
-import { Composer } from "../../src/features/chat/Composer.tsx";
-import { RoomsView } from "../../src/features/chat/RoomsView.tsx";
-import { RoomView } from "../../src/features/chat/RoomView.tsx";
+import { Composer } from "../../src/features/chat/composer/Composer.tsx";
+import { RoomsView } from "../../src/features/chat/rooms/RoomsView.tsx";
+import { RoomView } from "../../src/features/chat/lines/RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";

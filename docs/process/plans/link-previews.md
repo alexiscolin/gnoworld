@@ -129,7 +129,7 @@ no GET ever calls the reader); lifecycle (an edit and a REDACT drop the card; th
 
 ### L4. The page (`csp.ts`, `embeds.ts`, `Embed.tsx` untouched)
 `lib/stream/verdicts.ts`: a `card` listener; `lib/api/cards.ts` (Zod); `store/cards.ts` (an added slice); `askVerdicts.ts`, `linked.ts`,
-`useVerdicts.ts` also ask `GET /api/cards`; `features/chat/LinkCard.tsx` and its CSS, a lazy chunk, after `<Embed>` and `<LinePreview>` in
+`useVerdicts.ts` also ask `GET /api/cards`; `features/chat/lines/LinkCard.tsx` and its CSS, a lazy chunk, after `<Embed>` and `<LinePreview>` in
 `LineView.tsx`: one card per line (player, realm capture, link card), none in a DM or for a hidden line, the link through `Message.tsx`'s
 `LINK` (`rel="noopener noreferrer"`); Remove for the author and moderators; the design system's components, tried live.
 Tests: text as text; the link is the line's URL and the host shows; no card before its event, none for a hidden line; the picture only

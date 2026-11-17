@@ -2,7 +2,7 @@
 // irc/fetch.ts uses it). A hit's msgid comes from the server's index, never from Ergo, so it is checked again before it goes into a command.
 import type { IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
-import { isCommandMsgid } from "../history.ts";
+import { isCommandMsgid } from "../link/history.ts";
 import { shortDay } from "../../../lib/days.ts";
 
 /** The items asked around the message: half before it, then on from there (Ergo's AROUND); under the window the store keeps. */

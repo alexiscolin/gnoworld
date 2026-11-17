@@ -2,7 +2,7 @@
 @layer components {
   /* Under the dock's breakpoint no dock holds the chat: a block of the page under the globe, most of a window, and the plate goes on below it. */
   .chat {
-    /* The chat's skeleton stands over it while it comes (features/chat/DockCover.tsx) */
+    /* The chat's skeleton stands over it while it comes (features/chat/dock/DockCover.tsx) */
     position: relative;
     /* raw: a chat of a few lines reads poorly */
     block-size: 70vb;

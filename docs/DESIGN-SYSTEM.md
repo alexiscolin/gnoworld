@@ -402,7 +402,7 @@ component with its CSS Module, documented by its props.
 | `LinkProvider` | `pages`, the paths the app routes | Hands every link of the design system the page's own link, for the site's own paths; a link that must `reload` the document stays a plain anchor |
 
 Not built, each when it is needed: `Table` and `Checkbox` (the admin console). A message is an assembly of the chat feature
-(`app/src/features/chat/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
+(`app/src/features/chat/lines/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
 slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
 **Rich cards in the chat.** Every interactive structure of a room is one `Card`:

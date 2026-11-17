@@ -15,7 +15,7 @@ export const all = (root: ParentNode | null, selector: string): Element[] =>
   root === null ? [] : [...root.querySelectorAll(selector)];
 
 // The chat's parts as the demo's: its header, the lines in view (it stands at its end: the last ten) and what follows them. A chat that stood
-// through the move from the page before (`data-stood`, fullHost.tsx) keeps its own: it changes in place, never rising again.
+// through the move from the page before (`data-stood`, FullChatHost.tsx) keeps its own: it changes in place, never rising again.
 const LINES = "ol[aria-label='Messages']";
 const SEATED = "[data-chat-seat]:not([data-stood])";
 export const CHAT = ["header", `${LINES} > li:nth-last-child(-n + 10)`, `${LINES} ~ *`]

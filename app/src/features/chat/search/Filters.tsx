@@ -1,7 +1,7 @@
 // The chat search's filters under its field: the room, the sender, a link, the time (the canvas's chips), each writing its word into the field.
 import { shortAddress } from "@gnoworld/schemas";
 import { Chip, Cluster, Select } from "@gnoworld/ui";
-import { roomLabel } from "../names.ts";
+import { roomLabel } from "../rooms/names.ts";
 import { parseFind, setFilter, TIMES } from "./filters.ts";
 import type { ChatSearchProps } from "./ChatSearch.tsx";
 

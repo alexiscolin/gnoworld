@@ -7,9 +7,9 @@ import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
 import { ErrorView, errorKind } from "../errors/index.ts";
 import { useApp } from "../../storeContext.tsx";
-import { listAhead } from "./roomsListed.ts";
+import { listAhead } from "./rooms/roomsListed.ts";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
-import { UnreadPill } from "./UnreadPill.tsx";
+import { UnreadPill } from "./rooms/UnreadPill.tsx";
 import { WorldsMore } from "./WorldsMore.tsx";
 import styles from "./Worlds.module.css";
 

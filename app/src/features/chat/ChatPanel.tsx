@@ -14,16 +14,16 @@ import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
 import { savesData } from "../../lib/saveData.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import type { ChatLink } from "./link.ts";
-import { dropLink, takeLink } from "./pageLink.ts";
-import { GuestLoaded } from "./GuestLoaded.tsx";
-import { LOADING } from "./Loading.tsx";
-import { groupRooms, roomIds, roomsQuery } from "./names.ts";
+import type { ChatLink } from "./link/link.ts";
+import { dropLink, takeLink } from "./link/pageLink.ts";
+import { GuestLoaded } from "./rooms/GuestLoaded.tsx";
+import { LOADING } from "./dock/Loading.tsx";
+import { groupRooms, roomIds, roomsQuery } from "./rooms/names.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { watchRoomsChanged } from "./roomsListed.ts";
+import { watchRoomsChanged } from "./rooms/roomsListed.ts";
 import { useDrawn } from "./useDrawn.ts";
 import { useOnHide } from "./useOnHide.ts";
-import { useVerdicts } from "./useVerdicts.ts";
+import { useVerdicts } from "./lines/useVerdicts.ts";
 
 // An account's chat, its code asked once the session is an account's (the first screen's budget, ADR-0001 §12).
 const AccountChat = lazy(async () => ({ default: (await import("./AccountChat.tsx")).AccountChat }));

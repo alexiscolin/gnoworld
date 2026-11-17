@@ -25,7 +25,7 @@ export interface PreviewCardProps {
   tabbable?: boolean;
 }
 
-// A key pressed in the open capture is its own: under a line, the room's list would take its arrows (lineFocus.ts).
+// A key pressed in the open capture is its own: under a line, the room's list would take its arrows (useLineFocus.ts).
 const kept = (event: KeyboardEvent) => {
   event.stopPropagation();
 };

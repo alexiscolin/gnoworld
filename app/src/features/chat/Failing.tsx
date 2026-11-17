@@ -1,7 +1,7 @@
 // What a lazy chunk's failure is held by: a chunk that could not be fetched leaves its own place alone, never the page.
 // The lazy component keeps its failure for good, so `renew` makes it anew for the next time it is drawn.
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
-import { useInPageSheet } from "./placePage.ts";
+import { useInPageSheet } from "./phone/placePage.ts";
 
 interface FailingProps {
   /** What stands in the chunk's place once it failed, given the failure. */
