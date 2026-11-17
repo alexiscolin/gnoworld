@@ -6,8 +6,9 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect, createServer, type AddressInfo } from "node:net";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { toolsCache } from "./toolsCache.ts";
 
 export interface ErgoOptions {
   origins?: string[];
@@ -37,7 +38,8 @@ export interface Ergo {
 
 const ROOT = new URL("../../../", import.meta.url);
 const [TAG = ""] = readFileSync(new URL("deploy/ergo/VERSION", ROOT), "utf8").split(" ");
-const BINARY = join(process.env["GNOWORLD_TOOLS"] ?? join(homedir(), ".cache/gnoworld-tools"), `ergo-${TAG}`, "ergo");
+// The pinned binary, in the tools' cache read at each start.
+const binary = () => join(toolsCache(), `ergo-${TAG}`, "ergo");
 
 export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
   const [port, wsPort] = options.ports ?? [await freePort(), await freePort()];
@@ -50,7 +52,7 @@ export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
     if (owned) rmSync(dir, { recursive: true, force: true });
     throw error;
   }
-  const child = spawn(BINARY, ["run", "--conf", join(dir, "ircd.yaml")], {
+  const child = spawn(binary(), ["run", "--conf", join(dir, "ircd.yaml")], {
     cwd: dir,
     env: { ...process.env, ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
@@ -141,7 +143,7 @@ function render(values: Record<string, string | string[]>): string {
 }
 
 function hash(password: string): string {
-  const run = spawnSync(BINARY, ["genpasswd"], { input: `${password}\n`, encoding: "utf8" });
+  const run = spawnSync(binary(), ["genpasswd"], { input: `${password}\n`, encoding: "utf8" });
   const line = run.stdout.trim().split("\n").at(-1) ?? "";
   if (!line.startsWith("$2")) throw new Error(`ergo genpasswd gave no hash:\n${run.stderr}`);
   return line;
