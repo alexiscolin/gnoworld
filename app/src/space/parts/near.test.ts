@@ -5,12 +5,22 @@ import { Near } from "./near.ts";
 
 vi.mock("./draw.ts", () => ({ drawnOf: vi.fn() }));
 
+// A renderer that uploads and compiles nothing, for the screen or into the blur's kind of target (held.ts).
+const RENDERER = {
+  initTexture: () => undefined,
+  compileAsync: () => Promise.resolve(),
+  compile: () => new Set(),
+  getRenderTarget: () => null,
+  setRenderTarget: () => undefined,
+  getContext: () => ({ getContextAttributes: () => ({ antialias: false }) }),
+};
+
 describe("a wanted planet whose maps have not come", () => {
   it("gets its quad back once it is no longer wanted", () => {
     const shown = new Map<number, boolean>();
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: {},
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: (i: number, s: boolean) => shown.set(i, s) },
@@ -57,7 +67,7 @@ describe("a planet that was drawn as itself", () => {
     const added: Object3D[] = [];
     const device = {
       stage: { add: (o: Object3D) => added.push(o), remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -119,7 +129,7 @@ describe("a planet coming in from its skeleton", () => {
     const added: Object3D[] = [];
     const device = {
       stage: { add: (o: Object3D) => added.push(o), remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -179,7 +189,7 @@ describe("a Near that adopts the last one's planets", () => {
     );
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -224,7 +234,7 @@ describe("from the galaxy", () => {
     const shown = new Map<number, boolean>();
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: {},
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: (i: number, s: boolean) => shown.set(i, s) },
@@ -276,7 +286,7 @@ describe("a planet leaving the screen", () => {
     );
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -322,7 +332,7 @@ describe("a planet leaving the screen", () => {
     );
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -374,7 +384,7 @@ describe("a planet a few pixels across that the camera is flying towards", () =>
     vi.mocked(drawnOf).mockImplementation(() => made as never);
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture, compileAsync: () => Promise.resolve() },
+      renderer: { ...RENDERER, initTexture },
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: (i: number, s: boolean) => shown.set(i, s) },
@@ -427,7 +437,7 @@ describe("an open system with more small planets than a Near keeps", () => {
     });
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: () => undefined },
@@ -458,7 +468,7 @@ describe("a planet wanted in a flight, where the browser compiles no program asi
     const shown = new Map<number, boolean>();
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
-      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
       planets: { show: (i: number, s: boolean) => shown.set(i, s) },
