@@ -11,7 +11,7 @@ import { fall, handOver, ready, step } from "./arrival.ts";
 import { dayOf } from "../earth/light.ts";
 import { drawnOf } from "./draw.ts";
 import { adopt, SPHERE } from "./adopt.ts";
-import { holdOf, type Held } from "./held.ts";
+import { holdOf, hullIn, type Held } from "./held.ts";
 import { Bones } from "./bones.ts";
 import { upgradeStep } from "./upgrade.ts";
 import { warmFrame } from "./warmup.ts";
@@ -76,6 +76,9 @@ export class Near {
     device.stage.add(this.#bones.group);
     if (from !== undefined) adopt(from.near.#kept, this.#kept, { ...from, planets: device.planets });
   }
+
+  /** The hull of the world `id` drawn as itself, a colony's, which the page's signs stand on; none for a planet or one not drawn. */
+  readonly hullOf = (id: string): Drawn["hull"] => hullIn(this.#held, id);
 
   /** Turns the ground of the world `id` on `seconds` past its own spin; its clouds keep time. */
   lead(id: string, seconds: number, leaned: Quaternion): void {
@@ -145,9 +148,7 @@ export class Near {
   }
 
   /** Whether planet `index` stands as itself (its maps on the GPU), not as its quad. */
-  shows(index: number): boolean {
-    return this.#held.get(index)?.shown === true;
-  }
+  readonly shows = (index: number): boolean => this.#held.get(index)?.shown === true;
 
   // Planet `index` shown as itself or as its quad: made once, called on frames.
   readonly #showOne = (held: Held, index: number): void => {

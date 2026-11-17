@@ -217,6 +217,8 @@ function signs(space: Space, step: number): void {
   // eases back to rest then.
   if (space.neared && !space.rig.flying) {
     ground.grab.advance(step, space.camera.quaternion, space.options.still());
+    // A colony's signs stand on its hull, a planet's on its ground.
+    ground.hull = near?.hullOf(planet.id);
     ground.place(planet, { seconds: space.seconds, step }, space.see);
   } else {
     ground.grab.stop();

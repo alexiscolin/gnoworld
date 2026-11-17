@@ -1,4 +1,4 @@
-import { hubWorldOf } from "@gnoworld/core";
+import { hubWorldOf, SHOWN_STATIONS } from "@gnoworld/core";
 import { describe, expect, it, vi } from "vitest";
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import { queryClient } from "../../lib/query/client.ts";
@@ -22,7 +22,7 @@ const said = async (worlds: typeof heard.worlds) => {
 
 // A station's world stands round the Earth, never in the cloud: the rail names it not and its people count on none.
 describe("the rail's stations", () => {
-  const station = hubs.find((hub) => hub.kind === "station");
+  const station = hubs.find((hub) => hub.kind === "station" && !SHOWN_STATIONS.includes(hub.slug));
   const other = hubs.find((hub) => hub.kind !== "station");
   const here = (world: string) => ({ world, here: 3, perHour: 0, rise: null });
 
@@ -34,9 +34,16 @@ describe("the rail's stations", () => {
     expect(signals.names.get(hubWorldOf(other))).toBe(other.name);
   });
 
-  it("names every hub of the universe but its stations", () => {
-    const stations = hubs.filter((hub) => hub.kind === "station").length;
+  it("names every hub of the universe but its stations round the Earth", () => {
+    const stations = hubs.filter((hub) => hub.kind === "station" && !SHOWN_STATIONS.includes(hub.slug)).length;
     expect(localSignals(0).names.size).toBe(hubs.length - stations);
+  });
+
+  // gnosh's colony stands in gno.land's own system, in the cloud as a world does (D13743): its people count and it is named.
+  it("counts the people of gnosh's colony and names it, as a world's", async () => {
+    const signals = await said([here("gnosh-ai")]);
+    expect(signals.present.get("gnosh-ai")).toMatchObject({ here: 3 });
+    expect(signals.names.get("gnosh-ai")).toBe("gnosh.ai");
   });
 });
 

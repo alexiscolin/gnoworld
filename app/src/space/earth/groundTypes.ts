@@ -1,5 +1,6 @@
 // What the page's signs and the ground know of each other (ground.ts): a mark on the ground, the ground the page reaches, the eye.
 import type { LatLon } from "@gnoworld/core/bubbles";
+import type { Vector3 } from "three";
 import type { Vec } from "../layout.ts";
 
 export type { LatLon };
@@ -37,4 +38,13 @@ export interface Ground {
 export interface Eye {
   readonly eye: Vec;
   project(at: Vec, out: Vec): boolean;
+}
+
+/** A colony's hull, which its marks stand on in place of a ground (colony/colony.ts): the point and normal nearest a mark's spot, in the
+ * frame a ground direction is in, and whether the colony stands between a point and the eye. */
+export interface Hull {
+  anchorFor(ground: Vector3, at: Vector3, out: Vector3): void;
+  blocks(point: Vec, eye: Vec): boolean;
+  /** The share of its planet's radius it stands at now: less on its page, framed close. */
+  readonly scale: number;
 }

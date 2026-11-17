@@ -2,7 +2,7 @@
 // route's not-found. The world is found by the request's path as written: its case is part of the address.
 import { useState, type ReactNode } from "react";
 import { useLoaderData, type MetaArgs } from "react-router";
-import { hubWorldOf } from "@gnoworld/core";
+import { hubWorldOf, SHOWN_STATIONS } from "@gnoworld/core";
 import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, ORIGIN, worldMeta } from "../pageMeta.ts";
@@ -106,6 +106,7 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
       <PlaceFrame
         ring={ring}
         label={world.name}
+        imposing={!SHOWN_STATIONS.includes(world.slug)}
         plate={
           <>
             <Kicker planet>{kickerOf(world)}</Kicker>

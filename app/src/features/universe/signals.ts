@@ -4,7 +4,7 @@
 // every count.
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
-import { callersIn, daysSince, hubWorldOf, isFresh, type Signals } from "@gnoworld/core";
+import { callersIn, daysSince, hubWorldOf, isFresh, SHOWN_STATIONS, type Signals } from "@gnoworld/core";
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { CosmosWorld } from "../../space/cosmosWorld.ts";
 import { resultOf } from "../../lib/query/api.ts";
@@ -31,8 +31,11 @@ export interface WorldSignals {
 /** The signals from the server's answer, read at `now`. */
 function fromPresence({ worlds }: Presence, now: number): WorldSignals {
   const universe = universes.find((each) => each.default === true)?.id ?? "";
-  // A station's world stands round the Earth, never in the cloud: its people count on no world of the rail.
-  const stations = new Set(hubs.filter((hub) => hub.kind === "station").map(({ slug }) => slug));
+  // A station's world stands round the Earth, never in the cloud: its people count on no world of the rail; gnosh's colony, in gno.land's
+  // own system, counts as a world's.
+  const stations = new Set(
+    hubs.filter((hub) => hub.kind === "station" && !SHOWN_STATIONS.includes(hub.slug)).map(({ slug }) => slug),
+  );
   const ours = hubs.filter((hub) => hub.universe === universe && !stations.has(hub.slug));
   const bySlug = new Map(ours.map((hub) => [hub.slug, hubWorldOf(hub)]));
   return {

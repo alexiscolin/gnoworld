@@ -1,6 +1,8 @@
 // What the universe's stage holds: the planets, the suns, the dust, the stars, the galaxy's body (drawn over the frame), the orbits
 // of the system the camera is in, the plate, the planets near enough to be themselves, and the speed and the scan; each made once per
 // worlds' file, all disposed together.
+import { COLONY_AXIS } from "./stationWorlds.ts";
+import { SHOWN_STATIONS } from "@gnoworld/core";
 import { Scene, type PerspectiveCamera, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
 import { DONE, Intro } from "./intro.ts";
@@ -94,7 +96,8 @@ export class Stage {
   constructor({ base, still, bare = false }: { base: string; still: () => boolean; bare?: boolean | undefined }) {
     this.#bare = bare;
     this.#still = still;
-    this.ground = new EarthGround((id) => worldOf(id).look, still);
+    // A colony turns on its own axis (stationWorlds.ts), a planet on its seed's.
+    this.ground = new EarthGround((id) => (SHOWN_STATIONS.includes(id) ? COLONY_AXIS : worldOf(id).look), still);
     this.maps = this.owner.add(new Maps(base));
     this.moons = new Moons(this.maps, this.round.lines);
     this.effects = new Effects(this.scene, this.owner, still);

@@ -43,6 +43,21 @@ describe("a room of the Earth", () => {
   });
 });
 
+// gnosh's colony has a chat of its own, as the Earth's (D13744): its main room reads #general, its others by their own names.
+describe("a room of gnosh's colony", () => {
+  it("calls its main room #general, #help and #showcase by their own names, and leaves its page under /w/", () => {
+    expect(roomLabel("#gnosh-ai")).toBe("#general");
+    expect(roomLabel("#gnosh-ai/help")).toBe("#help");
+    expect(roomLabel("#gnosh-ai/showcase")).toBe("#showcase");
+    expect(roomHref("#gnosh-ai")).toBe("/w/gnosh-ai");
+    expect(roomHref("#gnosh-ai/help")).toBe("/w/gnosh-ai?room=help");
+  });
+
+  it("leaves another station's main room named by its world", () => {
+    expect(roomLabel("#adena")).toBe("#adena");
+  });
+});
+
 describe("a realm's room, which has no page of its world", () => {
   const room = "#gnogolf-golf-e00c30567c/golf-a-0123456789";
 
