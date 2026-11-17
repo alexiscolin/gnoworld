@@ -1,8 +1,11 @@
 // The rail's planets (7i): each world drawn alone by the planets' own code, the Earth from its own maps, in a corner of the scene's canvas at
 // the start of frames the scene lends, a few a frame, before it draws its own over them, so their grade is the scene's. A frame only draws
 // and reads pixels into buffers made before it; the JPEGs the page shows are made between frames. Maps are small and go with the planets.
+import { SHOWN_STATIONS } from "@gnoworld/core";
 import { PerspectiveCamera, Scene, SphereGeometry, Vector3, Vector4, type Texture, type WebGLRenderer } from "three";
 import { encoded, Packs, webgl2 } from "./pixels.ts";
+import { colonyBody, colonyCame } from "./colony/load.ts";
+import { COLONY_AXIS } from "./stationWorlds.ts";
 import { mapSetOf, namedLoad } from "./parts/maps.ts";
 import { earthPlanet } from "./earth/earth.ts";
 import { EARTH_MAPS } from "./earth/mapNames.ts";
@@ -95,6 +98,7 @@ function worldOf(
   { maps, sphere }: { maps: ReadonlyMap<string, Texture>; sphere: SphereGeometry },
 ) {
   const world = kit.worldOf(id);
+  if (SHOWN_STATIONS.includes(id)) return colonyBody({ ...world.look, ...COLONY_AXIS });
   const set = mapSetOf(kit.mapNamesOf(world), maps);
   return set === undefined ? undefined : kit.createWorld(world, set, sphere);
 }
@@ -213,7 +217,9 @@ export async function portraitsOf(
   size: number,
 ): Promise<Map<string, string>> {
   const kit = await import("./planet/generated.ts");
-  const maps = await mapsFor(device, new Set(ids.flatMap((id) => kit.namesFor(id))));
+  // gnosh's colony is drawn by its own code, which comes first, and asks no map.
+  if (ids.some((id) => SHOWN_STATIONS.includes(id))) await colonyCame();
+  const maps = await mapsFor(device, new Set(ids.flatMap((id) => (SHOWN_STATIONS.includes(id) ? [] : kit.namesFor(id)))));
   const sphere = new SphereGeometry(1, 64, 48);
   const planets = new Map<string, Planet>();
   try {

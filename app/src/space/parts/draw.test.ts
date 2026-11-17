@@ -10,18 +10,20 @@ const planet = (id: string) => ({ id }) as Planet;
 describe("a world drawn as itself", () => {
   // The colony's code is a chunk of its own, asked the first time it is drawn near: never with a first screen (D13746).
   it("gives gnosh's colony its own body, none till its code came, and asks no map of it", async () => {
-    const maps = { setOf: vi.fn(() => undefined), earth: vi.fn(() => undefined) } as unknown as Maps;
+    const setOf = vi.fn(() => undefined);
+    const maps = { setOf, earth: vi.fn(() => undefined) } as unknown as Maps;
     const sphere = new SphereGeometry();
     expect(drawnOf(planet("gnosh-ai"), maps, { sphere, page: true })).toBeUndefined();
     await colonyCame();
     const drawn = drawnOf(planet("gnosh-ai"), maps, { sphere, page: true });
     expect(drawn?.group.getObjectByName("colony")).toBeDefined();
-    expect(maps.setOf).not.toHaveBeenCalled();
+    expect(setOf).not.toHaveBeenCalled();
   });
 
   it("gives any other world its maps' planet, as before", () => {
-    const maps = { setOf: vi.fn(() => undefined), earth: vi.fn(() => undefined) } as unknown as Maps;
+    const setOf = vi.fn(() => undefined);
+    const maps = { setOf, earth: vi.fn(() => undefined) } as unknown as Maps;
     expect(drawnOf(planet("leon"), maps, { sphere: new SphereGeometry(), page: false })).toBeUndefined();
-    expect(maps.setOf).toHaveBeenCalledOnce();
+    expect(setOf).toHaveBeenCalledOnce();
   });
 });

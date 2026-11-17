@@ -14,6 +14,7 @@ import {
   type Texture,
 } from "three";
 import { Disposer } from "../disposer.ts";
+import type { Hull } from "../earth/groundTypes.ts";
 import { glowMaterial } from "./glowMaterial.ts";
 import type { PlateMask } from "./plateMask.ts";
 import { airMaterial, haloMaterial, ringMaterial } from "./planetMaterials.ts";
@@ -66,6 +67,8 @@ export interface Planet {
   setPlate(mask: PlateMask): void;
   /** Shows a world's stage. Its `size` is a factor for whoever scales the group: the view owns the group's scale. */
   setSigns(signs: WorldSigns): void;
+  /** A colony's hull, which the page's signs stand on in place of a ground; a planet has none. */
+  readonly hull?: Hull;
   dispose(): void;
 }
 

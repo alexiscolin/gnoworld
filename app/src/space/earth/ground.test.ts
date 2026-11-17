@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { placeOf, type Planet, type System } from "../layout.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { EarthGround } from "./ground.ts";
-import { dayOf } from "./light.ts";
+import { dayOf, kept } from "./light.ts";
 import type { Planet as Drawn } from "../planet/planet.ts";
 
 const v = { x: 0, y: 0, z: 0 };
@@ -366,12 +366,14 @@ describe("a colony's marks", () => {
     ground.hull = hull;
     const placed: [number, number, boolean][] = [];
     ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
-    ground.place(planet("gnosh-ai"), { seconds: 0, step: 0.1 }, seen);
+    // The ground turns by the planet's spin and the Earth's kept day (light.ts's kept): taken back, the turn is none.
+    const still = { seconds: -kept() / SPIN, step: 0.1 };
+    ground.place(planet("gnosh-ai"), still, seen);
     expect(hull.anchorFor).toHaveBeenCalledOnce();
     // The planet stands on its orbit of 1 at phase 0, at x 1; the hull point stands 0.8 out toward the eye, which sees it at x 1, y 0.
     expect(placed.at(-1)).toEqual([1, 0, true]);
     hull.blocks.mockReturnValue(true);
-    ground.place(planet("gnosh-ai"), { seconds: 0, step: 0.1 }, seen);
+    ground.place(planet("gnosh-ai"), still, seen);
     expect(placed.at(-1)?.[2]).toBe(false);
   });
 
@@ -383,7 +385,7 @@ describe("a colony's marks", () => {
     ground.hull = hullOf();
     const placed: [number, number, boolean][] = [];
     ground.setMarks([{ lat: 10, lon: 20, place: (x, y, front) => placed.push([x, y, front]) }]);
-    ground.place(planet("gnosh-ai"), { seconds: Math.PI / 2 / SPIN, step: 0.1 }, seen);
+    ground.place(planet("gnosh-ai"), { seconds: (Math.PI / 2 - kept()) / SPIN, step: 0.1 }, seen);
     // A quarter turn takes the point 0.8 out along z to 0.8 back along x: 1 - 0.8; its face now looks along x, across the eye's line.
     const [x, , front] = placed.at(-1) ?? [];
     expect(x).toBeCloseTo(0.2, 5);

@@ -5,6 +5,7 @@ import { flightOf } from "./sceneStage.ts";
 // screen asks. On the gate's software GPU.
 const SLOW = { timeout: 90_000 };
 const COLONY = /\/assets\/gnoshColony-[\w-]+\.js$/;
+const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -17,13 +18,21 @@ async function visit(page: Page, path: string) {
 test.describe("on a computer's screen", () => {
   test.use({ viewport: { width: 1491, height: 932 } });
 
-  test("asks none of the colony's code with the home's or the Earth's first screen", async ({ page }) => {
-    const scripts = scriptsAsked(page);
-    await visit(page, "/?test-gpu");
-    await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
-    await visit(page, "/earth?test-gpu");
-    await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
-    expect(scripts.filter((url) => COLONY.test(url))).toEqual([]);
+  // The scene comes after a page's text, and the colony's code after the scene, which asks it once the colony is wanted near (the home
+  // system's worlds are made ahead): never with a first screen.
+  test("asks the colony's code after the scene's on the home and the Earth, never with their first screen", async ({ page }) => {
+    for (const [path, drawn] of [
+      ["/?test-gpu", "[data-arrival='drawn']"],
+      ["/earth?test-gpu", "[data-earth='drawn']"],
+    ] as const) {
+      const scripts = scriptsAsked(page);
+      await visit(page, path);
+      await expect(page.locator(drawn)).toBeAttached(SLOW);
+      const scene = scripts.findIndex((url) => SCENE.test(url));
+      const colony = scripts.findIndex((url) => COLONY.test(url));
+      expect(scene, path).toBeGreaterThanOrEqual(0);
+      expect(colony === -1 || colony > scene, path).toBe(true);
+    }
   });
 
   test("names the colony in gno.land's system and draws it there, its code asked then", async ({ page }) => {

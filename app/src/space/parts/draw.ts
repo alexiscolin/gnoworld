@@ -1,6 +1,9 @@
-// A planet drawn as itself, once its maps came: the Earth the hand-made one, every other world its recipe.
-import { EARTH } from "@gnoworld/core";
+// A planet drawn as itself, once its maps came: the Earth the hand-made one, gnosh's colony its own once its code came, every other world
+// its recipe.
+import { EARTH, SHOWN_STATIONS } from "@gnoworld/core";
 import type { BufferGeometry } from "three";
+import { colonyBody } from "../colony/load.ts";
+import { COLONY_AXIS } from "../stationWorlds.ts";
 import { earthPlanet } from "../earth/earth.ts";
 import type { Planet } from "../layout.ts";
 import { createWorld, mapNamesOf, worldOf } from "../planet/generated.ts";
@@ -18,6 +21,7 @@ export function drawnOf(
     return earth === undefined ? undefined : earthPlanet(earth, sphere);
   }
   const world = worldOf(planet.id);
+  if (SHOWN_STATIONS.includes(planet.id)) return colonyBody({ ...world.look, ...COLONY_AXIS });
   const set = maps.setOf(mapNamesOf(world), page);
   return set === undefined ? undefined : createWorld(world, set, sphere);
 }

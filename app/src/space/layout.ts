@@ -1,8 +1,8 @@
 // The universe from the worlds' file: each namespace a system, a sun on its own tilted plane, in a saucer thick at its heart and
 // flat at its rim, the home at the heart and the heaviest nearest it; each world a planet on its own orbit; the Earth in the home system,
 // still. Every number comes from a hash of the ids, so the same file always gives the same universe.
-import { EARTH } from "@gnoworld/core";
-import { byNamespace, type CosmosWorld } from "./cosmosWorld.ts";
+import { EARTH, SHOWN_STATIONS } from "@gnoworld/core";
+import { byNamespace, COLONY_PHASE, colonySizeOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { HOME_NAMESPACES } from "../cosmosAt.ts";
 import { hashOf } from "./hash.ts";
 import { HEART, placesOf } from "./saucer.ts";
@@ -160,20 +160,21 @@ function orbitsOf(id: string, home: boolean, kept: Kept): { orbits: number[]; re
 // A planet's radius by its use, on a log scale: an unused world small, the busiest the largest, each a fifth larger or smaller by its
 // id so no two stand alike; the Earth's own size.
 const radiusOf = (world: Held[number]) =>
-  GROW * (world.id === EARTH ? SIZE.earth : sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16)));
+  GROW * (world.id === EARTH ? SIZE.earth : (colonySizeOf(world.id) ?? sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16))));
 
 // The planets of `system`: the file's `worlds`, then the `asked` ones the file lacks, on orbits past them.
 function addPlanets(system: System, kept: Kept, planets: Planet[]): void {
   const { orbits, reach } = orbitsOf(system.id, system.home, kept);
   for (const [at, world] of allOf(kept).entries()) {
-    const still = world.id === EARTH;
+    // The Earth and gnosh's colony stand still, the colony right of the sun, where the system's view always holds it (D13747).
+    const still = world.id === EARTH || SHOWN_STATIONS.includes(world.id);
     const orbit = orbits[at] ?? FIRST_ORBIT;
     const planet: Planet = {
       index: planets.length,
       id: world.id,
       system,
       orbit,
-      phase: still ? 2.2 : hashOf(world.id, 13) * Math.PI * 2,
+      phase: world.id === EARTH ? 2.2 : still ? COLONY_PHASE : hashOf(world.id, 13) * Math.PI * 2,
       // Near ones fast, far ones slow, all seen to move: a turn in about 2 minutes close in, 10 to 15 far out; the Earth's own
       // system at a third of that, so the home's first screen keeps its worlds in view.
       speed: still ? 0 : (0.42 / orbit) * (0.6 + hashOf(world.id, 14) * 0.6) * (system.home ? 0.35 : 1),

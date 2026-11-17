@@ -2,7 +2,8 @@
 // HTML told where it stands on each frame. The sums are the surface shader's (planet/surfaceShader.ts): the ground's direction turned back
 // about the pole by the planet's own turn, then its lean and tilt (planet.ts), its size and its place. Nothing is made on a frame.
 import { EARTH as EARTH_ID, groundDirection } from "@gnoworld/core";
-import type { Axis, Eye, GroundMark, LatLon } from "./groundTypes.ts";
+import type { Axis, Eye, GroundMark, Hull, LatLon } from "./groundTypes.ts";
+import { bottom, heldOf, takeHull, within, type Held } from "./marks.ts";
 import { Euler, Quaternion, Vector3 } from "three";
 import { placeOf, type Planet, type Vec } from "../layout.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
@@ -13,7 +14,7 @@ import { kept, turned } from "./light.ts";
 import { EARTH } from "./look.ts";
 import { Spring } from "./spring.ts";
 
-export type { Axis, Eye, Ground, GroundMark, LatLon } from "./groundTypes.ts";
+export type { Axis, Eye, Ground, GroundMark, Hull, LatLon } from "./groundTypes.ts";
 
 const DEGREE = Math.PI / 180;
 // A sign this close to the limb would slide off the edge: the cosine of the eye's angle over the ground.
@@ -28,17 +29,10 @@ const MOST_TILT = 1;
 // The arrival has calmed this many seconds after its animation has ended: no aim, no ping before.
 const CALM_S = 4;
 
-// The window's foot, as the page stands in a window; none where there is no window (the unit tests).
-const bottom = () => (typeof innerHeight === "number" ? innerHeight : Infinity);
-
-// Whether the point `at` stands left of the bubble's dock, right of its plate and under its header, all by `margin`.
-function within({ x, y }: Vec, { keep, from }: GroundMark, margin: number): boolean {
-  const [left, top] = [from?.x ?? -Infinity, from?.y ?? -Infinity];
-  return keep !== undefined && x < keep - margin && x >= left + margin && y >= top + margin;
-}
-
 export class EarthGround {
-  #held: readonly { mark: GroundMark; ground: Vector3 }[] = [];
+  #held: readonly Held[] = [];
+  /** A colony's hull its marks stand on in place of a ground, the page's planet's; none for a planet. */
+  hull: Hull | undefined;
   readonly #normal = new Vector3();
   readonly #point = new Vector3();
   readonly #centre = new Vector3();
@@ -54,7 +48,7 @@ export class EarthGround {
   #cosine = 0;
   #radius = 1;
   #hidden = false;
-  #newest: { mark: GroundMark; ground: Vector3 } | undefined;
+  #newest: Held | undefined;
   // The newest bubble judged: the planet's own spin when its aim was made (made again when it has moved a few degrees), and whether its country has been well seen since.
   #aimed: { mark: GroundMark; spin: number; seen: boolean } | undefined;
   #id = "";
@@ -109,10 +103,9 @@ export class EarthGround {
   }
 
   setMarks(marks: readonly GroundMark[]): void {
-    this.#held = marks.map((mark) => ({
-      mark,
-      ground: new Vector3(...groundDirection({ latitude: mark.lat * DEGREE, longitude: mark.lon * DEGREE })),
-    }));
+    this.#held = marks.map((mark) =>
+      heldOf(mark, new Vector3(...groundDirection({ latitude: mark.lat * DEGREE, longitude: mark.lon * DEGREE }))),
+    );
   }
 
   // The axis a lean turns the pole about so it comes straight to the eye (or goes away from it): across the pole and the way to the eye.
@@ -135,13 +128,17 @@ export class EarthGround {
   }
 
   // Where `ground` stands on screen, left in `#on`, the world turned by `angle`; whether the eye sees it clear of the limb and on screen.
-  #stands(ground: Vector3, angle: number, seen: Eye): boolean {
+  // On a colony the point is its hull's nearest the spot, taken once a hull, and hidden too where the colony stands before it.
+  #stands(held: Held, angle: number, seen: Eye): boolean {
     const { eye } = seen;
-    const normal = this.#normalOf(ground, angle, this.#normal);
-    const point = this.#point.copy(normal).multiplyScalar(this.#radius).add(this.#centre);
+    const hull = takeHull(held, this.hull);
+    const normal = this.#normalOf(hull === undefined ? held.ground : held.out, angle, this.#normal);
+    const point =
+      hull === undefined ? this.#point.copy(normal) : this.#normalOf(held.at, angle, this.#point);
+    point.multiplyScalar(this.#radius).add(this.#centre);
     const away = Math.hypot(eye.x - point.x, eye.y - point.y, eye.z - point.z) || 1;
     this.#cosine = (normal.x * (eye.x - point.x) + normal.y * (eye.y - point.y) + normal.z * (eye.z - point.z)) / away;
-    return seen.project(point, this.#on) && this.#cosine > CLEAR;
+    return seen.project(point, this.#on) && this.#cosine > CLEAR && !hull?.blocks(point, eye);
   }
 
   // Whether the bubble `mark` stands, as `#on` has it, where it can be read; `well`, also facing the eye and clear of the window's foot.
@@ -181,12 +178,12 @@ export class EarthGround {
     const held = this.#newest;
     this.#hidden =
       held !== undefined &&
-      !(this.#stands(held.ground, seconds * SPIN + this.lead + kept(), seen) && this.#readable(held.mark, true));
+      !(this.#stands(held, seconds * SPIN + this.lead + kept(), seen) && this.#readable(held.mark, true));
     this.#turn(seen, seconds, step);
-    for (const { mark, ground } of this.#held) {
-      const front = this.#stands(ground, seconds * SPIN + this.lead + kept(), seen);
-      mark.place(this.#on.x, this.#on.y, front);
-      if (this.#calm.tell(mark)) mark.calm?.();
+    for (const held of this.#held) {
+      const front = this.#stands(held, seconds * SPIN + this.lead + kept(), seen);
+      held.mark.place(this.#on.x, this.#on.y, front);
+      if (this.#calm.tell(held.mark)) held.mark.calm?.();
     }
   }
 
@@ -229,14 +226,14 @@ export class EarthGround {
 
   // The pair of spin and lean that shows the newest bubble's country in the free area, by the shortest turn (aim.ts): once per bubble, and again
   // when the planet's own spin has moved it a few degrees.
-  #aim(held: { mark: GroundMark; ground: Vector3 }, seen: Eye, seconds: number): void {
+  #aim(held: Held, seen: Eye, seconds: number): void {
     const turn = seconds * SPIN + kept();
     if (this.#aimed?.mark === held.mark && Math.abs(this.#aimed.spin - turn) < AIM_STEP) return;
     this.#aimed = { mark: held.mark, spin: turn, seen: false };
     if (!this.#lean.moving && this.#lean.at === 0) this.#axisFor(seen.eye);
     const probe = (lead: number, lean: number) => {
       this.#leanBy(lean);
-      if (!this.#stands(held.ground, turn + lead, seen)) return undefined;
+      if (!this.#stands(held, turn + lead, seen)) return undefined;
       return {
         at: this.#on,
         cosine: this.#cosine,

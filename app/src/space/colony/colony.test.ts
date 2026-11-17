@@ -7,7 +7,7 @@ import { hullMaps, SIZE } from "./hull.ts";
 const meshesOf = (root: Object3D): Mesh[] => {
   const all: Mesh[] = [];
   root.traverse((each) => {
-    if (each instanceof Mesh) all.push(each);
+    if (each instanceof Mesh) all.push(each as Mesh);
   });
   return all;
 };
@@ -56,7 +56,9 @@ describe("gnosh's colony, the offset crown (D13740)", () => {
   it("hides the hub's sign from an eye out past the wheel, the wheel standing between them", () => {
     const colony = fresh();
     const [point, normal] = [new Vector3(), new Vector3()];
-    const hub = ANCHORS.indexOf(ROOM_ANCHORS[2] ?? ANCHORS[0]);
+    const showcase = ROOM_ANCHORS[2];
+    if (showcase === undefined) throw new Error("no hub's anchor");
+    const hub = ANCHORS.indexOf(showcase);
     colony.anchorAt(hub, point, normal);
     const eye = point.clone().addScaledVector(normal, 10);
     expect(normal.dot(eye.clone().sub(point))).toBeGreaterThan(0);
@@ -126,7 +128,7 @@ describe("the colony's hull, drawn in the code", () => {
   });
 
   it("gives its normals unit length, so its plates' seams catch the light as metal does", () => {
-    const { data } = hullMaps(5).normalMap.image;
+    const data = hullMaps(5).normalMap.image.data ?? new Uint8Array();
     expect(data.length).toBe(4 * SIZE * SIZE);
     for (let at = 0; at < data.length; at += 4 * 997) {
       const [x, y, z] = [data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0].map((byte) => (byte / 255) * 2 - 1);
@@ -136,7 +138,8 @@ describe("the colony's hull, drawn in the code", () => {
 
   it("glazes a band of the habitat, its windows lit behind it, and nothing outside the band", () => {
     const { emissiveMap } = hullMaps(7, [0.25, 0.5]);
-    const { data, width, height } = emissiveMap?.image ?? { data: new Uint8Array(), width: 0, height: 0 };
+    const { width, height } = emissiveMap?.image ?? { width: 0, height: 0 };
+    const data = emissiveMap?.image.data ?? new Uint8Array();
     const lit = (row: number) => {
       let sum = 0;
       for (let x = 0; x < width; x += 1) sum += data[(row * width + x) * 4] ?? 0;
