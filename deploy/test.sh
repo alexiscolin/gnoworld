@@ -364,6 +364,8 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed '/for own in /,/^\tdone$/ s#-j REJECT#-j ACCEPT#'
 	mutant "the guard takes any word for an address" "the guard does not start on a host address that is not one: example.com" \
 		guard sed '/is not an IPv4 address/,/exit 1/ s#exit 1#:#'
+	mutant "the guard reads its addresses as patterns" "the guard does not start on a host address that is not one: *" \
+		guard sed '/^set -f$/d'
 	mutant "the way out's port answers what it did not accept" "the guard lets nothing else out" \
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
