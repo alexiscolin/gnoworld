@@ -16,7 +16,8 @@ The on-chain side of gnoworld: the realms written in gno.
 Nothing is deployed. The satellite realm is tested locally (`gno test`, its guards checked by mutation in the
 gate). Its module path, `gno.land/r/gnoworld/satellite`, cannot be registered on onyx-1 or gnoland-1: the open
 registrar, `r/sys/namereg/v0`, takes only names shaped `nym-<5 to 13 letters><3 digits>` and refuses a stem that
-starts with `gno`, and any other name needs a GovDAO vote (read through gnomcp, 2026-11-17). The realm moves to
+starts with `gno` (among other reserved prefixes and names), and any other name needs a GovDAO proposal
+(`ProposeRegisterUser` in `r/sys/users`); `gnoworld` is not taken on either chain (read through gnomcp, 2026-11-17). The realm moves to
 its deployer's address namespace, `gno.land/r/<address>/satellite/v0`, at its first deploy, with `self` and the
 filetests' `PKGPATH` changed with it.
 

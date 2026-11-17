@@ -143,7 +143,7 @@ satellite realm, on Onyx (ADR-0002 §8, row 11); it is not deployed yet. Phones 
 **Where it stands:** slices 0 to 11 are built and in `main` (its tree holds `jarvis/`, `evals/` and `gno/r/satellite`; `gno/r/seal` is out for now, D13197), except 4b (images
 and files) and 4d (the Discord bridge), which have no code in `server/src` or `app/src`. Nothing of gnoworld is on chain: slice 11's
 realm is written and tested locally, not deployed. Its path, `gno.land/r/gnoworld/satellite`, cannot be registered (`r/sys/namereg/v0`
-takes only `nym-<5 to 13 letters><3 digits>` and no stem starting with `gno`; another name needs a GovDAO vote), so it moves to its
+takes only `nym-<5 to 13 letters><3 digits>` and no stem starting with `gno`; another name needs a GovDAO proposal), so it moves to its
 deployer's address namespace at its first deploy. Slice 12
 is not started: there is no `admin/` and no PostHog in the code (the server's admin API, `server/src/door/admin.ts`, holds Jarvis's
 settings only). Slice 13 (below) came after slice 9 and is in `main`.

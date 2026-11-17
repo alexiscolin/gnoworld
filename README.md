@@ -20,8 +20,9 @@ security-critical code gets its own review. [docs/harness.png](docs/harness.png)
   nothing of its own: the calls a visitor signs in Adena go to other realms.
 - **The satellite realm** ([`gno/r/satellite/`](gno/README.md)) is written and tested locally, not
   deployed. Its path, `gno.land/r/gnoworld/satellite`, cannot be registered: gno.land's open name
-  registrar (`r/sys/namereg/v0`) takes only names shaped `nym-<5 to 13 letters><3 digits>` and refuses
-  stems that start with `gno`; any other name needs a GovDAO vote. The realm moves to its deployer's
+  registrar (`r/sys/namereg/v0`) takes only names shaped `nym-<5 to 13 letters><3 digits>`, and refuses
+  stems that start with `gno` (among other reserved prefixes and names); any other name needs a GovDAO proposal
+  (`ProposeRegisterUser` in `r/sys/users`). The realm moves to its deployer's
   address namespace (`gno.land/r/<address>/...`) at its first deploy.
 - **The seal realm** (`r/seal`, [ADR-0001](adr/0001-gnoworld.md) §3), audited and fixed, is out of
   the tree until it is needed; its last version is at commit `e44037b8` (`git show

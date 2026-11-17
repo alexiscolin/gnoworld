@@ -30,7 +30,7 @@ const (
 	blank      = 0x2800      // the Braille blank: a symbol that shows nothing
 )
 
-// Strings, not structs: storage is billed per byte, and each object adds bytes of its own (ADR-0001, "Ideas to place").
+// Strings, not structs: storage is billed per byte, and each object adds bytes of its own (ADR-0001, "Measurements").
 var (
 	rentals  avl.Tree // world -> "payer start days price text", until the rental is closed
 	holds    avl.Tree // world -> the unix second until which a takedown keeps it unrented, outside the record the payer may close

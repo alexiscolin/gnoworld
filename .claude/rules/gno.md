@@ -37,6 +37,6 @@ before reviewing one. From gno's AGENTS.md (gnolang/gno at 90cebca0d, 2026-10-15
   (`gno.land/p/nt/markdown/sanitize/v0`) on anything written into the markdown.
 
 Ours, besides: panic versus error, since an error does not revert; storage is billed per byte (100 ugnot a
-byte on onyx-1 and gnoland-1), each object adding bytes of its own, and a change to a realm's storage layout is
+byte by default, the chain's `vm:p:storage_price`), each object adding bytes of its own, and a change to a realm's storage layout is
 a migration (stop and ask); a new entry in `GAPS`
 (`scripts/mutate.py`) needs its reason.

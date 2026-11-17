@@ -806,7 +806,7 @@ What the numbers say:
   call cost more than two ed25519 verifications. Constants are folded before execution, so
   lookup tables belong in `const`.
 - **Storage is billed per byte, and every object brings bytes of its own.** The deposit is the
-  bytes stored times the chain's storage price (100 ugnot a byte on onyx-1 and gnoland-1), and
+  bytes stored times the chain's storage price (100 ugnot a byte by default, `vm:p:storage_price`), and
   each live object adds its metadata to those bytes. Storing the record as an encoded string
   instead of a struct saved 873 B (−28%). This matches the ~780 B per live object that
   `r/moul/agents/relay/v0` reports.
