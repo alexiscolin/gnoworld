@@ -174,7 +174,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
   test("a direct message chosen in the drawer opens, and the drawer closes", async ({ page }) => {
     const { address, ergo } = await account(page, 390);
     ergo().send(dmFrom(address));
-    await expect(control(page)).toContainText("1 unread");
+    await expect(control(page)).toHaveAccessibleName("Rooms, 1 unread");
     await chooseDm(page);
     await expect(drawer(page)).toBeHidden();
     await takesWidth(page.getByRole("form", { name: `Write to ${OTHER_SHORT}` }), 390);
