@@ -1,7 +1,7 @@
 // A phone's main navigation, at the bottom of its chat: the worlds in one row that scrolls sideways inside itself, each its planet with its
 // name under it and its unseen lines at its corner; the world in view ringed and brought into view when the row is drawn. The row is the
 // desktop column's (the Earth, the worlds followed, then the chat's own, Worlds.tsx), then, read after the first paint, the desktop rail's
-// worlds the column lacks (railFeed, RailOrder), and ends with "All", which asks the search palette open on every place, as the rail's does.
+// worlds the column lacks (railFeed, RailOrder), and begins with "All", which asks the search palette open on every place, as the rail's does.
 import { EARTH, hubWorldOf } from "@gnoworld/core";
 import { Icon } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
@@ -92,6 +92,26 @@ function useRail(worlds: WorldsProps["worlds"]): readonly RailEntry[] | undefine
   return entries !== undefined && entries.length > 0 ? entries : undefined;
 }
 
+/** "All": asks the search palette open on every place, as the desktop rail's does. */
+function AllPlaces() {
+  return (
+    <button
+      type="button"
+      className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
+      onClick={() => {
+        window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
+      }}
+    >
+      <span className={`${styles["disc"] ?? ""} ${styles["all"] ?? ""} grid-center`}>
+        <Icon name="orbits" size="l" />
+      </span>
+      <span className={`${styles["name"] ?? ""} label`}>
+        All<span className="visually-hidden"> places</span>
+      </span>
+    </button>
+  );
+}
+
 export function PhoneWorlds(props: WorldsProps) {
   const rowRef = useRef<HTMLElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +147,9 @@ export function PhoneWorlds(props: WorldsProps) {
     <nav ref={rowRef} aria-label="Worlds" className={styles["row"]}>
       <div ref={scrollerRef} data-scroller="" className={styles["scroller"]}>
         <ul className={styles["list"]}>
+          <li>
+            <AllPlaces />
+          </li>
           {items.map((item) => (
             <li key={item.id}>
               <RouterLink
@@ -156,23 +179,8 @@ export function PhoneWorlds(props: WorldsProps) {
         </ul>
       </div>
       <span aria-hidden="true" className={styles["cue"]}>
-        <Icon name="arrow" size="s" />
+        <Icon name="chevron" size="s" />
       </span>
-
-      <button
-        type="button"
-        className={`${column["world"] ?? ""} ${styles["link"] ?? ""} ${styles["pinned"] ?? ""} no-edge`}
-        onClick={() => {
-          window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
-        }}
-      >
-        <span className={`${styles["disc"] ?? ""} ${styles["all"] ?? ""} grid-center`}>
-          <Icon name="orbits" size="l" />
-        </span>
-        <span className={`${styles["name"] ?? ""} label`}>
-          All<span className="visually-hidden"> places</span>
-        </span>
-      </button>
     </nav>
   );
 }

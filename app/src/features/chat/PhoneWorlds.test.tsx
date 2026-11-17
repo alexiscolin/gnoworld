@@ -107,7 +107,7 @@ describe("PhoneWorlds", () => {
     expect(scrolled.mock.contexts[0]).toBe(one(document.body, 'a[aria-current="page"]'));
   });
 
-  it("grows to the rail's worlds once read, after the column's, none twice, ending with All", async () => {
+  it("grows to the rail's worlds once read, after the column's, none twice, beginning with All", async () => {
     const box = mount("bubble");
     await act(async () => {
       await new Promise((done) => setTimeout(done, 20));
@@ -115,8 +115,7 @@ describe("PhoneWorlds", () => {
     expect(all(box, "a")).toHaveLength(3);
     await tell({ worlds: [world("games/go"), world("art/hall")], signals: SIGNALS });
     const names = all(box, "li").map((item) => item.textContent.trim());
-    expect(names.slice(0, 3)).toEqual(["Earth", "Bubble", "GovDAO"]);
-    expect(all(box, "button").at(-1)?.textContent).toBe("All places");
+    expect(names.slice(0, 4)).toEqual(["All places", "Earth", "Bubble", "GovDAO"]);
     expect(names.filter((name) => name === "Earth" || name === "Bubble")).toHaveLength(2);
     expect(names.length).toBeGreaterThan(4);
     expect(all(box, "a").map((link) => link.getAttribute("aria-current"))).toContain("page");
@@ -128,19 +127,19 @@ describe("PhoneWorlds", () => {
     await tell({ worlds: [world("games/go")], signals: SIGNALS });
     const heard = vi.fn<(event: Event) => void>();
     window.addEventListener(SEARCH, heard);
-    const button = all(box, "button").at(-1);
+    const button = one(box, "button");
     act(() => {
-      button?.click();
+      button.click();
     });
     window.removeEventListener(SEARCH, heard);
-    expect(button?.textContent).toContain("All");
+    expect(button.textContent).toContain("All");
     expect(heard).toHaveBeenCalledOnce();
   });
 
-  it("keeps All pinned outside the scrolling list, from the start", () => {
+  it("holds All as the scrolling list's first item, scrolling with the worlds", () => {
     const nav = one(mount("earth"), 'nav[aria-label="Worlds"]');
-    const button = all(nav, "button").at(-1);
-    expect(button?.closest("ul")).toBeNull();
+    const button = one(nav, "button");
+    expect(button.closest("[data-scroller] ul > li:first-child")).not.toBeNull();
     expect(all(nav, "a").every((link) => link.closest("button") === null)).toBe(true);
   });
 

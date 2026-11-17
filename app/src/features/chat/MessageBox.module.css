@@ -242,11 +242,11 @@
       border: var(--line-width) solid var(--color-line-strong);
     }
 
-    /* Three lines' room at rest, which Send (44 px) and its inset sit inside. */
+    /* Four lines' room at rest, which Send (44 px) and its inset sit inside. */
     .box:not(:focus-within) [role="textbox"],
     .box:not(:focus-within) [role="textbox"] + [aria-hidden="true"],
     .box:not(:focus-within) .field textarea {
-      min-block-size: calc(3lh + var(--space-s));
+      min-block-size: calc(4lh + var(--space-s));
     }
 
     /* At rest the field and Send are side by side, the foot (the format control and the quick actions' /) shown once the
