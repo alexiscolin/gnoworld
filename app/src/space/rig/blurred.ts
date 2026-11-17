@@ -13,3 +13,20 @@ export function blurTarget(
   const samples = renderer.getContext().getContextAttributes()?.antialias === true ? 4 : 0;
   return new WebGLRenderTarget(width, height, { type: HalfFloatType, samples });
 }
+
+/** Draws `scene` through `camera` once into a pixel of the blur's kind of target, where nothing shows: what draws into it gets its
+ * programs and pipelines then, as a near planet does before it shows (warmup.ts); the target set before is set back. */
+export function warmBlurred(
+  renderer: Pick<WebGLRenderer, "getContext" | "getRenderTarget" | "setRenderTarget" | "render">,
+  scene: Scene,
+  camera: Camera,
+): void {
+  const [was, target] = [renderer.getRenderTarget(), blurTarget(renderer, 1, 1)];
+  renderer.setRenderTarget(target);
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    renderer.setRenderTarget(was);
+    target.dispose();
+  }
+}

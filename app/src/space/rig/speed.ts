@@ -21,7 +21,7 @@ import type { Disposer } from "../disposer.ts";
 import type { Rig } from "./rig.ts";
 import { BLUR_FRAGMENT, BLUR_VERTEX, DUST_FRAGMENT, DUST_VERTEX } from "./speedShaders.ts";
 import { ADDITIVE } from "../additive.ts";
-import { blurTarget } from "./blurred.ts";
+import { blurTarget, warmBlurred } from "./blurred.ts";
 
 // The blur's strength by the stage's speed (its moves over its distance, a second): none under 0.8, all from 3.2; at most half,
 // reaching 14 % of the way to the centre at its strongest.
@@ -35,6 +35,10 @@ const OFF = 0.004;
 const GONE = 1e-3;
 // How long after the blur's last frame its target is freed: 40 MB of GPU memory at a Retina size.
 const FREE_MS = 10_000;
+// What the blur draws is warmed (blurred.ts) once the view has rested this long, past the galaxy's 2.4 s arrival or a page's: so what came
+// on the stage meanwhile makes its programs where nothing moves fast, not in the next flight's first blurred frames. Not as a flight starts:
+// there it cost the click, for what the flight never blurs (a page's plate and scan).
+const WARM_MS = 3000;
 const DUST = 700;
 
 export class Speed {
@@ -66,6 +70,9 @@ export class Speed {
   readonly #look = new Vector3();
   #strength = 0;
   #rested = 0;
+  // Whether a flight runs, and whether what the blur draws was warmed since the last.
+  #flying = false;
+  #warm = false;
 
   /** On `stage`, owned by `owner`. */
   constructor(stage: Scene, owner: Disposer) {
@@ -91,6 +98,8 @@ export class Speed {
   /** A frame of `rig`'s, `delta` ms on: the dust's wrap and gain, and the blur's strength, eased in and out. */
   tick(rig: Pick<Rig, "eye" | "pose" | "speed" | "flying">, delta: number): void {
     const { eye, pose, speed, flying } = rig;
+    if (flying) this.#warm = false;
+    this.#flying = flying;
     const want = flying ? smoothstep(BLUR_FROM, BLUR_FULL, speed) * BLUR_MOST : 0;
     this.#strength += (want - this.#strength) * (want < this.#strength ? FALL : RISE);
     const scale = Math.min(4000, Math.max(2, pose.distance * 0.8));
@@ -126,10 +135,18 @@ export class Speed {
 
   /** Draws `stage` through `camera`, blurred while fast: false where no blur runs and the caller draws it as it does. */
   draw(
-    renderer: Pick<WebGLRenderer, "getDrawingBufferSize" | "setRenderTarget" | "render" | "getContext">,
+    renderer: Pick<
+      WebGLRenderer,
+      "getDrawingBufferSize" | "getRenderTarget" | "setRenderTarget" | "render" | "getContext" | "compile"
+    >,
     stage: Scene,
     camera: PerspectiveCamera,
   ): boolean {
+    if (!this.#warm && !this.#flying && this.#rested > WARM_MS) {
+      this.#warm = true;
+      warmBlurred(renderer, stage, camera);
+      renderer.compile(this.#screen, this.#flat);
+    }
     if (this.#strength < OFF) return false;
     renderer.getDrawingBufferSize(this.#size);
     const target = (this.#target ??= blurTarget(renderer, this.#size.x, this.#size.y));
