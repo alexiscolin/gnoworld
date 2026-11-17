@@ -432,7 +432,7 @@ Each change that adds a resource proves it is released:
 
 ## Budgets the gate checks
 
-A cap moves only by a recorded decision with its reason, never to the latest measure plus a margin.
+A cap moves only by the owner's decision, recorded with its reason, never to the latest measure plus a margin.
 
 | Budget | Limit | Where |
 |---|---|---|

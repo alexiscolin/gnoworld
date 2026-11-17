@@ -8,7 +8,7 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets (D13801), gzip, hashed names left out: JavaScript before the first usable screen, on every page, and all a
-// phone downloads with the precache. They move only by a recorded decision, never to a new measure.
+// phone downloads with the precache. They move only by the owner's recorded decision, never to a new measure.
 const FIRST_SCREEN_JS = 300_000;
 const TOTAL = 3_300_000;
 

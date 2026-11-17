@@ -23,8 +23,8 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
   him the tip's 16 hex.
 - The safety net never shrinks quietly: a test gone or switched off, a floor lowered, a gap or an ignore added is declared on a line
   of its own (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`) or GitHub's regressions job fails; no `.skip`, `.only`,
-  `.todo`, `.fails`. Floors rise with the scores; a size cap moves only by a recorded decision with its reason, never to
-  the latest measure plus a margin (D13801).
+  `.todo`, `.fails`. Floors rise with the scores; a size cap moves only by Alexis's decision, recorded with its reason, never
+  to the latest measure plus a margin (D13801).
 - A fix starts with the test that reproduces the bug, seen failing, committed with it. Never change a test to make code pass
   without saying so.
 

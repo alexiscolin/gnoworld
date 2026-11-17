@@ -114,7 +114,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
    (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A size cap moves
-   only by a recorded decision with its reason (D13801), never to the latest measure plus a margin:
+   only by the owner's decision, recorded with its reason (D13801), never to the latest measure plus a margin:
    in a commit of its own with a `Lowered-floor:` line, both numbers in its report.
 
 ### A branch's weight by its kind

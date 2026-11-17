@@ -630,7 +630,7 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
   - at most 3,300,000 B in all on mobile, the precache included, about 5 % over the measure at the
     decision, against gno.world's 11.1 MB;
   - 60 fps on a mid-range phone.
-  - A cap moves only by a recorded decision with its reason, never to the latest measure plus a margin.
+  - A cap moves only by the owner's decision, recorded with its reason, never to the latest measure plus a margin.
 
 **PWA rules:**
 - Precache the app's hashed files, its scripts, styles and fonts, and its shell, its pages, their data,
