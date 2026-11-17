@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dmActs } from "./dmActs.ts";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 
 // A refusal is dismissed before a retry, or the retry would meet it at once: the line would offer Delete again while its
 // REDACT is in flight, and a success would still flash "Could not delete the message.".

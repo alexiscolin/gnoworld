@@ -44,7 +44,7 @@ Reuse, with the evidence:
 Corrections to the brief (read, not assumed):
 1. **There is no jump to a line.** `lineFlash.ts` is the flash of a copy and a delete (`lineFlash.ts:1-2`); `lineFocus.ts` is the keyboard
    focus. Saved's "Open in room" is only a link to the room (`SavedView.tsx:44-49`, `roomHref`). Opening a room *at a message* is new work,
-   and it needs an "around this message" history read the app does not have (it asks `CHATHISTORY BEFORE`, `app/src/features/chat/link/history.ts`,
+   and it needs an "around this message" history read the app does not have (it asks `CHATHISTORY BEFORE`, `app/src/features/chat/connection/history.ts`,
    a window of `LINES_KEPT`). That is the heaviest part of C (section 5).
 2. **The server does not "see" public rooms through the moderation's connection only**: it has one IRC link whose `onMessage` is `hearing`
    (`chat.ts:136`); a line is checked later by the queue, and only `passedLines` means "the bot passed it". The index must hang there, never

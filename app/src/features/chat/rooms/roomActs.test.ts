@@ -1,6 +1,6 @@
 import { compose } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 import { roomActs } from "./roomActs.ts";
 
 // What the composer composed of a draft.

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, markup, noMedia, one } from "../../../tests/mount.tsx";
 import { Composer, typingOf } from "./Composer.tsx";
 import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./composer/draftHint.ts";
-import { tooFast } from "./link/pace.ts";
+import { tooFast } from "./connection/pace.ts";
 import { refusalAfter } from "./composer/composerHooks.ts";
 import { acting, FIELD, inPage } from "../../../tests/composer.tsx";
 

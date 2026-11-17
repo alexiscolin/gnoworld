@@ -1,7 +1,7 @@
 import { compose, type Line } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import type { Dms } from "./Dms.tsx";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 import { roomActs } from "./roomActs.ts";
 import { shownOf, type DmPage, type Room } from "./shown.tsx";
 

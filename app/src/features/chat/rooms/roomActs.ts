@@ -3,7 +3,7 @@
 // typist's refresh costs 0.55-0.93 ms at 200 lines, 0.025-0.044 ms with them kept).
 import type { Composed, Reacting } from "@gnoworld/core";
 import type { RefObject } from "react";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 
 export type RoomActs = ReturnType<typeof roomActs>;
 

@@ -4,7 +4,7 @@ import { COUNTRIES, countryName } from "@gnoworld/core/bubbles";
 import type { Address } from "@gnoworld/schemas";
 import { Select } from "@gnoworld/ui";
 import { useState } from "react";
-import { keepCountry, shownCountry } from "../link/accountKit.ts";
+import { keepCountry, shownCountry } from "../connection/accountKit.ts";
 import { Setting } from "./RoomMenu.tsx";
 
 interface ListProps {

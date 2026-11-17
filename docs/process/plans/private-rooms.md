@@ -69,7 +69,7 @@ about a private room (the team has no right in it, section 6). A private room's 
   which asks `ResolveName(name)` for the current, undeleted holder's address; `roles/owners.ts` `makeOwnerReaders` wraps it with a 5 s
   timeout, a 1 KiB cap, a 60 s cache, 4 reads in flight, 1,000 an hour, a few a visitor, two pools (`act`, `show`), so an invite by name
   reuses that reader (and a third pool of its own, so a flood of invites never starves an owner's right, F13831's lesson).
-- **Notices (the bell) are the client's.** `Noticer` (`app/src/features/chat/link/noticing.ts`) makes a notice from each IRC line addressed to
+- **Notices (the bell) are the client's.** `Noticer` (`app/src/features/chat/connection/noticing.ts`) makes a notice from each IRC line addressed to
   the account; the server stores none. An invite is not an IRC line, so it needs a server list the page asks for.
 - **Accounts**: `accounts (address, first_seen)`; no account deletion route exists in the code (erasure is promised by ADR-0002, not
   built): a `forgetAccount` is written and tested, and called by whatever erasure comes.

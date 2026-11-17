@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useApp, useAppStore } from "../../../storeContext.tsx";
 import { ErrorView, errorKind } from "../../errors/index.ts";
 import { chunked } from "../Failing.tsx";
-import type { ChatLink } from "../link/linkTypes.ts";
+import type { ChatLink } from "../connection/linkTypes.ts";
 import { roomHref, roomWorld } from "../rooms/names.ts";
 import type { Act } from "../PlaceActs.tsx";
 import type { Time } from "./filters.ts";

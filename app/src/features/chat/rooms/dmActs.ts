@@ -2,7 +2,7 @@
 // for a room: built from the partner and the link alone.
 import type { Reacting } from "@gnoworld/core";
 import type { RefObject } from "react";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 
 export interface DmActs {
   onDelete: (id: string) => boolean;

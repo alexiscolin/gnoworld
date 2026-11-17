@@ -3,7 +3,7 @@
 import { Chip, Cluster, Icon } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
 import type { DmActs } from "./dmActs.ts";
-import type { Say } from "../link/linkTypes.ts";
+import type { Say } from "../connection/linkTypes.ts";
 import { shortAddress } from "./names.ts";
 import { PersonLink } from "../PersonLinkLazy.tsx";
 import type { RoomViewProps } from "../lines/RoomView.tsx";

@@ -8,7 +8,7 @@ import { chunked } from "../Failing.tsx";
 import { ChatScreen, type ChatPlace } from "../ChatScreen.tsx";
 import { JarvisTold } from "../jarvisTold.tsx";
 import { Dock } from "../dock/Dock.tsx";
-import type { ChatLink } from "../link/link.ts";
+import type { ChatLink } from "../connection/link.ts";
 import { LOG_IN_TO_READ_DMS } from "../loginWords.ts";
 import { GuestWriter } from "../composer/GuestWriter.tsx";
 import { LogInToWrite } from "../composer/LogInToWrite.tsx";
