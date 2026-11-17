@@ -65,6 +65,8 @@
       display: grid;
       /* layout: the words on the middle of the 44 px */
       align-content: center;
+      /* layout: the one track shrinks below its words' length, so a cut title never pushes the row past its box */
+      grid-template-columns: minmax(0, 1fr);
       min-block-size: var(--control-m);
     }
   }

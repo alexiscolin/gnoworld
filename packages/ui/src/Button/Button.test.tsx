@@ -13,7 +13,7 @@ const sheet = readFileSync(`.${new URL("./Button.module.css", import.meta.url).p
 
 // What a rule of the sheet sets, its declarations as one line, its comments left out.
 const rule = (selector: string) =>
-  (new RegExp(`\\n  ${selector.replaceAll(/[.[\]()*+?^$|]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "")
+  (new RegExp(`\\n {2,4}${selector.replaceAll(/[.[\]()*+?^$|]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "")
     .replaceAll(/\/\*[\s\S]*?\*\//g, "")
     .replaceAll(/\s+/g, " ")
     .trim();
@@ -235,6 +235,15 @@ describe("Button", () => {
     expect(rule(".button[data-stretch]::after")).toBe('content: ""; position: absolute; inset: 0;');
     // A solid (cream) fill keeps itself: the veil would make dark ink sit on a dark fill, and on a phone a tap leaves the hover on.
     expect(rule('.button[data-stretch]:not([data-emphasis="solid"]):hover')).toBe("--_fill: var(--color-fill-hover);");
+  });
+
+  // A tap leaves :hover on, so a phone's button would keep the veil: every :hover rule sits inside `@media (hover: hover)`.
+  it("answers :hover only where the primary input can hover", () => {
+    const outside = sheet
+      .replaceAll(/\/\*[\s\S]*?\*\//g, "")
+      .replaceAll(/@media \(hover: hover\) \{(?:[^{}]|\{[^}]*\})*\}/g, "");
+    expect(outside).not.toContain(":hover");
+    expect(sheet).toContain("@media (hover: hover)");
   });
 
   // The composer's format bar draws its tools' ink and their narrow height from outside, reaching its link tool's button too.

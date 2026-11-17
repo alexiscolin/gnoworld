@@ -44,6 +44,7 @@
       margin: 0;
       padding-block: max(var(--space-m), env(safe-area-inset-top)) max(var(--space-s), env(safe-area-inset-bottom));
       padding-inline: max(var(--space-s), env(safe-area-inset-left)) max(var(--space-s), env(safe-area-inset-right));
+      border: 0;
       border-radius: 0;
       overflow: auto;
     }
@@ -144,6 +145,13 @@
 
   .dialog[data-side="start"]::backdrop {
     background: transparent;
+  }
+
+  /* A phone's drawer has the page's own ground, so only a scrim sets it off from the page beside it. */
+  @media (width < 900px) {
+    .dialog[data-side="start"]::backdrop {
+      background: var(--color-scrim);
+    }
   }
 
   .dialog[data-side="start"] .close {

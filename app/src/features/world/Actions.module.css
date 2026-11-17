@@ -23,4 +23,19 @@
       justify-content: center;
     }
   }
+
+  /* Under about 340 px the two wide buttons cannot share a line with the icons: the main action takes a line of its own and the rest wrap
+     under it, so no pill breaks its words in two. */
+  @media (width < 340px) {
+    .line {
+      /* layout: the actions wrap under the main one */
+      flex-wrap: wrap;
+      overflow: visible;
+    }
+
+    .line > :first-child {
+      /* layout: the main action alone on its line */
+      flex-basis: 100%;
+    }
+  }
 }

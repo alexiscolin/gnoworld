@@ -28,6 +28,15 @@
   }
 
   @media (width < 900px) {
+    /* One left line: the body's box runs 16 px in from each edge, and the title and its rows' words stand a NavItem's padding inside it. */
+    .title {
+      padding-inline: calc(var(--space-s) + var(--space-xs));
+    }
+
+    .body {
+      padding-inline: var(--space-s);
+    }
+
     /* The rooms' links and the sections' toggles are 44 px, as a finger needs (NavItem's own height is this token). */
     .body {
       --chat-item: var(--control-m);

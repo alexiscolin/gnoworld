@@ -12,6 +12,19 @@
     transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
+  /* A phone's bar is two lines, which a capsule's ends would cut: a box's corners, and the sentence wraps instead of an ellipsis. */
+  @media (width < 900px) {
+    .talk {
+      border-radius: var(--radius-box);
+    }
+
+    .words {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+  }
+
   /* The words give way (cut with an ellipsis) before the bar's button does: a long line never runs out of the bar. */
   .who {
     /* layout: the faces and words take what the button leaves */
@@ -23,8 +36,10 @@
     min-inline-size: 0;
   }
 
-  .talk:hover {
-    background: var(--color-fill-hover);
+  @media (hover: hover) {
+    .talk:hover {
+      background: var(--color-fill-hover);
+    }
   }
 
   /* Stacked faces overlap, each ringed in the night (the avatar's own ring); an initial centred in its disc by the line. */
