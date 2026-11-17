@@ -350,6 +350,9 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       XTABLES_LOCKFILE: /tmp/xtables.lock
+      # The host's own public addresses, refused like the private ranges: where a public front on this host
+      # listens, which 80 and 443 would otherwise reach. None by default.
+      HOST_PUBLIC_ADDRESSES: ${HOST_PUBLIC_ADDRESSES:-}
       # Its own address on jarvis's way out's network, by which guard.sh finds that network.
       JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
       # And its address on the reader's way out's network.

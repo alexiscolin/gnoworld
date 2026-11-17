@@ -51,6 +51,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 | `JARVIS` | `off` | Section 4 |
 | `LINK_CARDS` | `0` | Section 4 |
 | `MODERATION` | `off` | OpenAI's moderation: `on` reads `openai_api_key` and checks every line and preview page |
+| `HOST_PUBLIC_ADDRESSES` | none | The host's own public IPv4 addresses, spaces between, which the guard refuses: set them when a public front runs on this host |
 | `JARVIS_GNOSCOPE` | `off` | Jarvis's gnoscope tools: `on` or `off` |
 | `JARVIS_BUDGET_USD`, `JARVIS_TRANSLATION_BUDGET_USD` | `3`, `1` | A day's budgets in whole dollars, kept from the first start (an admin changes them after) |
 | `GUEST_CHAT`, `GUEST_NAMES_PER_VISITOR_HOUR`, `GUEST_NAMES_PER_HOUR`, `GUEST_LIVING` | `on`, `10`, `600`, `5000` | Guest chat and its limits, below |
