@@ -98,6 +98,10 @@
      opening and hides after the last of its closing (content-visibility eases as a discrete value). Where it is not known, visibility hides it. */
   .inner {
     min-block-size: 0;
+    /* Room inside the clip for a focus ring at the body's edges, as .scroll-row does: a field or a Copy there keeps its whole ring. */
+    padding-inline: calc(var(--focus-width) + var(--focus-offset));
+    /* layout: the room taken back outside, so the body keeps its place */
+    margin-inline: calc(-1 * (var(--focus-width) + var(--focus-offset)));
     overflow: hidden;
     visibility: hidden;
     transition: visibility var(--motion-slow);

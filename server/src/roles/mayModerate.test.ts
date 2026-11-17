@@ -295,6 +295,7 @@ describe("a link to the team grants no role (trap 1, with real links)", () => {
       file: cliFile(key, made.text),
       host: "gnoworld.test",
       signedAt: at,
+      byProof: { kind: "adena", proof: lead.sign("onyx-1", made.text) },
     });
     expect(typeof done).toBe("object");
     expect(links.identityOf(key.address)).toContain(lead.address);

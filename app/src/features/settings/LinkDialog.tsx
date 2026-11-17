@@ -1,6 +1,7 @@
-// The dialog that links an account: two tabs, Adena and Command line.
+// The dialog that links an account: two tabs, Adena and Command line, each tab's panel named by its tab; the tab track as wide as its
+// tabs, at the content's start (the UX pass).
 import type { Address } from "@gnoworld/schemas";
-import { Dialog, Stack, Tabs } from "@gnoworld/ui";
+import { Cluster, Dialog, TabPanel, Tabs } from "@gnoworld/ui";
 import { useState } from "react";
 import { AdenaTab } from "./AdenaTab.tsx";
 import { CommandTab } from "./CommandTab.tsx";
@@ -13,15 +14,25 @@ const TABS = [
 export function LinkDialog({ me, onLinked, onClose }: { me: Address; onLinked: () => void; onClose: () => void }) {
   const [tab, setTab] = useState("adena");
   return (
-    <Dialog title="Link an account" open onClose={onClose}>
-      <Stack space="s">
-        <Tabs label="Kind of account" tabs={TABS} selected={tab} onSelect={setTab} size="s" />
+    <Dialog
+      title="Link an account"
+      description="The account to link signs a text, then you sign the same text."
+      open
+      onClose={onClose}
+    >
+      {/* A phone has no terminal: it keeps the Adena tab alone (PR #41's UX review). */}
+      <div className="fine-only">
+        <Cluster>
+          <Tabs id="link-way" label="Kind of account" tabs={TABS} selected={tab} onSelect={setTab} size="s" />
+        </Cluster>
+      </div>
+      <TabPanel id="link-way" tab={tab}>
         {tab === "adena" ? (
           <AdenaTab me={me} onLinked={onLinked} onCancel={onClose} />
         ) : (
-          <CommandTab onLinked={onLinked} onCancel={onClose} />
+          <CommandTab me={me} onLinked={onLinked} onCancel={onClose} />
         )}
-      </Stack>
+      </TabPanel>
     </Dialog>
   );
 }

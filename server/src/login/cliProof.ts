@@ -9,7 +9,7 @@ import { Address, toAddress } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { Expected } from "./verify.ts";
 
-const CLI_CHAIN = "gnoworld-link";
+export const CLI_CHAIN = "gnoworld-link";
 const MAX_FILE = 4096;
 const MAX_MEMO = 2000;
 // secp256k1's group order: a signature whose S is above half of it is malleable, and the chain refuses it.
@@ -83,7 +83,7 @@ export function cliDocument(address: Address, memo: string): { document: string;
     signatures: null,
     memo,
   });
-  const command = `gnokey sign --tx-path link.json --chainid ${CLI_CHAIN} --account-number 0 --account-sequence 0 KEY && cat link.json`;
+  const command = `gnokey sign --tx-path link.json --chainid ${CLI_CHAIN} --account-number 0 --account-sequence 0 ${address} && cat link.json`;
   return { document, command };
 }
 
@@ -100,6 +100,8 @@ const File = z.strictObject({
   memo: z.unknown(),
   signatures: z.array(Entry).length(1),
 });
+/** A pasted file as a body carries it: what `verifyCliProof` reads, 4 KiB at most. */
+export const CliFile = z.string().refine((text) => Buffer.byteLength(text) <= MAX_FILE);
 const Key = z.strictObject({ "@type": z.literal("/tm.PubKeySecp256k1"), value: z.string() });
 
 // Bytes of a base64 string only if it is the canonical spelling: Node's decoder skips what is not base64.

@@ -32,7 +32,8 @@ export const notSigned = (way: "adena" | "cli", address: string): string =>
 /** A verify's 403, after the proof passed: the account belongs to another identity. */
 export const LINKED_ELSEWHERE = "This account is already linked to another gnoworld account. Unlink it there first.";
 /** A paste that is not the tool's signed file: the code is kept. */
-export const PASTE_SHAPE = "Paste only what `cat link.json` printed, after the sign line ran.";
+export const PASTE_SHAPE =
+  'This is not the signed file. Paste everything the command printed, from {"msg" to the last }.';
 
 const RELEASE_TOO_MANY = "Too many tries from this network: wait a few minutes, or try from another network.";
 
