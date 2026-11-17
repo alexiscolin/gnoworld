@@ -2,7 +2,7 @@
 // A guest searches, and sees no word about making one.
 import type { RoomList } from "@gnoworld/schemas";
 import { Field, Stack } from "@gnoworld/ui";
-import { createContext, use, useState } from "react";
+import { createContext, use, useState, type ReactElement } from "react";
 import { roomLabel } from "./names.ts";
 import { NewRoom, useMayMakeRoom } from "./NewRoom.tsx";
 import { RoomSections, type RoomSectionsProps } from "./RoomSections.tsx";
@@ -25,7 +25,10 @@ export { RoomsNav } from "./RoomSections.tsx";
 /** What a list looks like where it stands: the default is the column's and the menu's (the filter always, New room a "+" at the first
  * section's name); a phone's drawer (DRAWER) shows its filter past PagedList's 12 rooms and New room as a full-width button at the foot. */
 export const RoomsLookContext = createContext({ filterPast: 0, wideNew: false });
-export const DRAWER = { filterPast: 12, wideNew: true };
+const DRAWER = { filterPast: 12, wideNew: true };
+
+/** A list as a phone's drawer shows it. */
+export const asDrawer = (list: ReactElement) => <RoomsLookContext value={DRAWER}>{list}</RoomsLookContext>;
 
 // Every world's rooms under a search, as Slack's and Discord's; on the
 // Earth an account may also make one.

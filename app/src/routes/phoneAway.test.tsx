@@ -49,9 +49,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("takes a phone that hydrated on the home to its landing chat, by a replace", () => {
+it("takes a phone that hydrated on the home to its landing chat, by a replace", async () => {
   draw(true, "/w/bubble");
-  expect(host.textContent).toBe("away /w/bubble?chat=full");
+  await vi.waitFor(() => {
+    expect(host.textContent).toBe("away /w/bubble?chat=full");
+  });
 });
 
 it("leaves a computer on the home", () => {
@@ -64,17 +66,17 @@ const asWindow = (phone: boolean, recent = "") => {
   vi.stubGlobal("localStorage", { getItem: () => recent, setItem: () => undefined });
 };
 
-it("sends a phone into the Earth's full chat, in the universe's own prefix, never a computer", () => {
+it("sends a phone into the Earth's full chat, in the universe's own prefix, never a computer", async () => {
   asWindow(true);
-  expect(phoneAway("/")?.headers.get("Location")).toBe("/earth?chat=full");
-  const away = phoneAway("/net/gnoland");
+  expect((await phoneAway("/"))?.headers.get("Location")).toBe("/earth?chat=full");
+  const away = await phoneAway("/net/gnoland");
   expect(away?.status).toBe(302);
   expect(away?.headers.get("Location")).toBe("/net/gnoland/earth?chat=full");
   asWindow(false);
   expect(phoneAway("/")).toBeUndefined();
 });
 
-it("sends a phone back to the last world it was in", () => {
+it("sends a phone back to the last world it was in", async () => {
   asWindow(true, "/r/gno.land/r/x\n/w/bubble");
-  expect(phoneAway("/")?.headers.get("Location")).toBe("/w/bubble?chat=full");
+  expect((await phoneAway("/"))?.headers.get("Location")).toBe("/w/bubble?chat=full");
 });

@@ -7,14 +7,18 @@ import { realmPath } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { PlaceInfo } from "./PlaceInfo.tsx";
 import { PlaceView } from "./PlaceView.tsx";
-import { liveLine } from "./liveLine.ts";
-import { countriesCount, CountriesFigure, Links } from "./PlaceMore.tsx";
+import { CountriesFigure, Links } from "./PlaceMore.tsx";
 
 // The place on its universe's gnoweb: its realm's page, else gnoweb itself (the Earth, a world with no realm).
 const gnowebOf = ({ universe: { gnoweb }, realms, realm: own }: ChatPlace): string | undefined => {
   const realm = own ?? realms?.[0];
   return gnoweb === undefined || realm === undefined ? gnoweb : `${gnoweb}${realmPath(realm)}`;
 };
+
+/** The place's links out, on its universe's gnoweb. */
+export const PlaceLinks = ({ place }: { place: ChatPlace }) => (
+  <Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />
+);
 
 export function Info({
   place,
@@ -25,8 +29,6 @@ export function Info({
   buttons,
   close,
   page,
-  planet = true,
-  bare = false,
 }: Pick<ChatScreenProps, "place" | "talking" | "people"> & {
   /** The place's buttons, in the planet's bar (PlaceView.tsx). */
   buttons: ReactNode;
@@ -34,33 +36,19 @@ export function Info({
   close: ReactNode;
   /** The control that opens the place's own page (PlaceSheet.tsx), where the page is not beside the chat. */
   page?: ReactNode;
-  /** Whether the place's small planet is drawn at the panel's top; a phone's band holds it, so its sheet does not (a second WebGL context). */
-  planet?: boolean;
-  /** Without its own kicker and name, where a sheet's title row says them (PhoneInfo.tsx). */
-  bare?: boolean;
   room: ChatScreenProps["here"];
   panelRef: RefObject<HTMLElement | null>;
 }) {
   return (
     <PlaceInfo
-      view={planet ? <PlaceView place={place} buttons={buttons} close={close} /> : undefined}
+      view={<PlaceView place={place} buttons={buttons} close={close} />}
       kicker={place.kicker}
       name={place.name}
-      bare={bare}
       description={place.description}
       talking={talking}
       countries={room === undefined ? undefined : <CountriesFigure lines={room.lines} members={room.members} />}
-      links={<Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />}
+      links={<PlaceLinks place={place} />}
       page={page}
-      {...(bare
-        ? {
-            live: liveLine({
-              talking,
-              here: room?.members.length,
-              countries: room === undefined ? undefined : countriesCount(room.lines, room.members),
-            }),
-          }
-        : {})}
       here={people}
       panelRef={panelRef}
     />

@@ -4,9 +4,13 @@
 // ui's Dialog's, which gives the focus back to the control that opened it; a swipe down on the title row closes it too (phoneSheet.ts).
 import type { ComponentProps, MouseEvent } from "react";
 import { useRef } from "react";
-import { Dialog } from "@gnoworld/ui";
-import { Info } from "./Info.tsx";
+import { Dialog, Stack } from "@gnoworld/ui";
+import type { Info } from "./Info.tsx";
+import { PlaceLinks } from "./Info.tsx";
+import { liveLine } from "./liveLine.ts";
+import info from "./PlaceInfo.module.css";
 import styles from "./PhoneInfo.module.css";
+import { countriesCount } from "./PlaceMore.tsx";
 import { PlacePage } from "./PlaceSheet.tsx";
 import { usePlacePage } from "./placePage.ts";
 import { useSwipeClose } from "./phoneSheet.ts";
@@ -29,13 +33,44 @@ function follow(event: MouseEvent<HTMLElement>, onClose: () => void) {
   else onClose();
 }
 
+// The panel's content in the sheet's order: what the place says of itself, what is live, who is here, then the links out. The wide panel
+// (PlaceInfo.tsx) keeps its own order, its figures and its planet.
+function SheetInfo({
+  place,
+  talking,
+  room,
+  people,
+  panelRef,
+}: Pick<InfoProps, "place" | "talking" | "room" | "people" | "panelRef">) {
+  const live = liveLine({
+    talking,
+    here: room?.members.length,
+    countries: room === undefined ? undefined : countriesCount(room.lines, room.members),
+  });
+  return (
+    <aside ref={panelRef} tabIndex={-1} aria-label={place.name} className={info["panel"]}>
+      <Stack space="xs">
+        {place.description === "" ? null : <p className={info["about"]}>{place.description}</p>}
+        {live === "" ? null : <p className={info["live"]}>{live}</p>}
+        <section className={info["here"]}>
+          <Stack space="2xs">
+            <h3 className="label">Here now</h3>
+            {people}
+          </Stack>
+        </section>
+        <PlaceLinks place={place} />
+      </Stack>
+    </aside>
+  );
+}
+
 export function PhoneInfo({
   open,
   onClose,
   place,
   panelRef,
-  ...info
-}: Omit<InfoProps, "buttons" | "close" | "page" | "panelRef" | "planet"> &
+  ...rest
+}: Omit<InfoProps, "buttons" | "close" | "page" | "panelRef"> &
   Partial<Pick<InfoProps, "panelRef">> & {
     open: boolean;
     onClose: () => void;
@@ -62,15 +97,7 @@ export function PhoneInfo({
             }}
           >
             {page ? <PlacePage place={place} onClose={onClose} /> : null}
-            <Info
-              {...info}
-              place={page ? { ...place, description: "" } : place}
-              panelRef={panelRef ?? ownRef}
-              buttons={null}
-              close={null}
-              planet={false}
-              bare
-            />
+            <SheetInfo {...rest} place={page ? { ...place, description: "" } : place} panelRef={panelRef ?? ownRef} />
             <Credits className={styles["credits"]} />
           </div>
         ) : null}

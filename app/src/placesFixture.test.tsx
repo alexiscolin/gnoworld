@@ -94,7 +94,7 @@ describe("an ecosystem's page", () => {
   test("checks the case of its path in the browser, a query and a fragment aside", () => {
     const slugOf = (path: string) => {
       const loaded = ecosystemLoader(asked(path));
-      return loaded instanceof Response ? undefined : loaded.slug;
+      return loaded instanceof Response || loaded instanceof Promise ? undefined : loaded.slug;
     };
     expect(slugOf("/e/tokens?x=1")).toBe("tokens");
     expect(slugOf("/e/tokens#a")).toBe("tokens");

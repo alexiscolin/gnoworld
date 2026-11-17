@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
-import { noMedia } from "../../../tests/mount.tsx";
+import { noMedia, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { InPageSheet, SheetClose } from "../chat/placePage.ts";
 import { Actions } from "./Actions.tsx";
@@ -102,10 +102,17 @@ describe("a world's actions, with proposals", () => {
   });
 
   // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts), at its page section (#page), where the proposals are.
-  it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", () => {
-    expect(draw(PROPOSALS, true).querySelector("a")?.getAttribute("href")).toBe(
-      `${PROPOSALS}?sheet=page&chat=full#page`,
-    );
+  it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: !query.includes("359px"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    // The phone's row comes in a chunk of its own, once the window is a phone's.
+    const phone = draw(PROPOSALS, true);
+    await settled(() => phone.querySelector("a") !== null);
+    expect(phone.querySelector("a")?.getAttribute("href")).toBe(`${PROPOSALS}?sheet=page&chat=full#page`);
+    noMedia();
     expect(draw(PROPOSALS).querySelector("a")?.getAttribute("href")).toBe(PROPOSALS);
   });
 
@@ -202,6 +209,8 @@ describe("a phone's actions", () => {
     [...box.querySelectorAll("[data-row]")].map((row) =>
       [...row.querySelectorAll("a, button")].map((n) => n.textContent || n.getAttribute("aria-label")),
     );
+  // The phone's row comes in a chunk of its own: its buttons are in once it has.
+  const ready = (box: HTMLElement) => settled(() => (box.querySelector("[data-row]")?.childElementCount ?? 0) > 0);
   const onPhone = (matches: boolean) => {
     // A phone as wide as 375: the under-360 query does not match.
     vi.stubGlobal("matchMedia", (query: string) => ({
@@ -221,6 +230,7 @@ describe("a phone's actions", () => {
     const lead = { label: "Read its page", href: "#page" };
     const second = { label: "Try a function", href: "#try" };
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    await ready(box);
     const press = box.querySelector<HTMLElement>("button[aria-label='Try a function']");
     expect(press?.textContent).toBe("");
     act(() => {
@@ -237,9 +247,11 @@ describe("a phone's actions", () => {
       removeEventListener: vi.fn(),
     }));
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(box);
     expect(rowsOf(box)[0]?.[0]).toBe("Read the proposals");
     vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     const narrow = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(narrow.box);
     expect(rowsOf(narrow.box)[0]?.[0]).toBe("Proposals");
   });
 
@@ -248,6 +260,7 @@ describe("a phone's actions", () => {
     const lead = { label: "Read its page", href: "#page" };
     const second = { label: "Try a function", href: "#try" };
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    await ready(box);
     expect(rowsOf(box)).toEqual([
       ["Read its page", "Try a function", "Following", "Share"].map((n) => (n === "Following" ? "Follow" : n)),
     ]);
@@ -257,6 +270,7 @@ describe("a phone's actions", () => {
   it("leads with the proposals' words and names Say hi, Follow and Share on the same row", async () => {
     onPhone(true);
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(box);
     expect(rowsOf(box)).toEqual([["Read the proposals", "Say hi in govdao", "Follow", "Share"]]);
     expect(box.querySelector("[data-stretch]")).toBeNull();
   });
@@ -269,6 +283,7 @@ describe("a phone's actions", () => {
         <Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />
       </SheetClose>,
     );
+    await ready(box);
     act(() => {
       box.querySelector<HTMLElement>("[aria-label='Say hi in govdao']")?.click();
     });

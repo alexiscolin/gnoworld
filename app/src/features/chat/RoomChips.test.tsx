@@ -2,7 +2,7 @@
 import type { RoomList } from "@gnoworld/schemas";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { all, mount as draw, noMedia, one } from "../../../tests/mount.tsx";
+import { all, mount as draw, noMedia, one, settled } from "../../../tests/mount.tsx";
 import { rememberRealms } from "../../lib/roomRealms.ts";
 import { RoomChips } from "./RoomChips.tsx";
 
@@ -120,10 +120,12 @@ describe("RoomChips", () => {
     expect(plus(EARTH)).toBeNull();
   });
 
-  it("opens the same New room dialog the full chat's button opens", () => {
+  it("opens the same New room dialog the full chat's button opens", async () => {
     session.kind = "in";
     const box = mount(<RoomChips sections={EARTH} current="#earth" />);
     one(box, 'button[aria-label="New room"]').click();
+    // The dialog's code comes at the first press.
+    await settled(() => box.querySelector("dialog") !== null);
     expect(one(box, "dialog").textContent).toContain("Make the room");
     session.kind = "out";
   });

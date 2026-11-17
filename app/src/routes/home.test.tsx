@@ -185,11 +185,11 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
   expectClientAsBuild("cosmos", clientLoader, loader);
 });
 
-test("a phone's home is its chat: the browser's loader redirects, the build's never does", () => {
+test("a phone's home is its chat: the browser's loader redirects, the build's never does", async () => {
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 899px)" }));
   vi.stubGlobal("localStorage", { getItem: () => "", setItem: () => undefined });
   const request = new Request("https://gno.world/");
-  expect(clientLoader({ request })).toMatchObject({ status: 302 });
+  await expect(clientLoader({ request })).resolves.toMatchObject({ status: 302 });
   expect(loader({ request })).not.toBeInstanceOf(Response);
   vi.unstubAllGlobals();
 });

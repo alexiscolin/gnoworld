@@ -7,7 +7,7 @@ import { act } from "react";
 import { all, button, click, mount } from "../../../tests/mount.tsx";
 import { askFor } from "../../pageAsks.ts";
 import { RoomsDrawer } from "./RoomsDrawer.tsx";
-import { RoomsList } from "./RoomsList.tsx";
+import { asDrawer, RoomsList } from "./RoomsList.tsx";
 
 // The rooms on a phone: one control, and a drawer with the rooms, then the worlds below them.
 const draw = (unread = 0, phone = true, modes?: ReactNode) =>
@@ -125,7 +125,8 @@ describe("the rooms' drawer", () => {
       const box = mount(
         <StoreProvider>
           <MemoryRouter>
-            <RoomsDrawer unread={0} phone rail={<RoomsList sections={rooms(count)} current="#r0" />} />
+            {/* ChatScreen's roomsOf gives a phone's rail the drawer's look. */}
+            <RoomsDrawer unread={0} phone rail={asDrawer(<RoomsList sections={rooms(count)} current="#r0" />)} />
           </MemoryRouter>
         </StoreProvider>,
       );

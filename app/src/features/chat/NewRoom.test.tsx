@@ -45,6 +45,8 @@ describe("making a room on the Earth", () => {
       </MemoryRouter>,
     );
     click(button(host, "New room"));
+    // The dialog's code comes at the first press.
+    await settled(() => all(host, "input").length > 0);
     const box = all(host, "input")[0];
     if (box === undefined) throw new Error("no name box");
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.bind(box);

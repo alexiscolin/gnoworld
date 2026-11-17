@@ -6,7 +6,6 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { onAsked } from "../../pageAsks.ts";
 import { Folding } from "./Folding.tsx";
-import { DRAWER, RoomsLookContext } from "./RoomsList.tsx";
 import { WorldRows } from "./WorldRows.tsx";
 import type { WorldsProps } from "./Worlds.tsx";
 import { countWords } from "./unread.ts";
@@ -92,9 +91,7 @@ function PhoneBody({ rail, worlds, modes, close }: Body & { close: () => void })
           </Disclosure>
         )}
         {/* Its own box, so the rail's column (fill-column: the height of the body) no longer pushes the worlds to the foot. */}
-        <RoomsLookContext value={DRAWER}>
-          <div>{rail}</div>
-        </RoomsLookContext>
+        <div>{rail}</div>
         {worlds === undefined ? null : (
           <div className={styles["worlds"]}>
             <Folding name="Worlds">

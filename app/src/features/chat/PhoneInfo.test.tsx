@@ -83,6 +83,30 @@ describe("the place's sheet of a phone", () => {
     expect(all(box, "p").some((each) => each.textContent === "d")).toBe(true);
   });
 
+  it("reads the description, the live line, Here now and the links last, with no lone figure", () => {
+    const box = mount(
+      <MemoryRouter>
+        <PlacePageProvider value={null}>
+          <PhoneInfo
+            open
+            onClose={() => undefined}
+            place={place}
+            talking={0}
+            room={{ lines: [], members: ["a"] }}
+            people={<ul data-slot="people" />}
+            panelRef={createRef()}
+          />
+        </PlacePageProvider>
+      </MemoryRouter>,
+    );
+    const order = all(one(box, "aside"), "p, h3, [data-slot], a").map(
+      (each) => each.textContent || each.getAttribute("data-slot"),
+    );
+    expect(order.slice(0, 4)).toEqual(["d", "Nobody talking now · 1 here", "Here now", "people"]);
+    expect(order.length).toBeGreaterThan(4);
+    expect(box.textContent).not.toContain("Talking now");
+  });
+
   it("leaves the description to the page when there is one", async () => {
     const box = sheet(true, () => undefined);
     await settled(() => all(box, "[data-plate]").length === 1);

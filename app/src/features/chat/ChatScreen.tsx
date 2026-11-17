@@ -20,24 +20,15 @@ import { useSwapMove } from "./swapMove.ts";
 import { FullButton } from "./FullButton.tsx";
 import { warmPictures } from "../../WorldPlanet.tsx";
 import { Info } from "./Info.tsx";
+import { roomsOf } from "./roomsOf.tsx";
 import { useSearching, type SearchInput } from "./Searching.tsx";
 import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
-import { ErrorView, errorKind } from "../errors/index.ts";
 import type { ChatWorld } from "./place.ts";
 import { DOCKED, useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
 import { useWorldsOf } from "./chatWorlds.tsx";
-import type { WorldsProps } from "./Worlds.tsx";
 import styles from "./ChatScreen.module.css";
-
-// The rooms of a narrow chat (a dock's, a phone's) sit behind a control and a drawer, whose code is asked once the box is
-// narrow: a wide one never carries it (the first screen's budget, ADR-0001 §12). A chunk that cannot be fetched leaves a
-// notice that the rooms could not load.
-const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
-  waiting: null,
-  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" urgent />,
-});
 
 // A phone's row of worlds at the chat's foot, its code asked once the window is a phone's. Its place is reserved by the wrapper (ChatScreen.module.css).
 const PhoneWorlds = chunked(async () => ({ default: (await import("./PhoneWorlds.tsx")).PhoneWorlds }), {
@@ -122,12 +113,6 @@ const takesPage = (dockable: boolean, { inPage }: ChatPlace) => !dockable && inP
 // Whether the planet's bar holds the place's buttons: the info panel shows (wide, full, no thread over it).
 const inPlaceView = (full: boolean, compact: boolean, thread: ReactNode): boolean =>
   full && !compact && thread === undefined;
-
-// The narrow full chat's rooms: the worlds join them in the drawer on a phone (the window under 900 px) alone.
-const roomsOf = (
-  props: { unread: number; rail: ReactElement; phone: boolean; modes: ReactNode },
-  rows: WorldsProps,
-) => <RoomsDrawer {...props} worlds={props.phone ? rows : undefined} />;
 
 // What closes the full chat: none where the page is the chat and would open it again.
 const closeFull = (dockable: boolean, place: ChatPlace) => (takesPage(dockable, place) ? null : <FullButton full />);
