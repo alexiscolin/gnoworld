@@ -1,0 +1,14 @@
+/* A phone's Close drawn as the screen sheets' ring (ui Dialog.module.css): the 44 px target painted, its glyph on the 16 px line (the box hangs
+   out by the glyph's side room). The class a head's Close cell wears. */
+@layer components {
+  @media (width < 900px) {
+    .ring button:not(:disabled) {
+      /* the button's own two-class rule is matched, never undone by an !important */
+      --_line: var(--color-line-strong);
+
+      border-radius: var(--radius-pill);
+      /* layout: the glyph's side room hangs the box past the head's gutter */
+      margin-inline-end: calc((var(--icon-m) - var(--control-m)) / 2);
+    }
+  }
+}

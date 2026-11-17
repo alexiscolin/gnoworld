@@ -25,14 +25,17 @@
     visibility: visible;
   }
 
-  /* A phone: a sheet at the screen's foot, clear of the notch, its controls 44 px targets; it scrolls where the text is zoomed. */
+  /* A phone: a sheet at the screen's foot, clear of the notch, its controls 44 px targets. Its top is the composer's (Welcome.tsx sets --welcome-top
+     from the chat's dock), so it covers the composer and the row of worlds whole and the lines above it stay clear; where the chat has no dock
+     it is as tall as its words, to 70 % of the screen, and scrolls where the text is zoomed. */
   @media (width < 900px) {
     .welcome {
       inset-inline: 0;
-      inset-block-end: 0;
       /* raw: over the full chat (3, ChatScreen.module.css) a phone lands in, which the card covers at its foot */
       z-index: 4;
       inline-size: auto;
+      inset-block-start: var(--welcome-top, auto);
+      inset-block-end: 0;
       /* raw: the sheet leaves the top 30% of the screen visible; no token holds a share of the screen */
       max-block-size: 70dvb;
       overflow: auto;

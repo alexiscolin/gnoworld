@@ -1,14 +1,44 @@
 // The welcome card: a first visit's three ways in, over space at the bottom left. A chunk of its own, asked once the page rests.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Button, Card, Cluster, IconButton } from "@gnoworld/ui";
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { fullChatHref, leaveDock } from "../../fullChat.ts";
 import { askFor } from "../../pageAsks.ts";
 import { site } from "../../places.ts";
-import { focusComposer } from "../chat/index.ts";
+import { focusComposer, useMedia } from "../chat/index.ts";
 import { adenaHere, askGetStarted } from "../login/index.ts";
 import { seen } from "./seen.ts";
+import ring from "../../phoneClose.module.css";
 import styles from "./Welcome.module.css";
+
+// A phone's sheet starts at the composer's top edge, so it covers the composer and the row of worlds whole: --welcome-top follows the chat's dock,
+// which may come after the card (its code is a chunk of its own).
+function useDockTop(cardRef: RefObject<HTMLElement | null>, phone: boolean) {
+  useLayoutEffect(() => {
+    const sheet = cardRef.current;
+    if (!phone || sheet === null) return;
+    const sizes = new ResizeObserver(() => {
+      const dock = document.querySelector("[data-dock]");
+      if (dock !== null) sheet.style.setProperty("--welcome-top", `${String(dock.getBoundingClientRect().top)}px`);
+    });
+    const arrivals = new MutationObserver(() => {
+      const dock = document.querySelector("[data-dock]");
+      if (dock === null) return;
+      arrivals.disconnect();
+      sizes.observe(dock);
+    });
+    arrivals.observe(document.body, { childList: true, subtree: true });
+    sizes.observe(document.documentElement);
+    const dock = document.querySelector("[data-dock]");
+    if (dock !== null) sizes.observe(dock);
+    return () => {
+      arrivals.disconnect();
+      sizes.disconnect();
+      sheet.style.removeProperty("--welcome-top");
+    };
+  }, [cardRef, phone]);
+}
 
 /** The card; closed it stays drawn, inert and faded, so that it leaves as it came. */
 export function Welcome() {
@@ -17,6 +47,10 @@ export function Welcome() {
   const universe = site.universeAt(useLocation().pathname);
   // With Adena in the page, its own connect: Get started's dialog is for a reader with none.
   const adena = adenaHere();
+  // A phone opens a world; it does not fly.
+  const phone = useMedia(PHONE_QUERY);
+  const cardRef = useRef<HTMLElement>(null);
+  useDockTop(cardRef, phone);
   // Any use closes it for good.
   const using = (act: (from: HTMLElement) => void) => (event: MouseEvent<HTMLElement>) => {
     seen();
@@ -31,6 +65,7 @@ export function Welcome() {
   };
   return (
     <aside
+      ref={cardRef}
       aria-label="Welcome"
       className={["appears", styles["welcome"]].join(" ")}
       data-open={open ? "" : undefined}
@@ -47,12 +82,15 @@ export function Welcome() {
           title="Every world here is a program on gno.land"
           level={2}
           actions={
-            <IconButton icon="close" label="Close" emphasis="plain" size="xs" onClick={using(() => undefined)} />
+            <span className={ring["ring"]}>
+              <IconButton icon="close" label="Close" emphasis="plain" size="xs" onClick={using(() => undefined)} />
+            </span>
           }
         />
         <Card.Body>
           <p className="meta">
-            gno.land is a blockchain whose programs anyone can read. Fly to a world, read its chat, say hi.
+            gno.land is a blockchain whose programs anyone can read. {phone ? "Open" : "Fly to"} a world, read its chat,
+            say hi.
           </p>
         </Card.Body>
         <Card.Actions>

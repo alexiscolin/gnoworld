@@ -216,6 +216,8 @@
     --box-in: var(--space-s);
     /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
     --flash-room: 0px;
+    /* A phone's welcome sheet's top edge: the composer's, set by the card while it shows (Welcome.tsx); none, it is as tall as its words. */
+    --welcome-top: auto;
     /* The top centre's slot (DESIGN-SYSTEM.md, Layout): the bottom of the header in view, the shell's or a full chat's, which sets
        it; the arrival's pill a step under it; and the room a page keeps free above its first line so the pill covers none of it
        and nothing moves when it comes: one row of the pill and a step. */

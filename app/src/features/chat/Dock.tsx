@@ -31,7 +31,7 @@ export interface DockProps {
 
 export function Dock({ pinned, children }: DockProps) {
   return (
-    <div className={styles["dock"]}>
+    <div className={styles["dock"]} data-dock="">
       {pinned === undefined ? null : (
         <>
           <div className={styles["cards"]}>{pinned.cards}</div>
