@@ -1,5 +1,5 @@
 // A realm page's actions: a `$help` link of its own realm drawn as a button where it stood, its card (nothing till opened)
-// joining the page's forms, a block, never inside a paragraph; named from the page, as its forms' cards are (D13541).
+// joining the page's forms, a block, never inside a paragraph; named from the page, as its forms' cards are.
 import { createElement, lazy, Suspense, type ReactNode } from "react";
 import type { Ink } from "./drawBudget.ts";
 import type { CallPlace } from "./InlineCard.tsx";

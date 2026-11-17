@@ -25,7 +25,7 @@ export function sitemapXml(data: {
       .filter((place) => mainnet.has(place.universe))
       .map((place) => ORIGIN + place.canonical),
   ];
-  // ponytail: one file; past the cap the protocol wants several and an index, which this site does not write.
+  // ceiling: one file; past the cap the protocol wants several and an index, which this site does not write.
   if (urls.length > MAX_URLS)
     throw new RangeError(`sitemap: ${String(urls.length)} urls, more than the 50,000 a file may hold`);
   return [

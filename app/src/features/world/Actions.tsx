@@ -1,4 +1,4 @@
-// A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
+// A place's actions: the main one, then Follow and Share as the design draws them, with the plate at its first paint
 // (a size budget on that paint); the share sheet's code comes at the first press. A phone's row is PhoneActions.tsx's, its code asked
 // once the window is a phone's.
 import { PHONE_QUERY } from "@gnoworld/core";
@@ -33,7 +33,7 @@ export interface ActionsProps {
   proposals?: string;
   /** The main action's words, "Say hi in the chat" unless the place names its room. */
   say?: string;
-  /** The place's main room, by its id: once its history came with no message in it, the main action asks to be the first (frame 93). */
+  /** The place's main room, by its id: once its history came with no message in it, the main action asks to be the first. */
   room?: string;
   /** Where the main action leads when the place has no chat to say hi in yet: a realm's page, its own page. */
   lead?: { label: string; href: string; icon?: IconName };
@@ -43,7 +43,7 @@ export interface ActionsProps {
   className?: string | undefined;
 }
 
-// The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
+// The main action and the one beside it. A world with a proposals realm leads with reading them and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
 function Leads({ second, ...asked }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
   const { main, proposals } = useLeads(asked);
@@ -93,7 +93,7 @@ export function Actions(props: ActionsProps) {
   return (
     <Cluster space="2xs" wrap="scroll" className={className}>
       <Leads {...leads} />
-      {/* Follow and Share in words, as frame 30 draws them: icons alone left what each does unclear. */}
+      {/* Follow and Share in words, as the design draws them: icons alone left what each does unclear. */}
       <FollowButton kind="worlds" id={follow} size="m" />
       <Button
         icon="share"

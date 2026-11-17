@@ -1,4 +1,4 @@
-// How the market card writes a price and its change, (frame 6).
+// How the market card writes a price and its change,.
 
 /** A thousand and more whole and grouped ("66,601"), a dollar and more to the cent, less than a dollar to three significant digits, so a fraction of a cent never reads as zero. */
 export const dollars = (usd: number): string =>

@@ -1,5 +1,5 @@
 // The lines waiting on a page being read: at most 1,000 a page and 20,000 in all, the oldest going first.
-// ponytail: the total is counted per line heard, which the queue's 10,000 pages at most keep cheap.
+// ceiling: the total is counted per line heard, which the queue's 10,000 pages at most keep cheap.
 export interface Tied {
   room: string;
   msgid: string;

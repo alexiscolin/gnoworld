@@ -1,5 +1,5 @@
 /* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
-   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, one row:
+   and fixed at the top of the screen (DESIGN-SYSTEM.md, Layout); on a phone, one row:
    the logo and the controls, with no views (the full chat only). The one breakpoint of both is here. */
 @layer components {
   /* The views' bar's height, one source for the bars and the room the page leaves under them; the two are no parent and child. */
@@ -100,7 +100,7 @@
     block-size: var(--round-h);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
-    /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
+    /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the design's letters are those) */
     font: 500 0.71875rem/1 var(--family-sans);
     /* raw: the prototype's and the frames' own value */
     letter-spacing: 0.1em;
@@ -246,7 +246,7 @@
     background: none;
   }
 
-  /* Between two levels, the video's chevron (the breadcrumb's, packages/ui), at 60%. */
+  /* Between two levels, the design's chevron (the breadcrumb's, packages/ui), at 60%. */
   .chevron::before {
     content: "\203a";
   }

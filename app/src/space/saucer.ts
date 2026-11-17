@@ -14,7 +14,7 @@ const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 /** Where the `ids` stand, the heaviest first, round the home (its orbits `heart` wide): the golden angle loosened by a turn each id draws,
  * the radius by its rank's power a little under the root, the heart denser; the first `count` fill the disc, the rest stand past its rim,
  * so nothing of the file moves for them. Each steps out till its orbits clear those before it. */
-// ponytail: n² steps (10⁴ at 100 systems); a grid by reach if the cosmos passes a few thousand.
+// ceiling: n² steps (10⁴ at 100 systems); a grid by reach if the cosmos passes a few thousand.
 export function placesOf(ids: readonly string[], reaches: readonly number[], { disc, count, heart }: Room): Vec[] {
   const placed = [{ at: HEART, reach: heart }];
   return ids.map((id, rank) => {

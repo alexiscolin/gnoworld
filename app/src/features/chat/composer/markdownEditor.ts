@@ -140,7 +140,7 @@ export function getMarkdown(editor: LexicalEditor): string {
 }
 
 // The reader opens nothing from a tilde run of 3 or more, but the editor's `~~` would strike inside it: such a run is escaped (the
-// editor unescapes `\~` on import) outside a fence, so what the editor reads is what the room reads (F13632). An escape is read first and
+// editor unescapes `\~` on import) outside a fence, so what the editor reads is what the room reads. An escape is read first and
 // left alone: `\~~~a~~` has no run.
 const ESCAPE_FENCE_OR_TILDES = /\\[\s\S]|```[\s\S]*?```|~{3,}/g;
 const readAsTheRoomDoes = (markdown: string): string =>

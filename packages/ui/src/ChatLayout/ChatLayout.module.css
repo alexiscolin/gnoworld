@@ -1,5 +1,5 @@
-/* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none (the video's frame
-   23.58.01). The widths are the video's, measured at 1728 px. */
+/* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none.
+   The widths are the design's, measured at 1728 px. */
 @layer components {
   .root {
     block-size: 100%;

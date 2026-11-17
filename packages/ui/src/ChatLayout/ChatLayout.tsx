@@ -51,7 +51,7 @@ function roomFor(box: HTMLElement | null, edge: Edge): number {
   return box.clientWidth - others - CONVERSATION_MIN;
 }
 
-/** The full-screen chat's frame (the video's frame 23.58.01): a header across, then the worlds, the rooms, the
+/** The full-screen chat's frame (the design.58.01): a header across, then the worlds, the rooms, the
  * conversation and the info panel, each a region that holds its own scroll. It places; the app fills the slots, and the conversation's own list scrolls
  * inside it, over a composer that stays. */
 export function ChatLayout({

@@ -37,7 +37,7 @@
     text-transform: none;
   }
 
-  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are. */
+  /* A dot before words, in its tone: a kicker's, a Plan's world where people are. */
   .dot {
     display: inline-block;
     inline-size: var(--size-dot);
@@ -60,7 +60,7 @@
     --_dot: var(--color-signal);
   }
 
-  /* The place's own colour, as a plate's kickers have it (frames 26, 40). */
+  /* The place's own colour, as a plate's kickers have it. */
   .dot[data-tone="world"] {
     --_dot: var(--world);
   }

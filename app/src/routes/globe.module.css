@@ -5,7 +5,7 @@
     /* layout: what stands round the planet (the proposal's ring) is placed from its box */
     position: relative;
     display: none;
-    /* raw: the ring reaches 1.106 radii of the globe (frame 39), and keeps a step of space from the window's edge */
+    /* raw: the ring reaches 1.106 radii of the globe, and keeps a step of space from the window's edge */
     inline-size: min(calc((100vi - 2 * var(--space-s)) / 1.106), 56vb);
     aspect-ratio: 1;
     /* layout: over the plate, clear of the header */
@@ -35,7 +35,7 @@
     }
   }
 
-  /* Beside the plate, between its words and the dock (frame 39): the ring keeps 28 px off each, and the globe stands 16 px over the frame's
+  /* Beside the plate, between its words and the dock: the ring keeps 28 px off each, and the globe stands 16 px over the frame's
      middle, which leaves the pill's row under it. The window's height caps it. */
   @media (width >= 1280px) {
     .globe,
@@ -56,7 +56,7 @@
       --_radius: calc(var(--_reach) / 1.106);
     }
 
-    /* A world's circle is its busiest planet, frame 104's Bubble: its ring, 1.143 radii, comes a small step short of
+    /* A world's circle is its busiest planet, the design's Bubble: its ring, 1.143 radii, comes a small step short of
        the plate's words and the dock, never under them, and the window's height caps it as the Earth's; a quieter world fills less (fit.ts). */
     .globe[data-world] {
       /* raw: the world's ring reaches 1.143 radii */

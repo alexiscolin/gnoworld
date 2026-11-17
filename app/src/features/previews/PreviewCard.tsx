@@ -1,5 +1,5 @@
-// A page's capture as a card: on a world's plate (frame 26, "Preview · gno.land/r/gov/dao · captured · Open large") and under a chat
-// line (frames 104, 107). The page is drawn small by the realm view's own drawing, as a picture: inert and hidden from assistive technology,
+// A page's capture as a card: on a world's plate ("Preview · gno.land/r/gov/dao · captured · Open large") and under a chat
+// line. The page is drawn small by the realm view's own drawing, as a picture: inert and hidden from assistive technology,
 // so nothing of it is a control. The card's one button opens it at size, with when it was captured and the way to the page as it is now.
 import type { Capture } from "@gnoworld/schemas/indexer";
 import { page } from "@gnoworld/core";
@@ -35,7 +35,7 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
   const read = page(capture.text, { origin: gnoweb });
   const blocks = read.kind === "page" ? read.blocks : [];
   const when = moment(new Date(capture.captured));
-  // Under a line the page alone, as frame 104 draws it: the card's words are its button's name, for assistive technology alone.
+  // Under a line the page alone, as the design draws it: the card's words are its button's name, for assistive technology alone.
   const said = look === "line" ? "visually-hidden" : undefined;
   const thumb = (
     <div className={styles["thumb"]} data-preview-thumb="" inert aria-hidden="true">

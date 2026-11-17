@@ -2,7 +2,7 @@
 // no metadata (handler.go:233 at v1.5.0). Its limit is 1,000 by default and 10,000 at most, and a limit over the cap is lowered,
 // not refused, so an answer of exactly the limit may be cut: the prefix is then split on the next character and each part asked
 // on its own (the chain pages by prefix only, handler.go:196, pagination not implemented there). What comes back is data: capped,
-// and each line kept only if it is a realm path. ponytail: at most LIST_MAX_QUERIES requests; then the list is returned, marked partial.
+// and each line kept only if it is a realm path. ceiling: at most LIST_MAX_QUERIES requests; then the list is returned, marked partial.
 import { pathsAsk } from "@gnoworld/chain/asks";
 import { REALM_PREFIX } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas/indexer";

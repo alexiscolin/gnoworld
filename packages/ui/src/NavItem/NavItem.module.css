@@ -1,4 +1,4 @@
-/* The item of a column of places: on the video's pill (38 px high, 10 px round), cream when it is the one in view, a count
+/* The item of a column of places: on the design's pill (38 px high, 10 px round), cream when it is the one in view, a count
    or a dot at its end (the prototype's .room, index.html:603-641). */
 @layer components {
   .item {

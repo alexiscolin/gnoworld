@@ -47,7 +47,7 @@
     overflow: hidden;
   }
 
-  /* A phone's closed fold takes no room: the Card's Stack step above it goes with it (a computer unchanged, D13711). */
+  /* A phone's closed fold takes no room: the Card's Stack step above it goes with it (a computer unchanged). */
   @media (width < 900px) {
     .fold:not([data-open]) {
       /* layout: gives back the Stack step above the shut fold */

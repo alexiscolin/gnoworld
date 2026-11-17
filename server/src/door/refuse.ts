@@ -23,7 +23,7 @@ const hostOf = (link: string): string | undefined =>
 const words = (question: string): boolean =>
   [...question.matchAll(WORDS)].some(([, count]) => Number((count ?? "").replaceAll(",", "")) >= 500);
 
-// ponytail: a text's length in UTF-16 units, near its code points for a pasted document.
+// ceiling: a text's length in UTF-16 units, near its code points for a pasted document.
 const pasted = (question: string): boolean => /\btranslat/i.test(question) && question.length > PASTED;
 
 /** Whether a host is on the list or a subdomain of a host on it. */

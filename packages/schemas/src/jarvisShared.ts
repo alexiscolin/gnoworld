@@ -1,5 +1,5 @@
 // A fixed ask (what to do here, a room caught up, a function explained) is answered once for everyone who asks the same at the same place,
-// from anyone's lines (D13508): its answer carries flight buttons alone, so a line someone wrote never steers Jarvis into a call that
+// from anyone's lines: its answer carries flight buttons alone, so a line someone wrote never steers Jarvis into a call that
 // everyone then sees. A person's own question keeps both kinds. Jarvis drops them where it makes the answer, the door where it shares it.
 import type { AnswerButton } from "./jarvis.ts";
 

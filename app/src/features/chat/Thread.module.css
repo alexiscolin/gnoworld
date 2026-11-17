@@ -3,7 +3,7 @@
 @layer components {
   .panel {
     inline-size: 100%;
-    /* the video's thread text, 13.5 px, as the room's lines (prototype #threadList li) */
+    /* the design's thread text, 13.5 px, as the room's lines (prototype #threadList li) */
     font: var(--font-chat);
   }
 

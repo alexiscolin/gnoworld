@@ -1,4 +1,4 @@
-/* The call card: the block that names the call, in the frame the video draws, and a phone's words in place of the signature. */
+/* The call card: the block that names the call, in the frame the design draws, and a phone's words in place of the signature. */
 @layer components {
   .block {
     /* layout: the labels in one column and the values in the other, so every value starts at the same place */

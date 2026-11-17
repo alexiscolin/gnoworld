@@ -1,4 +1,4 @@
-// A world's proposals on its plate (frames 20 to 35): the realm's home page read once, its newest proposal under the status
+// A world's proposals on its plate: the realm's home page read once, its newest proposal under the status
 // pill, then the newest few as cards, each with the way to read it on gnoweb. Only what the realm's page states: a page that gives no
 // threshold gives no ring and no "of 66.66%". The ring is the scene's tilted orbit, handed to the page. A read that fails says its
 // state and links to the realm on gnoweb. This file is a chunk of its own, asked only by a world with a realm (world.tsx).

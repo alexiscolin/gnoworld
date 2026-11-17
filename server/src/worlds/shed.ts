@@ -76,7 +76,7 @@ function crowdsOf(worlds: readonly WorldRow[]): Map<string, number> {
 
 /**
  * The worlds that fit `maxBytes` once written as the job writes them (JSON and a newline), or null when not even none do.
- * ponytail: O(w log w) for w worlds, one sort and a running total; w is bounded by the chain's realms (a few 10^4).
+ * ceiling: O(w log w) for w worlds, one sort and a running total; w is bounded by the chain's realms (a few 10^4).
  */
 export function fitted(head: Head, worlds: readonly WorldRow[], maxBytes: number): Fitted | null {
   // The text of n worlds: the file with none, a newline, the worlds and a comma between two.

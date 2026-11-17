@@ -92,7 +92,7 @@ export function tagOf(
   },
 ): void {
   const under = arrival && "radius" in item;
-  // Every world's name carries who is there, as the video's labels do; a system's, none.
+  // Every world's name carries who is there, as the design's labels do; a system's, none.
   showCount(button, "radius" in item ? fact?.(item.id) : undefined);
   const drop = under ? (seen?.pixels(at, item.radius * scaleOf(item.index)) ?? 0) + 10 : -14;
   button.style.transform = `translate3d(${on.x.toFixed(1)}px, ${(on.y + drop).toFixed(1)}px, 0)`;

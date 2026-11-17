@@ -101,7 +101,7 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
     }
   };
   // One room at a time; one whose state or changes failed is passed over, and the next pass asks it again.
-  // ponytail: a pass lasts rooms x Ergo's answer, 10 s for a silent room; read a few at once if that grows.
+  // ceiling: a pass lasts rooms x Ergo's answer, 10 s for a silent room; read a few at once if that grows.
   const drain = async (): Promise<void> => {
     for (const room of waiting) {
       waiting.delete(room);
@@ -112,7 +112,7 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
       }
     }
   };
-  // The rooms the last full pass walked: one that left the list since (past the window, D13675) is left, once.
+  // The rooms the last full pass walked: one that left the list since (past the window) is left, once.
   let walked = new Set<string>();
   const ask = (room?: string): void => {
     const names = room === undefined ? rooms() : [room];
@@ -132,7 +132,7 @@ export function makeReconciler({ rooms, desired, state, send, log, seen }: Optio
     flags: () => {
       for (const room of rooms()) for (const flag of desired(room).modes) send("SAMODE", [room, `+${flag}`]);
     },
-    // ponytail: a JOIN reads the whole room again (10,000 people at most, a few ms); voice the joiner alone
+    // ceiling: a JOIN reads the whole room again (10,000 people at most, a few ms); voice the joiner alone
     // if busy rooms that voice grow.
     joined: (room) => {
       if (desired(room).voiced.length > 0) ask(room);

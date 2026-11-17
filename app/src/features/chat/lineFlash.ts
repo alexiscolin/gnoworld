@@ -81,7 +81,7 @@ function useHidden(props: Pick<RemovalProps, "lines" | "room" | "me" | "setSaid"
 /** The id of a delete gone out and not answered yet, and the delete itself, which says whether it went out. */
 export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room }: RemovalProps) {
   // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
-  // its refusal ends it too. ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
+  // its refusal ends it too. ceiling: a line trimmed out of the window meanwhile reads as deleted, in the
   // milliseconds a REDACT waits for its echo.
   const [deleting, setDeleting] = useState<string>();
   useHidden({ lines, room, me, deleting, setSaid });

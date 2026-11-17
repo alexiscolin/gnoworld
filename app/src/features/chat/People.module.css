@@ -1,4 +1,4 @@
-/* Who is here, as the video's info panel draws it: a row a rule under each, the person at its start. */
+/* Who is here, as the design's info panel draws it: a row a rule under each, the person at its start. */
 @layer components {
   .row {
     padding-block: var(--space-2xs);

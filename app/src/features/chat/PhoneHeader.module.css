@@ -21,7 +21,7 @@
     gap: 0;
   }
 
-  /* The dock's separator (the video's frame 40): a line between the tools and the chips. */
+  /* The dock's separator: a line between the tools and the chips. */
   .rule {
     /* layout: kept whole, an icon's height */
     flex: none;

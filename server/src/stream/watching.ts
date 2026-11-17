@@ -6,7 +6,7 @@ export interface Watcher {
   readonly visitor: string;
 }
 
-// Who has a stream open: a guest once by its visitor, whatever its streams and tabs; an account once. ponytail: counted at each
+// Who has a stream open: a guest once by its visitor, whatever its streams and tabs; an account once. ceiling: counted at each
 // ask, over 2,000 clients at most.
 export function watchingOf(clients: ReadonlySet<Watcher>): { guests: number; accounts: ReadonlySet<string> } {
   const accounts = new Set<string>();
@@ -19,7 +19,7 @@ export function watchingOf(clients: ReadonlySet<Watcher>): { guests: number; acc
 }
 
 // Who follows each world: a guest once by its visitor key, whatever its streams on that world, an account once; a guest on two
-// worlds counts on each. ponytail: counted at each ask, 2,000 clients at most and 25 rooms each.
+// worlds counts on each. ceiling: counted at each ask, 2,000 clients at most and 25 rooms each.
 export function watchingIn(
   clients: ReadonlySet<Watcher>,
 ): ReadonlyMap<string, { guests: number; accounts: ReadonlySet<string> }> {

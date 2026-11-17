@@ -1,4 +1,4 @@
-// The docked chat's rooms as chips under its header (the video's frame 26), on one line: the room in view, those holding unseen
+// The docked chat's rooms as chips under its header, on one line: the room in view, those holding unseen
 // lines, the most active, as many as the row's width holds, and a last "+N" chip that opens the rooms' view the header's name opens. One link
 // to each, the one in view cream, a count after the one that holds something unseen, a "+" to make one for an account on the Earth.
 // The full chat has its column, a phone its drawer; this row is the dock's.

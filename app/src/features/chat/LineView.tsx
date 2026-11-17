@@ -130,7 +130,7 @@ export interface LineViewProps {
   pinned: boolean;
   /** Its reactions as shown, as chipsOf writes them, and how an account reacts; none for a guest. */
   chips: string | undefined;
-  /** Whether it is its author's first words in the room: the video's "new here". */
+  /** Whether it is its author's first words in the room: the design's "new here". */
   newHere?: boolean | undefined;
   /** A poll line's votes, as votesString writes them; none for a line that is no poll. */
   votes?: string | undefined;

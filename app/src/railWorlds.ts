@@ -63,7 +63,7 @@ export function keptRail(known: Known, places: RailPlaces, kept: (id: string) =>
   const quiet = [...pagesOf(worlds, places)].flatMap(([id, href]): RailEntry[] =>
     taken.has(id) || !kept(id) ? [] : [{ id, title: nameOf(id), section: "trend", href }],
   );
-  // ponytail: every one, the column scrolling and each planet drawn as it shows (worldThumbs.ts); a cap if a namespace of thousands comes.
+  // ceiling: every one, the column scrolling and each planet drawn as it shows (worldThumbs.ts); a cap if a namespace of thousands comes.
   return [...lively, ...quiet];
 }
 

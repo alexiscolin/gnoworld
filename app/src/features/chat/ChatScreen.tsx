@@ -1,5 +1,5 @@
 // The chat's screen on a world's page, whoever reads it (a visitor's or an account's): docked at the right of the page
-// (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
+// or, expanded, full bleed over it: the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
 import { PHONE_QUERY } from "@gnoworld/core";
 import { ChatLayout, Stack } from "@gnoworld/ui";
@@ -45,7 +45,7 @@ export interface ChatPlace {
   kicker: string;
   /** Where closing the chat goes: the universe's home. */
   home: string;
-  /** What closing does instead, where the chat stands over the page it closes back to (the dock over the cosmos, frame 143). */
+  /** What closing does instead, where the chat stands over the page it closes back to (the dock over the cosmos). */
   close?: (() => void) | undefined;
   /** The universe's worlds, in order. */
   worlds: readonly ChatWorld[];

@@ -15,7 +15,7 @@ const Line = z.strictObject({
   usd: z.array(MarketToken.shape.usd).check(z.maxLength(MARKETS_HISTORY_MOST)),
 });
 
-/** The history: when its last price was read, and each token's line, in the video's order, each once. */
+/** The history: when its last price was read, and each token's line, in the design's order, each once. */
 export const MarketsHistory = z.strictObject({
   updated: z.iso.datetime({ offset: true }),
   tokens: z.array(Line).check(

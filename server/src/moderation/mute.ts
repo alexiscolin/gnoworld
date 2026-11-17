@@ -27,7 +27,7 @@ interface Options {
   roomsOf: (world: string) => readonly string[];
   now: () => number;
   forMs: number;
-  // ponytail: a world's live mutes at most, the one ending first lifted to make room; Ergo's list holds 100.
+  // ceiling: a world's live mutes at most, the one ending first lifted to make room; Ergo's list holds 100.
   max: number;
 }
 

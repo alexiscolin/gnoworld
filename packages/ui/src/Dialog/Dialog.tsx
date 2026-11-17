@@ -23,7 +23,7 @@ export interface DialogProps {
   /** What it asks about, muted under the title and read with it by assistive technology. */
   description?: string;
   /** A drawer at the screen's start, its full height, over the page with no scrim, its title for assistive technology alone and Close at
-   * its top end (the search, frames 98 to 100); a click beside it closes it. */
+   * its top end (the search); a click beside it closes it. */
   side?: "start";
   /** A mark before the heading, as wide as the heading's two lines (the passport's seal). */
   lead?: ReactNode;

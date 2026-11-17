@@ -1,4 +1,4 @@
-// A poll's line drawn as the video's frames 73 and 76 draw it: the question, a bar an answer filled to its share, the share at
+// A poll's line drawn as the design draw it: the question, a bar an answer filled to its share, the share at
 // its end, the reader's own answer edged, then the count of votes. A vote is a reaction (core's poll.ts): an account taps an
 // answer to vote, another to move its vote, its own to take it back; a guest reads the bars.
 import { POLL_KEYS, revote, type Poll, type Reacting } from "@gnoworld/core";

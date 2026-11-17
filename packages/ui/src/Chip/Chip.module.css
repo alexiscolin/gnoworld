@@ -30,7 +30,7 @@
       color var(--motion-base) var(--ease-standard);
   }
 
-  /* The dock's room shortcuts: the video's pill, 27 px high. */
+  /* The dock's room shortcuts: the design's pill, 27 px high. */
   .chip[data-size="chip"] {
     --_h: var(--control-chip);
     --_pad: var(--space-xs);

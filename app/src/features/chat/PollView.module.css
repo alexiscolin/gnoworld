@@ -1,4 +1,4 @@
-/* A poll as the video's frames 73 and 76 draw it: a bar an answer, 36 px high, filled to its share in a dark mint, the share at
+/* A poll as the design draw it: a bar an answer, 36 px high, filled to its share in a dark mint, the share at
    its end, the reader's own edged in mint. */
 @layer components {
   .bar {
@@ -11,7 +11,7 @@
     /* layout: the one row of words on the bar's middle */
     align-content: center;
     inline-size: 100%;
-    /* raw: the video's bar, 36 px high (frame 76) */
+    /* raw: the design's bar, 36 px high */
     block-size: 36px;
     padding-inline: var(--space-s);
     overflow: hidden;
@@ -37,7 +37,7 @@
   .answer {
     /* layout: over the fill */
     position: relative;
-    /* layout: at the bar's start, as the video's frame 73 */
+    /* layout: at the bar's start, as the design */
     justify-self: start;
   }
 

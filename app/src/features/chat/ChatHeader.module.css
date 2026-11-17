@@ -60,7 +60,7 @@
     inline-size: calc(var(--chat-info) + var(--chat-inset) - 2 * var(--space-m));
   }
 
-  /* The rooms' control and the place: on a wide chat, items of the header's one row (frame 60). */
+  /* The rooms' control and the place: on a wide chat, items of the header's one row. */
   .place {
     /* layout: on a wide chat, the place over the worlds' and the rooms' columns, so what follows stands on the messages' edge */
     display: block;
@@ -73,7 +73,7 @@
   }
 
   /* The chat's breakpoint, from its own width (ChatScreen.tsx's `data-compact`: no container query, none holds one). A
-     phone's header keeps two rows (frame 38: the place and the controls, then the name); a dock's one, what does not fit under "More"
+     phone's header keeps two rows (the place and the controls, then the name); a dock's one, what does not fit under "More"
      (PlaceActs.tsx). */
   [data-compact] {
     .place {

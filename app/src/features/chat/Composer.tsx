@@ -165,7 +165,7 @@ export function Composer(props: ComposerProps) {
     >
       <Stack space="2xs">
         {editing.bar}
-        {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
+        {/* The design's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
         <MessageBox
           onFormat={format}
           linkTool={(size) => <LinkTool onApply={link} size={size} />}

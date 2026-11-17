@@ -1,4 +1,4 @@
-// The room's Media (the video's frame 56, over Saved; frame 104's image icon in the dock): greyed "coming soon", what
+// The room's Media (over Saved; the design's image icon in the dock): greyed "coming soon", what
 // its lines shared from the accepted services; images come by link only, never uploaded.
 import { Icon, NavItem } from "@gnoworld/ui";
 

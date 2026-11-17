@@ -45,7 +45,7 @@
 
   /* The pinned actions and what writes under the lines, set off by a rule across the conversation. */
   .dock {
-    /* the video's 21 px under the box, from the tokens: 16 and 4 */
+    /* the design's 21 px under the box, from the tokens: 16 and 4 */
     padding-block: var(--space-s) calc(var(--space-s) + var(--space-3xs));
     padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);

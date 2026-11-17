@@ -27,7 +27,7 @@
     }
 
     .chat {
-      /* The dock takes the plate's tint, as frames 43 to 85 have it: the fill as the page's own, read above the chat. */
+      /* The dock takes the plate's tint, as the design have it: the fill as the page's own, read above the chat. */
       --color-surface: var(--_tinted);
 
       /* layout: the dock's own height */

@@ -1,4 +1,4 @@
-/* The dock's rooms as a row of pills (frame 26): ui's Chip at the video's 27 px, the one in view cream, a count after its name. */
+/* The dock's rooms as a row of pills: ui's Chip at the design's 27 px, the one in view cream, a count after its name. */
 @layer components {
   .row {
     /* layout: kept to its own height above the lines, at the lines' inset, a step of its own fill under the pills */

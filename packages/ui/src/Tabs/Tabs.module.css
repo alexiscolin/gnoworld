@@ -70,7 +70,7 @@
     --_ink: var(--color-ink);
   }
 
-  /* A count in the icon button's badge (frames 86, 87): mint on a tab at rest, ink on the cream of the selected one. */
+  /* A count in the icon button's badge: mint on a tab at rest, ink on the cream of the selected one. */
   .count {
     display: inline-block;
   }

@@ -7,13 +7,13 @@
     list-style: none;
   }
 
-  /* The rooms' and the direct messages' items, a step apart as the video sets them. */
+  /* The rooms' and the direct messages' items, a step apart as the design sets them. */
   .items {
-    /* layout: the items one under the other, the video's step between them */
+    /* layout: the items one under the other, the design's step between them */
     display: flex;
     /* layout: one under the other */
     flex-direction: column;
-    /* layout: the video's step between the items */
+    /* layout: the design's step between the items */
     gap: var(--chat-item-gap);
   }
 

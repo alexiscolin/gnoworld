@@ -1,4 +1,4 @@
-// A call the chain told, as a card of a room's thread (frames 20 to 35): who called what, on which realm, at which block, in words from the
+// A call the chain told, as a card of a room's thread: who called what, on which realm, at which block, in words from the
 // event alone, drawn as text and never before its event (ADR-0002 §4). The schema stopped hostile text at the stream; this is the second
 // wall: names are capped and stripped of control and bidi characters. Its Details open the call's own detail, read when they open.
 import { PHONE_QUERY } from "@gnoworld/core";

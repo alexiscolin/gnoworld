@@ -1,4 +1,4 @@
-// The chat's header (the video's frames 26 and 66, top): the room's name and the place's buttons; the site header's Chat and the chat's own
+// The chat's header (top): the room's name and the place's buttons; the site header's Chat and the chat's own
 // arrows open a docked chat full, its arrows or a level close it, and a chat with no dock (a phone's screen) has a close.
 import { Cluster, Dialog, Icon, IconButton, Sidebar } from "@gnoworld/ui";
 import { useEffect, useState, type ReactNode, type Ref } from "react";

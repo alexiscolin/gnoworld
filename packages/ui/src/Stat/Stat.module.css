@@ -13,7 +13,7 @@
   }
 
   .unit {
-    /* raw: the frame sets its unit about 5 px after the figure, the space counted (frame 26) */
+    /* raw: the frame sets its unit about 5 px after the figure, the space counted */
     /* layout: the unit stands a little off its figure */
     margin-inline-start: 0.2em;
     /* layout: the figure's tight tracking is not the unit's words' */

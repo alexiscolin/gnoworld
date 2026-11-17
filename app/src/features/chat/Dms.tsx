@@ -57,7 +57,7 @@ export function conversationOf(all: AppState["dms"], partner: string | undefined
 }
 
 // Everyone in a room this page follows, as one string the store's selector compares by value: a partner among them is online.
-// ponytail: every member of every room followed: a world's few rooms of a few hundred people each.
+// ceiling: every member of every room followed: a world's few rooms of a few hundred people each.
 const presentIn = (rooms: AppState["chat"]["rooms"]): string =>
   [...new Set(Object.values(rooms).flatMap((room) => room.members))].sort().join(" ");
 

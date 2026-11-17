@@ -1,5 +1,5 @@
 // The tools' cache the tests' pinned binaries live in (scripts/ergo.sh builds Ergo there): GNOWORLD_TOOLS, else ~/.cache/gnoworld-tools;
-// empty is unset, as ergo.sh, check_nginx.py and workshop.sh read it (F13755).
+// empty is unset, as ergo.sh, check_nginx.py and workshop.sh read it.
 import { homedir } from "node:os";
 import { join } from "node:path";
 

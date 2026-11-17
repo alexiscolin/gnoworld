@@ -1,8 +1,8 @@
-/* The trail: the video's kicker over a title, in the label style at the kicker's size, a dot in the world's colour before it and
+/* The trail: the design's kicker over a title, in the label style at the kicker's size, a dot in the world's colour before it and
    a chevron between the steps. */
 @layer components {
   .trail {
-    /* raw: the video's crumbs are 12 px sans, 0.08em apart, at 70% (the prototype's .kicker), set through the label style's own values */
+    /* raw: the design's crumbs are 12 px sans, 0.08em apart, at 70% (the prototype's .kicker), set through the label style's own values */
     --font-label: 500 0.75rem/1 var(--family-sans);
     --tracking-caps: 0.08em;
     --color-text-muted: color-mix(in oklab, var(--color-text) 70%, transparent);
@@ -39,7 +39,7 @@
     display: inline-flex;
     /* layout: the chevron centred on its box, wider than it */
     justify-content: center;
-    /* raw: the advance of the "›" it replaced (D13218), measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
+    /* raw: the advance of the "›" it replaced, measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
     inline-size: 0.4284em;
     /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-2xs);

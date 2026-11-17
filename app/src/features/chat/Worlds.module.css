@@ -1,4 +1,4 @@
-/* The column of worlds: planets one under another at the video's 44 px, no text, a ring around the one in view (frame 80). */
+/* The column of worlds: planets one under another at the design's 44 px, no text, a ring around the one in view. */
 @layer components {
   .list {
     /* the fill-column utility lays it: the planets from the top, the credits at the column's foot */
@@ -15,11 +15,11 @@
     text-decoration: none;
   }
 
-  /* raw: the video's planet, 44 px: ui's thumb sizes are 32, 48 and 64, so the column sets its own (a new size is ui's to add) */
+  /* raw: the design's planet, 44 px: ui's thumb sizes are 32, 48 and 64, so the column sets its own (a new size is ui's to add) */
   .world > span:first-child {
-    /* raw: the video's planet is 44 px wide */
+    /* raw: the design's planet is 44 px wide */
     inline-size: 44px;
-    /* raw: the video's planet is 44 px high */
+    /* raw: the design's planet is 44 px high */
     block-size: 44px;
   }
 
@@ -40,7 +40,7 @@
      A focused link keeps the focus ring, which is the same outline. */
   .world[aria-current="page"]:not(:focus-visible) > span:first-child {
     outline: calc(2 * var(--line-width)) solid var(--color-text);
-    /* raw: the video's ring stands 3 px off the planet's edge (54 round 44, its two lines included) */
+    /* raw: the design's ring stands 3 px off the planet's edge (54 round 44, its two lines included) */
     outline-offset: 3px;
   }
 

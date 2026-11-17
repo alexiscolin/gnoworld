@@ -49,7 +49,7 @@ export interface DmsProps {
   partners: readonly string[];
   /** The conversation in view. */
   current: string | undefined;
-  /** Everyone in a room the page follows, space-separated: a partner among them gets the video's green dot (frame 56). */
+  /** Everyone in a room the page follows, space-separated: a partner among them gets the design's green dot. */
   present?: string | undefined;
 }
 
@@ -102,7 +102,7 @@ function Notices({
   );
 }
 
-// A partner in a room the page follows, with nothing unread: the video's dot at the row's end (frame 56), said "online".
+// A partner in a room the page follows, with nothing unread: the design's dot at the row's end, said "online".
 const ONLINE = { said: "online", status: true };
 
 function Dms({
@@ -147,7 +147,7 @@ function Dms({
               </li>
             ))}
           </ul>
-          {/* What every direct message says of itself, in the video's small grey note under the list. */}
+          {/* What every direct message says of itself, in the design's small grey note under the list. */}
           <p className={["meta", styles["note"]].join(" ")}>
             {NOT_ENCRYPTED} {PAGE_ONLY}
           </p>

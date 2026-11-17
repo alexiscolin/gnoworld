@@ -157,8 +157,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
         ...used.map((part) => (part === null ? null : JSON.stringify(part))),
         msgid,
       );
-      // Counted once, when first settled: a retry that hides it later leaves the count (F13503), which only spares a room
-      // longer; taking it back could erase another line's count and archive an active room (F13517).
+      // Counted once, when first settled: a retry that hides it later leaves the count, which only spares a room
+      // longer; taking it back could erase another line's count and archive an active room.
       if (fresh && verdict.action !== "hide") countLine(room, at);
       return verdict;
     };

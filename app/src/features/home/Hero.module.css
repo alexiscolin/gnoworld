@@ -1,5 +1,5 @@
 /* The hero: bottom left of the cosmos, 48 px from the left and 32 from the bottom (the ticker's room given to it), the kicker, the number at 176 px in mono with its
-   line at its right, then two actions of 52 px (the prototype's #hero, lines 514 to 546; frames 1 to 8); a block in the page on a phone and on a screen too short to hold it over the page. */
+   line at its right, then two actions of 52 px; a block in the page on a phone and on a screen too short to hold it over the page. */
 @layer components {
   .hero {
     /* layout: the kicker, the number and the row, one under the other */
@@ -75,14 +75,14 @@
     gap: var(--space-s);
   }
 
-  /* Who is here, live: the mint of "ONLINE" (frame 6), larger than a kicker, a dot beating slowly beside it; still under reduced motion. */
+  /* Who is here, live: the mint of "ONLINE", larger than a kicker, a dot beating slowly beside it; still under reduced motion. */
   .online {
     /* layout: the dot a step from the words */
     gap: var(--space-2xs);
     color: var(--color-mine);
-    /* raw: 13 px mono, a step over the kicker's, tracked as frame 6's word */
+    /* raw: 13 px mono, a step over the kicker's, tracked as the design's word */
     font: 500 0.8125rem/1 var(--family-mono);
-    /* raw: frame 6's wide tracking, a little closer at this size */
+    /* raw: the design's wide tracking, a little closer at this size */
     letter-spacing: 0.2em;
   }
 

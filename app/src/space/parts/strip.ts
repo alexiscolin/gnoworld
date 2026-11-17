@@ -6,7 +6,7 @@ import { placeOf, type Planet, type Vec } from "../layout.ts";
 import { ORBIT_COLOUR } from "./marks.ts";
 import { ADDITIVE } from "../additive.ts";
 
-// ponytail: one planet draws this many links at most; a hub with more shows its first ones. Raise it with the buffers' size.
+// ceiling: one planet draws this many links at most; a hub with more shows its first ones. Raise it with the buffers' size.
 const MOST = 256;
 // raw: the strip's width in CSS pixels, its strength over the orbits' colour (still about three times the links at rest), and how long it takes to come or go
 const WIDTH_PX = 1.5;

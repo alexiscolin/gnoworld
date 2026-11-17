@@ -1,4 +1,4 @@
-// The header's bell (frames 86, 87): the button and its count on the first screen, the rest later. The count comes a moment after
+// The header's bell: the button and its count on the first screen, the rest later. The count comes a moment after
 // the page has loaded (Watch.tsx); the panel at the first press (Panel.tsx). Neither is in the first screen's code, nor in later.ts:
 // on the home, the one page that has it nowhere else, it would cost a chunk of its own.
 import { IconButton } from "@gnoworld/ui";

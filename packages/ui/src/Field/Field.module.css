@@ -2,7 +2,7 @@
    invalid, coral. */
 @layer components {
   /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
-  /* The strong line at rest and under the pointer, frame 10's edge. */
+  /* The strong line at rest and under the pointer, the design's edge. */
   .box,
   .frame {
     --_line: var(--color-line-strong);

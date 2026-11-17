@@ -72,7 +72,7 @@
     }
   }
 
-  /* A phone draws no corner: its menu and its Info sheet hold the link (D13724). */
+  /* A phone draws no corner: its menu and its Info sheet hold the link. */
   @media (width < 900px) {
     .credits {
       display: none;
@@ -103,7 +103,7 @@
     }
   }
 
-  /* Level with the hero's foot, left of the rail's column (frames 4 and 17: 118 px wide, 25 from the edge). */
+  /* Level with the hero's foot, left of the rail's column (118 px wide, 25 from the edge). */
   @media (width >= 900px) {
     .offer,
     .status {

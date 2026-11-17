@@ -58,7 +58,7 @@ export function PlaceActs({ acts }: { acts: readonly Act[] }) {
   );
 }
 
-/** The place's acts: search in the chat, then who is here, the events and the video call. */
+/** The place's acts: search in the chat, then who is here, the events and the design call. */
 export const placeActs = (search: Act, onWhoIsHere: () => void): Act[] => [
   search,
   { label: "Who's here", icon: "people", onSelect: onWhoIsHere },

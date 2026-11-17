@@ -1,4 +1,4 @@
-// The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' /, the
+// The composer's one rounded box (the design.58.01): the format bar, the field, and at its foot the quick actions' /, the
 // field's words, when it has some to say, and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
 import { Cluster, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, useState, type ReactNode } from "react";
@@ -8,7 +8,7 @@ import { useFull } from "./full.ts";
 import { useKeepFocus } from "./keepFocus.ts";
 import styles from "./MessageBox.module.css";
 
-// The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
+// The format bar's groups, a rule between each (the marks, the code, the lists), the marks as the design orders
 // them: B, I, U, S. Underline goes as `++`.
 const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: string }[])[] = [
   [
@@ -80,7 +80,7 @@ function FormatBar({
   );
 }
 
-// The video's one rounded box: the format bar, the field (its children), and at its foot the room's quick actions, the field's words
+// The design's one rounded box: the format bar, the field (its children), and at its foot the room's quick actions, the field's words
 // (the field draws them, the box's grid places them) and Send. No @ nor / of its own: both are typed, and Tab completes them.
 export function MessageBox({
   onFormat,

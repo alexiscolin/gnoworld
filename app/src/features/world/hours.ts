@@ -1,4 +1,4 @@
-// A world's last day of messages an hour (frames 26 and 40): the server's history of its rooms (server/src/worlds/present.ts), read once
+// A world's last day of messages an hour: the server's history of its rooms (server/src/worlds/present.ts), read once
 // the page runs. A chunk of its own, asked by useHours.ts: the first screen holds neither the schema nor the read.
 import { PresenceHours, PRESENCE_HOURS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readPageFile } from "../../lib/query/siteFile.ts";

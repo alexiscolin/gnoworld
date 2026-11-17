@@ -1,5 +1,5 @@
-// What a room's lines show beyond their words: a poll's votes (core's poll.ts) and an account's first words, the video's
-// "new here" (frame 56). Apart from Lines.tsx, which draws them.
+// What a room's lines show beyond their words: a poll's votes (core's poll.ts) and an account's first words, the design's
+// "new here". Apart from Lines.tsx, which draws them.
 import { POLL_KEYS, pollOf, votesOn, type Reaction, type Shown, type ShownLine } from "@gnoworld/core";
 import { dayKey, dayName } from "../../lib/days.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
@@ -15,7 +15,7 @@ interface Room {
 }
 
 /** Each poll line's votes as votesString writes them, by msgid.
- * ponytail: one pass over the reactions a poll, a room's window holding 200 lines and 1,000 reactions at most. */
+ * ceiling: one pass over the reactions a poll, a room's window holding 200 lines and 1,000 reactions at most. */
 export function votesOf({ lines, reactions, me, lineOf }: Room): ReadonlyMap<string, string> {
   const votes = new Map<string, string>();
   for (const line of lines) {

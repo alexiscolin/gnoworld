@@ -18,7 +18,7 @@ export function quoted(words: string): string {
 
 export { shortAddress } from "@gnoworld/schemas";
 
-// The Earth is a page of its own, under no /w/, and its main room is the general chat (frames 37 to 55).
+// The Earth is a page of its own, under no /w/, and its main room is the general chat.
 const EARTH = "earth";
 
 /** A room by its own name: #games for #bubble/games, the world's main room by the world, the Earth's the general chat. */

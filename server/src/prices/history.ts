@@ -40,7 +40,7 @@ export function makeHistory(file: string, now: () => number): History {
       }
       day = MarketsHistory.parse({
         updated: day?.updated ?? new Date(at).toISOString(),
-        // The lines in the video's order, whichever the seeding gave first.
+        // The lines in the design's order, whichever the seeding gave first.
         tokens: MARKET_SYMBOLS.flatMap((symbol) => {
           const usd = lines.get(symbol);
           return usd === undefined ? [] : [{ symbol, usd }];
@@ -51,7 +51,7 @@ export function makeHistory(file: string, now: () => number): History {
     add(tokens, at) {
       const lines = new Map((day?.tokens ?? []).map(({ symbol, usd }) => [symbol, usd]));
       const read = new Map(tokens.map(({ symbol, usd }) => [symbol, usd]));
-      // A token that had no price at a read keeps its line as it was; the lines keep the video's order.
+      // A token that had no price at a read keeps its line as it was; the lines keep the design's order.
       day = MarketsHistory.parse({
         updated: new Date(at).toISOString(),
         tokens: MARKET_SYMBOLS.filter((symbol) => lines.has(symbol) || read.has(symbol)).map((symbol) => {

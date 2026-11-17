@@ -10,7 +10,7 @@
   }
 
   .name {
-    /* raw: the video's panel title, 32 px; its stems are 1.3 px against 1.8 px at 400 (frame 66), so 300, not the prototype's 400 */
+    /* raw: the design's panel title, 32 px; its stems are 1.3 px against 1.8 px at 400, so 300, not the prototype's 400 */
     font: 300 2rem/1.1 var(--family-sans);
     /* raw: the prototype's -0.03em */
     letter-spacing: -0.03em;
@@ -22,7 +22,7 @@
     font: 400 0.84375rem/1.5 var(--family-sans);
   }
 
-  /* The figures between two rules, as the video's panel sets them. */
+  /* The figures between two rules, as the design's panel sets them. */
   .stats {
     padding-block: var(--space-xs);
     border-block: var(--line-width) solid var(--color-line);
@@ -38,7 +38,7 @@
   }
 }
 
-/* The place's links out, as the video's frame 56 sets them: the label's capitals in the text's colour, an arrow after each. */
+/* The place's links out, as the design sets them: the label's capitals in the text's colour, an arrow after each. */
 @layer components {
   /* Inside the label's anchor: its words and arrow in the text's colour, which the label's own grey would take. */
   .link {

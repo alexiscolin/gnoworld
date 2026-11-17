@@ -1,6 +1,6 @@
 /* The composer's box: three rows on a grid, the format bar, the field and the foot. */
 @layer components {
-  /* The composer's one box (frame 23.58.01, prototype index.html:196-224): three rows, the format bar, the field and the
+  /* The composer's one box (the design.58.01, prototype index.html:196-224): three rows, the format bar, the field and the
      foot. The field draws no edge of its own; its label is for assistive technology alone, the placeholder's job. */
   .box {
     /* layout: three rows on one grid, so the field's words, which the field draws itself, sit in the foot's row */
@@ -22,7 +22,7 @@
     position: relative;
   }
 
-  /* The box carries the focus: one mint edge, as the video's (prototype .cbox:focus-within), the field's own ring and handle gone. */
+  /* The box carries the focus: one mint edge, as the design's (prototype .cbox:focus-within), the field's own ring and handle gone. */
   .box:focus-within {
     border-color: var(--color-mine);
   }
@@ -118,7 +118,7 @@
     display: none;
   }
 
-  /* Send: IconButton's solid, round, at the foot's end; its arrow points up, as the video's does. */
+  /* Send: IconButton's solid, round, at the foot's end; its arrow points up, as the design's does. */
   .send {
     /* layout: the foot's row, its last column */
     grid-area: 3 / 2;

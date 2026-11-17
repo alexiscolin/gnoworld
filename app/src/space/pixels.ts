@@ -2,7 +2,7 @@
 // costs the page the copy alone, not the GPU's whole queue (WebGL2, which three needs; a context without it has no packs).
 const POLL_MS = 8;
 const QUALITY = 0.9;
-// What frame 4's planets keep on their night side, out of 255: their dark edges are never black (#201e1d to #292524).
+// What the design's planets keep on their night side, out of 255: their dark edges are never black (#201e1d to #292524).
 const NIGHT = 26;
 
 /** The context as WebGL2's, or none where it is not. */

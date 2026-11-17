@@ -40,10 +40,10 @@
     background: var(--color-primary);
   }
 
-  /* The arc: a thin ring's three quarters on the line's grey, the done part in cream, round at its ends (frame 99: about 88 px across). */
+  /* The arc: a thin ring's three quarters on the line's grey, the done part in cream, round at its ends (about 88 px across). */
   .arc {
     display: block;
-    /* raw: 88 px across, frame 99 */
+    /* raw: 88 px across, the design */
     inline-size: 88px;
     /* raw: the same */
     block-size: 88px;

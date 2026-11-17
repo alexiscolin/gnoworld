@@ -1,4 +1,4 @@
-// The "Share" of the "First to chart" pill (frame 93): the slot, filled at the first screen with a few bytes that ask the share's own
+// The "Share" of the "First to chart" pill: the slot, filled at the first screen with a few bytes that ask the share's own
 // code at the press.
 import { plug } from "../../slots.tsx";
 

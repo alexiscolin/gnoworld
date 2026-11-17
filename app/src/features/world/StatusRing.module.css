@@ -2,7 +2,7 @@
 @layer components {
   .ring {
     position: absolute;
-    /* raw: the ring reaches 1.106 radii of the globe (frame 39), so it stands 5.3 % of the box past each side */
+    /* raw: the ring reaches 1.106 radii of the globe, so it stands 5.3 % of the box past each side */
     inset: -5.3%;
     overflow: visible;
     pointer-events: none;

@@ -28,7 +28,7 @@ const RING_FLAT = -Math.PI / 2;
 const AIR_ORDER = 1;
 const RING_ORDER = 2;
 const HALO_ORDER = 3;
-// A seed's glow reaches this far past its small body, in front of it: frame 4's signal is a glow with a heart, not a ring round a disc.
+// A seed's glow reaches this far past its small body, in front of it: the design's signal is a glow with a heart, not a ring round a disc.
 const HALO_REACH = 2.6;
 // Vector4's own default is w = 1, a moon of radius 1: none is radius 0.
 /** How long the real height takes to come in, in milliseconds. */
@@ -56,7 +56,7 @@ export interface Planet {
   setArrive(share: number): void;
   /** Whether the relief's shadows and cavities are drawn: off under the Low setting. */
   setDepth(on: boolean): void;
-  /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
+  /** Lights the edge of its air by hand on the day side: the Earth's bright rim, for scattering alone floods its seas first. */
   setLimb(light: number): void;
   /** How dim it stands, 0 to 1: a world a lens leaves unlit. */
   setFar(share: number): void;
@@ -74,7 +74,7 @@ interface Parts {
   readonly sphere: BufferGeometry;
 }
 
-/** How hard the Earth lights the edge of its air: the bright limb of frame 39. */
+/** How hard the Earth lights the edge of its air: the bright limb in the design. */
 export const LIMB_LIGHT = 1.05;
 
 class LivePlanet implements Planet {

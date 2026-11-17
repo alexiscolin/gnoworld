@@ -23,7 +23,7 @@
     display: none;
   }
 
-  /* The bar asks the list's own width, not the page's (LineActions); the lines a step apart, as the video's are. */
+  /* The bar asks the list's own width, not the page's (LineActions); the lines a step apart, as the design's are. */
   .lines {
     container-type: inline-size;
     /* layout: the lines one under the other, a step apart, on the list itself, which a composition cannot name or label */
@@ -35,7 +35,7 @@
   }
 
   /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
-     the page (the video's frame 23.58.01); the thread's list keeps its own height. */
+     the page; the thread's list keeps its own height. */
   .fill {
     /* layout: a list's own margin and marks, taken off as the reset takes a paragraph's */
     margin: 0;
@@ -52,7 +52,7 @@
     --_room: max(var(--chat-inset), var(--space-l));
     padding-inline: calc(var(--_room) - var(--focus-width) - var(--focus-offset))
       calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
-    /* the video's chat text, a half point under the body's */
+    /* the design's chat text, a half point under the body's */
     font: var(--font-chat);
   }
 
@@ -125,9 +125,9 @@
     margin-block-start: 0;
   }
 
-  /* A line that opens a group stands a step under the one before it, as the video's lines do: the step less the two paddings. */
+  /* A line that opens a group stands a step under the one before it, as the design's lines do: the step less the two paddings. */
   .lines > li:not([data-grouped]) {
-    /* layout: the step the video puts between lines, less the paddings of the two rows */
+    /* layout: the step the design puts between lines, less the paddings of the two rows */
     margin-block-start: calc(var(--space-s) - var(--space-3xs) * 2);
   }
 
@@ -180,7 +180,7 @@
     color: var(--color-text-muted);
   }
 
-  /* The country a line declares: the video's frames 40 and 60, a box 22 by 15 between the face and the name. */
+  /* The country a line declares: the design, a box 22 by 15 between the face and the name. */
   .country {
     /* raw: a step above the line's width, and a corner under the small radius, as the frames draw it */
     padding: 1px var(--space-3xs);
@@ -208,7 +208,7 @@
     cursor: pointer;
   }
 
-  /* An account's first words in the room: the video's mint "new here" tag after the name (frame 56). */
+  /* An account's first words in the room: the design's mint "new here" tag after the name. */
   .newHere {
     /* raw: the frame's tag, a pixel above and under its words */
     padding: 1px var(--space-2xs);
@@ -229,12 +229,12 @@
   .head .time {
     /* layout: the far end of the head's row */
     margin-inline-start: auto;
-    /* the video's time in mono (the prototype's #chatList li em) */
+    /* the design's time in mono (the prototype's #chatList li em) */
     font: var(--text-2xs)/1 var(--family-mono);
   }
 
   [data-line-text] {
-    /* layout: the text a hair under its head, as the video sets it */
+    /* layout: the text a hair under its head, as the design sets it */
     margin-block-start: calc(var(--space-3xs) / 2);
   }
 
@@ -325,7 +325,7 @@
     border-block-start: var(--line-width) solid var(--color-line);
   }
 
-  /* A poll's bars run the line's whole width, over the room kept for its bar, as the video's frame 73 draws them. */
+  /* A poll's bars run the line's whole width, over the room kept for its bar, as the design draws them. */
   /* A line's translation, under its words: the text's own size and ink, a rule at its start and a step in, no box. */
   .translation {
     /* layout: a step under the original, the rule drawn at the start of the translation alone */
@@ -378,7 +378,7 @@
 @layer components {
   @media (width < 900px) {
     .lines > li:not([data-grouped], :first-child) {
-      /* layout: the video's step between lines is the head's own room above, below */
+      /* layout: the design's step between lines is the head's own room above, below */
       margin-block-start: 0;
     }
 
