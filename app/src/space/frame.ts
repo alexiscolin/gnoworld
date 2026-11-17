@@ -9,6 +9,7 @@ import { advance, paint, present } from "./move.ts";
 import { touchOf } from "./hands.ts";
 import { onResize } from "./onResize.ts";
 import { choose, livelyOf, momentOf, napOf, pace, resize, stateOf } from "./view.ts";
+import { programsAtRest } from "./parts/programs.ts";
 
 /** Runs `space`'s loop till `signal` aborts; `space.keep.wake` wakes it where it sleeps. */
 export function runFrames(space: Space, signal: AbortSignal): void {
@@ -44,6 +45,7 @@ export function runFrames(space: Space, signal: AbortSignal): void {
       if (!drawn && space.universe !== undefined) {
         drawn = true;
         space.options.events.drawn();
+        programsAtRest(space, signal);
       }
       sharpen(now);
       return state.need;
