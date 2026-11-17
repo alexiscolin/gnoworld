@@ -94,7 +94,7 @@ function statements(db: DatabaseSync) {
   return {
     purge: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     pending: db.prepare("SELECT count(*) AS n FROM nonces WHERE owner = ? AND kind IS NOT NULL"),
-    // A link's code has its owner: the command line's login's nonces (kind cli, no owner) are the login's cap's.
+    // A link's code has its owner: a nonce with none is a login's, which the login's own cap counts.
     pendingAll: db.prepare("SELECT count(*) AS n FROM nonces WHERE kind IS NOT NULL AND owner IS NOT NULL"),
     add: db.prepare(
       "INSERT INTO nonces (nonce, chain, host, text, owner, subject, kind, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
