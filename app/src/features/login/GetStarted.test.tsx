@@ -53,7 +53,7 @@ describe("GetStarted watches for Adena only while it is open", () => {
   const draw = () => {
     const into = drawer();
     return (open: boolean) => {
-      into(<GetStarted open={open} onClose={vi.fn()} onConnect={vi.fn()} />);
+      into(<GetStarted open={open} onClose={vi.fn()} onConnect={vi.fn()} onCommandLine={vi.fn()} />);
       return document.body.textContent;
     };
   };
@@ -156,5 +156,27 @@ describe("the dialog Get started, opened and closed from the control", () => {
     draw(<LoginControl login={none} logIn={vi.fn()} />);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(isOpen(document.body)).toBe(false);
+  });
+});
+
+describe("the command line's way in (D13880)", () => {
+  it("offers to log in with the command-line tool on a computer only, beside Connect, and hands the click on", () => {
+    const onKey = vi.fn();
+    const box = mount(<GetStarted open onClose={vi.fn()} onConnect={vi.fn()} onCommandLine={onKey} />);
+    const offer = button(box, "Log in with gnokey");
+    expect(offer?.closest(".fine-only")).not.toBeNull();
+    click(offer);
+    expect(onKey).toHaveBeenCalledOnce();
+  });
+
+  it("asks the page for the command line's login and closes, from the header's control", async () => {
+    const heard = vi.fn();
+    window.addEventListener("gnoworld:key-login", heard);
+    const box = mount(<LoginControl login={missing} logIn={vi.fn()} />);
+    await settled(() => box.querySelector("dialog[open]") !== null);
+    click(button(box, "Log in with gnokey"));
+    expect(heard).toHaveBeenCalledOnce();
+    expect(box.querySelector("dialog[open]")).toBeNull();
+    window.removeEventListener("gnoworld:key-login", heard);
   });
 });

@@ -19,7 +19,7 @@ export function LinkDialog({ me, onLinked, onClose }: { me: Address; onLinked: (
         {tab === "adena" ? (
           <AdenaTab me={me} onLinked={onLinked} onCancel={onClose} />
         ) : (
-          <CommandTab onLinked={onLinked} onCancel={onClose} />
+          <CommandTab me={me} onLinked={onLinked} onCancel={onClose} />
         )}
       </Stack>
     </Dialog>

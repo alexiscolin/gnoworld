@@ -10,7 +10,9 @@ import { logIn } from "./irc.ts";
 // routes (the server's own logic is its tests'): the list, the link dialog's two tabs, an unlink that asks first, a session too old
 // that signs in again, and a guest's release.
 const COMPUTER = { width: 1280, height: 900 };
-const CODE = "AAAAAAAAAAAAAAAAAAAAAA";
+// Each code its own nonce, as the server's are: a code's text and the logged-in account's own block change with it.
+let codes = 0;
+const nextCode = () => `${"A".repeat(20)}${String(10 + (codes++ % 90))}`;
 const FILE = '{"msg":[],"fee":{},"signatures":[{"pub_key":{},"signature":"x"}],"memo":""}';
 const json = { "content-type": "application/json" };
 
@@ -29,22 +31,26 @@ type Answer = (asked: Asked, held: Held) => unknown;
 
 const expiresAt = () => new Date(Date.now() + 600_000).toISOString();
 const addresses = (held: Held) => ({ members: held.members.map(({ address }) => address) });
-const challenge = ({ address }: Asked) => ({
-  nonce: CODE,
-  memo: "gnoworld",
-  block: `gnokey sign --key KEY # ${address}`,
-  expiresAt: expiresAt(),
-});
+const challenge = ({ address }: Asked) => {
+  const nonce = nextCode();
+  return { nonce, memo: `gnoworld ${nonce}`, block: `gnokey sign --key KEY # ${address}`, expiresAt: expiresAt() };
+};
 const ANSWERS: Record<string, Answer> = {
   "/api/links": (_, held) => ({
     members: held.members.length > 1 ? held.members : [],
     worlds: ["bubble"],
     linked: held.members.length > 1,
   }),
-  "/api/links/challenge": (asked) =>
-    asked.kind === "adena"
-      ? { nonce: CODE, text: `Link ${asked.address} to gnoworld`, expiresAt: expiresAt(), chainId: "onyx-1" }
-      : challenge(asked),
+  // The logged-in account signs the same text too (the wallet audit's medium 1): its own block comes with each code.
+  "/api/links/challenge": (asked) => {
+    if (asked.kind !== "adena") {
+      const code = challenge(asked);
+      return { ...code, byBlock: `gnokey sign --key MINE # ${code.nonce}`, chainId: "onyx-1" };
+    }
+    const nonce = nextCode();
+    const text = `Link ${asked.address} to gnoworld, code ${nonce}`;
+    return { nonce, text, expiresAt: expiresAt(), chainId: "onyx-1", byBlock: `gnokey sign --key MINE # ${nonce}` };
+  },
   "/api/links/release/challenge": challenge,
   "/api/links/verify": (asked, held) => {
     held.members.push({
@@ -158,8 +164,10 @@ test.describe("linked accounts", () => {
     await expect(row.getByRole("button", { name: /^Unlink/ })).toBeVisible();
   });
 
-  test("links an account with Adena: its text shown, signed, the list now holding it", async ({ page }) => {
-    const { held, settings } = await inSettings(page);
+  test("links an account with Adena: its text shown, signed by it and by the logged-in account, the list now holding it", async ({
+    page,
+  }) => {
+    const { held, settings, me, as } = await inSettings(page);
     const name = word("other");
     const other = await walletOf(page, name);
     await adenaOn(page, name, other);
@@ -169,14 +177,21 @@ test.describe("linked accounts", () => {
     await expect(dialog).toContainText(`Adena will sign this text, for ${shortAddress(other)}`);
     await expect(dialog.getByRole("blockquote")).toContainText(`Link ${other} to gnoworld`);
     await dialog.getByRole("button", { name: "Sign in Adena" }).click();
-    await expect(said(dialog)).toContainText(`${shortAddress(other)} is linked.`);
+    const link = dialog.getByRole("button", { name: "Link", exact: true });
+    await expect(link).toBeDisabled();
+    // Adena switched back to the logged-in account signs the same text as it (AsMe.test.tsx holds the wrong account's words).
+    await adenaOn(page, as, me);
+    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
+    await expect(dialog).toContainText(`Signed as ${shortAddress(me)}.`);
+    await link.click();
+    await expect(said(dialog).last()).toContainText(`${shortAddress(other)} is linked.`);
     expect(held.members.map(({ address }) => address)).toContain(other);
     await page.keyboard.press("Escape");
     await expect(settings.getByRole("listitem").filter({ hasText: shortAddress(other) })).toBeVisible();
   });
 
   test("says Adena is on the same account, and a code another identity holds", async ({ page }) => {
-    const { held, settings } = await inSettings(page);
+    const { held, settings, me, as } = await inSettings(page);
     await settings.getByRole("button", { name: "Link an account" }).click();
     const dialog = page.getByRole("dialog", { name: "Link an account" });
     await dialog.getByRole("button", { name: "Continue" }).click();
@@ -186,7 +201,12 @@ test.describe("linked accounts", () => {
     held.refuse["/api/links/verify"] = { status: 403, error: "forbidden" };
     await dialog.getByRole("button", { name: "Continue" }).click();
     await dialog.getByRole("button", { name: "Sign in Adena" }).click();
-    await expect(said(dialog)).toContainText("already linked to another gnoworld account");
+    const link = dialog.getByRole("button", { name: "Link", exact: true });
+    await expect(link).toBeDisabled();
+    await adenaOn(page, as, me);
+    await dialog.getByRole("button", { name: "Sign in Adena" }).click();
+    await link.click();
+    await expect(said(dialog).last()).toContainText("already linked to another gnoworld account");
   });
 
   test("links a command-line key by its block and the file pasted back, a bad paste kept apart and an expired code replaced", async ({
@@ -203,24 +223,32 @@ test.describe("linked accounts", () => {
     await expect(dialog).toContainText("This is not a gno address: it starts with g1.");
     await dialog.getByLabel("Address").fill(other);
     await get.click();
-    await expect(dialog.locator("pre")).toContainText(`gnokey sign --key KEY # ${other}`);
+    await expect(dialog.locator("pre").first()).toContainText(`gnokey sign --key KEY # ${other}`);
+    await expect(dialog.locator("pre").last()).toContainText("gnokey sign --key MINE #");
+    // The logged-in account's own file, which Link waits for (the wallet audit's medium 1).
+    const mine = dialog.getByLabel("Or paste what your own key's command shows");
     await expect(dialog).toContainText("The code works once, for");
     const link = dialog.getByRole("button", { name: "Link", exact: true });
     await expect(link).toBeDisabled();
     // A paste that is not the tool's file keeps the code and says what to paste.
     await dialog.getByLabel("Paste what it shows").fill("hello");
+    await mine.fill(FILE);
     await link.click();
-    await expect(said(dialog)).toContainText("Paste only what `cat link.json` printed");
+    await expect(said(dialog).last()).toContainText("Paste only what `cat link.json` printed");
     // A refused file brings a new code at once.
     held.refuse["/api/links/verify"] = { status: 403, error: "refused" };
     await dialog.getByLabel("Paste what it shows").fill(FILE);
     await link.click();
-    await expect(said(dialog)).toContainText(`This file is not signed by the key of ${shortAddress(other)}`);
+    await expect(said(dialog).last()).toContainText(`This file is not signed by the key of ${shortAddress(other)}`);
     await expect(dialog.getByLabel("Paste what it shows")).toHaveValue("");
+    // A new code is a new text: the account's own file of the last one is gone with it.
+    await expect(mine).toHaveValue("");
     held.refuse["/api/links/verify"] = undefined;
     await dialog.getByLabel("Paste what it shows").fill(FILE);
+    await expect(link).toBeDisabled();
+    await mine.fill(FILE);
     await link.click();
-    await expect(said(dialog)).toContainText(`${shortAddress(other)} is linked.`);
+    await expect(said(dialog).last()).toContainText(`${shortAddress(other)} is linked.`);
     expect(held.members.find(({ address }) => address === other)?.kind).toBe("cli");
   });
 

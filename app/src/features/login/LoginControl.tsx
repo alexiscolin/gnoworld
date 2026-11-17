@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { reportedOr } from "../../lib/reported.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
+import { askFor } from "../../pageAsks.ts";
 import { GET_STARTED } from "./getStartedAsk.ts";
 import { knowSession, logIn, logOut, pageClock, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
@@ -113,6 +114,10 @@ export function LoginControl({
             onConnect={() => {
               setOpen(false);
               logIn();
+            }}
+            onCommandLine={() => {
+              setOpen(false);
+              askFor("key-login");
             }}
           />
         </Suspense>

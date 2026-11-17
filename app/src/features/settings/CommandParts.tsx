@@ -1,39 +1,39 @@
 // The pieces of the command-line flow that only draw: the block to copy and the box to paste into, the button, the code's clock, the address box.
 import { Button, Field, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent } from "react";
-import type { CliChallenge } from "../../lib/api/links.ts";
 import { canCopy, copyText } from "../../lib/copy.ts";
 import { clock, useCountdown } from "./useCountdown.ts";
 import styles from "./Settings.module.css";
 
-const CODE_SECONDS = 600;
 const PLACEHOLDER = '{"msg":[…],"fee":…,"signatures":[{"pub_key":…,"signature":…}],"memo":"…"}';
 
-// The block to copy and the box to paste into.
+// The block to copy and the box to paste into, named `paste`.
 export function Block({
-  code,
+  block,
   file,
   onFile,
   onCopied,
+  paste = "Paste what it shows",
 }: {
-  code: CliChallenge;
+  block: string;
   file: string;
   onFile: (file: string) => void;
   onCopied: (words: string) => void;
+  paste?: string;
 }) {
   return (
     <Stack space="2xs">
       <span className="meta">Copy, run in your terminal (KEY is your key's name); nothing is sent</span>
       <div className={styles["code"]}>
         <pre className={[styles["block"], "fill-box", "data-text"].join(" ")} data-scroll="">
-          {code.block}
+          {block}
         </pre>
         {canCopy() ? (
           <span className={styles["copy"]}>
             <Button
               size="s"
               onClick={() => {
-                copyText(code.block)
+                copyText(block)
                   .then((copied) => {
                     onCopied(copied ? "Copied" : "Could not copy the block");
                   })
@@ -45,7 +45,7 @@ export function Block({
           </span>
         ) : null}
       </div>
-      <Field kind="lines" label="Paste what it shows" value={file} onChange={onFile} placeholder={PLACEHOLDER} />
+      <Field kind="lines" label={paste} value={file} onChange={onFile} placeholder={PLACEHOLDER} />
     </Stack>
   );
 }
@@ -54,27 +54,29 @@ export function Block({
 export const blocked = (valid: boolean, step: { at: string }, file: string) =>
   !valid || step.at === "asking" || (step.at === "ready" && file.trim() === "");
 
-// Get a code, then Link; the Link's own words while the server checks.
+// Get a code, then the flow's verb; its own words while the server checks.
 export function Submit({
   ready,
   disabled,
   onClick,
+  verb,
 }: {
   ready: { checking?: true } | undefined;
   disabled: boolean;
   onClick: () => void;
+  verb: string;
 }) {
   return (
     <Button emphasis="solid" disabled={disabled || ready?.checking === true} onClick={onClick}>
-      {ready === undefined ? "Get a code" : ready.checking === true ? "Checking…" : "Link"}
+      {ready === undefined ? "Get a code" : ready.checking === true ? "Checking…" : verb}
     </Button>
   );
 }
 
 // How long the code works, counted from its arrival (the page trusts no clock but its own), and what the signature is for; it asks for a new code
-// when the time is up. Keyed by the code, so each starts at ten minutes.
-export function CodeNote({ onExpired }: { onExpired: () => void }) {
-  const left = useCountdown(CODE_SECONDS);
+// when the time is up. Keyed by the code, so each starts at its flow's `seconds`.
+export function CodeNote({ seconds, onExpired }: { seconds: number; onExpired: () => void }) {
+  const left = useCountdown(seconds);
   const expired = useEffectEvent(onExpired);
   useEffect(() => {
     if (left === 0) expired();
