@@ -1,5 +1,5 @@
 // The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout; frames 6 and 17): logged out, the way in,
-// Connect Adena, beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
+// Connect (its menu: Adena or the command line, D13881), beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
 // that holds the passport, the saved messages, the settings, a name to pick and the way out. The name shown, its dialog and the menu's code
 // come after the first screen, never with it.
 import { shortAddress, type Address } from "@gnoworld/schemas";

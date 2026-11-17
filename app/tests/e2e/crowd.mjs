@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { wallet } from "../../../server/src/testing/signer.ts";
 import { adena } from "./adena.ts";
-import { connectButton } from "./account.ts";
+import { connectAdena } from "./account.ts";
 import { closeButton, threadField, threadOf } from "./thread.ts";
 
 export const parse = (argv) => {
@@ -245,7 +245,7 @@ async function logIn(page, n) {
   if (still) return;
   for (let tried = 1; ; tried += 1) {
     await page.goto("/");
-    await connectButton(page).click();
+    await connectAdena(page);
     const done = await page
       .getByRole("button", { name: /Your account/ })
       .waitFor({ timeout: 20_000 })

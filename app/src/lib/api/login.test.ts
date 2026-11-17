@@ -1,7 +1,7 @@
 import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TIMEOUT_MS } from "./http.ts";
-import { loginApi, pageLoginApi, type Fetcher } from "./login.ts";
+import { FILE_MAX_BYTES, loginApi, pageLoginApi, type Fetcher } from "./login.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -18,6 +18,13 @@ const PROOF = {
   signature: { pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A".repeat(44) }, signature: "A".repeat(88) },
 };
 const VERIFY = { nonce: CHALLENGE.nonce, address: ADDRESS, proof: PROOF };
+const CLI = {
+  nonce: CHALLENGE.nonce,
+  memo: "Sign in to gnoworld",
+  block: "cat > link.json",
+  expiresAt: CHALLENGE.expiresAt,
+};
+const FILE = { nonce: CHALLENGE.nonce, address: ADDRESS, file: '{"msg":[]}' };
 
 // A server that answers as told: a JSON value, or raw text with its own type, as a proxy's page comes.
 interface Answer {
@@ -55,6 +62,20 @@ const CALLS = [
     method: "POST",
     ok: json(200, { address: ADDRESS }),
     run: (api: ReturnType<typeof loginApi>) => api.verify(VERIFY),
+  },
+  {
+    name: "cliChallenge",
+    url: "/api/login/cli/challenge",
+    method: "POST",
+    ok: json(200, CLI),
+    run: (api: ReturnType<typeof loginApi>) => api.cliChallenge(ADDRESS),
+  },
+  {
+    name: "verifyFile",
+    url: "/api/login/cli/verify",
+    method: "POST",
+    ok: json(200, { address: ADDRESS }),
+    run: (api: ReturnType<typeof loginApi>) => api.verifyFile(FILE),
   },
   {
     name: "ticket",
@@ -117,6 +138,38 @@ describe("the login's calls to the server", () => {
 
   it("refuses a login the server says is another account's", async () => {
     expect(await server(json(200, { address: OTHER })).api.verify(VERIFY)).toEqual({ ok: false, reason: "malformed" });
+  });
+
+  it("asks a command-line code for the address typed, and keeps the block the server composed", async () => {
+    const { api, sent } = server(json(200, CLI));
+    expect(await api.cliChallenge(ADDRESS)).toEqual({ ok: true, value: CLI });
+    expect(JSON.parse(bodyOf(sent[0]?.init))).toEqual({ address: ADDRESS });
+    expect(await server(json(200, { ...CLI, block: "" })).api.cliChallenge(ADDRESS)).toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+  });
+
+  it("posts the pasted file as it is, and refuses a login the server says is another account's", async () => {
+    const { api, sent } = server(json(200, { address: ADDRESS }));
+    expect(await api.verifyFile(FILE)).toEqual({ ok: true, value: { address: ADDRESS } });
+    expect(JSON.parse(bodyOf(sent[0]?.init))).toEqual(FILE);
+    expect(await server(json(200, { address: OTHER })).api.verifyFile(FILE)).toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+  });
+
+  it("sends no file over 4 KiB, counted in bytes", async () => {
+    const { api, sent } = server(json(200, { address: ADDRESS }));
+    expect(await api.verifyFile({ ...FILE, file: "é".repeat(2049) })).toEqual({ ok: false, reason: "refused" });
+    expect(sent).toHaveLength(0);
+    // Exactly the most the server reads is sent: it refuses only past it (server/src/login/cliProof.ts).
+    expect(await api.verifyFile({ ...FILE, file: "x".repeat(FILE_MAX_BYTES) })).toEqual({
+      ok: true,
+      value: { address: ADDRESS },
+    });
+    expect(sent).toHaveLength(1);
   });
 
   it("asks a ticket for Ergo with an empty object", async () => {

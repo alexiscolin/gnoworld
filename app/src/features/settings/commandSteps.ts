@@ -13,9 +13,9 @@ export type Step =
   | { at: "ready"; code: Code; checking?: true }
   | { at: "stale" }
   | { at: "done"; address: Address };
-/** The two calls of a flow: a link's (with a session) or a release's (with none); its button's verb and its code's life. */
+/** The two calls of a flow: a link's (with a session), a release's or a login's (with none); its button's verb and its code's life. */
 export interface Flow {
-  kind: "link" | "release";
+  kind: "link" | "release" | "login";
   verb: string;
   /** The address box's name: whose address the flow asks for. */
   address: string;
@@ -79,7 +79,7 @@ export async function link(
   }
 }
 
-// A link's ready code: the logged-in account and what `AsMe` needs of the code; a release's has none.
+// A link's ready code: the logged-in account and what `AsMe` needs of the code; a release's and a login's have none.
 export function asMeOf(me: Address | undefined, ready: { code: Code } | undefined) {
   if (me === undefined || ready === undefined) return undefined;
   const { memo: text, byBlock, chainId } = ready.code;
