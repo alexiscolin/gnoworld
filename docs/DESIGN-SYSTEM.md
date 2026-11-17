@@ -2,8 +2,8 @@
 
 The look and the rules every screen follows. Values come from the approved prototype
 (`docs/prototype`), reduced to one token and one component for every CSS rule, script style, icon
-and screen of the recorded tour (`docs/design/coherence.md`). The UX, UI and design-systems review
-of the first designs is in `docs/design/review-2a.md`. Nothing in the style changes without the
+and screen of the recorded tour (`docs/process/design/coherence.md`). The UX, UI and design-systems review
+of the first designs is in `docs/process/design/review-2a.md`. Nothing in the style changes without the
 owner's approval.
 
 ## Principles
@@ -606,7 +606,7 @@ never the choice written again.
 
 ## Not rebuilt
 
-These are kept out on purpose (`docs/design/coherence.md`, "Not to rebuild"):
+These are kept out on purpose (`docs/process/design/coherence.md`, "Not to rebuild"):
 - **The prototype's dead UI:** the side card, the old Jarvis panel, the toast, the top and
   bottom bars, the evolutions board, the range slider, avatar upload.
 - **Its invented timers:** the pot and its countdown (ADR-0002 §8, row 2).

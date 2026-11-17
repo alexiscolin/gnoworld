@@ -11,14 +11,14 @@ and never commit. You may run read-only commands, the tests, the dev server and 
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
 `--work-tree`); to try a change, `cp` the files into a new folder made by `mktemp -d` in `$TMPDIR`.
 
-Read first: `docs/design/video-screens.md` (which frames show which screen, and the three things that may differ: real data for the
-sample people, what is not built yet, the prototype's bugs and false words, `docs/design/coherence.md`, "Not to rebuild"),
+Read first: `docs/process/design/video-screens.md` (which frames show which screen, and the three things that may differ: real data for the
+sample people, what is not built yet, the prototype's bugs and false words, `docs/process/design/coherence.md`, "Not to rebuild"),
 `docs/DESIGN-SYSTEM.md`, and the diff at the path you are given.
 
 Then, for each screen the diff changes (a route or a feature under `app/src/`, a component or the tokens under `packages/ui/src/`, which
 changes every screen that uses it):
 1. Render it at 1728 by 1080, device scale 1, in its real state (the data a journey gives it).
-2. Open the frames `docs/design/video-screens.md` lists for that screen in `~/.cache/gnoworld-tools/video-frames/` (`f0001.jpg` to
+2. Open the frames `docs/process/design/video-screens.md` lists for that screen in `~/.cache/gnoworld-tools/video-frames/` (`f0001.jpg` to
    `f0144.jpg`, one a second) with Read, which shows the picture. A frame is a still of a video: check a boundary of its range before
    relying on it.
 3. Compare them and report each difference in position, size, spacing, type, colour or radius as one finding, with both pictures named

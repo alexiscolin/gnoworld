@@ -68,7 +68,7 @@ about 600 product lines, and a one-line push script each for the owner (D13192).
 
 ## Slices
 
-One slice is worked at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
+One slice is worked at a time, each with its plan in `docs/process/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
 plans it and cuts it into branches, each run in a session and a worktree of its own, two at once at
 most (`docs/HARNESS.md`, "Who does what").
 

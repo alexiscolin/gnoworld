@@ -1919,8 +1919,8 @@ def design_mutants():
     yield from each("scripts/repo_files.py", r'str(i).replace("\r", "\\r").replace("\n", "\\n")', "str(i)", "hooks", "repo_files.report writes an item's newline as \\n")
     yield from each("scripts/test_hooks.sh", "unset GITHUB_" "ACTIONS\n", "", "hooks", "test_hooks runs its cases off GitHub's marker (killed where GitHub sets it)")
     # D13408: both ledgers merge by union, and check_docs refuses a row the union kept twice.
-    yield from each(".gitattributes", "docs/decisions.md merge=union\n", "", "hooks", "the decisions merge by union (D13408)")
-    yield from each(".gitattributes", "docs/review/findings.md merge=union\n", "", "hooks", "the findings merge by union (D13408)")
+    yield from each(".gitattributes", "docs/process/decisions.md merge=union\n", "", "hooks", "the decisions merge by union (D13408)")
+    yield from each(".gitattributes", "docs/process/review/findings.md merge=union\n", "", "hooks", "the findings merge by union (D13408)")
     yield from each("scripts/check_docs.py", "if (did, kind) in seen:", "if False:", "hooks", "check_docs refuses a decision written twice")
     yield from each("scripts/check_docs.py", "seen.add((did, kind))", "seen.add((did, ''))", "hooks", "check_docs reads an amended row apart from the decision")
     yield from each("scripts/check_docs.py", "problems or decisions or orphans", "problems or orphans", "hooks", "check_docs fails on a decision written twice")

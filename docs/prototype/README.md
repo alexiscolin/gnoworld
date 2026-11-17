@@ -2,7 +2,7 @@
 
 The prototype was approved on 2026-10-16. It is the reference for what gnoworld does and
 how it feels. It is **not** a code base. Nothing here is imported, built or maintained.
-Every concept is rebuilt slice by slice, test first, as `docs/plans/backlog.md` lists. The
+Every concept is rebuilt slice by slice, test first, as `docs/process/plans/backlog.md` lists. The
 scope and the decisions it changes are in [ADR-0002](../../adr/0002-validated-prototype.md).
 
 ## Where to see it

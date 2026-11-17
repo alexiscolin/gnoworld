@@ -90,6 +90,7 @@ Hosting and running the whole stack: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Documentation
 
+- The decisions that shape the product: [docs/DECISIONS.md](docs/DECISIONS.md)
 - Design: [ADR-0001](adr/0001-gnoworld.md), and the scope of the prototype,
   [ADR-0002](adr/0002-validated-prototype.md)
 - Code layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -97,7 +98,8 @@ Hosting and running the whole stack: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 - Look and components: [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md)
 - Settings, secrets and switches: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 - Reviews and quality gates: [docs/REVIEW.md](docs/REVIEW.md), [docs/HARNESS.md](docs/HARNESS.md)
-- Plans and what comes next: [docs/plans/backlog.md](docs/plans/backlog.md)
+- Plans and what comes next: [docs/process/plans/backlog.md](docs/process/plans/backlog.md); the working journal (decisions, review
+  findings, plans): [docs/process/](docs/process/README.md)
 
 ## License
 

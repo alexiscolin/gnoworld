@@ -72,7 +72,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    size each input reaches, and simplification. Where StrykerJS runs on the files it reads its
    survivors and writes no mutant by hand. A tier-1 file or the harness adds the `security-reviewer`
    (Opus, the threat model), a realm the `gno-auditor`. A changed screen is the `reviewer`'s too, read
-   with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
+   with the video's frames (`docs/process/design/video-screens.md`) in the same pass; the `design-reviewer`
    runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
    `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
    missing fail the step). One review a pull request, before the owner's merge (D13181). Each finding names its
@@ -90,7 +90,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    row, or moot). A second round runs only for a high finding fixed in a tier-1 file, only its
    lens, on the diff since the first; after three rounds the review stops and Claude and the owner
    reconsider the approach.
-6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
+6. **Learn from it.** Every finding goes into [the findings ledger](process/review/findings.md), with its
    status and evidence, numbered in its slice's range (slice N: F N000 to N999, a hundred a
    part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
@@ -141,4 +141,4 @@ job refuses a harness file no commit declares on a line `Harness-changed: <path>
 
 The owner reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). The notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
-The author gives the whole review card, all 8 items (`CLAUDE.md`, "Review card (end of every change)"): what to read line by line, what to read and skim, what to try, what the tests prove, what not to trust, what changed, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.
+The author gives the whole review card, all 8 items (`CLAUDE.md`, "Review card (end of every change)"): what to read line by line, what to read and skim, what to try, what the tests prove, what not to trust, what changed, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](process/review-log.md): what was caught, what was missed, and why.

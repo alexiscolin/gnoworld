@@ -3,7 +3,7 @@
 The harness is everything around Claude Code that keeps the code it writes correct, safe and
 cheap: what Claude reads, what it may do, the checks every change goes through, the reviews,
 and the tests that prove those checks work. This file says what runs today; why each piece is
-there lives in `docs/decisions.md`, the findings ledger and the review log, by its id.
+there lives in `docs/process/decisions.md`, the findings ledger and the review log, by its id.
 
 Three ideas run through it:
 - **A claim is not evidence.** A review's finding counts once a command or a failing test
@@ -57,7 +57,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
   `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,
-  `docs/decisions.md`, the ledger, a state file per branch and one shared learnings file.
+  `docs/process/decisions.md`, the ledger, a state file per branch and one shared learnings file.
 - **The dream** (`/dream <slice>`, `.claude/commands/dream.md`), at each slice's end, keeps a
   dated copy of the memory, then the `dreamer` agent (read only, no shell) reads the agents' reports, the learnings,
   the review log, the ledger and the handoff (never transcripts) and proposes rule, memory, test
@@ -67,7 +67,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 
 ## A change, from plan to merge
 
-1. **Plan.** `/slice-plan <n>` writes the slice's plan in `docs/plans/`; the owner approves it.
+1. **Plan.** `/slice-plan <n>` writes the slice's plan in `docs/process/plans/`; the owner approves it.
 2. **Tests first.** The failing tests, seen failing; the `test-auditor`'s red pass, once per
    branch, never on a fixer's tests; the commit that brings the tests and their code carries
    `Red-pass: <findings fixed>`.
@@ -209,7 +209,7 @@ baseline on `main`, so review alone holds it until the slice merges.
 ## Reviews and findings
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
-goes into `docs/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
+goes into `docs/process/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
 `rejected`, `intended`, `moot`, `asked`) and its evidence; a fixed one names its commit. Reviews
 grep the ledger for their diff's paths and ids, never read it whole, so a rejected claim is not
 raised again and a fixed one that comes back is a regression. A flaky test that passed on its second
@@ -558,5 +558,5 @@ costs context in every session.
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets, run by hand |
 | `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in GitHub's build job; the Mac's pinned binary's checksum |
-| `docs/review/findings.md`, `docs/review-log.md` | every finding; what the owner caught and missed, each branch's cost |
+| `docs/process/review/findings.md`, `docs/process/review-log.md` | every finding; what the owner caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

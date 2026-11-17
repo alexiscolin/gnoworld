@@ -27,7 +27,7 @@ Never wait for Alexis on product work: ask, then go on; CLAUDE.md's "Stop and as
    read first.
 6. **One review a pull request** (D13181): the `reviewer`, with the `security-reviewer` for tier 1 or the harness, the `gno-auditor`
    for a realm, the `design-reviewer` when space's look changes. Each finding reproduced before it is fixed, high and medium fixed,
-   low listed; each into `docs/review/findings.md` in the given range, one row a pull request in `docs/review-log.md`; a second round
+   low listed; each into `docs/process/review/findings.md` in the given range, one row a pull request in `docs/process/review-log.md`; a second round
    only as `docs/REVIEW.md`'s step 5 allows.
 7. **Hand over.** For each branch, in `/private/tmp/claude-<uid>/land/`: `<branch>.bundle` (`git bundle create` of that one branch,
    from GitHub's main) and `<branch>.md`, the pull request's title, a blank line and its body (what it lands, what was run, what was

@@ -121,7 +121,7 @@ deploy/                      compose.yaml (the demo stack, the reference wiring 
                              and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
                              egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       not built yet: the admin console, on its own origin (ADR-0002 §6), reusing ui and lib
-gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
+gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/process/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
 ```
 
 Inside a feature:

@@ -2,7 +2,7 @@
 
 gnoworld: a social, on-chain, graphical hub for gno.land. The design is [ADR-0001](adr/0001-gnoworld.md), the approved prototype's
 scope [ADR-0002](adr/0002-validated-prototype.md). Layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the look:
-[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md); the order of work: [docs/plans/backlog.md](docs/plans/backlog.md); build and test:
+[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md); the order of work: [docs/process/plans/backlog.md](docs/process/plans/backlog.md); build and test:
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); the process, the gates and the core: [docs/HARNESS.md](docs/HARNESS.md); the tiers and
 the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.claude/rules/` when its files are touched.
 
@@ -53,7 +53,7 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 - One slice at a time, each branch in its own session and worktree, two at most at once (docs/HARNESS.md, "Who does what").
   Slice N numbers its findings and decisions N000 to N999. Stop at a slice's end for Alexis's review; the dream runs then
   (D13182).
-- A decision Alexis makes in conversation goes into `docs/decisions.md` at once, with its reason and where it lives, in
+- A decision Alexis makes in conversation goes into `docs/process/decisions.md` at once, with its reason and where it lives, in
   neutral English, never as a quote; no personal detail (setup, accounts, machines, spend) reaches a committed file.
 - The prototype's video is the end state, to the pixel; quantities come from the chain and ADR-0002 §3. Never copy the prototype's
   code: rebuild each concept test first, with the design system's components. No interim look and no old version kept beside the

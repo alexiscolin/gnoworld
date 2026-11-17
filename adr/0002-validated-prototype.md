@@ -36,7 +36,7 @@ This ADR records:
 7. **What changes in ADR-0001.** Every difference with the prototype is decided (§8).
 
 **The prototype's code is not reused.** Every concept is rebuilt slice by slice, test first
-(§9, `docs/plans/backlog.md`).
+(§9, `docs/process/plans/backlog.md`).
 
 **A word on words.** One meaning per word:
 - **world:** a place with rooms, shown as a planet: a realm's world, or a station. The code
@@ -51,7 +51,7 @@ This ADR records:
   station.
 - **signal:** a new realm not yet charted.
 - **satellite:** a sponsored slot (§1); people are not drawn as satellites (§8). People are
-  **nebulae** (astronauts until 2026-10-20, `docs/decisions.md`): an avatar is never a planet.
+  **nebulae** (astronauts until 2026-10-20, `docs/process/decisions.md`): an avatar is never a planet.
 
 ## Context
 
@@ -145,7 +145,7 @@ Phases are ADR-0001's:
 |---|---|---|
 | Rooms, shared rooms, and a room switcher that scales to hundreds: groups set by the world's moderators, pinned, joined, "active now", then the rest; search, unread counts, the keyboard, a windowed list | 0 | Ergo channels; groups in the hubs data file, then `r/gnoworld/hubs` |
 | Replies, reactions, mentions, threads built from reply chains | 0 | `+draft/reply`, `+draft/react` (message-tags) |
-| Rich composer with a format bar: bold, italic, underline, strikethrough, code, quote and lists show as such; Markdown on the wire. Underline, which Markdown lacks, as the video (Alexis, 2026-11-04, `docs/decisions.md`): `++word++` on the wire (markdown-it-ins's; part 8k's choice, since `__` is bold in CommonMark and gnoweb), the chat's alone, a realm's page reading none as gnoweb does | 0 | `draft/multiline` |
+| Rich composer with a format bar: bold, italic, underline, strikethrough, code, quote and lists show as such; Markdown on the wire. Underline, which Markdown lacks, as the video (Alexis, 2026-11-04, `docs/process/decisions.md`): `++word++` on the wire (markdown-it-ins's; part 8k's choice, since `__` is bold in CommonMark and gnoweb), the chat's alone, a realm's page reading none as gnoweb does | 0 | `draft/multiline` |
 | Slash commands with autocomplete; `#room` and `@name` completion; Alt+Up and Alt+Down between rooms | 0 | — |
 | Message menu: copy, room link, save, report, delete your own | 0. Delete needs `allow-individual-delete` on (it is off by default); report goes to moderation (§6) | `draft/message-redaction` |
 | Moderation: a bot checks each public message; a hidden message says why and can be contested | 0 | The moderation bot (§6) |
@@ -1146,7 +1146,7 @@ All decided by Alexis on 2026-10-17.
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
 | 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites:** on Onyx in phase 0, shown only in the Onyx universe; on mainnet after an external audit and mainnet's approval, without holding back phase 0's exit (Alexis, 2026-10-17).<br>- a fixed daily price in GNOT, set by the slot realm's owner; 40 characters at most, for 1, 3 or 7 days; at most one per world; a limit per address; anyone may rent, from the app, gnoweb or gnokey;<br>- no approval and no server in the realm (Alexis, 2026-11-03: "un realm simple et si possible sans serveur", "un truc simple mais sécure"): the app shows a satellite only once its text passed the name filter and the chat's moderation, and the realm's owner or its operator takes one down after a report, refunding the days left;<br>- its owner is one address, no multisig, handed over in two steps (the new owner accepts); it sets the price and the operator, pauses renting and withdraws only what live rentals no longer hold; the operator, an address the owner names, may only take down;<br>- on mainnet, the revenue's recipient is named in the realm before launch;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
-| 9 | §10: a generated identicon | A planet chosen as an avatar | A nebula generated from the address (an astronaut as §1 said, until Alexis chose the nebula on 2026-10-20, `docs/decisions.md`): where its clouds and stars sit always comes from the address; its palette is chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
+| 9 | §10: a generated identicon | A planet chosen as an avatar | A nebula generated from the address (an astronaut as §1 said, until Alexis chose the nebula on 2026-10-20, `docs/process/decisions.md`): where its clouds and stars sit always comes from the address; its palette is chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 | 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that. **Amended 2026-11-17** (D13711, Alexis): under 900 px the full chat alone, a place's link opening its chat, no 3D and no "View in space" until a later pass; the planet stays in the chat's info, drawn when that sheet opens |
 | 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own writes in phase 0 are the slot realm's owner and operator actions on Onyx, signed by the admins who hold those addresses (§8, row 7) |
 | 12 | §1, §2, §12 and §13: a small Go program on `auth-script`; "no Node server in production"; one Go binary (the stdlib, `coder/websocket`, `gnoclient`) | — | One TypeScript server on Node, sharing `core` and the schemas with the client, run as two containers (`server`, `jarvis`); still no rendering server. Adena's SDK verifies logins; Ergo stays, as an image (§7) |
@@ -1415,7 +1415,7 @@ k6 runs as a binary or an image, not as a package.
 
 ### 10. What slice 7's validation changes (Alexis, 2026-11-01)
 
-This section overrides the text above where they differ. The reasons and the numbers are in `docs/decisions.md`.
+This section overrides the text above where they differ. The reasons and the numbers are in `docs/process/decisions.md`.
 
 - **A world is a product, not a realm.** One planet and one room for `gnogolf`; its realms and versions sit under it, shown as you zoom in, with no room of their own. A namespace is a star. A hub with no realm is a world. The grouping reads paths, and a hub's `realms` list corrects it. This replaces "every realm is a world" (Summary, "A word on words", §3).
 - **A world evolves with its use, little by little.** Two gauges: a vitality that remembers and moves a few percent a day, and the people present. Its stages run from seed through rest, living, inhabited and busy to beacon. Each class shows a stage its own way: a sign keeps its meaning, where it shows and how it grows, and varies its form.
@@ -1531,4 +1531,4 @@ ADR-0001's question 5 keeps its jurisdiction and retention parts.
 - PostHog, [EU cloud](https://posthog.com/eu)
 - The architecture: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
 - The design system: [docs/DESIGN-SYSTEM.md](../docs/DESIGN-SYSTEM.md)
-- The backlog: [docs/plans/backlog.md](../docs/plans/backlog.md)
+- The backlog: [docs/process/plans/backlog.md](../docs/process/plans/backlog.md)

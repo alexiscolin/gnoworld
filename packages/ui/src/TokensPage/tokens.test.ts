@@ -252,7 +252,7 @@ describe("the tokens", () => {
     expect(value(name)).toBe(px);
   });
 
-  // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/decisions.md, the floor chosen).
+  // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/process/decisions.md, the floor chosen).
   it("set the plate to 808 px at the video's width, narrowing with the window to a floor", () => {
     const [, floor = "", share = "", cap = ""] =
       /^clamp\((\d+)px, ([\d.]+)vi, (\d+)px\)$/.exec(value("--plate-w") ?? "") ?? [];

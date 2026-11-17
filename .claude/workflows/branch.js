@@ -315,7 +315,7 @@ for (let round = 1; ; round += 1) {
             "design-reviewer",
             "design-reviewer",
             `Compare every screen the branch changes since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}) with the video's frames: ` +
-              "render each at 1728 by 1080, open the frames docs/design/video-screens.md gives for it in ~/.cache/gnoworld-tools/video-frames/, " +
+              "render each at 1728 by 1080, open the frames docs/process/design/video-screens.md gives for it in ~/.cache/gnoworld-tools/video-frames/, " +
               "and report each difference as a finding naming both pictures. Frames missing: set framesMissing, the step fails.",
           ],
         ]
@@ -351,7 +351,7 @@ for (let round = 1; ; round += 1) {
   // The scribe: every finding of the round to the ledger with its status and evidence, the round's reports saved; the reviewers wrote
   // nothing themselves.
   const scribed = await write(
-    `${where(`ledger-${round}`, true)}. Write each of these findings as a row of docs/review/findings.md, with the next free F number: ` +
+    `${where(`ledger-${round}`, true)}. Write each of these findings as a row of docs/process/review/findings.md, with the next free F number: ` +
       `the urgent ones \`claimed\` (their fixer marks each \`reproduced\` once its test fails, or \`rejected\` with its evidence), the low ones and those beyond the plan \`asked\`. ` +
       `Number them within this branch's range, ${A.ids}, never past it. ` +
       `Findings: ${JSON.stringify(found)}. Urgent: ${JSON.stringify(urgent.map((f) => f.id))}. ` +

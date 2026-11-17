@@ -1,4 +1,4 @@
-// Who made each texture (docs/design/textures.md holds how each was changed). A texture shows only with its credit: CC BY 4.0 §3(a)(2)
+// Who made each texture (docs/process/design/textures.md holds how each was changed). A texture shows only with its credit: CC BY 4.0 §3(a)(2)
 // allows a link, and ESA/Hubble's and ESA/Webb's terms ask the full credit, with changes noted after it. The files each row credits are in
 // creditFiles.ts, which the first screen never ships.
 
