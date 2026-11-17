@@ -476,20 +476,23 @@ describe("a planet wanted in a flight, where the browser compiles no program asi
       lens: { value: 0 },
     };
     const system = {
+      index: 0,
       place: { x: 0, y: 0, z: 0 },
       across: { x: 1, y: 0, z: 0 },
       along: { x: 0, y: 0, z: 1 },
       reach: 10,
       planets: [] as unknown[],
     };
+    // 2/(5*0.01) = 40 px: wanted; 0.2/(5*0.01) = 4 px: made ahead in the open system; but the flight runs.
     system.planets.push({ index: 0, id: "w0", radius: 1, orbit: 0, phase: 0, speed: 0, system });
+    system.planets.push({ index: 1, id: "w1", radius: 0.1, orbit: 0, phase: 0, speed: 0, system });
     const near = new Near(device as never);
-    // 2/(5*0.01) = 40 px: wanted, but the flight runs.
-    near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0, wait: true });
+    const at = { x: 0, y: 0, z: 5 };
+    near.choose({ systems: [system] } as never, at, { pxK: 0.01, seconds: 0, open: 0, wait: true });
     near.tick(0, { alone: -1, close: undefined, delta: 0.016, still: false });
     expect(drawnOf).not.toHaveBeenCalled();
     expect(shown.get(0)).not.toBe(false);
-    near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
-    expect(drawnOf).toHaveBeenCalledTimes(1);
+    near.choose({ systems: [system] } as never, at, { pxK: 0.01, seconds: 0, open: 0 });
+    expect(drawnOf).toHaveBeenCalledTimes(2);
   });
 });

@@ -99,5 +99,8 @@ describe("Speed's warm-up", () => {
     expect(warmed).toHaveLength(1);
     rest(5);
     expect([warmed.length, compiled.length]).toEqual([2, 2]);
+    // A flight's first frames, still slow and unblurred, long after the last: never then, which would stall the click.
+    for (let at = 0; at < 10; at += 1) frame(true);
+    expect(warmed).toHaveLength(2);
   });
 });
