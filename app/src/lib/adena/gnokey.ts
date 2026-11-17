@@ -8,9 +8,13 @@ import { MAX_DEPOSIT } from "./deposit.ts";
 
 // A POSIX shell takes everything between single quotes as it is; a quote of its own is closed, escaped and reopened.
 const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
-// What a terminal would run as a new line or draw unlike its bytes, and a backslash, which fish reads inside single quotes as an
-// escape (PR #41's security review): no command, rather than one a shell reads otherwise.
-const unquotable = (word: string): boolean => !word.isWellFormed() || hasHidden(word) || word.includes("\\");
+/** A quote, which PowerShell ends a single-quoted text on, curly ones included (the split's security review). */
+export const QUOTE = /['\u2018-\u201B]/;
+// What a terminal would run as a new line or draw unlike its bytes, a backslash, which fish reads inside single quotes as an escape
+// (PR #41's security review), and a quote: no command, rather than one a shell reads otherwise. An argument is then single-quoted with
+// nothing inside to escape.
+const unquotable = (word: string): boolean =>
+  !word.isWellFormed() || hasHidden(word) || word.includes("\\") || QUOTE.test(word);
 
 /** One line to paste, signed by `key` (an address, which the tool takes as a key's name; else KEY to replace), or the index of the
  * first argument it cannot hold. A value after a flag stays its value even when it starts with a dash: Go's flag package takes the

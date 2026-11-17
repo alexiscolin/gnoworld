@@ -5,12 +5,11 @@
 import { callFields } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { Button, Card, Field, Stack } from "@gnoworld/ui";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
 import { CallStatus } from "./CallStatus.tsx";
-import { CommandLine } from "./CommandLine.tsx";
 import { problemsOf } from "./problems.ts";
 import { depositText, networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
@@ -20,6 +19,9 @@ import { retryable } from "./slice.ts";
 const adenaInPage = (): boolean => "adena" in globalThis;
 // Sign in Adena leads where Adena is; elsewhere it is the second way, after the command.
 const signLook = (): "solid" | "outline" => (adenaInPage() ? "solid" : "outline");
+
+// The command line's way, a computer's alone and folded while Adena is here: loaded after the card, off the plates' budgets.
+const CommandLine = lazy(async () => ({ default: (await import("./CommandLine.tsx")).CommandLine }));
 
 export interface CallCardProps {
   card: Card_;
@@ -201,7 +203,11 @@ export function CallCard({
             ))
           : null}
         <CallStatus card={card} />
-        {preview ? <CommandLine card={card} network={network} as={login?.as} open={!adenaInPage()} /> : null}
+        {preview ? (
+          <Suspense fallback={null}>
+            <CommandLine card={card} network={network} as={login?.as} open={!adenaInPage()} />
+          </Suspense>
+        ) : null}
         {preview ? <p className="meta coarse-only">To sign, use a computer.</p> : null}
       </Card.Body>
       <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} login={login} />

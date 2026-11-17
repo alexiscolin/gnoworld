@@ -69,9 +69,6 @@ describe("the command a call card prints for the command-line tool (D13880)", ()
     const args = [
       `$(touch ${planted})`,
       `\`touch ${planted}\``,
-      "it's",
-      "'",
-      "''",
       '"quoted" back',
       `; touch ${planted}`,
       `&& touch ${planted}`,
@@ -119,6 +116,18 @@ describe("the command a call card prints for the command-line tool (D13880)", ()
     expect(args).toEqual(["x\\", " -send 100000000ugnot -args y\\"]);
     expect(gnokeyCall({ realm, func: action.func, args }, ONYX)).toEqual({ ok: false, argument: 0 });
     expect(gnokeyCall({ ...CALL, args: ["fine", "a\\b"] }, ONYX)).toEqual({ ok: false, argument: 1 });
+  });
+
+  // The split's security review: PowerShell, Windows' own terminal, ends a single-quoted text on ’ ‘ ‚ ‛ as on ', and reads `''`
+  // as a quote, so `'\''` lets a realm's text run as code there. No quote at all: no shell's escaping matters.
+  it.each([
+    ["a straight quote", "x'; Remove-Item -Recurse ~; '"],
+    ["a right single quote", "x’; Remove-Item -Recurse ~ ; ’"],
+    ["a left single quote", "x‘"],
+    ["a low single quote", "x‚"],
+    ["a reversed single quote", "x‛"],
+  ])("prints no command for an argument holding %s", (_name, bad) => {
+    expect(gnokeyCall({ ...CALL, args: ["fine", bad] }, ONYX)).toEqual({ ok: false, argument: 1 });
   });
 
   it("names the first of two arguments it cannot hold, and refuses a NUL", () => {
