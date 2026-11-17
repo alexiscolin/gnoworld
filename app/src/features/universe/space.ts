@@ -106,11 +106,11 @@ function start(): void {
       exposeSpace(space);
       // The Map: space from above at every level, flown to and from as it is picked; a place asked later is reached the same.
       space.view(isMap());
-      import.meta.hot?.dispose(
-        onMap(() => {
-          space?.view(isMap());
-        }),
-      );
+      // Wired in every build, as lightSpace below: in `hot?.dispose(onMap(…))` a build with no hot module never calls onMap.
+      const unmapped = onMap(() => {
+        space?.view(isMap());
+      });
+      import.meta.hot?.dispose(unmapped);
       // A tag's light, as it is picked and as who is here changes; the engine eases it.
       // Wired in every build: in `hot?.dispose(lightSpace(…))` a build with no hot module would never call lightSpace.
       const unlit = lightSpace(space);

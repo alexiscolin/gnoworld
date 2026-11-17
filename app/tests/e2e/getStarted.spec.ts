@@ -1,5 +1,5 @@
 import { expect, hydrated, test } from "./fixtures.ts";
-import { connectButton } from "./account.ts";
+import { connectAdena } from "./account.ts";
 
 // A Connect with no Adena opens the steps; Adena's coming, seen without a reload, shows Connect; a guest closes it.
 const SHOTS = process.env["GET_STARTED_SHOTS"];
@@ -7,14 +7,13 @@ const sizes = { computer: { width: 1280, height: 900 }, phone: { width: 390, hei
 
 for (const [name, size] of Object.entries(sizes)) {
   test(`opens the steps with no Adena and shows Connect once it comes (${name})`, async ({ page }) => {
-    await page.setViewportSize(size);
+    // Opened at a computer's width, then narrowed to the width read: under 900 px the header has no Connect, and a guest's menu offers
+    // Adena only where it is found (LoginView.module.css). Connect's menu (D13881): Adena's row opens the steps where there is no Adena.
+    await page.setViewportSize(sizes.computer);
     await page.goto("/");
     await hydrated(page);
-    const connect = connectButton(page);
-    if (name === "phone") await page.emulateMedia({ media: "screen" });
-    await connect.click({ force: true });
-    // Connect's menu (D13881): Adena's row opens the steps where there is no Adena.
-    await page.getByRole("menuitem", { name: "Adena", exact: true }).click({ force: true });
+    await connectAdena(page);
+    await page.setViewportSize(size);
     const dialog = page.getByRole("dialog", { name: "Get started" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Connect", exact: true })).toHaveCount(0);

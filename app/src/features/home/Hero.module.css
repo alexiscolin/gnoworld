@@ -1,5 +1,5 @@
 /* The hero: bottom left of the cosmos, 48 px from the left and 32 from the bottom (the ticker's room given to it), the kicker, the number at 176 px in mono with its
-   line at its right, then two actions of 52 px; a block in the page on a phone and on a screen too short to hold it over the page. */
+   line at its right, then two actions of 52 px; over the page on every computer, under the header on the shortest. */
 @layer components {
   .hero {
     display: flex;
@@ -235,14 +235,29 @@
     }
   }
 
-  /* Over the page only where it holds: a screen of 800 px high, the list of worlds above it in the room that is left. */
-  @media (width >= 900px) and (height >= 800px) {
+  /* From 900 px the hero stands over the page at the cosmos' foot, whatever the window's height: in the page's flow it stood under the logo. */
+  @media (width >= 900px) {
     .hero {
       position: fixed;
       inset-inline-start: var(--space-xl);
       inset-block-end: var(--space-l);
     }
+  }
 
+  /* A window too short for the hero under the header (its 96 px, the hero at its tallest, 265, and the foot's gap): its room scrolls there. */
+  @media (width >= 900px) and (height < 400px) {
+    .hero {
+      /* raw: under the header's 96 px, as the list's kicker at 101 */
+      max-block-size: calc(100dvb - 101px - var(--space-l));
+      overflow: auto;
+      /* Room inside the scroll for a focus ring at the hero's edges, taken back outside, so the hero keeps its place. */
+      padding: calc(var(--focus-width) + var(--focus-offset));
+      margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
+    }
+  }
+
+  /* The list over the page only where it holds: a screen of 800 px high, the list above the hero in the room that is left. */
+  @media (width >= 900px) and (height >= 800px) {
     .worlds {
       /* No offset from the hero: the list is fixed at the top, the hero at the foot */
       margin-block-start: 0;
