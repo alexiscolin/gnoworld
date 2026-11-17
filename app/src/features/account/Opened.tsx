@@ -12,6 +12,22 @@ const jarvisRow = (onJarvis: (() => void) | undefined, why: string | undefined):
     ? { label: "Jarvis", icon: "spark", soon: true, ...(why === undefined ? {} : { why }) }
     : { label: "Jarvis", icon: "spark", onSelect: onJarvis };
 
+// A mouse or a trackpad, read as the menu opens: a computer's, whatever its window's width.
+const finePointer = (): boolean => typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches;
+
+// A guest's ways in where the header has no room for them: Adena where it is found, and a narrow computer's command line (PR #41's UX
+// review); a touch phone has no terminal.
+function waysIn(
+  onConnect: (() => void) | undefined,
+  narrow: boolean,
+  to: (label: string, icon: IconName, view: DeviceView) => MenuItem,
+) {
+  return [
+    ...(onConnect === undefined ? [] : [{ label: "Connect Adena", onSelect: onConnect }]),
+    ...(narrow && finePointer() ? [to("Log in with gnokey", "key", "key-login")] : []),
+  ];
+}
+
 // A network's row among the account's own, so it reads as the network and not as a place.
 const named = (item: MenuItem): MenuItem => ("soon" in item ? item : { ...item, label: `Network: ${item.label}` });
 
@@ -71,7 +87,7 @@ export function Opened({
     },
   });
   const items: MenuItem[] = [
-    ...(address === undefined && onConnect !== undefined ? [{ label: "Connect Adena", onSelect: onConnect }] : []),
+    ...(address === undefined ? waysIn(onConnect, phone === true, to) : []),
     // A phone has no use for a greyed "Jarvis, soon": the row shows once it can act.
     ...(phone && onJarvis === undefined ? [] : [jarvisRow(onJarvis, jarvisWhy)]),
     to("Passport", "passport", "passport"),

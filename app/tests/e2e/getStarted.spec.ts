@@ -13,6 +13,8 @@ for (const [name, size] of Object.entries(sizes)) {
     const connect = connectButton(page);
     if (name === "phone") await page.emulateMedia({ media: "screen" });
     await connect.click({ force: true });
+    // Connect's menu (D13881): Adena's row opens the steps where there is no Adena.
+    await page.getByRole("menuitem", { name: "Adena", exact: true }).click({ force: true });
     const dialog = page.getByRole("dialog", { name: "Get started" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Connect", exact: true })).toHaveCount(0);

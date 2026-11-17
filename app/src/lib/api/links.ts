@@ -6,20 +6,10 @@ import { jsonOf } from "@gnoworld/core";
 import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 import { pageFetch } from "../query/policy.ts";
+import { CliChallenge, tooBig } from "./login.ts";
 
 export { type Fetcher, type Result } from "./http.ts";
-
-/** The most the server reads of a pasted file, in bytes (server/src/login/linkRoutes.ts). */
-export const FILE_MAX_BYTES = 4096;
-// Whether a pasted file is more than the server reads: never sent.
-const tooBig = (file: string): boolean => new TextEncoder().encode(file).length > FILE_MAX_BYTES;
-const CliChallenge = z.object({
-  nonce: Nonce,
-  memo: z.string().check(z.maxLength(1024)),
-  block: z.string().check(z.minLength(1), z.maxLength(8192)),
-  expiresAt: z.iso.datetime(),
-});
-export type CliChallenge = z.infer<typeof CliChallenge>;
+export { type CliChallenge } from "./login.ts";
 
 const Signed = z.object({ signatures: z.array(z.unknown()).check(z.length(1)) });
 
