@@ -6,6 +6,15 @@ import { all, button, click, mount as bare, one } from "../../../tests/mount.tsx
 import { ChatHeader } from "./ChatHeader.tsx";
 import { FullProvider } from "./full.ts";
 
+// A computer's window: the full chat's close goes back to the page (a phone goes back as the browser does, phoneGo.test.tsx).
+window.matchMedia = (query: string) =>
+  ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }) as unknown as MediaQueryList;
+
 // The full-screen chat's header (frame 23.58.01, top): the room's name, the close control.
 const none = () => undefined;
 // The header reads the address (its name's menu, its full-chat button).

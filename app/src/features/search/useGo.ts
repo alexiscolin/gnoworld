@@ -11,7 +11,8 @@ import { showMap } from "../../mapView.ts";
 import type { SearchItem } from "./types.ts";
 import { realmChat } from "./discover/realms.ts";
 
-export function useGo(universe: UniverseView, close: () => void) {
+// `replace`: the palette stands on its own #search entry, which the place chosen takes over (usePaletteHistory.ts).
+export function useGo(universe: UniverseView, close: () => void, replace = false) {
   const navigate = useNavigate();
   const explore = useExplore({ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id });
   // What the copy came to says so for a moment, "Copied" or not; the palette's closing ends its timer.
@@ -48,7 +49,7 @@ export function useGo(universe: UniverseView, close: () => void) {
       return;
     }
     if (item.command === "plan") showMap(true);
-    Promise.resolve(navigate(to)).catch(reportError);
+    Promise.resolve(navigate(to, { replace })).catch(reportError);
   };
   // A world's chat is docked on its page, the Earth's on its own, a realm's in its own room, full; any other place says its chat on its Earth.
   // Opened from the full chat, it stays there: the place's own chat page, its room changing, no space.

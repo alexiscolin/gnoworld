@@ -86,6 +86,26 @@
     flex-wrap: nowrap;
   }
 
+  /* A phone's row of buttons: one line that scrolls across inside itself (no bar), never two; wide, it wraps as any cluster. */
+  @media (width < 900px) {
+    .cluster[data-wrap="scroll"] {
+      flex-wrap: nowrap;
+      overflow: auto hidden;
+      /* Room inside the clip for a focus ring and the 44 px box a control's hit area adds, taken back outside (utilities.css, .scroll-row). */
+      padding: calc(var(--focus-width) + var(--focus-offset));
+      margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
+      /* A row cut by its edge fades out there, and its last button scrolls clear of the fade (utilities.css, .scroll-row). */
+      /* raw: the fade's 32 px, half a chip */
+      padding-inline-end: 32px;
+      /* raw: the fade over the last 32 px */
+      mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - 32px), transparent);
+    }
+
+    .cluster[data-wrap="scroll"] > * {
+      flex: none;
+    }
+  }
+
   .cluster[data-justify="start"] {
     --_justify: flex-start;
   }
@@ -124,6 +144,14 @@
 
   :where(.grid[data-cols="12"]) > [data-span] {
     grid-column: span var(--_span);
+  }
+
+  /* A phone's cell holds no wider than its columns: a long legend or row wraps or is cut in its card, never carried past it. */
+  @media (width < 900px) {
+    .grid[data-cols="12"] > [data-span] {
+      /* layout: the cell may shrink below its content's minimum */
+      min-inline-size: 0;
+    }
   }
 
   /* A cell's one block fills its row's height: the cards of a row stand as tall as each other. */

@@ -15,6 +15,11 @@ const gnowebOf = ({ universe: { gnoweb }, realms, realm: own }: ChatPlace): stri
   return gnoweb === undefined || realm === undefined ? gnoweb : `${gnoweb}${realmPath(realm)}`;
 };
 
+/** The place's links out, on its universe's gnoweb. */
+export const PlaceLinks = ({ place }: { place: ChatPlace }) => (
+  <Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />
+);
+
 export function Info({
   place,
   talking,
@@ -23,11 +28,14 @@ export function Info({
   panelRef,
   buttons,
   close,
+  page,
 }: Pick<ChatScreenProps, "place" | "talking" | "people"> & {
   /** The place's buttons, in the planet's bar (PlaceView.tsx). */
   buttons: ReactNode;
   /** What closes the full chat, at the bar's right (FullButton.tsx); none where the chat cannot be closed. */
   close: ReactNode;
+  /** The control that opens the place's own page (PlaceSheet.tsx), where the page is not beside the chat. */
+  page?: ReactNode;
   room: ChatScreenProps["here"];
   panelRef: RefObject<HTMLElement | null>;
 }) {
@@ -39,7 +47,8 @@ export function Info({
       description={place.description}
       talking={talking}
       countries={room === undefined ? undefined : <CountriesFigure lines={room.lines} members={room.members} />}
-      links={<Links gnoweb={gnowebOf(place)} chainId={universes.find(({ id }) => id === place.universe.id)?.chainId} />}
+      links={<PlaceLinks place={place} />}
+      page={page}
       here={people}
       panelRef={panelRef}
     />

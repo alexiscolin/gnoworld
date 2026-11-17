@@ -52,18 +52,16 @@ test("a guest sees no banner and a plate that names nobody before anyone has cha
   await expect(page.getByText(/^First charted by/)).toHaveCount(0);
 });
 
-test("the first logged-in account to open a world gets the banner from the server's signal, at 390 and 1280 px, with no axe violation", async ({
+// A phone opens a world in its full chat alone (D13711), with no plate beside it: this journey is a computer's, its phone half gone.
+test("the first logged-in account to open a world gets the banner from the server's signal, with no axe violation", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1280, height: 1080 });
   expect(await arriveAs(page, "first-charter")).toEqual({ world: "govdao", first: true });
   await expect(chartBanner(page)).toBeVisible();
   await expect(page.getByText(/^First charted by @g1/)).toBeVisible();
   expect(await violations(page)).toEqual([]);
   expect(await sideways(page)).toBe(0);
-  await page.setViewportSize({ width: 1280, height: 1080 });
-  await expect(chartBanner(page)).toBeVisible();
-  expect(await violations(page)).toEqual([]);
 });
 
 // The server's own answer comes first, then the page's: a banner shown from a late answer would be missed by a count read too soon.

@@ -44,3 +44,9 @@ describe("useRealm", () => {
     expect(seen.at(0)).toEqual({ state: "loading" });
   });
 });
+
+// A phone's route reads the page with this query (known.ts's ask) and the plate with useRealm's: one key, so one read, whichever draws.
+it("keys the page's read as known.ts looks it up, for a realm on the default chain", () => {
+  const source = { rpc: "https://rpc.one", realm: "gno.land/r/gnoland/wugnot", origin: "https://gno.land" };
+  expect(realmPageQuery(source).queryKey).toEqual(keys.page(source.rpc, source.realm, source.origin));
+});

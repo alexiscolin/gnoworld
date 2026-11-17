@@ -22,11 +22,11 @@ export function PaletteLeft({ palette, children }: { palette: ReturnType<typeof 
   return (
     <div className={styles["left"]}>
       <div className={styles["head"]}>
-        {/* The sort ends the kinds' row; the chips wrap freely under it. */}
+        {/* The sort ends the kinds' row; the chips wrap freely under it (one row that scrolls across on a phone). */}
         <Sidebar side="end" space="2xs" align="center">
           <div role="group" aria-label="Kinds">
             {counts === undefined ? null : (
-              <Cluster space="2xs">
+              <Cluster space="2xs" wrap="scroll">
                 {TABS.map(({ id, label }) => (
                   <Chip
                     key={id}
@@ -53,7 +53,7 @@ export function PaletteLeft({ palette, children }: { palette: ReturnType<typeof 
         </Sidebar>
         {chips ? (
           <div role="group" aria-label="Filters">
-            <Cluster space="2xs">
+            <Cluster space="2xs" wrap="scroll">
               <ToggleChips items={FILTERS} selected={filters} onToggle={toggle} />
               {(query.trimStart().startsWith("@") || namespace !== undefined ? namespaces : []).map((name) => (
                 <Chip

@@ -2,7 +2,7 @@
 // rail's second tab open it too, by an event. The palette is a chunk of its own, fetched once the page rests and kept
 // after, so its first opening is at once; a new page closes it (a place chosen, Go explore).
 import { IconButton } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
 import { useLocation } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
@@ -38,17 +38,24 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [start, setStart] = useState("");
   const { pathname, hash } = useLocation();
   const [at, setAt] = useState(pathname);
+  const [seenHash, setSeenHash] = useState(hash);
+  if (seenHash !== hash) {
+    setSeenHash(hash);
+    if (seenHash === SEARCH_HASH && at === pathname) setOpen(false);
+  }
   if (at !== pathname) {
     setAt(pathname);
     // The address /list leads to asks it open.
     setOpen(hash === SEARCH_HASH);
     if (hash === SEARCH_HASH) setAsked(true);
   }
-  const show = () => {
+  const show = useEffectEvent(() => {
     setStart("");
     setAsked(true);
     setOpen(true);
-  };
+  });
+  // A cold load of the #search address opens it, as the /list redirect does (the hash is the client's alone: no server render).
+  const cold = useEffectEvent(() => hash === SEARCH_HASH);
   useEffect(() => {
     const controller = new AbortController();
     afterLoad(
@@ -78,6 +85,7 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
       },
       { signal: controller.signal },
     );
+    if (cold()) window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
     return () => {
       controller.abort();
     };

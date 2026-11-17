@@ -7,8 +7,6 @@ export interface Settings {
   quality: "auto" | "high" | "low";
   /** Reduce animations even where the system does not ask it. */
   calm: boolean;
-  /** The 3D on a phone, where the list is the default. */
-  phone3d: boolean;
   /** The language the room's lines are translated into; the site's own by default. */
   language: Language;
   /** Whether the lines on screen are translated as they come, through Jarvis. */
@@ -17,7 +15,6 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   quality: "auto",
   calm: false,
-  phone3d: false,
   language: "en",
   autoTranslate: true,
 };

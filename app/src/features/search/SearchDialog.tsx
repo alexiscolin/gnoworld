@@ -1,9 +1,10 @@
 // The search as a large sheet over a scrim (⌘K, the "/" key and the header's button). The field is on top. Empty, the sheet is
 // Discover, a store of realms; typing, one ranked list of the best 50 at the left with how many more answered, the chosen place's
 // preview at the right.
-import type { StoreRow } from "@gnoworld/core";
+import { PHONE_QUERY, type StoreRow } from "@gnoworld/core";
 import { Dialog } from "@gnoworld/ui";
-import { useEffect, type KeyboardEvent } from "react";
+import { useEffect, useEffectEvent, type KeyboardEvent } from "react";
+import { useMedia } from "../chat/index.ts";
 import { placeOf, type UniverseView } from "../../places.ts";
 import { itemOf, realmChat } from "./discover/realms.ts";
 import { useDiscover } from "./discover/useDiscover.ts";
@@ -15,6 +16,7 @@ import { LIST_ID } from "./PlaceResults.tsx";
 import styles from "./SearchDialog.module.css";
 import { useGo } from "./useGo.ts";
 import { usePalette } from "./usePalette.ts";
+import { usePaletteHistory } from "./usePaletteHistory.ts";
 
 const NO_WORLDS: never[] = [];
 
@@ -25,6 +27,10 @@ function intoCards(event: KeyboardEvent<HTMLElement>) {
   if (card === null) return;
   event.preventDefault();
   card.focus();
+}
+
+function isDiscovering({ query, filters, namespace }: ReturnType<typeof usePalette>) {
+  return query.trim() === "" && filters.size === 0 && namespace === undefined;
 }
 
 export default function SearchDialog({
@@ -39,9 +45,11 @@ export default function SearchDialog({
   /** The namespace a full Plan's "+N" opens on. */
   start?: string;
 }) {
+  const phone = useMedia(PHONE_QUERY);
+  const wide = phone ? "screen" : "sheet";
   const palette = usePalette(universe, open, start);
   // A chip or a namespace on, with no words, lists the places it keeps, not Discover.
-  const discovering = palette.query.trim() === "" && palette.filters.size === 0 && palette.namespace === undefined;
+  const discovering = isDiscovering(palette);
   const { flat, active, choose } = palette;
   const chosen = discovering ? undefined : palette.chosen;
   const discovery = useDiscover(discovering ? (palette.worlds ?? NO_WORLDS) : NO_WORLDS, {
@@ -52,11 +60,20 @@ export default function SearchDialog({
   useEffect(() => {
     document.getElementById(`${LIST_ID}-${String(active)}`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
-  const close = () => {
+  // On a phone the open palette is a history entry (usePaletteHistory.ts), pushed as it opens and, as it closes, taken off.
+  const history = usePaletteHistory();
+  const push = useEffectEvent(history.push);
+  useEffect(() => {
+    if (open) push();
+  }, [open]);
+  // `going`: closed by a place chosen, whose own navigation follows.
+  const closeFor = (going: boolean) => () => {
     palette.reset();
+    history.leave(going);
     onClose();
   };
-  const { go, chat, copy, copySaid } = useGo(universe, close);
+  const close = closeFor(false);
+  const { go, chat, copy, copySaid } = useGo(universe, closeFor(true), phone && history.holding);
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };
@@ -66,7 +83,7 @@ export default function SearchDialog({
     go(item, realmChat(item, placeOf(universe, row.world)?.href ?? universe.earth.path));
   };
   return (
-    <Dialog title="Search" open={open} onClose={close} wide="sheet">
+    <Dialog title="Search" open={open} onClose={close} wide={wide}>
       <div
         className={styles["palette"]}
         onKeyDown={(event) => {

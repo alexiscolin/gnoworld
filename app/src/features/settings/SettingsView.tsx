@@ -1,10 +1,11 @@
 // The settings (ADR-0002 §1, Menu and settings): every choice in one place, only those whose feature exists: display,
 // privacy, the accounts, this device. Each takes effect at once, with no reload (settings.ts applies them), and is kept on this device. No
 // setting hides a safety notice: they change quality, motion and choices alone.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Button, Dialog, Stack } from "@gnoworld/ui";
 import { useDeviceView } from "../../deviceViews.ts";
 import { useApp } from "../../storeContext.tsx";
-import { CountryChoice } from "../chat/index.ts";
+import { CountryChoice, useMedia } from "../chat/index.ts";
 import { lazy, Suspense } from "react";
 import { DeviceSection } from "./DeviceSection.tsx";
 import { DisplaySection } from "./DisplaySection.tsx";
@@ -34,12 +35,13 @@ function ReleaseSection() {
 
 export function SettingsView({ open, onClose }: { open: boolean; onClose: () => void }) {
   const session = useApp(({ login }) => login.session);
+  const phone = useMedia(PHONE_QUERY);
   const account = session.kind === "in" ? session.address : undefined;
   return (
     <Dialog
       title="Settings"
       description="Kept on this device. Each takes effect at once."
-      wide
+      wide={phone ? "screen" : true}
       open={open}
       onClose={onClose}
     >

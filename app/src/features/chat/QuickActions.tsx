@@ -4,7 +4,15 @@
 import { Menu, type MenuItem } from "@gnoworld/ui";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { PollDialog, type PollDialogProps } from "./PollDialog.tsx";
+import { ErrorView, errorKind } from "../errors/index.ts";
+import { chunked } from "./Failing.tsx";
+import type { PollDialogProps } from "./PollDialog.tsx";
+
+// Poll's dialog is asked at the first Poll chosen: the composer's menu carries only the item.
+const PollDialog = chunked(async () => ({ default: (await import("./PollDialog.tsx")).PollDialog }), {
+  waiting: null,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" />,
+});
 
 /** What a conversation is, for its acts: the Earth's general chat, a world's with a realm or without, a direct message. */
 type PillsOf = "earth" | "realm" | "hub" | "dm";
@@ -38,6 +46,7 @@ const soon = (label: string, icon: NonNullable<MenuItem["icon"]>, why?: string):
 
 export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, market, jarvisWhy }: QuickActionsProps) {
   const navigate = useNavigate();
+  const [asked, setAsked] = useState(false);
   const [polling, setPolling] = useState(false);
   const poll: MenuItem[] =
     send === undefined
@@ -47,6 +56,7 @@ export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, mar
             label: "Poll",
             icon: "chart",
             onSelect: () => {
+              setAsked(true);
               setPolling(true);
             },
           },
@@ -93,7 +103,7 @@ export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, mar
         size="s"
         items={[soon("Image", "image"), ...items[pills]]}
       />
-      {send === undefined ? null : (
+      {send === undefined || !asked ? null : (
         <PollDialog
           {...send}
           open={polling}

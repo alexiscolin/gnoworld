@@ -47,6 +47,19 @@
     cursor: pointer;
   }
 
+  /* A phone's finger (utilities.css, .hit): the box reaches past the pill's height, so only its width is cut. */
+  @media (width < 900px) {
+    :is(button, a).chip {
+      overflow: clip visible;
+    }
+
+    /* The box's room, taken as margin so wrapped rows and a scroll-row, which clips its block axis, keep the whole 44 px box. */
+    :is(button, a).chip:not([data-size="chip"]) {
+      /* layout: the room of the 44 px box above and below the pill */
+      margin-block: calc((var(--control-m) - var(--_h)) / 2);
+    }
+  }
+
   /* The pointer lightens a neutral chip at rest, never a selected one's cream or a tone's tint. */
   .chip:is(button, a)[data-tone="neutral"]:not([aria-pressed="true"], [aria-current="true"]):hover {
     --_fill: var(--color-fill-hover);
@@ -74,6 +87,13 @@
     --_fill: var(--color-danger-soft);
     --_line: var(--color-danger-line);
     --_ink: var(--color-danger);
+  }
+
+  /* What is unseen: the solid coral of the world column's pill (UnreadPill) and the bell's count. */
+  .chip[data-tone="new"] {
+    --_fill: var(--color-new);
+    --_line: var(--color-new);
+    --_ink: var(--color-ink);
   }
 
   /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"); a link in view says so by aria-current. */

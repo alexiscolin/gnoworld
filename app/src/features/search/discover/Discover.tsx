@@ -39,7 +39,14 @@ export default function Discover({ discovery, universe, fly, chat, followed, ran
             <Grid rows={list} discovery={discovery} />
           )}
           {shelf === "today" && today.length === 0 ? (
-            <EmptyState look="inline" line="No realm here with these filters. Clear one of them." />
+            <EmptyState
+              look="inline"
+              line={
+                discovery.filters.size === 0
+                  ? "No realm has moved today."
+                  : "No realm here with these filters. Clear one of them."
+              }
+            />
           ) : null}
         </Stack>
       </div>

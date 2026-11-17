@@ -3,6 +3,7 @@ import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes
 import { indexer } from "../chain/indexerRoute.ts";
 import { violations } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { openPlacePage } from "./realmRoom.ts";
 
 // A realm's read functions are buttons; a click reads one call through vm/qeval (ADR-0002 §4), free, and
 // nothing opens Adena. The RPC is answered here as a browser would get it, from the recorded answers; whether a real RPC
@@ -201,8 +202,7 @@ test.describe("a realm's read functions", () => {
     test(`has no accessibility violation on ${name}, listed, read and failed`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await chain(page, { evals: {} });
-      await page.goto("/r/gnoland/wugnot");
-      await hydrated(page);
+      await openPlacePage(page, "/r/gnoland/wugnot", REALM);
       await expect(rows(page)).toHaveCount(1);
       expect(await violations(page)).toEqual([]);
       await readFn(page, "TotalSupply");
@@ -222,8 +222,7 @@ test.describe("a realm's read functions", () => {
       await page.setViewportSize({ width, height });
       const long = Array.from({ length: 200 }, (_, i) => `line ${String(i)} of a long answer`).join("\n");
       await chain(page, { evals: { TotalSupply: long } });
-      await page.goto("/r/gnoland/wugnot");
-      await hydrated(page);
+      await openPlacePage(page, "/r/gnoland/wugnot", REALM);
       await readFn(page, "TotalSupply");
       const result = reads(page).getByRole("region", { name: "Result of TotalSupply" });
       await expect(result).toContainText("line 199 of a long answer");
@@ -241,8 +240,7 @@ test.describe("a realm's read functions", () => {
       const wide = `A${"b".repeat(127)}`;
       const many = readers([wide, ...Array.from({ length: 30 }, (_, i) => `Get${String(i).padStart(2, "0")}Value`)]);
       await chain(page, { functions: many, evals: { [wide]: "(x string)" } });
-      await page.goto("/r/gnoland/wugnot");
-      await hydrated(page);
+      await openPlacePage(page, "/r/gnoland/wugnot", REALM);
       await expect(reads(page).getByRole("textbox", { name: "Filter read functions" })).toBeVisible();
       expect(await violations(page)).toEqual([]);
       await fits(page);
@@ -263,8 +261,7 @@ test.describe("a realm's read functions", () => {
       test(`the panel listed and after a read, on a ${name}'s screen`, async ({ page }) => {
         await page.setViewportSize({ width, height });
         await chain(page);
-        await page.goto("/r/gnoland/wugnot");
-        await hydrated(page);
+        await openPlacePage(page, "/r/gnoland/wugnot", REALM);
         await expect(rows(page)).toHaveCount(1);
         await expect(reads(page)).toHaveScreenshot(`read-functions-listed-${name}.png`);
         await readFn(page, "TotalSupply");

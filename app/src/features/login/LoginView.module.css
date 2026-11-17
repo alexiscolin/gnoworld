@@ -1,4 +1,5 @@
-/* A phone cannot log in: a coarse pointer gets the words, a computer the button; once logged in, a phone writes. */
+/* A touch screen at 900 px or more cannot log in: it gets the words, a mouse's the button; once logged in, it writes. Under 900 px the
+   header's one line holds neither: the button, the network and the words are rows of the account's menu (AccountMenu.tsx). */
 @layer components {
   .phone {
     display: none;
@@ -13,6 +14,18 @@
       display: inline;
     }
 
+    .computer {
+      display: none;
+    }
+  }
+
+  @media (width < 900px) {
+    /* layout: the way in's box takes no room in the header's row; its status region stays for a screen reader */
+    .way {
+      display: contents;
+    }
+
+    .phone,
     .computer {
       display: none;
     }

@@ -24,7 +24,10 @@ const edgesOf = (page: Page) =>
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
       // The bell's count overhangs its button's corner by design (the video's frames): the button, measured below, carries it.
-      if (text === "" || parent?.closest("script, style, [hidden], [data-full], [data-tone=new][aria-hidden]") !== null)
+      if (
+        text === "" ||
+        parent?.closest("script, style, [hidden], .visually-hidden, [data-full], [data-tone=new][aria-hidden]") !== null
+      )
         continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
@@ -75,13 +78,13 @@ for (const width of WIDTHS) {
 
     for (const path of PAGES) {
       test(`${path}: the home link and the account share one header row`, async ({ page }) => {
-        const address = await logInAt(page);
+        await logInAt(page);
         await page.goto(path);
         await hydrated(page);
         await chatOpened(page, path, width);
-        const account = page.getByTitle(address);
-        // The shortening the chat's names get: the first six characters, an ellipsis, the last five.
-        await expect(account).toHaveText(`${address.slice(0, 6)}…${address.slice(-5)}`);
+        // The account's own control: a phone's pill is its face alone (D13718), the address in its menu and its accessible name.
+        const account = page.getByRole("banner").getByRole("button", { name: /Your account/ });
+        await expect(account).toBeVisible();
         // One row means the boxes share a middle: each one's centre lies inside the others' height. On a phone the search is the
         // views' bar's, at the screen's foot (the prototype's #hnav .views), not of this row.
         const row = [

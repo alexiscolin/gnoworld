@@ -1,8 +1,9 @@
 // The chat: a world's rooms by section, a room's lines and people, the page's link to Ergo.
 import { lazy } from "react";
 
-export { chatHeld, DockedChatHost, FullChatHost, PlaceChat } from "./fullHost.tsx";
+export { chatHeld, DockedChatHost, FullChatHost } from "./fullHost.tsx";
 export { LOADING } from "./Loading.tsx";
+export { PlateFrame } from "./PlateFrame.tsx";
 export { roomsChanged } from "./roomsListed.ts";
 export {
   BOT,
@@ -26,6 +27,7 @@ export async function drawing() {
 export type Drawing = Awaited<ReturnType<typeof drawing>>;
 export { chatPlace, EARTH_CHAT, EARTH_KICKER } from "./place.ts";
 export { composerBox, focusComposer } from "./composerBox.ts";
+export { sheetHref, useInPageSheet, useSheetClose } from "./placePage.ts";
 
 // The settings' country and the account menu's saved messages, each in a chunk asked when its dialog opens: a static export put
 // them in every world page's first screen.
@@ -33,3 +35,4 @@ export const CountryChoice = lazy(async () => ({ default: (await import("./Count
 export const SavedDialog = lazy(async () => ({ default: (await import("./SavedDialog.tsx")).SavedDialog }));
 
 export { PersonLink } from "./PersonLinkLazy.tsx";
+export { useMedia } from "./useMedia.ts";

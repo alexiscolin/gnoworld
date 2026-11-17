@@ -1,11 +1,9 @@
 /* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
-   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, the logo
-   and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
-   room for. The one breakpoint of both is here. */
+   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, one row:
+   the logo and the controls, with no views (the full chat only). The one breakpoint of both is here. */
 @layer components {
-  /* The views' bar's height, one source for the bars and the room the page leaves under them on a phone; the two are no parent and child. */
-  .bars,
-  .page {
+  /* The views' bar's height, one source for the bars and the room the page leaves under them; the two are no parent and child. */
+  .bars {
     --_bar: var(--size-bar);
   }
 
@@ -19,6 +17,19 @@
     /* layout: the cells' centres share a line */
     align-items: center;
     padding: var(--space-s);
+  }
+
+  .brand {
+    /* layout: a computer's grid sees the logo alone: the box takes no part in it */
+    display: contents;
+  }
+
+  .testnet {
+    /* layout: a phone's warning, drawn only there (shellHeader.tsx); the chip or the dot, one of them shown */
+    display: grid;
+    /* layout: the chip or the dot on the logo's line */
+    align-items: center;
+    min-inline-size: 0;
   }
 
   .logo {
@@ -43,17 +54,12 @@
     margin-block: 0;
   }
 
-  /* Where one is and how one looks, side by side, a bar over the page's foot on a phone. */
+  /* Where one is and how one looks, side by side (a computer's; a phone draws none). */
   .bars {
     /* layout: the two pills side by side */
     display: flex;
     /* layout: a step between the pills */
     gap: var(--space-2xs);
-    position: fixed;
-    inset-inline: var(--space-s);
-    inset-block-end: var(--space-s);
-    /* raw: above the page's content and the welcome card (1) until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
-    z-index: 2;
   }
 
   /* The views: a pill with its levels and the chat; the ways: Space and Map. */
@@ -332,9 +338,6 @@
     }
   }
 
-  /* A phone's bar: the places' names alone and the ways' icons alone, their kinds and words for a screen reader. */
-  /* The search: beside the bell on a computer; in the views' pill on a phone, after a divider, a control's own size centred in the pill's
-     34 px, so the pill keeps its height. */
   .divider {
     /* layout: the line keeps its room when the levels give way */
     flex: none;
@@ -345,31 +348,6 @@
     /* layout: the arrangement the prototype and the frames draw */
     margin-inline: var(--space-3xs);
     background: var(--color-line-strong);
-  }
-
-  .phoneSearch {
-    /* layout: the button is the pill's own item */
-    display: contents;
-
-    /* raw: the target is the control's 44 px; the veil (an inset shadow) stops at the transparent 5 px edge, so the look stays the pill's 34 px */
-    --round-h: var(--control-m);
-  }
-
-  .phoneSearch button {
-    /* raw: the 5 px edge the 44 px target keeps over the pill's 34 */
-    border-width: 5px;
-  }
-
-  @media (width >= 900px) {
-    .phoneSearch {
-      display: none;
-    }
-  }
-
-  @media (width < 900px) {
-    .wideSearch {
-      display: none;
-    }
   }
 
   /* Where the bar cannot hold every word beside the logo and the account (a phone's, and a computer's under 1340 px), each level is its mark and
@@ -392,24 +370,74 @@
     }
   }
 
-  /* The ways where the bar cannot hold them: a pill of their own at the scene's top right, under the header; a phone's bar at the
-     foot keeps its one row, a computer's levels the room. */
+  /* The ways where the bar cannot hold them: a pill of their own at the scene's top right, under the header. */
   @media (width < 1140px) {
     .ways {
       position: fixed;
-      /* raw: under the header, 96 px high (a phone's: 16 px, a 40 px row, 4 px, a 20 px line, 16 px), a step below it */
+      /* raw: under the header, 96 px high a step below it */
       inset-block-start: calc(96px + var(--space-2xs));
       inset-inline-end: var(--page-edge, var(--space-s));
     }
   }
 
+  /* A phone is the full chat only: no views, no ways, no bar; the header is one row of 44 px targets, the logo, the network, then the
+     search, the bell and the account. */
   @media (width < 900px) {
-    .chevron {
-      /* raw: a phone's levels a step closer, so the lean is less */
-      --_lean: 6px;
+    .bars {
+      display: none;
+    }
 
-      /* layout: the links' own padding around the chevron, no more: a 320 px bar keeps its names */
-      margin-inline: 0;
+    /* The header's own height (tokens.css's --shell-head), which a full chat keeps visible and starts below (ChatScreen.module.css,
+       PhoneHeader.module.css, FullLoading.module.css): its padding twice and its one row of 44 px targets. */
+    :root {
+      --shell-head: calc(var(--space-2xs) * 2 + var(--control-m));
+    }
+
+    .header {
+      /* layout: the notch's room above, never less than the step; the mark and the controls on the safe lines S and E */
+      padding-block: max(var(--space-2xs), env(safe-area-inset-top)) var(--space-2xs);
+      padding-inline: calc(var(--space-s) + env(safe-area-inset-left)) calc(var(--space-s) + env(safe-area-inset-right));
+      /* layout: the logo and the controls on one line, at every width from 320 px: the network and the way in are rows of the account's menu */
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .brand {
+      /* layout: the logo and the testnet's warning on one line, a step apart, giving way before the controls */
+      display: grid;
+      /* layout: the logo and the warning side by side, from the start */
+      grid-auto-flow: column;
+      /* layout: from the start, never spread */
+      justify-content: start;
+      /* layout: they share a middle */
+      align-items: center;
+      /* layout: a step between the logo and the warning */
+      column-gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+
+    .logo {
+      /* layout: the link is a 44 px target round its mark */
+      align-items: center;
+      /* layout: the mark at the start of the target, so it sits on the safe line, not 6 px in */
+      justify-content: start;
+      min-inline-size: var(--control-m);
+      min-block-size: var(--control-m);
+    }
+
+    .network {
+      /* layout: the account's menu holds the network */
+      display: none;
+    }
+
+    .controls {
+      /* layout: the last glyph on E, as the logo's ink sits on S (the 44 px target hangs out by the glyph's side room) */
+      margin-inline-end: calc((var(--phone-icon) - var(--control-m)) / 2);
+    }
+
+    /* The search, the bell and the menu: a phone's header icon in their 44 px targets, still plain. */
+    .controls button > svg {
+      inline-size: var(--phone-icon);
+      block-size: var(--phone-icon);
     }
   }
 
@@ -417,9 +445,10 @@
      stacking. */
   .fill {
     position: absolute;
-    /* raw: the fill as tall as a link, 34 px, in the 44 px pill */
-    inset-block: 5px;
-    inset-inline-start: 0;
+    /* As tall as a link, so the pill's edge is the same step all round (control-bar's padding, inside its rule). */
+    inset-block: calc((var(--_bar) - var(--round-h)) / 2 - var(--line-width));
+    /* --_fill-x counts from the pill's outer edge (viewsIndicator.ts); the fill stands inside its rule */
+    inset-inline-start: calc(var(--line-width) * -1);
     /* raw: under the links, above the pill's own glass */
     z-index: -1;
     inline-size: var(--_fill-w, 0);
@@ -443,11 +472,6 @@
   .view:not([aria-current="page"]):hover {
     background: var(--color-fill);
     color: var(--color-text);
-  }
-
-  /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
-  .page {
-    padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
   @media (width >= 900px) {
@@ -514,10 +538,6 @@
       /* layout: Space and Map keep their width: the levels give way before them */
       flex: none;
     }
-
-    .page {
-      padding-block-end: 0;
-    }
   }
 
   /* A chat's page opened full covers itself from its first paint (fullChat.ts marks the root before React draws), till the chat is drawn
@@ -538,6 +558,13 @@
   @keyframes chat-cover-out {
     to {
       visibility: hidden;
+    }
+  }
+
+  /* A phone keeps the header's row above its full chat: the cover starts under it. */
+  @media (width < 900px) {
+    :root[data-chat="full"]::before {
+      inset-block-start: calc(var(--flash-room) + var(--shell-head));
     }
   }
 

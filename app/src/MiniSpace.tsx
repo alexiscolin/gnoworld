@@ -1,6 +1,6 @@
 // A second engine on a small canvas of its own (the full chat's planet): the same code as the page's space, drawn at a world's planet,
 // never from above (the Map's system would stand tiny and off centre in so small a box); it draws while mounted, and what unmounts it ends its loop and frees its context.
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import type { Space } from "./space/scene.ts";
 import { type groundOn } from "./earthGround.ts";
 import { motionOf } from "./space/motion.ts";
@@ -17,7 +17,19 @@ const nothing = () => undefined;
 const loadEngine = () => import("./space/scene.ts");
 
 /** The world `world`'s planet, centred in the box; `ground` (the Earth's signs') is handed the engine while it runs. */
-export default function MiniSpace({ world, ground }: { world: string; ground: ReturnType<typeof groundOn> }) {
+export default function MiniSpace({
+  world,
+  ground,
+  onDrawn,
+}: {
+  world: string;
+  ground: ReturnType<typeof groundOn>;
+  /** Told once the engine has drawn its first frame, for a caller that shows a still till then. */
+  onDrawn?: (() => void) | undefined;
+}) {
+  const drawn = useEffectEvent(() => {
+    onDrawn?.();
+  });
   const hostRef = useRef<HTMLDivElement>(null);
   const spaceRef = useRef<Space>(undefined);
   useEffect(() => {
@@ -53,6 +65,7 @@ export default function MiniSpace({ world, ground }: { world: string; ground: Re
             landed: nothing,
             drawn: () => {
               canvas.dataset["drawn"] = "";
+              drawn();
             },
           },
         });

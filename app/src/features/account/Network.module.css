@@ -20,7 +20,7 @@
     padding-inline: 0;
   }
 
-  /* On a phone the header's row names the network: the pill keeps the name alone. */
+  /* Under 900 px the header holds no network (the account's menu does): the pill is a computer's. */
   .inPill {
     display: none;
   }

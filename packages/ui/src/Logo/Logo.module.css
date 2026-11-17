@@ -30,8 +30,9 @@
     font-weight: 600;
   }
 
-  /* When narrow, the word drops before the mark (DESIGN-SYSTEM.md, Layout); the link around it keeps its name. */
-  @media (width <= 600px) {
+  /* When narrow, the word drops before the mark (DESIGN-SYSTEM.md, Layout); the link around it keeps its name. A phone's header holds it
+     from 385 px (the logo, the testnet's pill and three 44 px targets on one line), so only a 320 to 384 px phone loses it. */
+  @media (width < 385px) {
     .word {
       display: none;
     }

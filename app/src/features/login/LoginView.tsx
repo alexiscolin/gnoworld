@@ -1,6 +1,7 @@
 // The login's place in the header: one pill, Connect, the step a login is at, and why the last login stopped; pressed, Connect opens
 // its menu of two ways in, Adena and the command line (D13881). Logged in, the account's pill and its menu take the address and the way
-// out (AccountMenu.tsx). A phone cannot log in: it is told to use a computer for that, and that it writes once logged in.
+// out (AccountMenu.tsx). Under 900 px the header holds none of it: the way in is a row of the account's menu where Adena is found, else
+// the menu says to use a computer.
 import { Button, Cluster, Icon } from "@gnoworld/ui";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import type { LoginSlice } from "../../store/login.ts";
@@ -16,12 +17,15 @@ export interface LoginViewProps {
   onLogIn: () => void;
   /** The command line's way in (D13881). */
   onKey: () => void;
-  /** The network's name, after the button in its pill, and after the phone's words. */
+  /** The network's name, after the button in its pill, and after the words of a touch screen. */
   network?: ReactNode;
 }
 
 // The menu's code comes with Connect's first press, as the device's menu's does (AccountMenu.tsx).
 const ConnectMenu = lazy(async () => ({ default: (await import("./ConnectMenu.tsx")).ConnectMenu }));
+
+/** What a phone is told where Adena is not found: atop a guest's menu, its header having no room for words. */
+export const USE_A_COMPUTER = "To log in, use a computer; once logged in you can write from here.";
 
 const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…", verifying: "Checking your signature…" };
 
@@ -58,7 +62,7 @@ export function LoginView({ session, step, problem, onLogIn, onKey, network = nu
     </Button>
   );
   return (
-    <Cluster>
+    <Cluster className={styles["way"]}>
       <span className={styles["computer"]}>
         <span className="pill-group">
           {asked ? (
@@ -73,7 +77,7 @@ export function LoginView({ session, step, problem, onLogIn, onKey, network = nu
         </span>
       </span>
       <span className={styles["phone"]}>
-        To log in, use a computer; once logged in you can write from here.
+        {USE_A_COMPUTER}
         {network}
       </span>
       {status}

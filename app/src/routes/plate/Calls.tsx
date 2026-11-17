@@ -2,10 +2,12 @@
 // first call (a day with none a dot), the range (all or 14 days), then its last calls as a paged list of three that Expand opens to a hundred: who,
 // which function, when. Every text is the rollup's, checked by its schema; nothing here is made up.
 import { useState } from "react";
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Card, Cell, Cluster, DayChart, grouped, PagedList, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { CallRow } from "./CallRow.tsx";
 import { dayLabel, dayValues } from "./days.ts";
+import { useMedia } from "../../features/chat/index.ts";
 import { callerName } from "../../features/realms/worldsIndex.ts";
 
 type Call = RealmRollup["last"][number] & { at: number };
@@ -154,6 +156,9 @@ export function Calls({ rollup, worlds }: { rollup: RealmRollup; worlds: Worlds[
   const [scale, setScale] = useState<"log" | "linear">("log");
   const [range, setRange] = useState<"all" | "14">("all");
   const expand = useAlone("calls");
+  // On a phone the header is the title and Expand alone (the title cut to "C…" beside two Tabs); the scale and the range have the line under it.
+  const phone = useMedia(PHONE_QUERY);
+  const segments = <Segments scale={scale} range={range} onScale={setScale} onRange={setRange} />;
   const { open } = expand;
   const every = dayValues(rollup.days, rollup.updated);
   if (every.length === 0 && rollup.last.length === 0) return null;
@@ -165,11 +170,16 @@ export function Calls({ rollup, worlds }: { rollup: RealmRollup; worlds: Worlds[
           icon="chart"
           title="Calls per day"
           level={2}
-          actions={<Segments scale={scale} range={range} onScale={setScale} onRange={setRange} />}
+          {...(phone ? {} : { actions: segments })}
           expand={expand}
         />
         <Card.Body>
           <Stack space="s">
+            {phone ? (
+              <Cluster justify="between" wrap="no" space="2xs">
+                {segments}
+              </Cluster>
+            ) : null}
             {every.length === 0 ? null : (
               <CallsChart
                 days={range === "14" ? every.slice(-FORTNIGHT) : every}

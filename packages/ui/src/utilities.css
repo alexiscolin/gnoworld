@@ -176,6 +176,22 @@
     flex: none;
   }
 
+  /* A phone's finger (WCAG 2.5.5): a control under 44 px gains an invisible box 44 px high, never wider than it, so neighbours never cover
+     each other; a stretched or link-look button takes none; a bare button has it without the class; `--hit-inline` widens a narrow one
+     (the Switch's track). */
+  @media (width < 900px) {
+    :is(.hit, button.bare):not([data-stretch], [data-emphasis="link"]) {
+      position: relative;
+    }
+
+    :is(.hit, button.bare):not([data-stretch], [data-emphasis="link"])::after {
+      content: "";
+      position: absolute;
+      inset-block: calc((100% - var(--control-m)) / 2);
+      inset-inline: var(--hit-inline, 0);
+    }
+  }
+
   /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit. */
   .nowrap {
     white-space: nowrap;

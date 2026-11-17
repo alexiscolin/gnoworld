@@ -117,13 +117,6 @@
     --_line: transparent;
   }
 
-  /* At once under the pointer: the veil is left out of the transitions here, and eases back on leave. */
-  .button:hover:not(:disabled, [aria-disabled="true"]) {
-    --_veil: var(--_hover);
-
-    transition-property: background-color, border-color;
-  }
-
   /* The press over the nearest positioned box, whose hover lights the button as its own. */
   .button[data-stretch]::after {
     content: "";
@@ -131,8 +124,19 @@
     inset: 0;
   }
 
-  .button[data-stretch]:hover {
-    --_fill: var(--color-fill-hover);
+  /* A tap leaves :hover on, so a phone would keep the veil: hover answers only where the primary input can hover (a touch screen with no
+     mouse as its main input shows none). */
+  @media (hover: hover) {
+    /* At once under the pointer: the veil is left out of the transitions here, and eases back on leave. */
+    .button:hover:not(:disabled, [aria-disabled="true"]) {
+      --_veil: var(--_hover);
+
+      transition-property: background-color, border-color;
+    }
+
+    .button[data-stretch]:not([data-emphasis="solid"]):hover {
+      --_fill: var(--color-fill-hover);
+    }
   }
 
   .button:disabled {

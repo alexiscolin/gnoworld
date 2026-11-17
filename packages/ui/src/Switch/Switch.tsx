@@ -15,11 +15,12 @@ export interface SwitchProps {
  * end, cream when on (docs/DESIGN-SYSTEM.md, "Colour": what is selected). Space toggles it; the name toggles it under the pointer. */
 export function Switch({ label, description, checked, onChange }: SwitchProps) {
   const id = useId();
+  const named = `${id}-name`;
   const described = description === undefined ? undefined : `${id}-description`;
   return (
     <Sidebar side="end" align="center">
       <Stack space="3xs">
-        <label htmlFor={id} className={styles["name"]}>
+        <label id={named} htmlFor={id} className={styles["name"]}>
           {label}
         </label>
         {described === undefined ? null : (
@@ -28,20 +29,21 @@ export function Switch({ label, description, checked, onChange }: SwitchProps) {
           </span>
         )}
       </Stack>
-      <span className={styles["switch"]}>
+      <label className={[styles["switch"], "hit"].join(" ")}>
         <input
           id={id}
           type="checkbox"
           role="switch"
           className={styles["track"]}
           checked={checked}
+          aria-labelledby={named}
           aria-describedby={described}
           onChange={(event) => {
             onChange(event.currentTarget.checked);
           }}
         />
         <span className={styles["knob"]} aria-hidden="true" />
-      </span>
+      </label>
     </Sidebar>
   );
 }

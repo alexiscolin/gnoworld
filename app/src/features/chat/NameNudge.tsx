@@ -6,7 +6,7 @@ import { askFor, useNameless } from "../../pageAsks.ts";
 export function NameNudge() {
   if (!useNameless()) return null;
   return (
-    <Cluster justify="between">
+    <Cluster justify="between" data-nudge="">
       <span className="meta">People here read your address. Pick a gno.land name they can read.</span>
       <Button
         size="s"

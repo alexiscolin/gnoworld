@@ -1,6 +1,6 @@
 // What a plate is given ahead of the click, in a chunk of its own: asked by plateWarm.ts once the page's space has drawn, or at a link's
 // intent. Every read here is the page's own, kept (lib/query): the plate finds the answer asked, or the answer already come.
-import { hubWorldOf } from "@gnoworld/core";
+import { hubWorldOf, PHONE_QUERY } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { HOME_NAMESPACES, isHome } from "./cosmosAt.ts";
 import { realmPageQuery } from "./features/realms/useRealm.ts";
@@ -17,6 +17,8 @@ import { site } from "./places.ts";
 // the same request.
 let chunks: Promise<unknown> | undefined;
 const warmChunks = (): void => {
+  // A phone shows a plate only in its sheet, once opened: nothing of it is asked ahead.
+  if (matchMedia(PHONE_QUERY).matches) return;
   chunks ??= Promise.all([
     import("./routes/plate/RealmPlate.tsx"),
     import("./routes/plate/EarthPlate.tsx"),

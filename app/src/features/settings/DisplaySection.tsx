@@ -136,14 +136,6 @@ export function DisplaySection() {
           set({ autoTranslate });
         }}
       />
-      <Switch
-        label="Space in 3D on a phone"
-        description="On a phone, the worlds show as a list until you ask for space."
-        checked={settings.phone3d}
-        onChange={(phone3d) => {
-          set({ phone3d });
-        }}
-      />
     </Section>
   );
 }

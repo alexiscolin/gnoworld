@@ -2,10 +2,12 @@
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ircOf } from "../../../tests/irc.ts";
 import { mountInStore } from "../../../tests/inStore.tsx";
+import { noMedia, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
+import { InPageSheet, SheetClose } from "../chat/placePage.ts";
 import { Actions } from "./Actions.tsx";
 
 // Frames 26, 31, 86, 92 and 93: the main action, then Follow and Share with the plate's first paint. Share
@@ -14,28 +16,40 @@ const PLACE = { name: "Bubble", path: "/net/onyx/w/bubble" };
 const FOLLOW = "onyx:bubble";
 const PROPOSALS = "/net/onyx/r/gov/dao";
 let host: HTMLElement | undefined;
+beforeEach(noMedia);
 afterEach(() => {
   host?.remove();
   host = undefined;
   vi.unstubAllGlobals();
 });
-function draw(proposals?: string) {
+function draw(proposals?: string, inSheet = false) {
   host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
   act(() => {
     root.render(
       <StoreProvider>
-        {proposals === undefined ? (
-          <Actions place={PLACE} follow={FOLLOW} />
-        ) : (
-          <Actions place={PLACE} follow={FOLLOW} proposals={proposals} />
-        )}
+        <InPageSheet value={inSheet}>
+          {proposals === undefined ? (
+            <Actions place={PLACE} follow={FOLLOW} />
+          ) : (
+            <Actions place={PLACE} follow={FOLLOW} proposals={proposals} />
+          )}
+        </InPageSheet>
       </StoreProvider>,
     );
   });
   return host;
 }
+
+// A phone as wide as 375: the under-360 query does not match.
+const onPhone = (matches: boolean) => {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: matches && !query.includes("359px"),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+};
 
 describe("a world's actions", () => {
   it("draws the main action: a link to the world's chat on the page, in words that say so", () => {
@@ -94,6 +108,17 @@ describe("a world's actions, with proposals", () => {
     expect(first?.textContent).toBe("Read the proposals");
     expect(first?.getAttribute("href")).toBe(PROPOSALS);
     expect(first?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+  });
+
+  // A phone's chat is the page it leaves for: the proposals are the realm's page, in its own sheet (phoneSheet.ts), at its page section (#page), where the proposals are.
+  it("opens the realm's page sheet in the full chat from a phone's page sheet, the computer's link unchanged", async () => {
+    onPhone(true);
+    // The phone's row comes in a chunk of its own, once the window is a phone's.
+    const phone = draw(PROPOSALS, true);
+    await settled(() => phone.querySelector("a") !== null);
+    expect(phone.querySelector("a")?.getAttribute("href")).toBe(`${PROPOSALS}?sheet=page&chat=full#page`);
+    noMedia();
+    expect(draw(PROPOSALS).querySelector("a")?.getAttribute("href")).toBe(PROPOSALS);
   });
 
   it("draws Read the proposals, Follow and Share, the three of frame 31", () => {
@@ -179,5 +204,90 @@ describe("a world's main action, in a room nobody spoke in", () => {
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} />);
     expect(box.querySelector("a[href='#page']")?.textContent).toBe("Read its page");
     expect(box.querySelector("a[href='#chat']")).toBeNull();
+  });
+});
+
+// A phone: every action on one line, the main one with its words, Say hi, Follow and Share as named icon buttons; never wrapped to two rows
+// and never a stretched press (its ::after would cover the sheet's own controls).
+describe("a phone's actions", () => {
+  const rowsOf = (box: HTMLElement) =>
+    [...box.querySelectorAll("[data-row]")].map((row) =>
+      [...row.querySelectorAll("a, button")].map((n) => n.textContent || n.getAttribute("aria-label")),
+    );
+  // The phone's row comes in a chunk of its own: its buttons are in once it has.
+  const ready = (box: HTMLElement) => settled(() => (box.querySelector("[data-row]")?.childElementCount ?? 0) > 0);
+  // A realm's row: its page as the main action, Try a function beside it.
+  const withLeadAndSecond = async () => {
+    const lead = { label: "Read its page", href: "#page" };
+    const second = { label: "Try a function", href: "#try" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} second={second} />);
+    await ready(box);
+    return box;
+  };
+
+  it("draws the second action as a named icon, which scrolls to the section its href names", async () => {
+    onPhone(true);
+    const target = document.createElement("section");
+    target.id = "try";
+    const scroll = vi.fn();
+    target.scrollIntoView = scroll;
+    document.body.append(target);
+    const box = await withLeadAndSecond();
+    const press = box.querySelector<HTMLElement>("button[aria-label='Try a function']");
+    expect(press?.textContent).toBe("");
+    act(() => {
+      press?.click();
+    });
+    expect(scroll).toHaveBeenCalledWith({ block: "start" });
+    target.remove();
+  });
+
+  it("shortens 'Read the proposals' under 360 px, where three icons share its line", async () => {
+    onPhone(true);
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(box);
+    expect(rowsOf(box)[0]?.[0]).toBe("Read the proposals");
+    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const narrow = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(narrow.box);
+    expect(rowsOf(narrow.box)[0]?.[0]).toBe("Proposals");
+  });
+
+  it("sets the main actions, then Follow and Share, in one row", async () => {
+    onPhone(true);
+    const box = await withLeadAndSecond();
+    expect(rowsOf(box)).toEqual([
+      ["Read its page", "Try a function", "Following", "Share"].map((n) => (n === "Following" ? "Follow" : n)),
+    ]);
+    expect(box.querySelector("[data-stretch]")).toBeNull();
+  });
+
+  it("leads with the proposals' words and names Say hi, Follow and Share on the same row", async () => {
+    onPhone(true);
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />);
+    await ready(box);
+    expect(rowsOf(box)).toEqual([["Read the proposals", "Say hi in govdao", "Follow", "Share"]]);
+    expect(box.querySelector("[data-stretch]")).toBeNull();
+  });
+
+  it("goes back to the chat from Say hi by the sheet's close, and by the chat's anchor outside a sheet", async () => {
+    onPhone(true);
+    const close = vi.fn();
+    const { box } = await mountInStore(
+      <SheetClose value={close}>
+        <Actions place={PLACE} follow={FOLLOW} proposals={PROPOSALS} room="govdao" />
+      </SheetClose>,
+    );
+    await ready(box);
+    act(() => {
+      box.querySelector<HTMLElement>("[aria-label='Say hi in govdao']")?.click();
+    });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the computer's single row", async () => {
+    onPhone(false);
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} />);
+    expect(rowsOf(box)).toEqual([]);
   });
 });

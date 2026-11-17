@@ -1,6 +1,10 @@
+// @vitest-environment jsdom
 import fc from "fast-check";
+import { MemoryRouter } from "react-router";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mount, one } from "../../../tests/mount.tsx";
+import { FullChatLinks } from "../../routerLink.tsx";
 import { markdown } from "@gnoworld/core";
 import { ANONYMOUS, block, Markdown, type MarkdownProps } from "./Message.tsx";
 
@@ -281,5 +285,51 @@ describe("a reader's own link", () => {
     expect(out).toMatch(
       /^<p><a href="https:\/\/a\.example" title="https:\/\/a\.example" dir="ltr" target="_blank" rel="noopener noreferrer">a <strong>b<\/strong><\/a> and <i>https:\/\/c\.example<\/i><\/p>$/,
     );
+  });
+});
+
+// Messages link https addresses only: the page stands at one.
+const SITE = "https://gno.world";
+const phone = (matches: boolean) => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  vi.stubGlobal("location", { origin: SITE });
+};
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+const link = (text: string) =>
+  one(
+    mount(
+      <MemoryRouter>
+        <FullChatLinks full>
+          <Markdown blocks={markdown(text)} />
+        </FullChatLinks>
+      </MemoryRouter>,
+    ),
+    "a",
+  );
+
+describe("a link in a chat line, on a phone", () => {
+  it.each(["/w/govdao", "/earth", "/r/gov/dao"])("opens this site's place %s in the app, its full chat", (path) => {
+    phone(true);
+    const a = link(`[here](${SITE}${path})`);
+    expect(a.getAttribute("href")).toBe(`${path}?chat=full`);
+    expect(a.hasAttribute("target")).toBe(false);
+  });
+
+  it("leaves another site's link, and this site's file, in a new tab", () => {
+    phone(true);
+    expect(link("[x](https://gno.land/docs)").getAttribute("target")).toBe("_blank");
+    expect(link(`[x](${SITE}/sitemap.xml)`).getAttribute("target")).toBe("_blank");
+  });
+
+  it("keeps a computer's link to this site's place in a new tab, as it was", () => {
+    phone(false);
+    expect(link(`[x](${SITE}/w/govdao)`).getAttribute("target")).toBe("_blank");
   });
 });

@@ -20,9 +20,9 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 194,353 B measured, 256 B ahead.
   { chunk: "scene", after: ["root", "universe"], cap: 194_609 },
-  // On the home's first screen: 19,370 B measured beyond `root` and `universe` (its worlds, their thumbs, the home's views and the follow
-  // chunks it imports), 256 B ahead.
-  { chunk: "Rail", after: ["root", "universe"], cap: 19_626 },
+  // On the home's first screen: 19,888 B measured beyond `root` and `universe` (its worlds, their thumbs, the home's views and the follow
+  // chunks it imports; the phone's worlds row reads the rail, D13719), 256 B ahead.
+  { chunk: "Rail", after: ["root", "universe"], cap: 20_144 },
   // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 2,436 B alone, 256 B ahead.
   { chunk: "thumbs", cap: 2692 },
   // The temperate worlds' coasts, shapes and climates and the cream veins.

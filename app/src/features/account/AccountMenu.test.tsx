@@ -45,9 +45,84 @@ describe("the account's menu", () => {
     expect(on.querySelector("[role='menuitem']")?.getAttribute("aria-label")).toBe("Jarvis, Open a room to ask Jarvis");
   });
 
+  it("on a phone keeps the order note, Connect, Passport, Settings, networks, Release a key, with no greyed Jarvis", () => {
+    const box = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} onConnect={() => undefined} phone />,
+    );
+    const rows = [...box.querySelectorAll("[role^='menuitem']")].map((item) => item.textContent);
+    expect(rows.slice(0, 3)).toEqual(["Connect Adena", "Passport", "Settings"]);
+    expect(rows.at(-1)).toBe("Release a key");
+    expect(rows.filter((row) => row.startsWith("Network:")).length).toBeGreaterThan(0);
+    expect(rows.some((row) => row.startsWith("Jarvis"))).toBe(false);
+    expect(rows.findIndex((row) => row.startsWith("Network:"))).toBeGreaterThan(rows.indexOf("Settings"));
+  });
+
+  it("on a phone has a Credits row after Settings, which opens the credits dialog; a computer's menu has none", async () => {
+    Object.assign(HTMLDialogElement.prototype, {
+      showModal(this: HTMLDialogElement) {
+        this.open = true;
+      },
+      close(this: HTMLDialogElement) {
+        this.open = false;
+      },
+    });
+    const computer = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(items(computer)).not.toContain("Credits");
+    const box = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} phone />);
+    const rows = items(box);
+    expect(rows.indexOf("Credits")).toBe(rows.indexOf("Settings") + 1);
+    expect(box.querySelector("dialog")).toBeNull();
+    const row = [...box.querySelectorAll<HTMLButtonElement>("[role='menuitem']")].find(
+      (item) => item.textContent === "Credits",
+    );
+    act(() => {
+      row?.click();
+    });
+    await vi.waitFor(() => {
+      expect(box.querySelector("dialog[open]")?.textContent).toContain("Credits");
+    });
+  });
+
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
+  });
+
+  it("draws the note it is given atop a guest's menu, outside its items, and none otherwise", () => {
+    const guest = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />,
+    );
+    expect(guest.querySelector("[role='menu']")?.firstElementChild?.textContent).toBe("Use a computer.");
+    expect(items(guest)).not.toContain("Use a computer.");
+    const none = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(none.querySelector("[role='menu']")?.textContent).not.toContain("Use a computer.");
+  });
+
+  it("reads a guest's note as the menu's description, and says no description without one", () => {
+    const guest = mount(
+      <Opened address={undefined} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />,
+    );
+    const menu = guest.querySelector("[role='menu']");
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    const none = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
+    expect(none.querySelector("[role='menu']")?.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("gives an account no note, whatever a phone says: the note is for a guest", () => {
+    const box = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} guestNote="Use a computer." />);
+    const menu = box.querySelector("[role='menu']");
+    expect(menu?.textContent).not.toContain("Use a computer.");
+    expect(menu?.getAttribute("aria-describedby")).toBeNull();
+    expect(menu?.querySelector("p")).toBeNull();
+  });
+
+  it("on a phone tells a logged-in account whose it is, as the menu's note; a computer's pill says it already", () => {
+    const phone = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} phone />);
+    const menu = phone.querySelector("[role='menu']");
+    expect(menu?.firstElementChild?.textContent).toBe("Logged in as g1jg8m…vsqf5");
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    const computer = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} />);
+    expect(computer.querySelector("[role='menu']")?.querySelector("p")).toBeNull();
   });
 
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {

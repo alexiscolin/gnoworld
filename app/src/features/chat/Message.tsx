@@ -4,9 +4,12 @@
 // whole address in its title, its label being anyone's words. A mention shows its account's address shortened,
 // whole in its title; the reader's own apart; an address neither the reader's nor a member's whole. Children go
 // to createElement one by one: a tree that never changes needs no keys.
-import type { Block, Inline } from "@gnoworld/core";
+import { PHONE_QUERY, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
+import { holdsChat } from "../../fullChat.ts";
 import { NEW_TAB } from "../../lib/newTab.ts";
+import { RouterLink } from "../../routerLink.tsx";
+import { useMedia } from "./useMedia.ts";
 import { isAccount, shortAddress } from "./names.ts";
 
 // A realm page's `$help` link to its own function is its words alone, never an address; the realm's view makes it a call card.
@@ -103,9 +106,40 @@ export interface MarkdownProps {
   tabbable?: boolean;
 }
 
+// A link to one of this site's own places: on a phone it opens in the app (its full chat, RouterLink), never a new tab that leaves it. The
+// window is read by this link alone, so no other line needs it.
+function PlaceLink({
+  path,
+  href,
+  tabbable,
+  label,
+}: {
+  path: string;
+  href: string;
+  tabbable: boolean;
+  label: ReactNode[];
+}) {
+  const phone = useMedia(PHONE_QUERY);
+  const attributes = { title: href, dir: "ltr", tabIndex: tabbable ? undefined : -1 } as const;
+  return phone
+    ? createElement(RouterLink, { href: path, ...attributes }, ...label)
+    : createElement("a", { href, ...attributes, ...NEW_TAB }, ...label);
+}
+
+const ownPlace =
+  (tabbable: boolean): Reader["link"] =>
+  (href, label) => {
+    // A message drawn with no page (a server's) has no place of its own.
+    if (typeof location === "undefined") return undefined;
+    const url = URL.parse(href);
+    if (url?.origin !== location.origin || !holdsChat(url.pathname)) return undefined;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    return createElement(PlaceLink, { path, href, tabbable, label });
+  };
+
 /** A message's tree as elements: one paragraph on its line, in a span; other blocks below it, in a div. */
 export function Markdown({ blocks, className, me, members, tabbable = true }: MarkdownProps) {
-  const reader = { me, members, tabbable };
+  const reader: Reader = { me, members, tabbable, link: ownPlace(tabbable) };
   const [first] = blocks;
   if (first === undefined) return createElement("span", { className });
   if (blocks.length === 1 && first.type === "paragraph") {

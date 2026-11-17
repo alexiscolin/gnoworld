@@ -72,10 +72,10 @@
     }
   }
 
-  /* On a phone it stands where the offer stands, above the views' bar. */
+  /* A phone draws no corner: its menu and its Info sheet hold the link (D13724). */
   @media (width < 900px) {
     .credits {
-      inset-block-end: calc(var(--size-bar) + 3 * var(--space-s));
+      display: none;
     }
   }
 

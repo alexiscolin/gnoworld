@@ -2,6 +2,7 @@ import type { Locator } from "@playwright/test";
 import { sound } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { openGovdao } from "./govdaoChain.ts";
+import { openPageSheet, pageSheet } from "./realmRoom.ts";
 
 // GovDAO's pinned "Vote" (hubs.json) on its page under Read the proposals and in the chat's pinned row,
 // each once vm/qfuncs confirms it; its card names the realm and the function, every field empty and editable.
@@ -21,6 +22,8 @@ for (const width of [390, 1280] as const) {
     page,
   }) => {
     await opened(page, width);
+    // A phone has the plate in its page sheet over the chat: read there first, then the sheet is closed to reach the pinned row.
+    if (width < 900) await openPageSheet(page);
     const form = plate(page)
       .getByRole("figure")
       .filter({ has: page.getByRole("button", { name: "Vote" }) });
@@ -32,6 +35,8 @@ for (const width of [390, 1280] as const) {
     expect(await follows(above, form), "the form under the actions' row").toBe(true);
     expect(await follows(figures, form), "the form under the figures").toBe(true);
     expect(await follows(form, proposals), "the Proposals card under the form").toBe(true);
+    // The sheet's one close leaves it for the chat.
+    if (width < 900) await pageSheet(page).getByRole("button", { name: "Back to the chat" }).click();
     await expect(bar(page).getByRole("button")).toHaveText(["Vote"]);
 
     await bar(page).getByRole("button", { name: "Vote" }).click();

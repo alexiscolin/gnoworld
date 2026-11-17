@@ -51,6 +51,19 @@
     --_ink: var(--color-text);
   }
 
+  /* A phone's finger (utilities.css, .hit): wrapped rows keep the gap the 44 px boxes need, so no box covers the row above. */
+  @media (width < 900px) {
+    .tabs {
+      /* layout: the gap between wrapped rows */
+      row-gap: calc(var(--control-m) - var(--control-s));
+    }
+
+    .tabs[data-size="xs"] {
+      /* layout: the gap between wrapped rows, for the 24 px tabs */
+      row-gap: calc(var(--control-m) - var(--control-xs));
+    }
+  }
+
   /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
   .tab[aria-selected="true"] {
     --_fill: var(--color-primary);

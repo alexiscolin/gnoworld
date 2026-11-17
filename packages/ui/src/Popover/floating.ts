@@ -18,6 +18,27 @@ interface Placing {
   align: "start" | "center";
 }
 
+/** The side of the anchor the box takes (its own, or the other when it does not fit there), its top, and the height it shows: when neither
+ * side holds it (a phone turned on its side) the roomier side, the box capped to it and scrolling inside, clear of its anchor. `gap` is
+ * the step from the anchor, `edge` the one from the screen's edges. */
+function vertical(
+  at: DOMRect,
+  height: number,
+  { gap, edge, screen, side }: { gap: number; edge: number; screen: number; side: Placing["side"] },
+) {
+  const spots = { below: at.bottom + gap, above: at.top - gap - height };
+  const fits = { below: spots.below + height <= screen - edge, above: spots.above >= edge };
+  const other = side === "below" ? "above" : "below";
+  if (!fits.below && !fits.above) {
+    const room = { below: screen - edge - spots.below, above: at.top - gap - edge };
+    const chosen = room.below >= room.above ? "below" : "above";
+    const shown = Math.min(height, room[chosen]);
+    return { chosen, shown, top: chosen === "below" ? spots.below : at.top - gap - shown };
+  }
+  const chosen = fits[side] ? side : other;
+  return { chosen, shown: height, top: spots[chosen] };
+}
+
 /** Puts the box on its side of the anchor, or the other one when it does not fit there, and slides it
  * to stay a step inside the screen's edges: centred, or from the anchor's start. A box kept unseen
  * until placed is seen from then on. */
@@ -26,23 +47,28 @@ function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   // Its own size: the enter draws it scaled (surface.module.css), and a box placed by that smaller size stays that much too near.
   const scale = Number.parseFloat(getComputedStyle(box).scale) || 1;
   const drawn = box.getBoundingClientRect();
-  const [width, height] = [drawn.width / scale, drawn.height / scale];
+  // A box this capped below (max-block-size) and scrolling inside still counts what it holds, so the cap never feeds back: its scroll
+  // height, a layout size the enter's scale never shrinks. Uncapped, its drawn size alone: what overflows it (a tooltip's tail) is none.
+  const capped = box.style.maxBlockSize !== "";
+  const natural = capped ? box.scrollHeight + box.offsetHeight - box.clientHeight : 0;
+  const [width, height] = [drawn.width / scale, Math.max(drawn.height / scale, natural)];
   const { clientWidth, clientHeight } = document.documentElement;
-  const step = Number.parseFloat(getComputedStyle(box).getPropertyValue("--space-2xs")) || 0;
-  const spots = { below: at.bottom + step, above: at.top - step - height };
-  const fits = { below: spots.below + height <= clientHeight - step, above: spots.above >= step };
-  const other = side === "below" ? "above" : "below";
-  const chosen = fits[side] || !fits[other] ? side : other;
-  const top = spots[chosen];
+  // A step from its anchor, 8 px; off the screen's edges the same, or what the box asks (--_edge, a phone's 16).
+  const styled = getComputedStyle(box);
+  const gap = Number.parseFloat(styled.getPropertyValue("--space-2xs")) || 0;
+  const edge = Number.parseFloat(styled.getPropertyValue("--_edge")) || gap;
+  const { chosen, top, shown } = vertical(at, height, { gap, edge, screen: clientHeight, side });
+  box.style.removeProperty("max-block-size");
+  if (shown < height) box.style.maxBlockSize = `${String(shown)}px`;
   let start = at.left;
   if (align === "center") start = at.left + (at.width - width) / 2;
   else if (getComputedStyle(anchor).direction === "rtl") start = at.right - width;
-  const left = Math.max(step, Math.min(start, clientWidth - step - width));
+  const left = Math.max(edge, Math.min(start, clientWidth - edge - width));
   box.style.left = `${String(left)}px`;
   // It grows from its trigger's middle, on the side it faces: the exit's travel is toward it too (surface.module.css).
   box.style.setProperty("--_dir", chosen === "below" ? "-1" : "1");
   box.style.transformOrigin = `${String(at.left + at.width / 2 - left)}px ${chosen === "below" ? "0" : "100%"}`;
-  box.style.top = `${String(Math.max(step, Math.min(top, clientHeight - step - height)))}px`;
+  box.style.top = `${String(Math.max(edge, Math.min(top, clientHeight - edge - shown)))}px`;
   box.style.removeProperty("visibility");
 }
 

@@ -41,8 +41,51 @@
     color: var(--color-text);
   }
 
+  /* Close is a phone's: the panel there is the whole screen, inside the notch and the bars, and covers the bell. */
+  .close {
+    display: none;
+  }
+
   .title {
     font: var(--font-title-s);
+  }
+
+  @media (width < 900px) {
+    .place {
+      inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      inline-size: auto;
+    }
+
+    .close {
+      display: contents;
+    }
+
+    /* The head: the title, Mark all read while something is unread, and Close on a line, Close at the screen's corner. */
+    .actions {
+      /* layout: the actions' parts join the head's own row, so Close can sit beside the title */
+      display: contents;
+    }
+
+    .title {
+      /* layout: the title takes the row's width, Close at its end */
+      flex: 1;
+      /* The size of Search's and Settings' titles. */
+      font: var(--font-title-m);
+    }
+
+    /* Four kinds across the sheet's column, no empty tail in the track. */
+    .place [role="tablist"] {
+      max-inline-size: var(--dialog-w);
+    }
+
+    /* Each kind grows from its own width, its words and count centred on one line: equal shares broke "Worlds 1" mid-word. */
+    .place [role="tab"] {
+      /* layout: each kind its width, then a share of the rest */
+      flex: 1 1 auto;
+      /* layout: the words and count centred in the kind's share */
+      justify-content: center;
+      white-space: nowrap;
+    }
   }
 
   .list {

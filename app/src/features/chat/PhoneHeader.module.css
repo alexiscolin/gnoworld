@@ -1,0 +1,60 @@
+/* A phone's rooms row, in the place band: a row of 44 px targets, at every width. */
+@layer components {
+  .bar {
+    /* layout: the row is a grid item whose track would otherwise grow to its widest content (the chips), past the screen */
+    min-inline-size: 0;
+    /* layout: row B is one 44 px row */
+    min-block-size: var(--control-m);
+  }
+
+  /* The two controls at the start: the large icon in a 44 px target (the icon button's own height, over its small size's), the first's box
+     whose glyph starts on the band's inline inset (.tools). */
+  .bar .tools button {
+    --_h: var(--control-m);
+  }
+
+  /* The first control's glyph on the band's inset (the 44 px target hangs out by the glyph's side room), as the place's words above it. */
+  .bar .tools {
+    /* layout: the glyph on the band's inset, the target's side room hung out */
+    margin-inline-start: calc((var(--icon-l) - var(--control-m)) / 2);
+    /* layout: the two tools touch, their targets side by side */
+    gap: 0;
+  }
+
+  /* The dock's separator (the video's frame 40): a line between the tools and the chips. */
+  .rule {
+    /* layout: kept whole, an icon's height */
+    flex: none;
+    inline-size: var(--line-width);
+    block-size: var(--icon-l);
+    background: var(--color-line);
+  }
+
+  .rule:has(+ .chips:empty) {
+    display: none;
+  }
+
+  .tools button > svg {
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
+  }
+
+  .chips {
+    /* layout: the chips take the row and give way at their end */
+    flex: 1 1 0;
+    min-inline-size: 0;
+    /* The chips' row (its held-top fill) is clear: the big planet shows through it */
+    --color-surface: transparent;
+  }
+
+  /* with no padding of its own (the dock's, RoomChips.module.css): the band's gutter is the line */
+  .chips nav {
+    padding: 0;
+  }
+
+  /* The keyboard owns the foot: no rooms' row while a chat field has the focus (the rooms' filter in the drawer is in a dialog, which
+     this row holds, and keeps it shown). */
+  :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus:not(dialog *)) .bar {
+    display: none;
+  }
+}

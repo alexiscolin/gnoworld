@@ -8,10 +8,11 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out: JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627).
-const FIRST_SCREEN_JS = 279_143;
-// A page with no plate (the home), exact: its measured size, 256 B ahead.
-const PLAIN_FIRST_SCREEN_JS = 276_255;
+// The Earth's or a world's page, exact: its measured size, 256 B ahead (278,887 B with the signed deposit cap, D13627; 282,407 with the
+// phone mode's shared parts, D13719, D13731).
+const FIRST_SCREEN_JS = 282_663;
+// A page with no plate (the home), exact: its measured size, 256 B ahead (277,691 B with the phone mode's media checks, D13719).
+const PLAIN_FIRST_SCREEN_JS = 277_947;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -140,8 +141,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // A page that holds the chat and space (the Earth's, a world's): its chat waits for space's first frame, or 2.5 s once the page is on screen
 // (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open: 54,541 B measured, 256 B ahead.
-const LATE_CHAT_JS = 54_797;
+// What leaves the first screen keeps a cap of its own, with what it asks once open: 53,696 B measured (Poll's dialog lazy, D13719), 256 B
+// ahead.
+const LATE_CHAT_JS = 53_952;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own.
@@ -155,8 +157,8 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 61062, // 60,806 B measured with the narrow plate's fixes (D13701), 256 B ahead
-  HubPlate: 57414, // 57,158 B measured with the narrow plate's fixes (D13701), 256 B ahead
+  EarthPlate: 61823, // 61,567 B measured with the phone sheet's branches (D13719), 256 B ahead
+  HubPlate: 58187, // 57,931 B measured with the phone sheet's branches (D13719), 256 B ahead
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,

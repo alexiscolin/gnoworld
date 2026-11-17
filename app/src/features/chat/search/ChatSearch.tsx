@@ -4,6 +4,7 @@
 import type { SearchHit } from "@gnoworld/schemas";
 import { composing, EmptyState, Field, Icon, IconButton, ShowMore, Sidebar, Skeleton, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useKeepFocus } from "../keepFocus.ts";
 import { pageRecent } from "../../../lib/keep/recent.ts";
 import { parseFind, toQuery, type Time, type Who } from "./filters.ts";
 import { Filters } from "./Filters.tsx";
@@ -162,6 +163,7 @@ function useRecent(found: boolean, words: string) {
 export function ChatSearch(props: ChatSearchProps) {
   const { text, onText, time, world, who, searched, onClose } = props;
   const rested = useRested(text);
+  const keep = useKeepFocus();
   const [hour] = useState(() => Math.floor(Date.now() / HOUR_MS) * HOUR_MS);
   const ask = searched ? toQuery(rested, { world: world.slug, who, now: new Date(hour), time }) : undefined;
   const search = useChatSearch(ask);
@@ -186,7 +188,14 @@ export function ChatSearch(props: ChatSearchProps) {
     else onText("");
   };
   return (
-    <aside ref={boxRef} tabIndex={-1} aria-label="Search results" className={styles["panel"]} onKeyDown={escape}>
+    <aside
+      ref={boxRef}
+      tabIndex={-1}
+      aria-label="Search results"
+      className={styles["panel"]}
+      onKeyDown={escape}
+      {...keep}
+    >
       <Head props={props} filtered={searched && text.trim() !== ""} page={first} />
       <div className={styles["body"]}>
         <Body props={props} ask={ask} search={search} answered={answered} />

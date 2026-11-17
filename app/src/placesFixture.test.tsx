@@ -92,8 +92,12 @@ describe("an ecosystem's page", () => {
   });
 
   test("checks the case of its path in the browser, a query and a fragment aside", () => {
-    expect(ecosystemLoader(asked("/e/tokens?x=1")).slug).toBe("tokens");
-    expect(ecosystemLoader(asked("/e/tokens#a")).slug).toBe("tokens");
+    const slugOf = (path: string) => {
+      const loaded = ecosystemLoader(asked(path));
+      return loaded instanceof Response || loaded instanceof Promise ? undefined : loaded.slug;
+    };
+    expect(slugOf("/e/tokens?x=1")).toBe("tokens");
+    expect(slugOf("/e/tokens#a")).toBe("tokens");
     expect(is404(() => ecosystemLoader(asked("/E/tokens")))).toBe(true);
   });
 });

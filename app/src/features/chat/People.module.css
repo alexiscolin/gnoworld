@@ -16,6 +16,11 @@
     display: grid;
     border-radius: var(--radius-pill);
     box-shadow: 0 0 0 var(--line-width) var(--color-line-strong);
+
+    /* A phone's sheet keeps the disc on the 16 px line: the ring inside it. */
+    @media (width < 900px) {
+      box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    }
   }
 
   /* A person the reader may write to: face and name in one button, plain as the row's words are. */

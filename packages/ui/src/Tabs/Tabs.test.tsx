@@ -113,6 +113,15 @@ describe("Tabs", () => {
     expect(screen.getByRole("tab", { name: "Calls" }).textContent).toBe("Calls");
   });
 
+  it("tones its counts coral when they are what is unseen, mint otherwise", () => {
+    const tabs = [{ id: "all", label: "All", count: 3 }];
+    const { unmount } = render(<Tabs label="Kinds" tabs={tabs} selected="all" onSelect={vi.fn()} countTone="new" />);
+    expect(screen.getByText("3").dataset["tone"]).toBe("new");
+    unmount();
+    render(<Tabs label="Kinds" tabs={tabs} selected="all" onSelect={vi.fn()} />);
+    expect(screen.getByText("3").dataset["tone"]).toBeUndefined();
+  });
+
   it("shows a tab's label beside its icon unless asked for the icon alone", () => {
     render(
       <Tabs label="Filter" tabs={[{ id: "all", label: "All", icon: "chat" }]} selected="all" onSelect={vi.fn()} />,

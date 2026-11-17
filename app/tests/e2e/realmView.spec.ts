@@ -3,6 +3,7 @@ import { PAGES } from "../chain/chainFixture.ts";
 import { indexer } from "../chain/indexerRoute.ts";
 import { chain, RPC } from "../chain/rpcRoute.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
+import { openPlacePage } from "./realmRoom.ts";
 import { violations } from "./axe.ts";
 
 // A realm page holding a script, an image with onerror, a javascript: link and a hidden form field
@@ -170,9 +171,9 @@ test.describe("a realm's view", () => {
     test(`has no accessibility violation on ${name}, whole or failed`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await chain(page, { "gno.land/r/demo/hostile": HOSTILE });
-      await page.goto("/r/demo/hostile");
-      await hydrated(page);
-      await expect(page.getByRole("main")).toContainText("Read at block");
+      // A phone has the realm's page in its page sheet, over the full chat.
+      await openPlacePage(page, "/r/demo/hostile", "gno.land/r/demo/hostile");
+      await expect(page.getByRole(width < 900 ? "dialog" : "main")).toContainText("Read at block");
       expect(await violations(page)).toEqual([]);
       await page.goto("/r/demo/nowhere");
       await hydrated(page);
@@ -196,37 +197,36 @@ test.describe("a realm's view", () => {
         await page.addInitScript(() => {
           localStorage.setItem("gnoworld:welcomed", "1");
         });
-        await page.goto("/r/gnoland/coins");
-        await hydrated(page);
-        await expect(page.getByRole("main")).toContainText("Read at block");
+        await openPlacePage(page, "/r/gnoland/coins", "gno.land/r/gnoland/coins");
+        await expect(page.getByRole(width < 900 ? "dialog" : "main")).toContainText("Read at block");
         await expect(page).toHaveScreenshot(`realm-view-${name}.png`, {
           mask: [page.getByRole("banner"), page.locator("[data-banner]")],
         });
       });
-
-      // The World view is the one lit on a world's page and on a realm's; hydration patches no attribute (react-dom 19.3.1), so the
-      // light must follow the path once the page wakes. The galaxy is lit on its own page.
-      test(`lights the World view on a realm's page or a world's, and Galaxy on the galaxy's, and none on the home, on a ${name}'s screen`, async ({
-        page,
-      }) => {
-        await page.setViewportSize({ width, height });
-        await chain(page, { "gno.land/r/gnoland/coins": COINS });
-        const views = page.getByRole("navigation", { name: "Views" });
-        for (const path of ["/r/gnoland/coins", "/w/bubble"]) {
-          await page.goto(path);
-          await hydrated(page);
-          await expect(views.getByRole("link", { name: "Galaxy" })).toBeVisible();
-          await expect(views.locator("[aria-current]")).toHaveCount(1);
-          await expect(views.locator("[aria-current='page']")).toContainText("World");
-        }
-        await page.goto("/universe");
-        await hydrated(page);
-        await expect(views.locator("[aria-current='page']")).toHaveText("Galaxy");
-        // The home is the Earth's first screen: no level is lit there.
-        await page.goto("/");
-        await hydrated(page);
-        await expect(views.locator("[aria-current]")).toHaveCount(0);
-      });
     }
+
+    // The World view is the one lit on a world's page and on a realm's; hydration patches no attribute (react-dom 19.3.1), so the light must
+    // follow the path once the page wakes. The galaxy is lit on its own page. A phone draws no views (D13711): this is a computer's.
+    test("lights the World view on a realm's page or a world's, and Galaxy on the galaxy's, and none on the home, on a computer's screen", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await chain(page, { "gno.land/r/gnoland/coins": COINS });
+      const views = page.getByRole("navigation", { name: "Views" });
+      for (const path of ["/r/gnoland/coins", "/w/bubble"]) {
+        await page.goto(path);
+        await hydrated(page);
+        await expect(views.getByRole("link", { name: "Galaxy" })).toBeVisible();
+        await expect(views.locator("[aria-current]")).toHaveCount(1);
+        await expect(views.locator("[aria-current='page']")).toContainText("World");
+      }
+      await page.goto("/universe");
+      await hydrated(page);
+      await expect(views.locator("[aria-current='page']")).toHaveText("Galaxy");
+      // The home is the Earth's first screen: no level is lit there.
+      await page.goto("/");
+      await hydrated(page);
+      await expect(views.locator("[aria-current]")).toHaveCount(0);
+    });
   });
 });

@@ -1,0 +1,24 @@
+/* A phone's actions on one line, each as wide as what it shows: none grows, none scrolls, none wraps. */
+@layer components {
+  @media (width < 900px) {
+    .line {
+      /* layout: one row */
+      display: flex;
+      /* layout: the actions a step apart */
+      gap: var(--space-2xs);
+    }
+
+    .line > * {
+      /* layout: no button squeezed */
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+  }
+
+  /* Under 360 px the main action drops its icon: its words and three 44 px icons a step apart fit the 288 px line. */
+  @media (width < 360px) {
+    .line > :first-child svg {
+      display: none;
+    }
+  }
+}

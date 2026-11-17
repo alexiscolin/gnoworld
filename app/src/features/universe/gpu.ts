@@ -2,7 +2,7 @@
 // Whether this GPU may have space, read on a canvas of its own whose context goes back at once (ADR-0002 §8). The gate's browsers have a
 // software GPU: a test build or the dev server lets `?test-gpu` pass it; a production build holds no trace of it, the build replacing both.
 import { isWeakGpu, PHONE_QUERY, sceneOffer, type SceneOffer } from "@gnoworld/core";
-import { savesData } from "../../lib/saveData.ts";
+import { asksToSaveData, savesData } from "../../lib/saveData.ts";
 
 declare global {
   interface ImportMetaEnv {
@@ -33,9 +33,11 @@ export function gpuCanDraw(): boolean {
   return !isWeakGpu(name);
 }
 
-// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone (unless its settings ask for
-// space there) or a reader who saves data on "View in space"; any other at once.
+// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone or a reader who saves data
+// on "View in space" (a phone draws no such button, D13711, and keeps the offer if its window widens); any other at once. A phone draws no
+// space, so it never makes the probe's WebGL2 context.
 export function offerOf(): SceneOffer {
-  const phone = matchMedia(PHONE_QUERY).matches && document.documentElement.dataset["phone3d"] !== "on";
-  return sceneOffer({ weak: !gpuCanDraw(), phone, savesData: savesData() });
+  const phone = matchMedia(PHONE_QUERY).matches;
+  // A computer waits for its reader's own Save-Data alone; a phone for a 2G estimate too (D13721).
+  return sceneOffer({ weak: !phone && !gpuCanDraw(), phone, savesData: phone ? savesData() : asksToSaveData() });
 }

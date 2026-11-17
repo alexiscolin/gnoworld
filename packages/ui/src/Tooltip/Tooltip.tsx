@@ -101,7 +101,9 @@ export function Tooltip({ label, children, drops }: TooltipProps) {
       ref={anchorRef}
       className={styles["anchor"]}
       data-drops={drops === true ? "" : undefined}
-      onPointerEnter={() => {
+      // A touch tap has no hover to wait on: its words would pop under the finger; the keyboard's focus still shows them.
+      onPointerEnter={(event) => {
+        if (event.pointerType === "touch") return;
         setPointer((now) => (now === "away" ? "waiting" : now));
         setDismissed(false);
       }}

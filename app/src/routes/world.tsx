@@ -1,14 +1,16 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
 // route's not-found. The world is found by the request's path as written: its case is part of the address.
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useLoaderData, type MetaArgs } from "react-router";
 import { hubWorldOf } from "@gnoworld/core";
 import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
-import { chatPlace, PlaceChat } from "../features/chat/index.ts";
-import { isMissing, RouteError } from "../features/errors/index.ts";
+import { chatPlace } from "../features/chat/index.ts";
+import { PlaceChat } from "../features/chat/PlaceChat.tsx";
+import { chunked } from "../features/chat/Failing.tsx";
+import { ErrorView, errorKind, isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
@@ -22,7 +24,10 @@ import { PlaceFrame } from "./placeFrame.tsx";
 const NO_CALLS: readonly ChainHeard[] = [];
 
 // The plate's blocks (routes/plate), in a chunk once the first screen has drawn.
-const HubPlate = lazy(() => import("./plate/HubPlate.tsx"));
+const HubPlate = chunked(() => import("./plate/HubPlate.tsx"), {
+  waiting: null,
+  failed: (error) => <ErrorView kind={errorKind(error)} size="inline" />,
+});
 
 // A world's kind as its crumb says it; a world the data says nothing of is a hub.
 const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp", station: "Station" };
@@ -54,6 +59,8 @@ function useWorldSpace(world: SiteWorld) {
 const kickerOf = (world: ReturnType<typeof site.world>) =>
   [...(world.genre === undefined ? [] : [world.genre]), KINDS[world.kind ?? "hub"] ?? "Hub"].join(" · ");
 
+const noRing = () => undefined;
+
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
@@ -65,20 +72,32 @@ export default function World() {
     place: chatPlace({ ...world, room: `#${world.slug}`, pinned: pinnedBar(world, universe), inPage: true }, universe),
     chain: { place: world, calls: calls ?? NO_CALLS },
   };
-  return <PlaceChat chat={chat} page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />} />;
+  // The same plate as the page's, for the phone's "Its page" sheet of the full chat (no ring there).
+  const plate = <HubPlate world={world} universe={universe} own={stationOf(world.slug)?.url} onRing={noRing} />;
+  // A place entered, its arrival and its signs belong to the route, so the chat alone (a phone's) has them as the page does (ADR-0003 §4).
+  useEntered();
+  return (
+    <>
+      <PlaceChat
+        chat={chat}
+        plate={plate}
+        page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />}
+      />
+      {/* The arrival banners and the chart call: the route's, so the chat alone (a phone's) charts the world too; nothing shows unless the server's signal says this account earned one. */}
+      <Banners world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
+      <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
+    </>
+  );
 }
 
 function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: UniverseView; chat: ReactNode }) {
   // The open proposal's ring round the planet, when the world takes votes (StatusRing.tsx).
   const [ring, setRing] = useState<Ring>();
-  // A world's page is a place entered (ADR-0003 §4).
-  useEntered();
   const chatDue = useWorldSpace(world);
   // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
   const loaded = useLoaded();
   // A station round the Earth keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
   const own = stationOf(world.slug)?.url;
-  const address = ORIGIN + world.canonical;
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -90,19 +109,14 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
         plate={
           <>
             <Kicker planet>{kickerOf(world)}</Kicker>
-            {/* The arrival banners: nothing unless the server's signal says this account earned one. */}
-            <Banners world={world.slug} name={world.name} address={address} />
             <Panel.Title>{world.name}</Panel.Title>
-            <Suspense fallback={null}>
-              {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
-            </Suspense>
+            {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
           </>
         }
         chat={chat}
         chatDue={chatDue}
       />
       <WorldSigns world={hubWorldOf(world)} />
-      <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
   );
 }

@@ -190,19 +190,58 @@ describe("the dock when the server does not answer", () => {
 
   it("says it in the rooms' rail and not the conversation, beside a direct message that is open", async () => {
     vi.stubGlobal("fetch", roomsAnswer(400));
-    drawer()(
-      <MemoryRouter initialEntries={[`/?dm=${OTHER}`]}>
-        <StoreProvider>
-          <Grab />
-          <ChatPanel world="bubble" place={place} />
-        </StoreProvider>
-      </MemoryRouter>,
-    );
+    drawPanel(`/?dm=${OTHER}`);
     act(() => {
       state().loginActions.signedIn(ME);
     });
     await settled(() => said() > 0);
     // The rail and the rooms' menu both say it (two surfaces); the conversation does not.
     expect(mine()?.querySelector("div[class*='lead']")).toBeNull();
+  });
+});
+
+const drawPanel = (entry: string) => {
+  drawer()(
+    <MemoryRouter initialEntries={[entry]}>
+      <StoreProvider>
+        <Grab />
+        <ChatPanel world="bubble" place={place} />
+      </StoreProvider>
+    </MemoryRouter>,
+  );
+};
+
+describe("the screen's header", () => {
+  const at = (entry: string, phone: boolean) => {
+    // An earlier test's screen may still stand in the body: count this one's band press alone (the phone's: one button to Info).
+    const before = document.querySelectorAll("[aria-label$=': info and its page']").length;
+    vi.stubGlobal("fetch", roomsAnswer(200));
+    // jsdom has none, and a browser's is none while the document is not fully active.
+    vi.stubGlobal("visualViewport", null);
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: phone && query === "(max-width: 899px)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    drawPanel(entry);
+    act(() => {
+      state().loginActions.signedOut();
+    });
+    return () => document.querySelectorAll("[aria-label$=': info and its page']").length > before;
+  };
+
+  it("is the phone's, with its Info, in the full chat of a phone", async () => {
+    const info = at("/?chat=full", true);
+    await settled(info);
+    expect(info()).toBe(true);
+  });
+
+  it("is the desktop's, with no phone Info, on a computer", async () => {
+    const info = at("/?chat=full", false);
+    await settled(() => document.querySelector("[data-chat-screen]") !== null);
+    expect(info()).toBe(false);
   });
 });

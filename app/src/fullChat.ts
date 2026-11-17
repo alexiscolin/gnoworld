@@ -1,5 +1,7 @@
 // The full chat in the address (?chat=full): read by the chat (features/chat/full.ts), by space (useSpace draws the chat at once), and here
 // before React draws, so a page opened full shows the chat's cover from its first paint and space never starts behind it.
+import { PHONE_QUERY } from "@gnoworld/core";
+
 /** The address's key for the chat's size. */
 export const FULL = "chat";
 
@@ -59,18 +61,33 @@ export function withoutFull(pathname: string, params: URLSearchParams): string {
 /** A link to a page, kept in the full chat when the page holds one (routerLink.tsx): what is in the full chat stays in it, and a page
  * with no chat opens as itself. A link in the page's own search ("?room=…") keeps it already (names.ts). */
 export function fullChatHref(href: string): string {
-  const [path = "", query = ""] = href.split("?", 2);
+  const hashAt = href.indexOf("#");
+  const hash = hashAt < 0 ? "" : href.slice(hashAt);
+  const rest = hashAt < 0 ? href : href.slice(0, hashAt);
+  const cut = rest.indexOf("?");
+  const path = cut < 0 ? rest : rest.slice(0, cut);
   if (!holdsChat(path)) return href;
-  const [search = "", hash] = query.split("#", 2);
+  const search = cut < 0 ? "" : rest.slice(cut + 1);
   const params = new URLSearchParams(search);
   params.set(FULL, "full");
-  return `${path}?${params.toString()}${hash === undefined ? "" : `#${hash}`}`;
+  return `${path}?${params.toString()}${hash}`;
+}
+
+/** Where a phone leaves the place `at` for: its full chat (what the address asked of the room or the person kept); none for an address with
+ * no chat or one already full. A computer's first screen carries this alone of the phone's going (phoneGo.ts holds the rest). */
+export function fullOnPhone(at: { readonly pathname: string; readonly search: string; readonly hash: string }) {
+  if (!holdsChat(at.pathname) || asksFull(new URLSearchParams(at.search))) return undefined;
+  return `${fullChatHref(`${at.pathname}${at.search}`)}${at.hash}`;
 }
 
 /** Marks the root of a chat's page opened full (data-chat="full", shellHeader.module.css's cover, space/motion.ts's pause), before React
  * draws; the chat keeps or drops the mark as it opens or shrinks. */
 export function markFullEarly(): void {
-  if (typeof document === "undefined" || !holdsChat(location.pathname)) return;
+  if (typeof document === "undefined") return;
+  // A phone's place is its full chat: the address says so before React reads it, so the page's own first paint never shows.
+  const to = matchMedia(PHONE_QUERY).matches ? fullOnPhone(location) : undefined;
+  if (to !== undefined) history.replaceState(history.state, "", to);
+  if (!holdsChat(location.pathname)) return;
   if (!asksFull(new URLSearchParams(location.search))) return;
   document.documentElement.dataset["chat"] = "full";
 }

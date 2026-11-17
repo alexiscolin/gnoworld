@@ -60,4 +60,45 @@
     max-block-size: 44dvb;
     overflow: auto;
   }
+
+  /* A phone: the composer clears the home indicator (no inset while the keyboard is up). */
+  @media (width < 900px) {
+    /* A pill is a finger's height; the row's step keeps one off the next. */
+    .pinned > * {
+      block-size: var(--control-m);
+    }
+
+    /* The pills stay on one line that scrolls across inside the bar (no bar drawn), never a second row. */
+    .bar {
+      /* layout: one line, the cut pill saying there is more */
+      flex-wrap: nowrap;
+      overflow: auto hidden;
+      /* Room inside the clip for a pill's focus ring, taken back outside. */
+      padding-inline: var(--space-3xs);
+      padding-block-start: var(--space-3xs);
+      /* layout: the room above given back, so the bar keeps its place */
+      margin: calc(-1 * var(--space-3xs)) calc(-1 * var(--space-3xs)) 0;
+    }
+
+    /* The home bar's inset goes under the row of worlds while it shows (it pads itself: ChatScreen's --phone-worlds counts it), under the box only when the row is hidden. */
+    .dock {
+      padding-block-end: max(var(--space-s), calc(env(safe-area-inset-bottom) - var(--phone-worlds)));
+      /* a step less above, so the lines keep the room */
+      padding-block-start: var(--space-2xs);
+    }
+
+    /* The composer's edge on the lines' own (the chat's inset), its words a step in. */
+    .dock {
+      /* raw: no bleed past the dock's inset */
+      --box-bleed: 0px;
+      --box-in: var(--space-s);
+    }
+  }
+
+  /* A phone on its side: height is what is scarce, so the dock's top padding is a step smaller (MessageBox.module.css budgets it). */
+  @media (width < 900px) and (height < 500px) {
+    .dock {
+      padding-block-start: var(--space-2xs);
+    }
+  }
 }

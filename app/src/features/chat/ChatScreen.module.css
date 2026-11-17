@@ -18,7 +18,7 @@
   /* Where no dock holds the chat (under 1280 px) it fades in as it mounts, on the entering curve; beside a plate or alone over the scene the
      dock's glass fill-in does it (ui's Panel). */
   @media (width < 1280px) {
-    .screen:not([data-full]) {
+    .screen:not([data-full], [data-arrived]) {
       opacity: 1;
       transition: var(--transition-fade);
     }
@@ -102,6 +102,95 @@
     --chat-inset: var(--space-s);
   }
 
+  /* A phone's full chat (under 900 px): from under the shell header to the visual viewport's foot, which viewport.ts keeps in --chat-vh (the dynamic viewport's where
+     unset), so the on-screen keyboard never covers the composer; a header of 44 px rows (PhoneHeader.module.css, which also says where the
+     arrival's pill stands under it); and no room kept over the lines for a pill, which a phone's full chat never draws. */
+  @media (width < 900px) {
+    .screen[data-full] {
+      /* the layer starts under the shell header's row, which stays visible and pressable (shellHeader.module.css); past it, where the
+         keyboard has panned the page up, at the visual viewport's top */
+      --_top: calc(var(--flash-room) + max(var(--shell-head), var(--chat-vtop)));
+
+      inset-block-start: var(--_top);
+      /* down to the visual viewport's foot, held there at once whatever the top does (the keyboard's resize) */
+      inset-block-end: calc(100% - var(--chat-vtop) - var(--chat-vh));
+      block-size: auto;
+    }
+
+    /* A field's focus gives the header's room to the chat: its top slides up over it, short, as the band folds (PhoneBand.module.css).
+       Once arrived (its sheet may come after its first draw, and it would slide over the header then), never while the keyboard pans. */
+    .screen[data-full][data-arrived]:not([data-panned]) {
+      transition: inset-block-start calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+    }
+
+    /* The header holds the place band (PhoneBand.module.css), which has its own gutter, padding and rule. */
+    .screen[data-full][data-compact] [data-region="header"] {
+      padding: 0;
+      border-block-end: 0;
+    }
+
+    :root:has(.screen[data-full][data-compact]) {
+      --chat-head: 0px;
+    }
+
+    /* No pill over a phone's full chat (the page's banners are not drawn there), so no room kept for one. */
+    .screen[data-full][data-compact] [data-region="conversation"] {
+      padding-block-start: 0;
+    }
+
+    /* The band's place while its code comes (ChatTop.tsx): its height at rest (PhoneBand.module.css: a step, the place's 88 px, the rooms' row, a few
+       pixels and the rule), so the conversation does not move down as it arrives; one row on a short window. */
+    :root:has(.topWaiting) {
+      --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) * 3 + var(--line-width));
+    }
+
+    @media (height < 500px) {
+      :root:has(.topWaiting) {
+        --phone-band: calc(var(--space-2xs) * 2 + var(--control-m) + var(--line-width));
+      }
+    }
+
+    .topWaiting {
+      /* layout: reserved room, nothing drawn */
+      display: block;
+      block-size: var(--phone-band);
+    }
+
+    /* The row of worlds at the foot (PhoneWorlds.tsx, about 75 px: its planet, its name, its padding and rule, and the home bar's inset):
+       its room is kept while its code comes. --phone-worlds is what MessageBox's field cap counts. Nothing while a chat field has the focus
+       (the keyboard takes the foot), nor on a short window, where the rooms' drawer holds the worlds and the lines keep their height. */
+    .worlds {
+      /* layout: the foot of the conversation, never squeezed */
+      flex: none;
+      min-block-size: var(--phone-worlds);
+    }
+
+    :root:has(.worlds) {
+      --phone-worlds: calc(
+        var(--control-m) + var(--space-xs) + var(--space-2xs) * 2 + var(--space-xs) + var(--line-width) +
+          env(safe-area-inset-bottom)
+      );
+    }
+
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) {
+      --phone-worlds: 0px;
+    }
+
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) .worlds {
+      display: none;
+    }
+
+    @media (height < 500px) {
+      .worlds {
+        display: none;
+      }
+
+      :root:has(.worlds) {
+        --phone-worlds: 0px;
+      }
+    }
+  }
+
   .rail {
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
@@ -110,5 +199,23 @@
   /* The place's bar over the search panel: the inset the info panel gives it, so its buttons stay where they were. */
   .bar {
     padding: var(--chat-panel-inset) var(--chat-panel-inset) 0;
+  }
+
+  /* While a chat's field has the focus on a phone, the keyboard takes the screen's foot: the chat takes the shell header's room back
+     (--shell-head, shellHeader.module.css) and covers it until the field lets go, so the lines and Send keep theirs. */
+  @media (width < 900px) {
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) {
+      --shell-head: 0px;
+    }
+
+    /* The header stays drawn under the sliding chat, hidden at the slide's end. */
+    header:not([data-chat-screen] *) {
+      transition: visibility calc(var(--motion-base) * var(--motion-scale));
+    }
+
+    /* ... and the header (the page's one outside the chat) is neither seen, focused nor tapped meanwhile. */
+    :root:has([data-chat-screen] :is(textarea, input, [role="textbox"]):focus) header:not([data-chat-screen] *) {
+      visibility: hidden;
+    }
   }
 }

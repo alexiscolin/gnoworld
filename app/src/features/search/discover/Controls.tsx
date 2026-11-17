@@ -31,6 +31,7 @@ export function Controls({ discovery }: { discovery: Discovery }) {
       <Stack space="2xs">
         {/* The styles' chips are a phone's way to the styles' shelves, which the column at the left offers on a computer. */}
         <div className={styles["styleChips"]}>
+          {/* One row that scrolls across, its cut edge fading (the scroll-row utility, as the lenses): never two or three rows at 320 px. */}
           <div className="scroll-row">
             {STYLES.filter(({ id }) => id !== "lab").map(({ id, label }) => (
               <span key={id}>

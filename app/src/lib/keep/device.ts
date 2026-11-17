@@ -25,6 +25,9 @@ const Count = z.int().check(z.minimum(0), z.maximum(100_000));
 /** A retired field (the reminders): its key is removed on the device's first read. */
 const RETIRED = "gnoworld:device:reminders";
 
+/** A retired setting (the phone's 3D): dropped on read, so a device that held it clears its key at the defaults. */
+const RETIRED_SETTINGS = ["phone3d"];
+
 const Quality = z.enum(["auto", "high", "low"]);
 /** The settings (ADR-0002 §1, Menu and settings): each has its default when the device holds none. */
 const SETTINGS = {
@@ -32,8 +35,6 @@ const SETTINGS = {
   quality: Quality,
   /** Reduce animations even where the system does not ask it. */
   calm: z.boolean(),
-  /** The 3D on a phone, where the list is the default. */
-  phone3d: z.boolean(),
   /** The language the room's lines are translated into. */
   language: z.enum(JARVIS_LANGUAGES),
   /** Whether the lines on screen are translated as they come. */
@@ -95,6 +96,7 @@ const CODECS: { [K in DeviceField]: Codec<DeviceFields[K]> } = {
       const value = { ...DEFAULT_SETTINGS };
       const strange: Record<string, unknown> = {};
       for (const [key, held] of Object.entries(raw)) {
+        if (RETIRED_SETTINGS.includes(key)) continue;
         const schema = Object.hasOwn(SETTINGS, key) ? SETTINGS[key as keyof Settings] : undefined;
         const read = schema?.safeParse(held);
         if (read?.success === true) Object.assign(value, { [key]: read.data });

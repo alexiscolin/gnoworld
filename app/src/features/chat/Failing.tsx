@@ -1,6 +1,7 @@
 // What a lazy chunk's failure is held by: a chunk that could not be fetched leaves its own place alone, never the page.
 // The lazy component keeps its failure for good, so `renew` makes it anew for the next time it is drawn.
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { useInPageSheet } from "./placePage.ts";
 
 interface FailingProps {
   /** What stands in the chunk's place once it failed, given the failure. */
@@ -24,6 +25,11 @@ export class Failing extends Component<FailingProps, { failure: { error: unknown
   }
 }
 
+// A plate waiting for its chunk in a phone's page sheet says so (its `waiting` stays nothing on a computer's page).
+function Waiting({ children }: { children: ReactNode }) {
+  return useInPageSheet() && children === null ? <p role="status">Loading the page…</p> : children;
+}
+
 /** A component whose code is asked when it is first drawn: while it comes `waiting` stands in its place, and when it cannot be
  * fetched `failed` does, given the failure, the page standing. The next time it is drawn, its code is asked again. */
 export function chunked<Props extends object>(
@@ -39,7 +45,7 @@ export function chunked<Props extends object>(
           Lazy = lazy(load);
         }}
       >
-        <Suspense fallback={waiting}>
+        <Suspense fallback={<Waiting>{waiting}</Waiting>}>
           <Lazy {...(props as Props & React.JSX.IntrinsicAttributes)} />
         </Suspense>
       </Failing>

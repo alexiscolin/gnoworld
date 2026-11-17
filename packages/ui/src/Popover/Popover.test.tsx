@@ -379,6 +379,66 @@ describe("Menu", () => {
   });
 });
 
+describe("Menu, its note", () => {
+  const items = [
+    { label: "Copy", onSelect: vi.fn() },
+    { label: "Report", onSelect: vi.fn() },
+  ];
+  const noted = async (note?: string) => {
+    render(<Menu trigger="More" label="Actions" items={items} note={note} />);
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    return screen.getByRole("menu");
+  };
+
+  it("draws it atop the items, outside them, as the menu's description", async () => {
+    const menu = await noted("Use a computer.");
+    const note = menu.firstElementChild;
+    expect(note?.textContent).toBe("Use a computer.");
+    expect(note?.id).not.toBe("");
+    expect(menu.getAttribute("aria-describedby")).toBe(note?.id);
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+  });
+
+  it("says nothing of a description, and draws no note, without one", async () => {
+    const menu = await noted();
+    expect(menu.hasAttribute("aria-describedby")).toBe(false);
+    expect(menu.querySelector("p")).toBeNull();
+  });
+
+  it("focuses its first item as it opens, never the note, and the arrows pass over the note", async () => {
+    await noted("Use a computer.");
+    const [copy, report] = screen.getAllByRole("menuitem");
+    expect(document.activeElement).toBe(copy);
+    await userEvent.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(report);
+    await userEvent.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(copy);
+  });
+
+  it("gives each menu's note an id of its own", () => {
+    render(
+      <>
+        <Menu trigger="One" label="One" items={items} note="a" />
+        <Menu trigger="Two" label="Two" items={items} note="b" />
+      </>,
+    );
+    const ids = screen.getAllByRole("menu", { hidden: true }).map((menu) => menu.getAttribute("aria-describedby"));
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).not.toBe("");
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  // The menu closes for a press on a button only (its onClickCapture): the note is no button, so a tap on it does nothing.
+  it("is no control: a click on it leaves the menu open and acts on nothing", async () => {
+    const onSelect = vi.fn();
+    render(<Menu trigger="More" label="Actions" items={[{ label: "Copy", onSelect }]} note="Use a computer." />);
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    await userEvent.click(screen.getByText("Use a computer."));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
 // The composer's link tool: its trigger a tool of the format bar, as the bar's other tools.
 it("draws an icon trigger as a bar's tool when its icon says so", () => {
   render(
@@ -406,6 +466,20 @@ describe("Menu, a choice among items", () => {
     expect(screen.getByRole("menuitemradio", { name: "Onyx" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("menuitemradio", { name: "gno.land" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("menuitem", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("draws a check on the chosen item alone, hidden from a screen reader (its radio says it)", async () => {
+    await opened([
+      { label: "Onyx", checked: true, onSelect: vi.fn() },
+      { label: "gno.land", checked: false, onSelect: vi.fn() },
+    ]);
+    const rows = screen.getAllByRole("menuitemradio");
+    expect(rows.map((each) => each.querySelector("[aria-hidden='true'] svg") !== null)).toEqual([true, false]);
+  });
+
+  it("names an item with a note by both, apart", async () => {
+    await opened([{ label: "Onyx", note: "Testnet", checked: true, onSelect: vi.fn() }]);
+    expect(screen.getByRole("menuitemradio", { name: "Onyx, Testnet" })).toBeTruthy();
   });
 
   it("marks its trigger busy, with a spinner, while busy: it stays in view when an act closes the panel", () => {

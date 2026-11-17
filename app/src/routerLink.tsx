@@ -1,8 +1,10 @@
 // The design system's links to the site's own paths follow the router: the page changes, never
 // reloads. The shell hands it to ui's link slot, in Layout, so the root's error boundary has it.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { LinkProvider, type PageLinkProps } from "@gnoworld/ui";
 import { createContext, use, type ReactNode } from "react";
 import { Link } from "react-router";
+import { useMedia } from "./features/chat/useMedia.ts";
 import { fullChatHref } from "./fullChat.ts";
 import { isPagePath } from "./pagePath.ts";
 
@@ -21,9 +23,11 @@ export function FullChatLinks({ children, full }: { children?: ReactNode; full: 
 
 /** The slot, filled: a link to a page goes through the router, one to a file of the site stays an anchor. */
 export function AppLinks({ children }: { children: ReactNode }) {
+  // A phone is the full chat only: every link to a place opens it full, from a page with no chat too (false while hydrating).
+  const phone = useMedia(PHONE_QUERY);
   return (
     <LinkProvider link={RouterLink} pages={isPagePath}>
-      {children}
+      <FullChatLinks full={phone}>{children}</FullChatLinks>
     </LinkProvider>
   );
 }

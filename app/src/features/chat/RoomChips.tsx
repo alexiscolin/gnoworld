@@ -2,6 +2,7 @@
 // lines, the most active, as many as the row's width holds, and a last "+N" chip that opens the rooms' view the header's name opens. One link
 // to each, the one in view cream, a count after the one that holds something unseen, a "+" to make one for an account on the Earth.
 // The full chat has its column, a phone its drawer; this row is the dock's.
+import { PHONE_QUERY } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Chip, Cluster } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { useFull } from "./full.ts";
 import { NewRoom, useMayMakeRoom } from "./NewRoom.tsx";
 import { distinctLabels, roomHref } from "./names.ts";
 import { chipsFit, pickRooms } from "./roomChipsPick.ts";
+import { useMedia } from "./useMedia.ts";
 import { badged } from "./unread.ts";
 import styles from "./RoomChips.module.css";
 
@@ -18,6 +20,8 @@ export interface RoomChipsProps {
   current: string | undefined;
   /** What each room holds unseen; none for none. */
   badges?: Readonly<Record<string, number>> | undefined;
+  /** Where a phone is the window (the default): the one room of a place with one is drawn, as the chip in view, so the row says where the field writes. */
+  lone?: boolean;
 }
 
 // What the "+N" chip takes before it is drawn once.
@@ -48,8 +52,9 @@ function useFitting(shown: boolean, said: string) {
   return { rowRef, fit };
 }
 
-export function RoomChips({ sections, current, badges }: RoomChipsProps) {
+export function RoomChips({ sections, current, badges, lone }: RoomChipsProps) {
   const full = useFull();
+  const phone = useMedia(PHONE_QUERY);
   const make = useMayMakeRoom(sections);
   // A room with no address (a realm world's) is no shortcut.
   const links = new Map(
@@ -63,8 +68,8 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
   const listed = sections.flatMap((section) => section.rooms).filter(({ room }) => links.has(room));
   const rooms = pickRooms(listed, current, badges);
   const labels = distinctLabels(listed);
-  // One room is the header's name already: the row shows a choice, or nothing.
-  const drawn = listed.length >= 2 || make;
+  // One room is the header's name already: the row shows a choice, or nothing; a phone's band has no such name beside it, so it shows it.
+  const drawn = listed.length >= 2 || make || ((lone ?? phone) && listed.length === 1);
   const { rowRef, fit } = useFitting(drawn, rooms.map((room) => `${room}${String(badges?.[room])}`).join());
   if (!drawn) return null;
   const shown = fit ?? rooms.length;
@@ -81,6 +86,7 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
                 href={links.get(room) ?? ""}
                 size="chip"
                 selected={room === current}
+                countTone="new"
                 {...(unseen?.count === undefined ? {} : { count: unseen.count })}
                 {...(unseen === undefined ? {} : { label: `${labels.get(room) ?? room}, ${unseen.said}` })}
               >
