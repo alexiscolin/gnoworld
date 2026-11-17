@@ -5097,6 +5097,13 @@ for v in 4.0.8 5.0.0 4.0.7-beta.1; do
 done
 lock picomatch@2.3.1
 audit "{\"picomatch\":[$redos]}" 2026-12-18 || fail "the waiver refused picomatch 2.3.1, under 4.0.7"
+lock tool@1.2.0
+audit "{\"picomatch\":[$redos]}" 2026-12-18 && fail "the waiver held with no picomatch locked"
+# Outside tests the waiver is judged on the machine's own day, not on one written in.
+lock picomatch@4.0.7
+printf '{"picomatch":[%s]}' "$redos" >"$au/answer.json"
+out=$(cd "$au" && AUDIT_ANSWER="$au/answer.json" python3 -I "$here/audit.py" 2>&1)
+printf '%s' "$out" | grep -qF "judged on $(date +%F)" || fail "audit judged the waiver on another day than today: $out"
 fi
 
 if part push_range; then

@@ -51,7 +51,7 @@ except (OSError, ValueError) as e:
 
 let = [f"{name}: {a.get('url')}" for name, advisories in sorted(answer.items()) for a in advisories if waived(name, a)]
 if let:
-    print(f"audit: let through until {WAIVED[3]}:", *let, sep="\n  ", file=sys.stderr)
+    print(f"audit: let through until {WAIVED[3]}, judged on {today}:", *let, sep="\n  ", file=sys.stderr)
 answer = {name: [a for a in advisories if not waived(name, a)] for name, advisories in answer.items()}
 found = [f"{name}: {a.get('severity')}: {a.get('title')} ({a.get('vulnerable_versions')}) {a.get('url')}"
          for name, advisories in sorted(answer.items()) for a in advisories if a.get("severity") in SEVERE]
