@@ -104,12 +104,72 @@ test.describe("on a phone", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
   test("logs in on a computer only: no login button, and the words that say so", async ({ page }) => {
-    await adena(page);
+    // No Adena found (a phone has none): the menu says so; where Adena is found its Connect is a row of the menu instead.
     await page.goto("/");
     await hydrated(page);
-    await expect(page.getByText("To log in, use a computer; once logged in you can write from here.")).toBeVisible();
+    // A phone's header keeps the account's way in its menu: the words stand there.
+    await page.getByRole("button", { name: "Menu" }).tap();
+    await expect(
+      page.getByRole("menu").getByText("To log in, use a computer; once logged in you can write from here."),
+    ).toBeVisible();
     await expect(connectButton(page)).toBeHidden();
   });
+});
+
+// A touch tablet keeps the words in the header from 900 px; under it the words move into the guest's menu (LoginView.module.css).
+const USE_A_COMPUTER = "To log in, use a computer; once logged in you can write from here.";
+for (const [width, here] of [
+  [899, "the menu"],
+  [900, "the header"],
+] as const) {
+  test.describe(`a touch screen ${String(width)} px wide`, () => {
+    test.use({ hasTouch: true, viewport: { width, height: 844 } });
+
+    test(`says to use a computer in ${here}`, async ({ page }) => {
+      // A screen with no Adena is told to use a computer; where Adena is found the menu holds its Connect instead.
+      if (width >= 900) await adena(page);
+      await page.goto("/");
+      await hydrated(page);
+      const words = page.getByRole("banner").getByText(USE_A_COMPUTER);
+      await expect(words).toHaveCount(1);
+      if (width < 900) await expect(words).toBeHidden();
+      else await expect(words).toBeVisible();
+      await page.getByRole("button", { name: "Menu" }).tap();
+      const note = page.getByRole("menu").getByText(USE_A_COMPUTER);
+      if (width < 900) await expect(note).toBeVisible();
+      else await expect(note).toHaveCount(0);
+    });
+  });
+}
+
+// Get started's steps read at the body size on a phone's width and the reading size from 900 px (GetStarted.module.css).
+for (const [width, size] of [
+  [390, "14px"],
+  [900, "13px"],
+] as const) {
+  test(`draws Get started's steps in ${size} at ${String(width)} px`, async ({ page }) => {
+    // Opened at a computer's width (a phone's header has no Connect where Adena is absent), then narrowed to the width read.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await hydrated(page);
+    await connectButton(page).click();
+    await page.setViewportSize({ width, height: 800 });
+    const steps = page.getByRole("dialog", { name: "Get started" }).getByRole("list").first();
+    await expect(steps).toBeVisible();
+    expect(await steps.evaluate((el) => getComputedStyle(el).fontSize)).toBe(size);
+  });
+}
+
+// Where Adena is found a phone's menu holds Connect as a row: it stays a 44 px target.
+test("draws the header's Connect Adena 44 px tall at 390 px", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await adena(page);
+  await page.goto("/");
+  await hydrated(page);
+  await page.getByRole("button", { name: "Menu" }).click();
+  expect((await page.getByRole("menuitem", { name: /^Connect Adena/ }).boundingBox())?.height).toBeGreaterThanOrEqual(
+    44,
+  );
 });
 
 // The way out is in the account's menu, which a phone given a computer's session must still reach.

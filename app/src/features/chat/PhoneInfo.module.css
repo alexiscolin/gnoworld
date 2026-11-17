@@ -1,0 +1,95 @@
+/* The phone's sheet: ui's whole-screen dialog (wide="screen") holds it; the info panel's own inset is the column's, the dialog's
+   padding is the sheet's. */
+@layer components {
+  /* The sheet is as wide as the dialog's padding box and no wider: every rule and row keeps the same inset at both ends. */
+  .sheet {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow: clip visible;
+  }
+
+  /* One ground from the title to the foot, the plate's tint; its muted grey measures 6.28:1, under the 6.3:1 floor: the soft grey, for the head's kicker too. */
+  @media (width < 900px) {
+    .swipe dialog {
+      --color-surface: var(--color-plate);
+      --color-text-muted: var(--color-text-soft);
+    }
+  }
+
+  /* The sheet's page, then its foot (the info), a step apart; the plate's fill runs out to the sheet's edges by one inset, and its own inner padding
+     keeps its words on the title's line. */
+  @media (width < 900px) {
+    .sheet {
+      --_inset: var(--space-s);
+
+      max-inline-size: none;
+      /* layout: the plate and the foot in one column */
+      display: flex;
+      /* layout: stacked */
+      flex-direction: column;
+      /* layout: the plate and the foot a step apart */
+      row-gap: var(--space-s);
+      /* The sheet's box reaches the screen's edges by one inset, inside its clip, where the plate's fill ends. */
+      /* layout: out to the screen's edge */
+      margin-inline: calc(-1 * var(--_inset));
+      padding-inline: var(--_inset);
+    }
+
+    .sheet [data-look="plate"] {
+      /* layout: the fill out to the screen's edge */
+      margin-inline: calc(-1 * var(--_inset));
+    }
+
+    /* A sheet has no bottom nav to leave room for, nor a line or corners: (0,2,1) beats Panel's (0,2,0) in any order. */
+    .sheet > section[data-look="plate"] {
+      padding-block-end: 0;
+      border: 0;
+      border-radius: 0;
+    }
+
+    /* A page opened from its URL holds its plates at opacity 0 till the arrival takes them (the ui's Panel, up to 6 s): the sheet's plate is
+       opened by a tap, long after, and shows at once. (html:root and :not([hidden]) lift the weight over the Panel's rule, `:root:not([data-live])`, whatever the sheets' order.) */
+    html:root .sheet [data-look="plate"]:not([hidden]) {
+      opacity: 1;
+      animation: none;
+    }
+  }
+
+  .sheet > aside {
+    padding: 0;
+    inline-size: 100%;
+  }
+
+  /* A hairline sets the foot apart from the plate. */
+  @media (width < 900px) {
+    .sheet > aside {
+      padding-block-start: var(--space-m);
+      border-block-start: var(--line-width) solid var(--color-line);
+    }
+  }
+
+  /* Landscape: one column, centred, so every block shares one left line. */
+  @media (width < 900px) {
+    .swipe dialog > * {
+      /* raw: the narrow plate's own width, Panel's 37.5 rem container query, less the sheet's two insets */
+      max-inline-size: calc(37.5rem - 2 * var(--space-s));
+      /* layout: the column centred */
+      margin-inline: auto;
+    }
+  }
+
+  /* The title row answers a swipe down (phoneSheet.ts): the browser leaves its vertical drag to the pointer events. */
+  .swipe dialog > * > :first-child {
+    touch-action: none;
+  }
+
+  /* The textures' credit at the sheet's foot: a plain muted link-look button, a 44 px row. */
+  .credits {
+    min-block-size: var(--control-m);
+    /* layout: the credits right under the links */
+    margin-block-start: calc(-1 * var(--space-s));
+    color: var(--color-text-muted);
+    /* layout: the credits' words on the foot's left line, as wide as they are */
+    align-self: flex-start;
+  }
+}

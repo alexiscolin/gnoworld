@@ -43,7 +43,11 @@ function End({ meta, badge }: Pick<Shared, "meta" | "badge">) {
         </span>
       )}
       {badge === undefined ? null : (
-        <span className={styles["badge"]} data-dot={badge.count === undefined ? "" : undefined}>
+        <span
+          className={styles["badge"]}
+          data-dot={badge.count === undefined ? "" : undefined}
+          data-unseen={badge.status === true ? undefined : ""}
+        >
           {badge.count === undefined ? null : <span aria-hidden="true">{badge.count}</span>}
           <span className="visually-hidden">{badge.said}</span>
         </span>

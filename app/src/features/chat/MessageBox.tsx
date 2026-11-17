@@ -1,10 +1,11 @@
 // The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' /, the
 // field's words, when it has some to say, and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
 import { Cluster, IconButton, type IconName } from "@gnoworld/ui";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import shared from "../../edge.module.css";
 import type { Format } from "./composer/kinds.ts";
 import { useFull } from "./full.ts";
+import { useKeepFocus } from "./keepFocus.ts";
 import styles from "./MessageBox.module.css";
 
 // The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
@@ -30,11 +31,19 @@ const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: 
 type LinkTool = (size: "xs" | "s") => ReactNode;
 
 // The format bar: each format of BAR, named, applied to the box's selection.
-function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: LinkTool | undefined }) {
+function FormatBar({
+  onFormat,
+  linkTool,
+  open,
+}: {
+  onFormat: (format: Format) => void;
+  linkTool: LinkTool | undefined;
+  open: boolean;
+}) {
   // Larger in the full chat, the screen its own.
   const tools = useFull() ? "s" : "xs";
   return (
-    <div role="group" aria-label="Format" className={styles["format"]}>
+    <div role="group" aria-label="Format" className={styles["format"]} data-open={open ? "" : undefined}>
       <Cluster space="3xs">
         {BAR.map((group, at) => (
           <Fragment key={group[0]?.format}>
@@ -91,11 +100,39 @@ export function MessageBox({
   quick?: ReactNode;
   children: ReactNode;
 }) {
+  // A phone folds the bar behind one control (MessageBox.module.css): its nine tools at 44 px fill two rows of a short screen.
+  const [folded, setFolded] = useState(false);
+  const keep = useKeepFocus();
   return (
-    <div role="group" aria-label="Message box" className={[shared["edge"], styles["box"]].join(" ")}>
-      {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} />}
+    <div
+      role="group"
+      aria-label="Message box"
+      className={[shared["edge"], styles["box"]].join(" ")}
+      // A press on the box's own buttons keeps the field focused: a phone folds the shell header while it is, and Send would move
+      // from under the finger at the blur, before the click. Also keeps the on-screen keyboard up after a send.
+      {...keep}
+    >
+      {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} open={folded} />}
       <div className={styles["field"]}>{children}</div>
-      {quick === undefined ? null : <div className={styles["acts"]}>{quick}</div>}
+      {quick === undefined && onFormat === undefined ? null : (
+        <div className={styles["acts"]}>
+          {quick}
+          {onFormat === undefined ? null : (
+            <span className={styles["fold"]}>
+              <IconButton
+                icon="bold"
+                label="Formatting"
+                size="s"
+                emphasis="plain"
+                expanded={folded}
+                onClick={() => {
+                  setFolded(!folded);
+                }}
+              />
+            </span>
+          )}
+        </div>
+      )}
       <span className={styles["send"]}>
         <IconButton solid type="submit" size="s" icon="arrow" label={send} disabled={!goes} />
       </span>

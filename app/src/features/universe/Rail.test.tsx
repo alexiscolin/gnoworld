@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, mount, nth, one } from "../../../tests/mount.tsx";
+import { hold, notify } from "../../../tests/railFeedFake.ts";
 import type { CosmosWorld } from "../../space/cosmosWorld.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Rail } from "./Rail.tsx";
@@ -45,25 +46,14 @@ const PLACES: RailPlaces = {
   worlds: [{ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }],
 };
 
-// The feed the rail reads (railFeed.ts): what `data` gives, and who listens.
+// The feed the rail reads (railFeed.ts), told by hand.
 type Data = Known | undefined;
-const feeding = vi.hoisted((): { held: Data; listeners: Set<() => void> } => ({
-  held: undefined,
-  listeners: new Set(),
-}));
-vi.mock("../../railFeed.ts", () => ({
-  subscribe: (listener: () => void) => {
-    feeding.listeners.add(listener);
-    return () => feeding.listeners.delete(listener);
-  },
-  data: () => feeding.held,
-  feed: () => undefined,
-}));
+vi.mock("../../railFeed.ts", () => import("../../../tests/railFeedFake.ts"));
 const KNOWN: Data = { worlds: WORLDS, signals: SIGNALS };
 const tell = (next: Data) => {
-  feeding.held = next;
+  hold(next);
   act(() => {
-    for (const listener of feeding.listeners) listener();
+    notify();
   });
 };
 
@@ -137,7 +127,7 @@ beforeEach(() => {
   resized.gone = 0;
 });
 afterEach(() => {
-  feeding.held = undefined;
+  hold(undefined);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();

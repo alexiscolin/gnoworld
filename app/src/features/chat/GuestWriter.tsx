@@ -1,12 +1,15 @@
 // A guest's composer: one plain line in the composer's box, Enter sending it as the account's does, said through the server, which judges it before the bot says it
 // as anon/<name>. The name is the visit's, asked as the reader first comes to the box; a refusal says why, in the field's own words.
 // Connect Adena stays beside it: an account keeps its name and does what a guest cannot.
+import { PHONE_QUERY } from "@gnoworld/core";
 import type { GuestCause } from "@gnoworld/schemas";
 import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useId, useRef, useState, type SubmitEvent } from "react";
 import { pageGuestApi, type Refused } from "../../lib/api/guest.ts";
 import { askFor } from "../../pageAsks.ts";
+import { useComputerNeeded } from "./computerNeeded.ts";
 import { MessageBox } from "./MessageBox.tsx";
+import { useMedia } from "./useMedia.ts";
 import { roomLabel } from "./names.ts";
 import styles from "./LogInToWrite.module.css";
 
@@ -40,6 +43,7 @@ const problemOf = (said: Refused): string => (said.cause === undefined ? reasonO
 
 // What an account has that a guest has not, said beside Connect Adena.
 const ADENA_GIVES = "With Adena, a gno.land name of your own, links, replies and reactions.";
+const PHONE_GUEST = "Guest · Connect for a name, links and reactions";
 
 // No guest name to be had: the server answers 404 where guests do not speak at all (GUEST_CHAT=off, or no moderation to judge them).
 const OFF = "Guests cannot speak on this server. Connect Adena to speak.";
@@ -85,13 +89,15 @@ function GuestField(props: {
   onDraft: (draft: string) => void;
 }) {
   const { label, draft, problem, onDraft } = props;
+  // A phone's box has no line saying who speaks: its placeholder does.
+  const asGuest = useMedia(PHONE_QUERY);
   return (
     <Field
       kind="lines"
       resizable={false}
       hideLabel
       label={`Message ${label}`}
-      placeholder={`Message ${label}`}
+      placeholder={asGuest ? `${label} as a guest` : `Message ${label}`}
       value={draft}
       invalid={problem !== undefined}
       describedBy={problem}
@@ -102,6 +108,7 @@ function GuestField(props: {
 
 export function GuestWriter({ room }: { room: string }) {
   const label = roomLabel(room);
+  const computer = useComputerNeeded();
   const guest = useGuestName();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -131,6 +138,7 @@ export function GuestWriter({ room }: { room: string }) {
   return (
     <form
       aria-label={`Write in ${label} as a guest`}
+      data-guest=""
       onSubmit={(event) => {
         send(event).catch(reportError);
       }}
@@ -155,23 +163,35 @@ export function GuestWriter({ room }: { room: string }) {
             {problem}
           </p>
         )}
-        <Cluster justify="between">
-          <span className="meta">
-            {guest.off
-              ? "Guests cannot speak here."
-              : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${ADENA_GIVES}`}
-          </span>
-          <Button
-            size="s"
-            icon="key"
-            onClick={() => {
-              askFor("log-in");
-            }}
-          >
-            Connect Adena
-          </Button>
-        </Cluster>
+        <GuestLine off={guest.off} name={guest.name} computer={computer} />
       </Stack>
     </form>
+  );
+}
+
+/** The line under a guest's box: who speaks and what Adena gives, with Connect Adena. A phone without Adena draws none: its placeholder
+ * says it speaks as a guest, the menu how to log in. */
+function GuestLine({ off, name, computer }: { off: boolean; name: string | undefined; computer: boolean }) {
+  // A phone's line is one short line, the way in a small control at its end (Alexis: "plus petit… sur une ligne").
+  const phone = useMedia(PHONE_QUERY);
+  if (computer && !off) return null;
+  const said = name === undefined ? "You speak as a guest." : `You speak as ${name}.`;
+  return (
+    <Cluster justify="between" wrap={phone ? "no" : "yes"} className={styles["way"]}>
+      <span className={phone ? "meta truncate" : "meta"}>
+        {off ? "Guests cannot speak here." : phone ? PHONE_GUEST : `${said} ${ADENA_GIVES}`}
+      </span>
+      {computer ? null : (
+        <Button
+          size="s"
+          icon="key"
+          onClick={() => {
+            askFor("log-in");
+          }}
+        >
+          Connect Adena
+        </Button>
+      )}
+    </Cluster>
   );
 }

@@ -6,9 +6,10 @@ import { useLocation, type MetaArgs } from "react-router";
 import { ErrorView, isMissing, RouteError, useWhere } from "../features/errors/index.ts";
 import { ecosystemMeta, failedPageMeta } from "../meta.ts";
 import { site } from "../places.ts";
+import { phoneAway } from "./phoneAway.ts";
 
 export function clientLoader({ request }: { request: Request }) {
-  return site.ecosystem(request);
+  return phoneAway(site.universeAt(new URL(request.url).pathname).home.path) ?? site.ecosystem(request);
 }
 
 export function meta({ location, error }: MetaArgs) {

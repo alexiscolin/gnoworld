@@ -82,7 +82,7 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
               <LineView key={line.id} line={line} me={me} members={known} {...BARE_ROW} inThread />
             ))}
           </ol>
-          {composer}
+          <div className={styles["composer"]}>{composer}</div>
         </Stack>
       </div>
     </aside>

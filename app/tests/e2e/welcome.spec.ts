@@ -10,9 +10,10 @@ const shot = async (page: Page, name: string) => {
   await page.waitForTimeout(1500);
   if (SHOTS !== undefined) await page.screenshot({ path: `${SHOTS}/${name}.png` });
 };
+// A phone lands at `/` in the Earth's full chat, where its card is a sheet over the chat (D13729); a computer's full chat has none, so it starts on the Earth's page.
 async function first(page: Page, size: { width: number; height: number }) {
   await page.setViewportSize(size);
-  await page.goto("/earth");
+  await page.goto(size.width < 900 ? "/" : "/earth");
   await hydrated(page);
   await expect(card(page)).toBeVisible({ timeout: 20_000 });
 }

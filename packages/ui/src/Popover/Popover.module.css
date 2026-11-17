@@ -18,6 +18,18 @@
     --_w: var(--popover-wide);
   }
 
+  /* A phone: never taller than the visual viewport either, which the on-screen keyboard shortens (viewport.ts keeps --chat-vh there; the
+     dynamic viewport's height elsewhere). */
+  @media (width < 900px) {
+    .panel {
+      /* The screen's edge: 16 px in, as the page's own gutter (floating.ts reads it, as --_edge). */
+      --_edge: var(--space-s);
+
+      max-inline-size: calc(100% - 2 * var(--_edge));
+      max-block-size: min(calc(100% - 2 * var(--_edge)), calc(var(--chat-vh) - 2 * var(--_edge)));
+    }
+  }
+
   .panel[data-kind="menu"] {
     --_w: max-content;
 
@@ -44,7 +56,7 @@
   }
 
   /* An act with an icon before its words; an irreversible one coral, its alert icon first. */
-  .item:has(svg) {
+  .item:has(> svg) {
     /* layout: the icon and the words on one line, as in a button */
     display: flex;
     /* layout: the icon's distance from its words */
@@ -57,6 +69,11 @@
     color: var(--color-danger);
   }
 
+  /* A choice's check is a phone's: its slot, filled for the one chosen, before the words. */
+  .check {
+    display: none;
+  }
+
   /* An act yet to come: ComingSoon's greyed look, its "Soon" at the row's end, no fill under the pointer. */
   .item[aria-disabled="true"] {
     --lit-fill: transparent;
@@ -67,6 +84,98 @@
     margin-inline-start: auto;
     /* layout: a gap off the words, kept where the row is as wide as its words */
     padding-inline-start: var(--space-s);
+  }
+
+  /* The menu's note: a muted line over the rows, in their inset. */
+  .note {
+    padding: var(--space-2xs) var(--space-xs);
+  }
+
+  /* A phone: rows line up at one width, with room to breathe, the note set off by a rule. */
+  @media (width < 900px) {
+    .panel[data-kind="menu"] {
+      --_w: var(--popover-w);
+
+      padding: var(--space-2xs);
+    }
+
+    .item:has(> svg),
+    .item[role="menuitemradio"] {
+      /* layout: the icon's (or the check's) distance from its words, wider on a phone */
+      gap: var(--space-xs);
+    }
+
+    .item[role="menuitemradio"] {
+      /* layout: the check's slot and the words on one line */
+      display: flex;
+      /* layout: the check centred on the words' line */
+      align-items: center;
+    }
+
+    .check {
+      /* layout: the slot is an icon wide, empty or not, so the words start at one x */
+      display: inline-flex;
+      /* layout: it never shrinks under its icon */
+      flex: none;
+      inline-size: var(--icon-l);
+    }
+
+    /* One text line: a row with no icon or check steps in by their width when a sibling has one. */
+    .panel[data-kind="menu"]:has(.item > svg, .check) .item:not(:has(> svg, .check)) {
+      /* layout: the words start where the icons' rows' words do */
+      padding-inline-start: calc(var(--space-xs) + var(--icon-l) + var(--space-xs));
+    }
+
+    .note {
+      /* layout: the rule under the note, apart from the first row */
+      margin-block-end: var(--space-3xs);
+      border-block-end: var(--line-width) solid var(--color-line);
+    }
+
+    /* The page under the menu is dimmed, as beside the drawer; a tap on the scrim closes the popover. */
+    .panel[data-kind="menu"]::backdrop {
+      background: var(--color-scrim);
+    }
+
+    /* The networks are a group of their own: a rule before the first and after the last, the separator's look; held sideways, the
+       column gap parts the groups instead (below). */
+    @media (height >= 500px) {
+      .item:not([role="menuitemradio"]) + .item[role="menuitemradio"],
+      .item[role="menuitemradio"] + .item:not([role="menuitemradio"]) {
+        position: relative;
+        /* layout: room for the rule between the group and its neighbour */
+        margin-block-start: calc(2 * var(--space-3xs) + var(--line-width));
+      }
+
+      .item:not([role="menuitemradio"]) + .item[role="menuitemradio"]::before,
+      .item[role="menuitemradio"] + .item:not([role="menuitemradio"])::before {
+        content: "";
+        position: absolute;
+        inset: calc(-1 * (var(--space-3xs) + var(--line-width))) 0 auto;
+        block-size: var(--line-width);
+        background: var(--color-line);
+      }
+    }
+  }
+
+  /* A phone held sideways: two columns so no row is cut; the column gap parts the groups. */
+  @media (width < 900px) and (height < 500px) {
+    .panel[data-kind="menu"] {
+      --_w: calc(2 * var(--popover-w));
+
+      /* layout: two columns of rows, so no row is cut on a short screen */
+      columns: 2;
+      /* layout: the gap parts the groups */
+      column-gap: var(--space-2xs);
+    }
+
+    .panel[data-kind="menu"] > * {
+      break-inside: avoid;
+    }
+
+    .note {
+      column-span: all;
+    }
   }
 
   .separator {

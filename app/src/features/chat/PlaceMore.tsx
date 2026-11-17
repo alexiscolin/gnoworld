@@ -8,8 +8,11 @@ import { countriesHere } from "./Country.tsx";
 import { Figure } from "./Figure.tsx";
 import styles from "./PlaceInfo.module.css";
 
+export const countriesCount = (lines: readonly Line[], members: readonly string[]) =>
+  new Set(countriesHere(lines, members).values()).size;
+
 export function CountriesFigure({ lines, members }: { lines: readonly Line[]; members: readonly string[] }) {
-  const count = new Set(countriesHere(lines, members).values()).size;
+  const count = countriesCount(lines, members);
   return count === 0 ? null : <Figure value={count} caption={count === 1 ? "Country" : "Countries"} />;
 }
 
@@ -25,7 +28,7 @@ export function Links({ gnoweb, chainId }: { gnoweb: string | undefined; chainId
     <Cluster as="ul" space="xs">
       {links.map(({ label, href }) => (
         <li key={label}>
-          <a href={href} {...NEW_TAB} className="label">
+          <a href={href} {...NEW_TAB} className="label hit">
             <span className={styles["link"]}>
               {label}
               <Icon name="arrow-up-right" />

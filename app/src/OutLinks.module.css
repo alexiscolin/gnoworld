@@ -12,4 +12,17 @@
   a.out:hover {
     text-decoration-color: currentcolor;
   }
+
+  /* A phone's finger (utilities.css, .hit): the link is a box of its own, so the 44 px box has its height to stand on. */
+  @media (width < 900px) {
+    a.out {
+      display: block;
+    }
+
+    /* A row of them that wraps leaves no lone link on a row far from the rest. */
+    :has(> li > a.out) {
+      /* layout: the wrapped rows a step apart */
+      row-gap: var(--space-2xs);
+    }
+  }
 }

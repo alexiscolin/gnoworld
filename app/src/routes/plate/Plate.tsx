@@ -8,6 +8,7 @@ import type { RealmRollup } from "@gnoworld/schemas/indexer";
 import { Cell, Figures, Grid, Room, Stack } from "@gnoworld/ui";
 import { OutLinks } from "../../OutLinks.tsx";
 import { Around } from "./Around.tsx";
+import { useInPageSheet } from "../../features/chat/index.ts";
 import { Callers } from "./Callers.tsx";
 import { Calls } from "./Calls.tsx";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
@@ -24,14 +25,18 @@ const RealmView = lazy(() =>
   import("../../features/realms/RealmView.tsx").then((chunk) => ({ default: chunk.RealmView })),
 );
 
-// The figures band, and the line that says what the figures cannot.
+// The figures band, and the line that says what the figures cannot. In a phone's sheet who is here is said once, in the foot beside the people
+// it counts, and the note stands a small step under its band (the sheet's blocks are not a plate's zones apart).
 function Band({ figures, note }: PlateModel["figures"]) {
-  return (
+  const sheet = useInPageSheet();
+  const shown = sheet ? figures.filter(({ key }) => key !== "here") : figures;
+  const band = (
     <>
-      {figures.length === 0 ? null : <Figures label="Figures" figures={figures} />}
+      {shown.length === 0 ? null : <Figures label="Figures" figures={shown} />}
       {note === undefined ? null : <p className="meta">{note}</p>}
     </>
   );
+  return sheet ? <Stack space="2xs">{band}</Stack> : band;
 }
 
 // The rollup's calls per function, by name, for Try it's rows.
@@ -115,6 +120,8 @@ function Cards({ model }: { model: PlateModel }) {
 
 export function Plate({ model }: { model: PlateModel }) {
   const { lede, actions, talk, figures, links } = model;
+  // The sheet's foot holds View on gnoweb and Explorer: a second row of links here would say them twice.
+  const sheet = useInPageSheet();
   return (
     <Room key={model.actions.place.path} data-blocks="">
       <Pills lede={lede} />
@@ -122,7 +129,7 @@ export function Plate({ model }: { model: PlateModel }) {
         <Hero lede={lede} actions={actions} talk={talk} />
         <Band {...figures} />
         <Cards model={model} />
-        {links === undefined ? null : <OutLinks links={links} />}
+        {links === undefined || sheet ? null : <OutLinks links={links} />}
       </Stack>
     </Room>
   );

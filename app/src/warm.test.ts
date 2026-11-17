@@ -35,4 +35,19 @@ describe("the idle batch", () => {
     expect(loads.plates).toBe(0);
     expect(fetched).not.toHaveBeenCalled();
   });
+
+  // A phone shows a plate only in a sheet, never ahead: its chunks wait for the sheet; a computer's batch asks them.
+  it.each([
+    [true, 0],
+    [false, 3],
+  ])("on a phone: %s, asks %s plate chunks", async (phone, asked) => {
+    vi.stubGlobal("matchMedia", () => ({ matches: phone }));
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("no network")));
+    vi.resetModules();
+    loads.plates = 0;
+    const { warmBatch } = await import("./warm.ts");
+    await warmBatch({ kind: "world", id: "x" }, new AbortController().signal);
+    await vi.dynamicImportSettled();
+    expect(loads.plates).toBe(asked);
+  });
 });

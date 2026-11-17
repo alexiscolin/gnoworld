@@ -5,6 +5,7 @@ import { CORS, HOME, RPC } from "./govdaoChain.ts";
 import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { opened } from "./sceneStage.ts";
+import { openPlacePage, pageSheet } from "./realmRoom.ts";
 
 // GovDAO, a world with a realm: its page reads the realm's proposals from the chain, in the format
 // RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own comment). The page states no threshold, so the
@@ -53,8 +54,7 @@ const proposals = (page: Page) =>
 // GovDAO's page on the recorded chain, hydrated, its proposals read.
 async function openedWithProposals(page: Page): Promise<void> {
   await chain(page);
-  await page.goto("/w/govdao");
-  await hydrated(page);
+  await openPlacePage(page, "/w/govdao");
   await expect(proposals(page).getByRole("link", { name: /#37/ })).toBeVisible();
 }
 
@@ -66,11 +66,17 @@ for (const width of [390, 1280, 1728] as const) {
       page,
     }) => {
       await chain(page);
-      await page.goto("/w/govdao");
-      await hydrated(page);
+      // A phone has the plate in its page sheet, where "Read the proposals" opens the sheet's own page section.
+      await openPlacePage(page, "/w/govdao");
       const plate = page.locator("[data-look='plate']");
-      await expect(plate.getByRole("heading", { level: 1 })).toHaveText("GovDAO");
-      await expect(plate.getByRole("link", { name: "Read the proposals" })).toHaveAttribute("href", "/r/gov/dao");
+      // The sheet's title is the page's heading on a phone.
+      await expect(
+        width < 900 ? pageSheet(page).getByRole("heading", { level: 2 }) : plate.getByRole("heading", { level: 1 }),
+      ).toHaveText("GovDAO");
+      await expect(plate.getByRole("link", { name: "Read the proposals" })).toHaveAttribute(
+        "href",
+        width < 900 ? /sheet=page.*#page$/ : "/r/gov/dao",
+      );
       const card = proposals(page);
       const newest = card.getByRole("link", { name: /Set validator gno-core-validator-1 to voting power 60/ }).first();
       await expect(newest).toBeVisible();
@@ -90,8 +96,7 @@ for (const width of [390, 1280, 1728] as const) {
 
     test("says why when the chain does not answer, and links to the realm on gnoweb", async ({ page }) => {
       await chain(page, { down: true });
-      await page.goto("/w/govdao");
-      await hydrated(page);
+      await openPlacePage(page, "/w/govdao");
       const plate = page.locator("[data-look='plate']");
       await expect(plate.getByRole("alert")).toContainText("did not answer");
       await expect(plate.getByRole("link", { name: "Read them on gnoweb" })).toHaveAttribute(

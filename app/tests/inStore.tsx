@@ -16,10 +16,10 @@ function Held({ seen }: { seen: { store?: AppStore } }) {
 }
 
 /** `element` mounted in the store, once the page has read the device (or found it unreadable); its box, and its store. */
-export async function mountInStore(element: ReactElement): Promise<{ box: HTMLElement; store: AppStore }> {
+export async function mountInStore(element: ReactElement, entry = "/"): Promise<{ box: HTMLElement; store: AppStore }> {
   const seen: { store?: AppStore } = {};
   const box = mount(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <StoreProvider>
         <Held seen={seen} />
         {element}

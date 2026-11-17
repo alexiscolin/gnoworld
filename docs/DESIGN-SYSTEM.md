@@ -179,7 +179,8 @@ the brightest planet behind the header's pills.
   `caps` utility, the capitals alone. Units and domains inside a label keep their case, and both
   utilities reset the case and the tracking under `:lang()` for scripts that caps break (Arabic,
   Hebrew, Persian…).
-- 11 px is the floor; nothing is smaller.
+- 11 px is the floor; nothing is smaller. Under 900 px the reading size (13 px) is: `--font-meta`, `--font-data`, `--font-hint` and
+  `--font-chip` take it, and the frames' 10 and 9 px mono (`--text-2xs`, `--text-3xs`) the label's 11 px, the one smaller size.
 - Two families, Geist and Geist Mono, self-hosted with `font-display: swap` and preloaded for the
   first screen; beyond the scripts Geist covers, a system fallback per script. The first paint is
   measured for layout shift.
@@ -366,7 +367,7 @@ component with its CSS Module, documented by its props.
 | `Popover` | anchored; plain or lazy trigger; an icon trigger, IconButton's plain look, a bar's tool when its `icon` says `tool`; `wide` (`--popover-wide`, 440 px, for a card of lists) | The native `popover` attribute; outside click and `Esc` close it |
 | `Listbox` | rows of a label and a muted hint; the picked row marked | The words that complete a field, on the floating surface (`Popover`'s): the field keeps the focus and the keys (`aria-controls`, `aria-activedescendant`), a press on a row picks it without taking the focus. The composer's `/`, `@` and `#` suggestions |
 | `Tooltip` | | On every icon-only control |
-| `Dialog` | standard, wide, sheet; from the start side (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. An optional `kicker` line above the title (the one label style, read with the description) and `hideClose` where the page draws another way out (Esc still closes). Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
+| `Dialog` | standard, wide, sheet, screen (`wide="screen"`: under 900 px the whole screen inside the notch and the bars, the standard width above; the phone's info and page sheets); from the start side (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. An optional `kicker` line above the title (the one label style, read with the description) and `hideClose` where the page draws another way out (Esc still closes). Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
 | `Panel` | docked, floating; the plate (world-tinted, dot grid, fading edge, a vertical caption) | Header (one height), body, footer; the plate and the chat dock are panels |
 | `Card` | header, body, actions; tones neutral and signal; dashed; compact; expand | Layout only. An article named by its header's title; one without a header (a call row's, which keeps its own heading) is named by nothing rather than by a missing id. Its kinds (message, call, digest, proposal, event, announcement, media, poll, quiz, seal) are assemblies in their features (ADR-0002 §4) |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
@@ -387,7 +388,7 @@ component with its CSS Module, documented by its props.
 | `EmptyState` | text and one action | Every list has one |
 | `Skeleton` | line, card, disc | Only where data takes longer than 300 ms |
 | `Logo` | mark, mark and wordmark | The header |
-| `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
+| `Menu` | a trigger of words or an icon; acts, one danger (coral, after a separator), one greyed as coming soon (`soon`, with a `why`); an optional `note` above the acts, its description, never an act (a guest's "use a computer" on a touch phone, D13718) | A list of acts under its trigger, in a `Popover`: the arrows, Home and End move among them, an act closes it first (WAI-ARIA's menu) |
 | `NavItem` | current; a lead, a badge, a meta; a link, a button, or coming soon | An item of a column of places, the full chat's rooms and direct messages: a pill that fills cream when it is the one in view |
 | `Breadcrumb` | a labelled trail of links ending on the current page | The video's kicker: the one label style, a dot in the world's colour, a chevron between steps |
 | `ComingSoon` | a name; an icon, words or both; sizes; or any children | What a later release brings, greyed and inert, "Coming soon" under the pointer and the focus, said so to a screen reader; it stays focusable and a click does nothing. The package's own parts wear it through `Soon`, which also takes a class (a `NavItem` that is yet to come), and the menu's greyed act wears its `soon` class: the grey is written once. The entry's `ComingSoon` takes no class |
@@ -505,11 +506,14 @@ Breakpoints, written in range syntax in a stylesheet: the phone's `(width < 900p
 `(width >= 900px)`, each other pair the same way (1280, 1340, 1400), so every width, 900 px itself and a
 fraction such as 899.5 included, falls on one side alone. The scripts' queries (`PHONE_QUERY`,
 `(max-width: 899px)`) agree with them at whole widths.
-- Under 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
-  are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
-  plate goes below the planet. The Earth alone keeps its chat a block of the page under the
-  globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
-  Credits.
+- Under 900 px: the phone is the full chat alone (ADR-0002 §8, row 10, amended; D13711). Home is
+  its hero and the worlds list; a place's link (a world, a realm, the Earth) opens its full chat;
+  the chat's header holds Back, Rooms (the rooms, then the worlds), Info and who is here; Info is
+  a sheet with the info column's content and the planet, drawn when it opens, and "Its page"
+  opens the place's own plate in a sheet. No 3D, no cosmos, no "View in space" until the phone's
+  3D pass. Every control is a 44 px target (`--control-m`), set under the phone's range alone.
+- 900 to 1279 px: the place's page with its chat a block, as before; the Earth keeps its chat a
+  block of the page under the globe, up to the dock's 1280 px.
 - 1280 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 
@@ -542,7 +546,8 @@ never the choice written again.
   - **Blocks** are the components, one CSS Module each, so class names never leak: no prefix,
     as the module renames each class with a hash; the utilities keep their plain names.
   - **Utilities** are single-purpose classes, driven by tokens, listed in
-    `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`,
+    `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`, `hit` (under 900 px an invisible
+    44 px box exactly as wide as its control, so neighbours never overlap: small buttons, chips, tabs, switches; D13718),
     `meta` (a secondary line) and `data-text` (figures or a path, broken anywhere), the rows
     `icon-text-meta` and `text-meta` (which `Grid`'s templates of those names add), among
     others, `lit` (the row's hover and current fill) and `dot` (a round mark in its tone; `--size-dot` its size, `--dot-gap` its step

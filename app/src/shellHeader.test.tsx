@@ -1,6 +1,11 @@
-import { Outlet, type RouteObject } from "react-router";
-import { describe, expect, test } from "vitest";
+// @vitest-environment jsdom
+import { act } from "react";
+import { MemoryRouter, Outlet, type RouteObject } from "react-router";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { mount, noObservers, popovers, settled } from "../tests/mount.tsx";
 import { render } from "../tests/render.tsx";
+import { USE_A_COMPUTER } from "./features/login/index.ts";
+import { StoreProvider } from "./storeContext.tsx";
 import Earth, { loader as earthLoader } from "./routes/earth.tsx";
 import { clientLoader as cosmosLoader } from "./routes/cosmos.tsx";
 import Home, { ErrorBoundary as HomeError, loader as homeLoader } from "./routes/home.tsx";
@@ -13,7 +18,7 @@ import { levelsOf } from "./shellWays.tsx";
 
 // The header as the video's frames 1, 20 and 37 show it: the logo, the views, the network named, "Testnet" on a testnet, search;
 // the chat is a control, and the passport's counter is not one.
-const inShell = (Page: () => React.JSX.Element) => () => (
+const inShell = (Page: () => React.JSX.Element | null) => () => (
   <Shell>
     <Page />
   </Shell>
@@ -167,15 +172,14 @@ describe("the header", () => {
     expect(mainnet).not.toContain("Testnet");
   });
 
-  // The video's search is the last of the views' pill, after a divider.
-  test("keeps search inside the views' pill, after the levels and the chat, and the wide one in the account's row", async () => {
+  // A phone has no views' pill to hold it: the one search is the account's row's, beside the bell.
+  test("keeps search in the account's row alone, none in the views' pill", async () => {
     const html = await header("/earth");
     const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
     expect(pill.indexOf("Earth")).toBeGreaterThan(0);
     expect(pill.indexOf(">Chat<")).toBeGreaterThan(pill.indexOf("Earth"));
-    expect(pill.match(/aria-label="Search"/g)).toHaveLength(1);
-    expect(pill.indexOf('aria-label="Search"')).toBeGreaterThan(pill.indexOf(">Chat<"));
-    expect(html.match(/aria-label="Search"/g)).toHaveLength(2);
+    expect(pill).not.toContain('aria-label="Search"');
+    expect(html.match(/aria-label="Search"/g)).toHaveLength(1);
   });
 
   // The chat full of the world in view, or of the Earth, is a control beside the World level, named for its world; no
@@ -241,5 +245,115 @@ describe("the header's Testnet, on a planted site", () => {
     const html = await headerOf("main");
     expect(html).toContain("Mainland");
     expect(html).not.toContain("Testnet");
+  });
+});
+
+// A phone's header is one line (the logo, search, bell, menu): the network and the way in live in the account's menu, where its words
+// ("To log in, use a computer…") stand where Adena is not found. The screen is stubbed as the query reads it, part by part.
+const api = vi.hoisted(() => ({ me: vi.fn(), logout: vi.fn(), challenge: vi.fn(), verify: vi.fn() }));
+vi.mock("./lib/api/login.ts", () => ({ pageLoginApi: () => api }));
+
+describe("the header's menu on a phone", () => {
+  beforeAll(() => {
+    popovers();
+    noObservers();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const screenOf = ({ width }: { width: number }) => {
+    vi.stubGlobal("reportError", vi.fn());
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(max-width: 899px)" && width < 900,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+  };
+  const withAdena = () => {
+    vi.stubGlobal("adena", { AddEstablish: () => undefined, version: "1.30.0" });
+  };
+  // A guest's header, its menu pressed open: the menu, once drawn.
+  async function guestMenu() {
+    api.me.mockResolvedValue({ ok: true, value: { address: null } });
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <ShellHeader universe={site.universeAt("/")} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    await settled(() => box.querySelector("button[aria-label='Menu']") !== null);
+    act(() => {
+      box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
+    });
+    await settled(() => box.querySelector("[role='menu']") !== null);
+    return box.querySelector("[role='menu']");
+  }
+  const items = (menu: Element | null | undefined) =>
+    [...(menu?.querySelectorAll("[role^='menuitem']") ?? [])].map((each) => each.textContent);
+
+  test("a phone with no Adena reads the words atop the menu, and no way in", async () => {
+    screenOf({ width: 390 });
+    const menu = await guestMenu();
+    expect(menu?.firstElementChild?.textContent).toBe(USE_A_COMPUTER);
+    expect(menu?.getAttribute("aria-describedby")).toBe(menu?.firstElementChild?.id);
+    expect(items(menu).join("|")).not.toContain("Connect Adena");
+  });
+
+  test("a narrow window where Adena is found offers Connect Adena in the menu, with no words", async () => {
+    screenOf({ width: 390 });
+    withAdena();
+    const menu = await guestMenu();
+    expect(items(menu)[0]).toBe("Connect Adena");
+    expect(menu?.textContent).not.toContain(USE_A_COMPUTER);
+  });
+
+  test("the menu holds the network, its switch the network menu's own, the current one checked", async () => {
+    screenOf({ width: 390 });
+    const menu = await guestMenu();
+    const radios = [...(menu?.querySelectorAll("[role='menuitemradio']") ?? [])];
+    expect(radios.map((each) => each.textContent.replace("Testnet", ""))).toEqual(
+      site.universes.map((each) => `Network: ${each.name}`),
+    );
+    expect(radios.filter((each) => each.getAttribute("aria-checked") === "true")).toHaveLength(1);
+  });
+
+  const headerOf = async (path: string) => {
+    api.me.mockResolvedValue({ ok: true, value: { address: null } });
+    const box = mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <ShellHeader universe={site.universeAt(path)} />
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+    await settled(() => box.querySelector("button[aria-label='Menu']") !== null);
+    return box;
+  };
+
+  test("a phone on a testnet keeps Testnet in the header, after the logo: the warm chip alone", async () => {
+    screenOf({ width: 390 });
+    const box = await headerOf("/");
+    const pill = box.querySelector("header [data-testnet]");
+    expect(pill?.previousElementSibling?.getAttribute("aria-label")).toBe("gnoworld");
+    expect(pill?.querySelector("[data-tone='warm']")?.textContent).toBe("Testnet");
+  });
+
+  test("a phone on mainnet, and a computer on a testnet, draw no such pill in the logo's place", async () => {
+    screenOf({ width: 390 });
+    expect((await headerOf("/net/gnoland")).querySelector("[data-testnet]")).toBeNull();
+    screenOf({ width: 1280 });
+    expect((await headerOf("/")).querySelector("[data-testnet]")).toBeNull();
+  });
+
+  test("a computer's menu has neither the words, the way in nor the network", async () => {
+    screenOf({ width: 1280 });
+    withAdena();
+    const menu = await guestMenu();
+    expect(menu?.textContent).not.toContain(USE_A_COMPUTER);
+    expect(items(menu).join("|")).not.toMatch(/Connect Adena|Network:/);
   });
 });

@@ -29,7 +29,7 @@ export function OtherSessions() {
   });
 
   return (
-    <Cluster space="xs">
+    <Cluster space="xs" wrap="scroll">
       <Button
         size="s"
         emphasis="quiet"

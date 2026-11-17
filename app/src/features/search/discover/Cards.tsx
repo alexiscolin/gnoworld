@@ -144,7 +144,14 @@ export function Grid({ rows, discovery }: { rows: readonly StoreRow[]; discovery
           <span className={["meta", styles["why"]].join(" ")} role="status">{`${String(rows.length)} realms`}</span>
         </div>
         {rows.length === 0 ? (
-          <EmptyState look="inline" line="Nothing here with these filters. Clear one of them." />
+          <EmptyState
+            look="inline"
+            line={
+              discovery.filters.size === 0
+                ? "No realm on this shelf yet."
+                : "Nothing here with these filters. Clear one of them."
+            }
+          />
         ) : (
           <Columns min="s" space="s">
             {rows.slice(0, GRID_MAX).map((row) => (

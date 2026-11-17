@@ -23,6 +23,19 @@
     padding: var(--space-m);
   }
 
+  /* A phone's floating panel is the whole screen (the bell's): no frame, no rounded corner at the screen's corners, the page's 16 px inset. */
+  @media (width < 900px) {
+    .panel[data-look="floating"] {
+      border-style: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .panel[data-look="floating"] .content {
+      padding: var(--space-s);
+    }
+  }
+
   /* The plate's blocks hold their own steps (Stack: 16 px inside a zone, --plate-zone between zones, the proposal's section 7); what stands at the
      plate's corner (its pills) takes the body for its box. */
   .body {
@@ -84,6 +97,10 @@
 
     /* The plain fill, no dot grid. */
     --_ground: var(--_fill);
+    /* Its cards' faint fill laid on what stands under them (in sRGB, as the wash composites): the plate's fill, or the scene's where
+       it paints the plate beside a planet (--plate-ground), so their words keep their contrast where the planet reaches under them. */
+    --color-card: color-mix(in srgb, var(--color-text) 3%, var(--plate-ground, var(--color-plate)));
+    --color-card-hover: color-mix(in srgb, var(--color-text) 6%, var(--plate-ground, var(--color-plate)));
 
     background: var(--_ground);
   }

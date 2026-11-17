@@ -45,6 +45,25 @@
     color: var(--color-text-faint);
   }
 
+  /* A phone's field is narrower than a long hint: the hint ends in an ellipsis, never cut mid-word. */
+  @media (width < 900px) {
+    .box {
+      text-overflow: ellipsis;
+      /* raw: iOS Safari zooms the page when it focuses a field under 16 px; no token holds a plain 16 px (--font-action is 500 over a line of 1) */
+      font-size: 1rem;
+    }
+
+    .box[data-shape="pill"] {
+      /* raw: the same, for the list's filter */
+      font-size: 1rem;
+    }
+
+    /* The input in a frame is a finger's height itself, the frame's edges outside it (a bare box's are inside its 44 px). */
+    .frame .box {
+      min-block-size: var(--control-m);
+    }
+  }
+
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls; a
      browser without field-sizing keeps the two rows of the markup. The handle moves its height alone. */
   textarea.box {
@@ -60,6 +79,13 @@
   textarea.box[data-fixed] {
     field-sizing: fixed;
     resize: none;
+  }
+
+  /* A phone's fixed box grows with its draft up to the cap, as a box of lines does (a guest's field). */
+  @media (width < 900px) {
+    textarea.box[data-fixed] {
+      field-sizing: content;
+    }
   }
 
   /* With a prefix the frame is the one box; the input inside is bare, and the ring is the frame's, around the prefix too. */

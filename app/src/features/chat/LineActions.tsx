@@ -3,7 +3,7 @@
 // account, Edit and, on the reader's own line, Delete, asked first.
 import { canEdit, type Line, type Shown } from "@gnoworld/core";
 import { Menu } from "@gnoworld/ui";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import styles from "./LineActions.module.css";
 import { AskDelete } from "./AskDelete.tsx";
 import { AskModerate } from "./AskModerate.tsx";
@@ -117,6 +117,23 @@ function Moderating({
   );
 }
 
+// The More menu, in a holder that stays at the end of a phone's scrolling bar (LineActions.module.css).
+function More({ items, at }: { items: ComponentProps<typeof Menu>["items"]; at: LineActionsProps["menuAt"] }) {
+  return (
+    <span className={styles["more"]}>
+      <Menu
+        trigger="More actions"
+        icon="more"
+        emphasis="plain"
+        size="xs"
+        label="Message actions"
+        items={items}
+        at={at}
+      />
+    </span>
+  );
+}
+
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
 export function LineActions({
@@ -182,15 +199,7 @@ export function LineActions({
       <Reacting given={given} onReact={onReact} onNeed={needs} />
       <Shortcuts {...{ line, dm, onCopy, onThread, onNeed: needs, onReply }} />
       <PinButton line={line} pin={keeping?.pin} />
-      <Menu
-        trigger="More actions"
-        icon="more"
-        emphasis="plain"
-        size="xs"
-        label="Message actions"
-        items={items}
-        at={menuAt}
-      />
+      <More items={items} at={menuAt} />
       <Moderating
         line={line}
         act={moderating}

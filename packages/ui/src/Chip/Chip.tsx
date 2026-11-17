@@ -2,8 +2,9 @@ import { pill } from "../Button/control.ts";
 import { Pressable } from "../Pressable.tsx";
 import { sightRef } from "../offscreen.ts";
 import styles from "./Chip.module.css";
+import badge from "../Button/Button.module.css";
 
-type Tone = "neutral" | "mine" | "warm" | "signal" | "danger";
+type Tone = "neutral" | "mine" | "warm" | "signal" | "danger" | "new";
 
 interface Mark {
   children: string;
@@ -14,6 +15,7 @@ interface Mark {
   popup?: never;
   selected?: never;
   count?: never;
+  countTone?: never;
   label?: never;
   size?: never;
   /** A dot in its ink before the words: what is live or quiet (the plate's status). */
@@ -30,6 +32,8 @@ interface Control {
   onClick: () => void;
   selected?: boolean;
   count?: number | string;
+  /** "new" draws the count in the coral of what is unseen (the bell's, the worlds' pill). */
+  countTone?: "mine" | "new";
   /** Its name, when its words and count do not say enough: a reaction's emoji, count and "including you". */
   label?: string;
   /** The smallest control's height, where many sit under a line (a reaction's, as Slack's and Discord's): the small one's otherwise; "chip", the dock's pill. */
@@ -50,6 +54,8 @@ interface Go {
   href: string;
   selected?: boolean;
   count?: number | string;
+  /** "new" draws the count in the coral of what is unseen (the bell's, the worlds' pill). */
+  countTone?: "mine" | "new";
   /** Its name, when its words and count do not say enough: the unseen count, in words. */
   label?: string;
   size?: "xs" | "s" | "chip";
@@ -63,14 +69,27 @@ interface Go {
 export type ChipProps = Mark | Control | Go;
 
 // The words, and the count after them: the flex row draws no space before it, so the name keeps one.
-function Words({ children, count }: { children: string; count: number | string | undefined }) {
+function Words({
+  children,
+  count,
+  countTone,
+}: {
+  children: string;
+  count: number | string | undefined;
+  countTone: "mine" | "new" | undefined;
+}) {
   return (
     <>
       {children}
       {count === undefined ? null : (
         <>
           {" "}
-          <span className={styles["count"]}>{count}</span>
+          <span
+            className={countTone === "new" ? `${String(badge["badge"])} ${String(styles["count"])}` : styles["count"]}
+            data-tone={countTone === "new" ? "new" : undefined}
+          >
+            {count}
+          </span>
         </>
       )}
     </>
@@ -114,6 +133,7 @@ export function Chip({
   popup,
   selected,
   count,
+  countTone,
   label,
   size,
   dot,
@@ -129,7 +149,7 @@ export function Chip({
     <Pressable
       href={href}
       onClick={onClick}
-      className={pill(styles["chip"])}
+      className={pill(styles["chip"], size === "chip" ? undefined : "hit")}
       data-tone={tone}
       data-size={size ?? "s"}
       aria-pressed={href === undefined ? selected : undefined}
@@ -138,7 +158,9 @@ export function Chip({
       aria-haspopup={popup}
       tabIndex={tabIndex}
     >
-      <Words count={count}>{children}</Words>
+      <Words count={count} countTone={countTone}>
+        {children}
+      </Words>
     </Pressable>
   );
 }

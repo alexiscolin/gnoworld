@@ -4,6 +4,7 @@ import { excerpt, foldEdits, reactionsOn, threadsOf, type Line, type Reaction } 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { noMedia } from "../../../tests/mount.tsx";
 import type { ChainHeard } from "../../store/chain.ts";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { Lines, type LinesProps } from "./Lines.tsx";
@@ -89,6 +90,8 @@ const point = (n: number) => {
 };
 
 beforeEach(() => {
+  // A chain card's heading level asks the window for a phone.
+  noMedia();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   // jsdom has no popover: a bar's tooltip toggles nothing.
   Object.assign(HTMLElement.prototype, { togglePopover: () => true });
@@ -101,6 +104,7 @@ afterEach(() => {
     root.unmount();
   });
   host.remove();
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 

@@ -4,7 +4,7 @@ import { box } from "./geometry.ts";
 import { countShifts, running, shifted, worldsDrawn } from "./sceneStage.ts";
 
 // The hero's number: the worlds the cosmos draws, read from the count the job writes beside the worlds' file, so a home whose scene
-// does not run keeps it (no WebGL; this browser's software GPU without `?test-gpu`) and a phone asks nothing of the cosmos before View in space.
+// does not run keeps it (no WebGL; this browser's software GPU without `?test-gpu`) and a phone asks nothing of the cosmos at all.
 // The host serves neither file (the job writes them): each test serves Onyx's recorded file and its count.
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const NUMBER = "[data-hero='number']";
@@ -95,42 +95,37 @@ for (const width of [390, 1280]) {
   });
 }
 
-// The phone rule: a phone gets nothing of the cosmos until View in space, the worlds' file included, and keeps its number all the same.
+// The phone rule (D13711): a phone is the full chat alone, so even where the scene could run (`?test-gpu`) it asks nothing of the cosmos, the
+// worlds' file included, has no View in space, and keeps its number all the same.
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test.describe.configure({ timeout: 180_000 });
-  // The home before View in space, its line as `line` says, and the scene's one read of the worlds' file once the button is pressed.
-  const beforeTheButton = async (page: Page, missing: boolean, line: string) => {
-    // A first visit's welcome card covers the button: it is told away.
+  const withNoSpace = async (page: Page, missing: boolean, line: string) => {
+    // A first visit's welcome card is not the page under test: it is told away.
     await page.addInitScript(() => {
       localStorage.setItem("gnoworld:welcomed", "1");
     });
     const file = await served(page, { missing });
     await page.goto("/?test-gpu");
     await hydrated(page);
-    const view = page.getByRole("button", { name: "View in space" });
-    await expect(view).toBeVisible();
     await expect(page.locator("h1")).toHaveText(line);
     await page.waitForLoadState("load");
+    await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
     expect(file.count()).toBe(1);
-    expect(file.worlds(), "no worlds' file before View in space").toBe(0);
-    await view.click({ timeout: 20_000 });
-    await running(page);
-    await expect.poll(() => file.worlds(), { timeout: 90_000 }).toBe(1);
-    await expect(page.locator(NUMBER)).toHaveText(COUNT);
+    expect(file.worlds(), "no worlds' file on a phone").toBe(0);
+    expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldSpace")), "no scene ran").toBe(false);
+    await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
   };
 
-  test("shows the number and asks no worlds' file before View in space, then the scene asks it once", async ({
-    page,
-  }) => {
-    await beforeTheButton(page, false, `${COUNT} worlds in Onyx`);
+  test("shows the number, with no View in space, and asks no worlds' file nor scene", async ({ page }) => {
+    await withNoSpace(page, false, `${COUNT} worlds in Onyx`);
+    await expect(page.locator(NUMBER)).toHaveText(COUNT);
   });
 
-  test("with no count served, names the worlds without a number and still asks no worlds' file before View in space", async ({
+  test("with no count served, names the worlds without a number and still asks no worlds' file nor scene", async ({
     page,
   }) => {
-    await beforeTheButton(page, true, "Worlds in Onyx");
+    await withNoSpace(page, true, "Worlds in Onyx");
   });
 });
 

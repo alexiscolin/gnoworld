@@ -66,16 +66,18 @@
     }
 
     /* Close, larger than the window, lit at three quarters: the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
-       height capping it past 16:10. Cropped by the window's edges, it stands over the plate's empty right margin, never under
-       its words, and the dock stands over it as dark glass. */
+       height capping it past 16:10; drawn 100 px left of that centre (D13732). Cropped by the window's edges, its limb reaches a little
+       under the plate's content, and the dock stands over it as dark glass. */
     .globe[data-framing] {
       /* raw: the study's centre, across */
-      --_x: 76vi;
+      --_study-x: 76vi;
       /* raw: the study's centre, down */
       --_middle: 68vb;
-      /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; held so that the disc's limb, drawn 1.04 radii out
-         (measured), stands a step (--space-m) right of the plate's content edge: over the plate's fade, never over its content */
-      --_radius: min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-m)) / 1.04);
+      /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; held so that, at the study's centre, the disc's limb,
+         drawn 1.04 radii out (measured), would stand a step (--space-m) right of the plate's content edge */
+      --_radius: min(37vi, 59vb, (var(--_study-x) - var(--_start) - var(--space-m)) / 1.04);
+      /* raw: Alexis's 100 px left of the study's centre, the same size (D13732): the limb up to 76 px under the content's edge */
+      --_x: calc(var(--_study-x) - 100px);
     }
 
     .globe {
@@ -91,6 +93,7 @@
        to the planet's space with no hole cut in another: the page's own fill, and its arrival, give way to it. */
     .globe:is([data-earth="drawn"], [data-world="drawn"]) + * {
       --plate-fill: hidden;
+      --plate-ground: var(--color-plate-scene);
     }
   }
 

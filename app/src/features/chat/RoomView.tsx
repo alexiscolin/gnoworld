@@ -4,7 +4,8 @@
 // the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import type { Line, Reacting, Reaction, Typing } from "@gnoworld/core";
+import { PHONE_QUERY, type Line, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
+import { EmptyState } from "@gnoworld/ui";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { lazy, Suspense, use, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
@@ -15,6 +16,7 @@ import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "./Failing.tsx";
 import { NO_ROOM_YET } from "./loginWords.ts";
+import { useMedia } from "./useMedia.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12). One boundary for every feature of a line.
@@ -141,6 +143,18 @@ function Lead({ status }: { status: ReactNode }) {
 /** What a page adds to the room in view (`Shown.view` gives the rest) before it gives its composer. */
 export type RoomViewOver = Pick<RoomViewProps, "chat"> & Partial<Omit<RoomViewProps, "room" | "composer" | "chat">>;
 
+// A room with no line: a computer says it in a word; a phone asks for the first line, in the design system's empty state.
+function Silence({ word }: { word: string }) {
+  const phone = useMedia(PHONE_QUERY);
+  return phone ? (
+    <div className={styles["lead"]}>
+      <EmptyState look="inline" title={word} line="Write the first line." />
+    </div>
+  ) : (
+    <p className={styles["lead"]}>{word}</p>
+  );
+}
+
 export function RoomView(props: RoomViewProps) {
   const { room, state, chat, composer, me, onDelete, onDismiss, onRead } = props;
   const { onReact, onReply, onThread, onEdit, partner } = props;
@@ -176,7 +190,7 @@ export function RoomView(props: RoomViewProps) {
         onThread={onThread}
         onEdit={onEdit}
       />
-      {connected && lines.length === 0 ? <p className={styles["lead"]}>{empty}</p> : null}
+      {connected && lines.length === 0 ? <Silence word={empty} /> : null}
       {/* A room's, whose place is kept so the composer never moves; a direct message tells none. */}
       {room === undefined ? null : <TypistsHere key={`${room} typing`} typing={typing} />}
       {composer}

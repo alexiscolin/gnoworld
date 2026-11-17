@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { PHONE_QUERY } from "@gnoworld/core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { all, button, click, mount, noMedia, one } from "../../../tests/mount.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 
 // The composer's one box (frame 23.58.01): a small format bar, the field, and at its foot a round Send alone (the @ and /
@@ -17,6 +18,11 @@ const draw = (over: Partial<Parameters<typeof MessageBox>[0]> = {}) =>
       <textarea aria-label="Message #games" />
     </MessageBox>,
   );
+
+beforeEach(noMedia);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("the composer's box", () => {
   it("is one group holding the format bar, the field and Send", () => {
@@ -58,12 +64,13 @@ describe("the composer's box", () => {
     expect(names.slice(4, 7)).toEqual(["Code", "Link tool", "Quote"]);
   });
 
-  it("holds Send alone at its foot: no @ nor / button", () => {
+  it("holds Send and the phone's format control at its foot: no @ nor / button", () => {
     // The buttons outside the format bar, by their names.
     const foot = all(draw(), "button")
       .filter((each) => each.closest('[aria-label="Format"]') === null)
       .map((each) => each.getAttribute("aria-label") ?? each.textContent);
-    expect(foot).toEqual(["Send"]);
+    // Formatting is the phone's fold control, hidden by CSS where the bar always shows.
+    expect(foot).toEqual(["Formatting", "Send"]);
   });
 
   it("applies a format of the bar to the draft", () => {
@@ -90,5 +97,52 @@ describe("the composer's box", () => {
     const sending = draw({ send: "Save", goes: false });
     expect(button(sending, "Save")?.hasAttribute("disabled")).toBe(true);
     expect(draw().querySelector("button[type='submit']")?.hasAttribute("disabled")).toBe(false);
+  });
+
+  // A phone shows the bar through one control (the CSS hides it until then), which says whether it is open.
+  it("opens the format bar from one control that says whether it is open", () => {
+    const box = draw();
+    const bar = one(box, '[role="group"][aria-label="Format"]');
+    expect(bar.hasAttribute("data-open")).toBe(false);
+    const fold = button(box, "Formatting");
+    expect(fold?.getAttribute("aria-expanded")).toBe("false");
+    click(fold);
+    expect(bar.hasAttribute("data-open")).toBe(true);
+    expect(button(box, "Formatting")?.getAttribute("aria-expanded")).toBe("true");
+    click(button(box, "Formatting"));
+    expect(bar.hasAttribute("data-open")).toBe(false);
+  });
+
+  it("draws no format control for a box with no bar", () => {
+    expect(button(draw({ onFormat: undefined }), "Formatting")).toBeUndefined();
+  });
+
+  // A phone folds the shell header while the field has the focus: a press that blurs it moves Send before the click lands.
+  it("keeps the field focused on a phone when a press lands on its own buttons, and not on the field", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === PHONE_QUERY,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    const box = draw();
+    const press = (target: Element | null | undefined, type: "pointerdown" | "mousedown") => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      target?.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    for (const type of ["pointerdown", "mousedown"] as const) {
+      expect(press(button(box, "Send"), type)).toBe(true);
+      expect(press(button(box, "Bold")?.querySelector("svg"), type)).toBe(true);
+      expect(press(box.querySelector("textarea"), type)).toBe(false);
+    }
+  });
+
+  it("leaves a computer's press to move the focus", () => {
+    const event = new Event("mousedown", { bubbles: true, cancelable: true });
+    button(draw(), "Send")?.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

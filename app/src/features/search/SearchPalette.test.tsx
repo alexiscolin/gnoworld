@@ -3,7 +3,7 @@ import { act } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
-import { all, button, click, modals, nth, one, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, noMedia, nth, one, settled } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { SearchButton, SearchPalette } from "./SearchPalette.tsx";
@@ -40,6 +40,14 @@ function Page() {
         }}
       >
         Leave
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          Promise.resolve(navigate(-1)).catch(reportError);
+        }}
+      >
+        Back
       </button>
     </>
   );
@@ -96,6 +104,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   localStorage.clear();
+  noMedia();
   vi.stubGlobal("reportError", reported);
   seen.file.mockReturnValue(undefined);
   seen.here.mockResolvedValue({ ok: true, value: { worlds: [{ world: "bubble", here: 7 }] } });
@@ -207,6 +216,79 @@ describe("closing the palette", () => {
     await openIt(box);
     type(field(box), "bub");
     expect(await reopened(box)).toHaveProperty("value", "");
+  });
+});
+
+describe("the palette in a phone's history", () => {
+  const phone = (matches: boolean) => {
+    vi.stubGlobal("matchMedia", () => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  };
+
+  it("pushes #search as it opens, so Back closes it and stays on the page", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    expect(at(box)).toBe("/#search");
+    click(button(box, "Back"));
+    await settled(() => !isOpen(box));
+    expect(at(box)).toBe("/");
+  });
+
+  it("goes back one entry when Close ends it, leaving no #search behind", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    click(button(box, "Close"));
+    await settled(() => !isOpen(box));
+    expect(at(box)).toBe("/");
+  });
+
+  it("keeps the address's query as it opens and as it closes", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />, "/w/bubble?room=games&chat=full");
+    await openIt(box);
+    expect(at(box)).toBe("/w/bubble#search");
+    expect(searchOf(box)).toBe("?room=games&chat=full");
+    click(button(box, "Close"));
+    await settled(() => !isOpen(box));
+    expect(searchOf(box)).toBe("?room=games&chat=full");
+  });
+
+  it("leaves no #search entry when a search is handed to the chat's", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "hello there");
+    click(all(box, "button").find((each) => each.textContent.startsWith("Search messages for")));
+    await settled(() => !isOpen(box));
+    expect(searchOf(box)).toContain("find=hello+there");
+    click(button(box, "Back"));
+    await settled(() => at(box) === "/");
+  });
+
+  it("opens on a cold load of the #search address", async () => {
+    phone(true);
+    const { box } = await mountInStore(<Page />, "/#search");
+    await settled(() => isOpen(box));
+    expect(isOpen(box)).toBe(true);
+  });
+
+  it("is the phone's whole-screen sheet on a phone, the large sheet on a computer", async () => {
+    phone(true);
+    const small = await mountInStore(<Page />);
+    await openIt(small.box);
+    expect(drawerOf(small.box)?.dataset["width"]).toBe("screen");
+    phone(false);
+    const wide = await mountInStore(<Page />);
+    await openIt(wide.box);
+    expect(drawerOf(wide.box)?.dataset["width"]).toBe("sheet");
+  });
+
+  it("pushes nothing on a computer", async () => {
+    phone(false);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    expect(at(box)).toBe("/");
   });
 });
 

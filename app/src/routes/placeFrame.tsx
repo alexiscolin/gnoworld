@@ -2,8 +2,8 @@
 // left, the dock at the right, and space's foot (SpaceFoot.tsx). A world's page and a realm's are this frame; only the plate's content and the dock's
 // chat differ. On a computer the planet stands larger than the window, lit at three quarters.
 import type { ReactNode } from "react";
-import { Panel, Stack } from "@gnoworld/ui";
-import { chatHeld, LOADING } from "../features/chat/index.ts";
+import { Panel } from "@gnoworld/ui";
+import { chatHeld, LOADING, PlateFrame } from "../features/chat/index.ts";
 import { DOCKED, useMedia } from "../features/chat/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { StatusRing } from "../features/world/StatusRing.tsx";
@@ -47,15 +47,7 @@ export function PlaceFrame({
       >
         {ring === undefined ? null : <StatusRing ring={ring} />}
       </div>
-      <Panel.Layout
-        plate={
-          <Panel label={label} look="plate" caption="gnoworld · hub atlas">
-            <Panel.Body>
-              <Stack>{plate}</Stack>
-            </Panel.Body>
-          </Panel>
-        }
-      >
+      <Panel.Layout plate={<PlateFrame label={label}>{plate}</PlateFrame>}>
         {chat === undefined ? null : (
           <DockChat className={styles["chat"]} due={chatDue}>
             {chat}

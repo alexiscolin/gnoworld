@@ -1,6 +1,6 @@
 // A universe's cosmos: the home for the default one (/), its own page for another (/net/<id>/).
 import { PHONE_QUERY } from "@gnoworld/core";
-import { Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { type MetaArgs, useLoaderData, useLocation } from "react-router";
 import { cosmosAt, isHome } from "../cosmosAt.ts";
 import { isMissing, RouteError } from "../features/errors/index.ts";
@@ -25,7 +25,10 @@ import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
+import { phoneAway } from "./phoneAway.ts";
 import { useFraming } from "./placeFrame.tsx";
+
+const PhoneAway = lazy(() => import("./PhoneAway.tsx"));
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
 // case is checked.
@@ -33,7 +36,8 @@ export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "cosmos");
 }
 export function clientLoader({ request }: { request: Request }) {
-  return site.universe(request, "cosmos");
+  // A phone has no home page: it opens into a chat (phoneAway.ts).
+  return phoneAway(site.universeAt(new URL(request.url).pathname).home.path) ?? site.universe(request, "cosmos");
 }
 
 export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
@@ -60,13 +64,15 @@ function OverSpace({
   const phone = useMedia(PHONE_QUERY);
   return (
     <>
-      <SpaceLoader waiting={!drawn} ready={loadedShare(drawn, worlds)} />
+      {/* No space on a phone, so no loader for it (false while hydrating, as the server drew it: no #418). */}
+      {phone ? null : <SpaceLoader waiting={!drawn} ready={loadedShare(drawn, worlds)} />}
       {phone ? null : (
         <Suspense fallback={null}>
           <LazyRail places={{ earth: universe.earth.path, worlds: universe.worlds }} universe={universe.id} />
         </Suspense>
       )}
-      <SpaceFoot />
+      {/* A phone draws no space, so offers none. */}
+      {phone ? null : <SpaceFoot />}
     </>
   );
 }
@@ -93,8 +99,19 @@ function FirstScreen({ to, people }: { to: string; people: People | undefined })
 // A system's name on the hero: the Earth's as the header says it, another's as its namespace.
 const systemTitle = (id: string): string => (isHome(id) ? "gno.land" : nameOf(id));
 
+// A phone has no home page: the pre-rendered one hydrates without the client loader's redirect, so it goes on here and draws nothing.
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
+  return useMedia(PHONE_QUERY) ? (
+    <Suspense fallback={null}>
+      <PhoneAway home={universe.home.path} />
+    </Suspense>
+  ) : (
+    <HomePage universe={universe} />
+  );
+}
+
+function HomePage({ universe }: { universe: UniverseView }) {
   // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's. The number reads that count,
   // whether the scene runs or not, from a few bytes of its own, so a phone asks nothing of the cosmos before View in space.
   const drawn = useWorldsCount(universe.isDefault);

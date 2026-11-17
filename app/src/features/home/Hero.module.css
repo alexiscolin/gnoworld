@@ -229,26 +229,10 @@
   }
 
   @media (width < 900px) {
-    /* Under the ways' pill, which a phone fixes at the top right just under its header (shellHeader.module.css). */
-    .hero {
-      /* layout: the hero starts under the pill fixed over the page's top */
-      margin-block-start: calc(var(--size-bar) + 2 * var(--space-2xs));
-    }
-
-    .actions {
-      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px */
-      flex-wrap: wrap;
-    }
-
-    .action {
-      /* raw: 48 px tall and 20 at the sides on a phone (the prototype's line 772) */
-      block-size: 48px;
-      /* raw: the prototype's and the frames' own value */
-      padding-inline: 20px;
-    }
-
-    .line {
-      white-space: normal;
+    /* A phone has no home: it goes on to its chat as the page hydrates (routes/phoneAway.ts), so the pre-rendered hero and list are never drawn. */
+    .hero,
+    .worlds {
+      display: none;
     }
   }
 

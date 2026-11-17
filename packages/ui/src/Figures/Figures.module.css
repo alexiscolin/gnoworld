@@ -73,6 +73,15 @@
     block-size: 32px;
   }
 
+  /* A phone's narrow plate has no room for the line beside its figure: the number alone (a computer unchanged, D13711). */
+  @media (width < 900px) {
+    @container plate (max-width: 37.5rem) {
+      .trace {
+        display: none;
+      }
+    }
+  }
+
   .dot {
     position: absolute;
     inset-inline-end: 0;

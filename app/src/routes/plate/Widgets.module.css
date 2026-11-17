@@ -46,4 +46,36 @@
     min-block-size: 0;
     overflow: hidden;
   }
+
+  /* A phone's closed fold takes no room: the Card's Stack step above it goes with it (a computer unchanged, D13711). */
+  @media (width < 900px) {
+    .fold:not([data-open]) {
+      /* layout: gives back the Stack step above the shut fold */
+      margin-block-start: calc(-1 * var(--space-s));
+    }
+  }
+}
+
+@layer utilities {
+  /* A phone's narrow square sets its unit under its figure rather than cut ("2,208 la…"); a value with no unit keeps its ellipsis. */
+  @media (width < 900px) {
+    @container plate (max-width: 37.5rem) {
+      span.value:has(> small) {
+        /* layout: the figure and its unit, the unit under the figure when the square is narrow */
+        display: inline-flex;
+        /* layout: wraps under the figure */
+        flex-wrap: wrap;
+        /* layout: on the figure's baseline */
+        align-items: baseline;
+        /* layout: the unit's step from the figure */
+        column-gap: var(--space-2xs);
+        white-space: normal;
+        text-overflow: clip;
+      }
+
+      .value small {
+        padding-inline-start: 0;
+      }
+    }
+  }
 }

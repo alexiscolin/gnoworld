@@ -1,5 +1,4 @@
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { framesOf } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival.
@@ -27,13 +26,6 @@ function mapsAsked(page: Page): string[] {
 // The globe's room is kept, or the plate is open.
 const kept = (page: Page) => page.locator("[data-earth='loading'], [data-earth='drawn']");
 const credits = (page: Page) => page.getByRole("button", { name: "Credits", exact: true });
-
-// A frame drawn after the Earth reached the stage: the page says drawn as it goes on stage, before any frame shows it.
-const painted = async (page: Page) => {
-  await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
-  const before = await framesOf(page);
-  await expect.poll(() => framesOf(page), SLOW).toBeGreaterThan(before);
-};
 
 test.describe("the pages that hold no Earth", () => {
   test.use({ viewport: COMPUTER });
@@ -86,19 +78,25 @@ test.describe("a texture that does not come", () => {
   });
 });
 
+// A phone has no globe nor views bar (D13711): the Earth is its full chat, and the textures' credit stands in the Rooms drawer.
 test.describe("a touch screen", () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
 
-  test("keeps Credits clear of the views' bar, a finger's size", async ({ page }) => {
+  test("keeps Credits in the Rooms drawer, a finger's size", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(EARTH);
+    await page.addInitScript(() => {
+      localStorage.setItem("gnoworld:welcomed", "1");
+    });
+    await page.goto("/earth");
     await hydrated(page);
-    await page.getByRole("button", { name: "View in space" }).click();
-    await painted(page);
+    await expect(page).toHaveURL(/\/earth\?.*chat=full/);
+    await page
+      .getByRole("button", { name: /^Rooms\b/ })
+      .first()
+      .tap();
     const link = await credits(page).boundingBox();
-    const views = await page.getByRole("navigation", { name: "Views" }).boundingBox();
-    if (link === null || views === null) throw new Error("no link or no bar");
+    if (link === null) throw new Error("no Credits in the drawer");
     expect(link.height).toBeGreaterThanOrEqual(44);
-    expect(link.y + link.height).toBeLessThanOrEqual(views.y);
+    await expect(page.getByRole("navigation", { name: "Views" })).toHaveCount(0);
   });
 });

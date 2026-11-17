@@ -2,7 +2,7 @@
 // "Stamped · GovDAO / 2 stamps in your passport", with the passport a press away; a world this device charted first says "First to chart",
 // as the scene wakes it. The expedition's line ("Today's expedition · 1 of 3") stands in the same pill, never a second one, and alone for a place
 // already stamped (slots.tsx). One pill at a time: the shell's (topPill.tsx).
-import { markFirst, stampedIn, stampKey, utcDay } from "@gnoworld/core";
+import { markFirst, PHONE_QUERY, stampedIn, stampKey, utcDay } from "@gnoworld/core";
 import { useEffect, useEffectEvent } from "react";
 import { useDeviceView } from "../../deviceViews.ts";
 import { worldName } from "../expedition/index.ts";
@@ -29,6 +29,8 @@ export function Arrival({ universe, world, name: given, path }: ArrivalProps) {
   const [, open] = useDeviceView();
   // The pill's one act: the passport, or for a world charted first, its share once the share slot is filled.
   const say = useEffectEvent((title: string, line: string, shared = false) => {
+    // The stamp is kept; a phone's chat has no room for a pill over its lines, and the passport is in its account menu.
+    if (typeof matchMedia === "function" && matchMedia(PHONE_QUERY).matches) return;
     const share = shared ? slot("share") : undefined;
     raisePill({
       title,

@@ -36,6 +36,12 @@ describe("how long ago", () => {
     expect(ago(now + 60_000, now)).toEqual({ value: 0, unit: "min ago" });
   });
 
+  it("says one hour in the singular", () => {
+    expect(ago(before(60), now)).toEqual({ value: 1, unit: "hour ago" });
+    expect(agoText(before(90), now)).toBe("2 hours ago");
+    expect(agoText(before(60), now)).toBe("1 hour ago");
+  });
+
   it("reads as one line", () => {
     expect(agoText(before(180), now)).toBe("3 hours ago");
   });

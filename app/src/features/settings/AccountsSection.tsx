@@ -98,7 +98,7 @@ function OwnerNote({ worlds }: { worlds: readonly string[] }) {
 function Buttons({ onLink }: { onLink: () => void }) {
   const [, open] = useDeviceView();
   return (
-    <Cluster space="xs">
+    <Cluster space="xs" wrap="scroll">
       <Button emphasis="solid" onClick={onLink}>
         Link an account
       </Button>

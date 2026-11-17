@@ -117,7 +117,7 @@ function Sheet({ place, open, onClose }: { place: SharedPlace; open: boolean; on
           </figure>
         )}
         <p className="data-text">{link}</p>
-        <Cluster space="2xs">
+        <Cluster space="2xs" wrap="scroll">
           <Button
             emphasis="solid"
             icon="link"

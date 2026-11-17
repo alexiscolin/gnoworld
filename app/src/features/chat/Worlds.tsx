@@ -31,7 +31,7 @@ export interface WorldsProps {
   unread?: Readonly<Record<string, number>> | undefined;
 }
 
-const NONE: readonly string[] = [];
+export const NONE: readonly string[] = [];
 
 /** The rail's order, as far as the chat knows it: the Earth, the worlds followed (the last followed first), then the rest as listed.
  * The rail's rest is by what is trending now, which the chat does not load. */
@@ -42,10 +42,41 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
   return worlds.toSorted((a, b) => place(a) - place(b));
 }
 
-export function Worlds({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
-  const session = useApp(({ login }) => login.session);
+// The followed worlds the hubs do not hold: the rest of the column, which WorldsMore draws.
+export const beyond = ({ worlds, followed = NONE }: Pick<WorldsProps, "worlds" | "followed">) =>
+  followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id));
+
+// The textures' credit, which the pictures carry wherever they show (DESIGN-SYSTEM.md): the button and the universe's own dialog,
+// asked at the first press.
+export function Credits({ className }: { className: string | undefined }) {
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className={`label ${className ?? ""}`}
+        onClick={() => {
+          setAsked(true);
+          setOpen(true);
+        }}
+      >
+        Credits
+      </button>
+      {asked ? (
+        <CreditsDialog
+          open={open}
+          onClose={() => {
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function Worlds({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
+  const session = useApp(({ login }) => login.session);
   return (
     <nav aria-label="Worlds" className={[styles["list"], "fill-column"].join(" ")}>
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
@@ -71,28 +102,8 @@ export function Worlds({ worlds, current, followed = NONE, universe, unread }: W
           </li>
         ))}
       </Cluster>
-      <WorldsMore
-        universe={universe}
-        followed={followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id))}
-      />
-      <button
-        type="button"
-        className={["label", styles["credits"]].join(" ")}
-        onClick={() => {
-          setAsked(true);
-          setOpen(true);
-        }}
-      >
-        Credits
-      </button>
-      {asked ? (
-        <CreditsDialog
-          open={open}
-          onClose={() => {
-            setOpen(false);
-          }}
-        />
-      ) : null}
+      <WorldsMore universe={universe} followed={beyond({ worlds, followed })} />
+      <Credits className={styles["credits"]} />
     </nav>
   );
 }

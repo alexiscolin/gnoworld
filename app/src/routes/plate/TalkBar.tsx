@@ -3,7 +3,7 @@
 // know: with no words, the invitation alone.
 import type { CSSProperties } from "react";
 import { Button, Cluster, nameColour, Stack } from "@gnoworld/ui";
-import { roomLabel } from "../../features/chat/index.ts";
+import { roomLabel, whoIs } from "../../features/chat/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import styles from "./TalkBar.module.css";
 
@@ -41,7 +41,7 @@ export function TalkBar({ name, room }: { name: string; room: string }) {
             <span className={["truncate", styles["words"]].join(" ")}>
               {latest === undefined
                 ? `Nobody has spoken in ${label} yet. Your question can be the first.`
-                : `${latest.from}: ${clip(latest.text)}`}
+                : `${whoIs(latest.from)}: ${clip(latest.text)}`}
             </span>
           </Stack>
         </Cluster>

@@ -261,22 +261,23 @@ test("lets the page's plain list of worlds step aside where it stands", async ({
   await expect(page.locator("nav[aria-label='Worlds']:visible")).toHaveCount(1);
 });
 
-test("stands no rail on a phone, which keeps its plain list and asks none of the rail's code once space shows", async ({
+test("stands no rail on a phone, which keeps its plain list and asks none of the rail's code nor the cosmos", async ({
   page,
 }) => {
   const asked: string[] = [];
   page.on("request", (request) => asked.push(request.url()));
+  await page.addInitScript(() => {
+    localStorage.setItem("gnoworld:welcomed", "1");
+  });
   await served(page);
   await page.setViewportSize(PHONE);
   await page.goto(HOME);
   await hydrated(page);
-  await page.getByRole("button", { name: "View in space" }).click();
-  await running(page);
-  await expect.poll(() => asked.some((url) => url.endsWith("/api/presence")), SLOW).toBe(true);
   await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
   await expect(page.locator("nav[aria-label='Worlds'][data-rail]")).toBeVisible();
   await expect(rail(page)).toHaveCount(0);
-  expect(asked.filter((url) => /\/assets\/(?:Rail|portraits)-[\w-]+\.js$/.test(url))).toEqual([]);
+  expect(asked.filter((url) => /\/assets\/(?:Rail|portraits|scene)-[\w-]+\.js$/.test(url))).toEqual([]);
 });
 
 test("holds 25 worlds at most in its fixed panel, which scrolls to its last world, reached by the keyboard", async ({

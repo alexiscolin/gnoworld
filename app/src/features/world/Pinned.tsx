@@ -2,8 +2,10 @@
 // that pins one, after hydration. On the plate, under Read the proposals (Proposals.tsx): a Form block each, under its label. In the
 // chat's quick actions bar, which the route hands these: a pill each after Who's here, and the cards they open, drawn over the bar; a
 // card's id holds the bar's, the call and its view, so a card opened in one world never shows under another's pill.
+import { PHONE_QUERY } from "@gnoworld/core";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import { pinnedOf, type PinnedCall, type PinnedRow } from "../../pinned.ts";
+import { useMedia } from "../chat/index.ts";
 import { realmAt } from "../../realmAt.ts";
 import { ActionForm, InlineCard } from "../realms/index.ts";
 import styles from "./Pinned.module.css";
@@ -51,12 +53,20 @@ export interface PinnedBarProps {
 }
 
 export function PinnedBar({ part, actions, universe, at }: PinnedBarProps) {
+  // A phone's full chat has no h2 before its cards (its info is a sheet): a card follows the h1.
+  const level = useMedia(PHONE_QUERY) ? 2 : undefined;
   return pinnedOf(actions, universe).map((call, index) => {
     const found = placed(call);
     const card = `${at} ${keyOf(index, call)}`;
     if (found === undefined) return null;
     return part === "cards" ? (
-      <InlineCard key={card} id={card} place={{ realm: found.realm, chain: found.chain }} title={call.label} />
+      <InlineCard
+        key={card}
+        id={card}
+        place={{ realm: found.realm, chain: found.chain }}
+        title={call.label}
+        level={level}
+      />
     ) : (
       <ActionForm
         key={card}

@@ -11,12 +11,15 @@ export interface DialogProps {
   open: boolean;
   /** Asked to close, by Esc or Close: the page sets open to false. */
   onClose: () => void;
-  /** 760 px, for the lightbox and the passport; "sheet" for the search's large sheet, Discover's; 490 otherwise. */
-  wide?: boolean | "sheet";
+  /** 760 px, for the lightbox and the passport; "sheet" for the search's large sheet, Discover's; "screen" for the phone's whole-screen
+   * sheet (under 900 px, kept inside the notch and the bars; the standard 490 px from 900 px up); 490 otherwise. */
+  wide?: boolean | "sheet" | "screen";
   /** The line above the title, in the one label style, read with the description. */
   kicker?: string;
   /** No Close button, where the page draws another way out; Esc still asks to close. */
   hideClose?: boolean;
+  /** Close's name for assistive technology, where another says where it leads ("Back to the chat"). */
+  closeLabel?: string;
   /** What it asks about, muted under the title and read with it by assistive technology. */
   description?: string;
   /** A drawer at the screen's start, its full height, over the page with no scrim, its title for assistive technology alone and Close at
@@ -56,21 +59,22 @@ interface TitleRowProps extends Pick<DialogProps, "title" | "onClose"> {
   side: DialogProps["side"] | undefined;
   headingRef: RefObject<HTMLHeadingElement | null>;
   id: string;
-  hideClose: boolean;
+  hideClose?: boolean | undefined;
+  closeLabel?: string | undefined;
 }
 
 // The title wraps its own words beside Close, which keeps the row's end at any width. A drawer's title is for assistive technology alone.
-function TitleRow({ headingRef, id, title, hideClose, onClose, side }: TitleRowProps) {
+function TitleRow({ headingRef, id, title, hideClose, closeLabel, onClose, side }: TitleRowProps) {
   return (
     <Sidebar side="end" space="s" align="center">
       <h2 ref={headingRef} id={id} tabIndex={-1} className={side === undefined ? undefined : "visually-hidden"}>
         {title}
       </h2>
-      {hideClose ? null : (
+      {hideClose === true ? null : (
         <div className={styles["close"]}>
           <IconButton
             icon="close"
-            label="Close"
+            label={closeLabel ?? "Close"}
             emphasis={side === undefined ? "plain" : "outline"}
             onClick={() => {
               onClose();
@@ -127,19 +131,18 @@ export function Dialog({
   onClose,
   wide = false,
   kicker,
-  hideClose,
   description,
   side,
   lead,
   children,
+  ...close
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const descriptionId = useId();
   const kickerId = useId();
-  const kickerShown = kicker !== undefined && kicker !== "";
-  const describedBy = ids(kickerShown ? kickerId : undefined, description === undefined ? undefined : descriptionId);
+  const describedBy = ids(kicker ? kickerId : undefined, description === undefined ? undefined : descriptionId);
   // Each close the browser made itself: the page is told, and while it keeps the dialog open the
   // dialog shows again.
   const [closes, setCloses] = useState(0);
@@ -161,7 +164,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       className={["appears", surface(styles["dialog"])].join(" ")}
-      data-width={wide === "sheet" ? "sheet" : wide ? "wide" : "standard"}
+      data-width={typeof wide === "string" ? wide : wide ? "wide" : "standard"}
       data-side={side}
       aria-labelledby={titleId}
       aria-describedby={describedBy || undefined}
@@ -186,17 +189,19 @@ export function Dialog({
       }}
     >
       <Stack space="m">
-        <Heading
-          kicker={kicker}
-          kickerId={kickerId}
-          lead={lead}
-          headingRef={headingRef}
-          id={titleId}
-          title={title}
-          hideClose={hideClose === true}
-          onClose={onClose}
-          side={side}
-        />
+        <div className={wide === "screen" ? ["held-top", styles["head"]].join(" ") : undefined}>
+          <Heading
+            kicker={kicker}
+            kickerId={kickerId}
+            lead={lead}
+            headingRef={headingRef}
+            id={titleId}
+            title={title}
+            {...close}
+            onClose={onClose}
+            side={side}
+          />
+        </div>
         {description === undefined ? null : (
           <p id={descriptionId} className={styles["description"]}>
             {description}

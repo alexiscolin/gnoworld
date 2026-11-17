@@ -1,0 +1,9 @@
+/* The account's pill's name, beside its face. */
+@layer components {
+  /* A phone's pill is its face alone: the header's row is the network's room too. */
+  @media (width < 900px) {
+    .who {
+      display: none;
+    }
+  }
+}

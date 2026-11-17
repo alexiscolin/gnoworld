@@ -27,7 +27,7 @@ export type PageDrawing = typeof RealmBlocks;
 
 export interface Slots {
   /** The bell, in the header's right group, before the account. */
-  bell: ComponentType;
+  bell: ComponentType<{ phone: boolean }>;
   /** Today's expedition, in the passport dialog after the constellations. */
   passportExpedition: ComponentType<PassportSectionProps>;
   /** The quests, in the passport dialog after the expedition. */
@@ -58,9 +58,9 @@ export function plug<K extends keyof Slots>(name: K, part: Slots[K]): void {
 export const slot = <K extends keyof Slots>(name: K): Slots[K] | undefined => filled[name];
 
 /** The header's bell, or nothing. */
-export function BellSlot() {
+export function BellSlot({ phone }: { phone: boolean }) {
   const bell = filled.bell;
-  return bell === undefined ? null : createElement(bell);
+  return bell === undefined ? null : createElement(bell, { phone });
 }
 
 /** A section of the passport, or nothing. */

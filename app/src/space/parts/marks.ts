@@ -154,7 +154,8 @@ export class Plate {
         uHeight: this.#height,
         uWidth: this.#width,
         uRound: this.#round,
-        // The plate's fill as the page's (--color-surface), before the grade: graded with the frame, straight or through the blur's pass.
+        // The plate's fill, tokens.css's --p-plate-scene (marks.test.ts reads both), before the grade: graded with the frame, straight or
+        // through the blur's pass.
         uFill: { value: new Vector3(...beforeGrade([0.118, 0.13, 0.176])) },
       },
       vertexShader: PLATE_VERTEX,

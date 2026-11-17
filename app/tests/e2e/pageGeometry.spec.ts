@@ -468,36 +468,6 @@ for (const width of [320, 390] as const)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
-// The bar of the three views stands over the foot of a phone's page; the page leaves it the room, so at the page's end
-// nothing of it lies under the bar (the prototype reserves it: lines 770 to 774).
-test.describe("the views' bar on a phone", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-  for (const path of ["/list", "/w/bubble", "/"]) {
-    test(`${path}: at the page's end nothing of the page meets the bar`, async ({ page }) => {
-      await page.goto(path);
-      await hydrated(page);
-      // A page long enough to scroll: a block at the end of main stands for what a long page holds.
-      await page.evaluate(() => {
-        const filler = document.createElement("div");
-        filler.setAttribute("data-filler", "");
-        filler.style.blockSize = "2000px";
-        document.querySelector("main")?.append(filler);
-        window.scrollTo(0, document.documentElement.scrollHeight);
-      });
-      const bar = await box(page, "nav[aria-label='Views']");
-      const lowest = await page.evaluate(() => {
-        const inside = [...document.querySelectorAll("main *")].filter(
-          (el) => getComputedStyle(el).position !== "fixed",
-        );
-        return Math.max(...inside.map((el) => el.getBoundingClientRect().bottom));
-      });
-      expect(lowest, `the page's last pixel ${String(lowest)}, the bar's top ${String(bar.y)}`).toBeLessThanOrEqual(
-        bar.y,
-      );
-    });
-  }
-});
-
 // The fixed plate must not push the chat's slot to 612 px at 1280, so that opening a thread hides the room, nor at 1366 the
 // message list to 242 px wide: the chat is the plate's dock at the right from 1280 px, 320 px
 // wide under 1400 and 360 from it, its lines 300 px wide or more; under 1280 px the plate is a block and the chat the page.

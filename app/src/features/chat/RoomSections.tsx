@@ -1,10 +1,11 @@
 // A world's rooms by section, each a link to its address, the one shown marked: the part of the rooms'
 // navigation a visitor has too. An account's direct messages and notices are RoomsView's.
 import type { RoomList as Rooms } from "@gnoworld/schemas";
-import { Disclosure, Icon, NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
+import { Icon, NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
 import { type ReactNode, type Ref } from "react";
 import { useFull } from "./full.ts";
 import { roomHref, roomLabel } from "./names.ts";
+import { Folding } from "./Folding.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
 
@@ -22,15 +23,6 @@ export function RoomsNav({
     <nav ref={navRef} tabIndex={-1} aria-label={label} className={[styles["nav"], "fill-column"].join(" ")}>
       {children}
     </nav>
-  );
-}
-
-/** A section of the column, as Discord's and Slack's: its name folds and unfolds it (ui's Disclosure, the section look), a control may stand at its end (a "+"). */
-export function Folding({ name, action, children }: { name: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <Disclosure look="section" title={name} open action={action}>
-      {children}
-    </Disclosure>
   );
 }
 

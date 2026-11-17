@@ -23,8 +23,10 @@
     min-inline-size: 0;
   }
 
-  .talk:hover {
-    background: var(--color-fill-hover);
+  @media (hover: hover) {
+    .talk:hover {
+      background: var(--color-fill-hover);
+    }
   }
 
   /* Stacked faces overlap, each ringed in the night (the avatar's own ring); an initial centred in its disc by the line. */
@@ -96,6 +98,37 @@
   @keyframes appear {
     from {
       opacity: 0;
+    }
+  }
+}
+
+/* A phone's bar is two lines, which a capsule's ends would cut: a box's corners, and the sentence wraps instead of an ellipsis. These answer the
+   `pill-ends` and `truncate` utilities the bar wears, which come last, so they sit in the same layer a step stronger. */
+@layer utilities {
+  @media (width < 900px) {
+    div.talk {
+      border-radius: var(--radius-box);
+    }
+
+    .said .words {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+  }
+
+  /* Under 400 px the button takes the line under the words (they ask the whole line), so the title keeps one line. */
+  @media (width < 400px) {
+    .talk > * {
+      /* layout: the button drops to its own line */
+      flex-wrap: wrap;
+      /* layout: a step between the words and the button */
+      row-gap: var(--space-xs);
+    }
+
+    .talk .who {
+      /* layout: the words ask the whole line */
+      flex-basis: 100%;
     }
   }
 }

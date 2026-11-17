@@ -183,7 +183,7 @@ function Body({ children }: { children: ReactNode }) {
 function Actions({ children }: { children: ReactNode }) {
   return (
     <div className={styles["actions"]}>
-      <Cluster as="footer" space="2xs">
+      <Cluster as="footer" space="2xs" wrap="scroll">
         {children}
       </Cluster>
     </div>

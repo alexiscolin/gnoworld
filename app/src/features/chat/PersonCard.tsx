@@ -97,7 +97,7 @@ function Shell({ title, kicker, name, open, onClose, other, account }: ShellProp
       <Stack space="m">
         <Cluster justify="between" space="xs">
           {account ? <span className={styles["address"]}>{name}</span> : null}
-          <Cluster space="2xs">
+          <Cluster space="2xs" wrap="scroll">
             {other ? <MessageButton partner={name} /> : null}
             {other ? (
               <Suspense fallback={null}>

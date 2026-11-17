@@ -116,4 +116,9 @@
     background: var(--color-mine);
     opacity: 1;
   }
+
+  /* An unseen message's dot is the coral of what is new (UnreadPill's, the bell's); a state's, online, stays mint. */
+  .badge[data-dot][data-unseen] {
+    background: var(--color-new);
+  }
 }

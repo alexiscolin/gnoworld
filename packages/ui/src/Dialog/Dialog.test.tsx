@@ -85,6 +85,12 @@ describe("Dialog", () => {
       </Dialog>,
     );
     expect(dialog().dataset["width"]).toBe("wide");
+    rerender(
+      <Dialog title="Passport" open={false} onClose={vi.fn()} wide="screen">
+        <p>Stamps</p>
+      </Dialog>,
+    );
+    expect(dialog().dataset["width"]).toBe("screen");
   });
 
   it("wears a mark before its heading when given one", () => {

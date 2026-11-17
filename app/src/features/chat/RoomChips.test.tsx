@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import type { RoomList } from "@gnoworld/schemas";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
-import { all, mount as draw, one } from "../../../tests/mount.tsx";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { all, mount as draw, noMedia, one, settled } from "../../../tests/mount.tsx";
 import { rememberRealms } from "../../lib/roomRealms.ts";
 import { RoomChips } from "./RoomChips.tsx";
 
@@ -27,6 +27,8 @@ const SECTIONS: RoomList["sections"] = [
 const mount = (element: React.ReactElement) => draw(<MemoryRouter>{element}</MemoryRouter>);
 
 describe("RoomChips", () => {
+  beforeEach(noMedia);
+
   it("is a navigation of one link to each room, the room in view first then the list's order, it marked", () => {
     const nav = one(
       mount(<RoomChips sections={SECTIONS} current="#bubble/games" />),
@@ -59,6 +61,7 @@ describe("RoomChips", () => {
     const games = all(box, "li").find((item) => item.textContent.includes("#games"));
     expect(games?.textContent).toContain("3");
     expect(games?.querySelector("a")?.getAttribute("aria-label")).toBe("#games, 3 unread");
+    expect(games?.querySelector("[data-tone='new']")?.textContent).toBe("3");
   });
 
   it("ends a crowded row with a +N chip that says it opens a dialog", () => {
@@ -79,6 +82,13 @@ describe("RoomChips", () => {
       wide.mockRestore();
       vi.unstubAllGlobals();
     }
+  });
+
+  it("draws a lone room as the selected chip where told (a phone), and nothing otherwise", () => {
+    const lone: RoomList["sections"] = [{ name: null, rooms: [{ room: "#bubble", type: "open" as const }] }];
+    expect(mount(<RoomChips sections={lone} current="#bubble" />).querySelector("nav")).toBeNull();
+    const link = one(mount(<RoomChips sections={lone} current="#bubble" lone />), "nav a");
+    expect(link.getAttribute("aria-current")).toBe("true");
   });
 
   it("draws nothing for no room", () => {
@@ -110,10 +120,12 @@ describe("RoomChips", () => {
     expect(plus(EARTH)).toBeNull();
   });
 
-  it("opens the same New room dialog the full chat's button opens", () => {
+  it("opens the same New room dialog the full chat's button opens", async () => {
     session.kind = "in";
     const box = mount(<RoomChips sections={EARTH} current="#earth" />);
     one(box, 'button[aria-label="New room"]').click();
+    // The dialog's code comes at the first press.
+    await settled(() => box.querySelector("dialog") !== null);
     expect(one(box, "dialog").textContent).toContain("Make the room");
     session.kind = "out";
   });

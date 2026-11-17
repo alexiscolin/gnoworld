@@ -1,10 +1,11 @@
 // A realm's view: /r/<path> in the default universe, /net/<id>/r/<path> in another. A client route with no page written
 // ahead: the static host's fallback serves it under the catch-all's policy, and the
 // browser's loader answers the 404 for a path that is no realm's. The page is read from the chain inside the view.
-import { labelName, worldIdOf } from "@gnoworld/core";
+import { labelName, PHONE_QUERY, worldIdOf } from "@gnoworld/core";
 import { data, useLoaderData, useLocation, type MetaArgs } from "react-router";
 import { Arrival } from "../features/passport/Later.tsx";
 import { ErrorView, RouteError, useWhere } from "../features/errors/index.ts";
+import { useMedia } from "../features/chat/useMedia.ts";
 import { useKnown } from "../features/realms/known.ts";
 import { useWorldsFile } from "../worldsFile.ts";
 import { PlaceFrame } from "./placeFrame.tsx";
@@ -30,7 +31,8 @@ export default function Realm() {
   const universe = site.universeAt(pathname).id;
   const { realm, chain } = found;
   const listed = useWorldsFile(true)?.some((each) => each.realms.some((one) => one.path === realm)) === true;
-  const known = useKnown({ rpc: chain.rpc, realm, origin: chain.gnoweb }, listed);
+  // A phone draws no plate, which is what reads the realm: the route asks, so the chat's room and a missing realm's page have their answer.
+  const known = useKnown({ rpc: chain.rpc, realm, origin: chain.gnoweb }, listed, useMedia(PHONE_QUERY));
   const where = useWhere();
   if (known === "no")
     return (

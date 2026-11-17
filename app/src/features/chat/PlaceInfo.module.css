@@ -49,3 +49,11 @@
     color: var(--color-text);
   }
 }
+
+/* The sheet's live line: who talks and who is here, one quiet line of words under the description. */
+@layer components {
+  .live {
+    color: var(--color-text-soft);
+    font: var(--font-ui);
+  }
+}

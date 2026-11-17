@@ -66,6 +66,14 @@ const tabs = (page: HTMLElement) =>
   all(page, "[role='tab']").map((tab) => tab.textContent.replaceAll(/\s+/g, " ").trim());
 const lines = (page: HTMLElement) => all(page, "ol li").map((line) => line.textContent);
 
+// A phone's query answers yes, as a phone's window does.
+function onPhone() {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined })),
+  );
+}
+
 describe("the bell's panel", () => {
   it("shows a followed world where people are, first and unread, with the events and the news", async () => {
     const page = await opened();
@@ -108,6 +116,17 @@ describe("the bell's panel", () => {
     press(page, "Mark all read");
     expect(unreadMarks(page)).toBe(0);
     expect(tabs(page)).toEqual(["All", "Messages", "Worlds", "News"]);
+  });
+
+  it("on a phone, draws Mark all read as an icon beside Close only while something is unread", async () => {
+    onPhone();
+    const page = await opened();
+    const markAll = () => all(page, "button").filter((each) => each.getAttribute("aria-label") === "Mark all read");
+    expect(markAll()).toHaveLength(1);
+    press(page, "Mark all read");
+    expect(unreadMarks(page)).toBe(0);
+    expect(markAll()).toHaveLength(0);
+    expect(all(page, "button").some((each) => each.textContent.trim() === "Mark all read")).toBe(false);
   });
 
   it("keeps a line read one by one read once Mark all read is pressed", async () => {

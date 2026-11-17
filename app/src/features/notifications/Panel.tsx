@@ -1,6 +1,7 @@
 // The bell's panel (frames 86, 87): over the dock's column, from under the header to the page's foot. Its title and "Mark all read", the
 // kinds with what is unread in each (All, Messages, Worlds, News), the worlds to filter by, then the lines, the newest first, each going
 // to its place: a page of the site, or off it through the warning. Esc, a click outside or the bell closes it.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { ComingSoon, EmptyState, Panel as Surface, Tabs } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useLocation } from "react-router";
@@ -8,6 +9,7 @@ import { createPortal } from "react-dom";
 import { FOLLOWS_KEPT } from "../../lib/keep/fields.ts";
 import { useHere } from "../../useHere.ts";
 import { useLeaving } from "../../leaving.tsx";
+import { useMedia } from "../chat/index.ts";
 import { useAppStore } from "../../storeContext.tsx";
 import { placeOf, universeAt } from "../events/index.ts";
 import { isUnread, type Item, type NoticeKind } from "./feed.ts";
@@ -84,6 +86,30 @@ function useShown(panel: RefObject<HTMLElement | null>, open: boolean, onGone: (
   }, [panel, open]);
 }
 
+// The lines, or the empty state; `id` restarts the list's entrance when the filter changes.
+function Lines({
+  shown,
+  id,
+  now,
+  read,
+  onOpen,
+}: {
+  shown: readonly Item[];
+  id: string;
+  now: number;
+  read: Parameters<typeof isUnread>[1];
+  onOpen: (item: Item) => void;
+}) {
+  if (shown.length === 0) return <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />;
+  return (
+    <ol key={id} className={[styles["list"], "enter"].join(" ")}>
+      {shown.map((item) => (
+        <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={onOpen} />
+      ))}
+    </ol>
+  );
+}
+
 export function Panel({
   onClose,
   open: showing = true,
@@ -101,6 +127,7 @@ export function Panel({
   const { items, read } = useFeed(now, useHere(true));
   const [kind, setKind] = useState<"all" | NoticeKind>("all");
   const [world, setWorld] = useState<string>();
+  const phone = useMedia(PHONE_QUERY);
   const leaving = useLeaving();
   const markRead = useMarkRead(now, items);
   const unread = (of: "all" | NoticeKind) =>
@@ -128,10 +155,14 @@ export function Panel({
           onMarkAll={() => {
             markRead("all");
           }}
+          onClose={onClose}
+          phone={phone}
+          unread={unread("all")}
         />
         <Tabs
           label="Kinds"
           size="s"
+          countTone="new"
           tabs={KINDS.map(({ id, label }) => ({ id, label, count: unread(id) }))}
           selected={kind}
           onSelect={(id) => {
@@ -144,19 +175,14 @@ export function Panel({
           name={(slug) => placeOf(universe, slug)?.name ?? slug}
           onShow={setWorld}
         />
-        {shown.length === 0 ? (
-          <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />
-        ) : (
-          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], "enter"].join(" ")}>
-            {shown.map((item) => (
-              <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={open} />
-            ))}
-          </ol>
-        )}
+        <Lines shown={shown} id={`${kind}:${world ?? ""}`} now={now} read={read} onOpen={open} />
         {/* The chain's own lines (a new realm's signal, a proposal opened or closing) wait for the indexer's events. */}
-        <ComingSoon name="New realms and proposals, from the chain">
-          New realms and proposals, from the chain
-        </ComingSoon>
+        {/* A phone drops it: the greyed line is under the text contrast a small screen needs. */}
+        {phone ? null : (
+          <ComingSoon name="New realms and proposals, from the chain">
+            New realms and proposals, from the chain
+          </ComingSoon>
+        )}
         <p className="meta">What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}

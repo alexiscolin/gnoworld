@@ -21,7 +21,7 @@ const Signs = lazy(async () => ({ default: (await import("../../EarthSigns.tsx")
 const FOLD_MS = 400;
 
 // The world space draws for the place: the Earth, a realm's, else the hub's.
-const worldOf = (place: ChatPlace): string =>
+export const worldOf = (place: ChatPlace): string =>
   place.earth === true ? EARTH : place.realm === undefined ? hubWorldOf(place) : worldIdOf(place.realm);
 
 /** The view's bar: the place's buttons and the control that closes the full chat. It stands alone over the search panel, which takes the rest

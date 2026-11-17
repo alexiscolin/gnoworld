@@ -1,11 +1,17 @@
 // A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
-// (a size budget on that paint); the share sheet's code comes at the first press.
+// (a size budget on that paint); the share sheet's code comes at the first press. A phone's row is PhoneActions.tsx's, its code asked
+// once the window is a phone's.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Button, Cluster, type IconName } from "@gnoworld/ui";
-import { useEffect } from "react";
-import { useApp } from "../../storeContext.tsx";
-import { composerBox } from "../chat/index.ts";
+import { lazy, Suspense, useEffect } from "react";
+import { composerBox, useMedia } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
+import styles from "./Actions.module.css";
+import { useLeads } from "./actionsShared.ts";
+import { MainAction } from "./MainAction.tsx";
+
+const PhoneActions = lazy(async () => ({ default: (await import("./PhoneActions.tsx")).PhoneActions }));
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once. The composer is the
 // chat's own field: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
@@ -17,11 +23,6 @@ const toComposer = (event: MouseEvent) => {
   event.preventDefault();
   composer.focus();
 };
-
-// A path of this site, made of plain segments and nothing else: a value from a world's data is untrusted, so a scheme, a host,
-// a backslash, a space, a control character, a dot segment, a query or a fragment is no link (the browser reads `/\\host` and
-// `/<tab>/host` as another host).
-const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+$/.test(path);
 
 export interface ActionsProps {
   /** The place, as a share names and links it. */
@@ -42,24 +43,12 @@ export interface ActionsProps {
   className?: string | undefined;
 }
 
-// Whether the room's history came and holds nobody's words, only notices: nobody has said hi yet. False while the chat has not shown it.
-const useNobodySpoke = (room: string | undefined) =>
-  useApp(({ chat }) => {
-    const held = room === undefined ? undefined : chat.rooms[room];
-    return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
-  });
-
 // The main action and the one beside it. A world with a proposals realm leads with reading them (frames 22 and 27) and says hi in its room beside; the
 // chat is otherwise on the page, where the one thing to do is to say hi in it, unless a place gives its own lead (a realm: its page, trying a function).
-function Leads({
-  proposals,
-  say,
-  room,
-  lead,
-  second,
-}: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
-  const first = useNobodySpoke(room);
-  if (proposals !== undefined && isSitePath(proposals)) {
+function Leads({ second, ...asked }: Pick<ActionsProps, "proposals" | "say" | "room" | "lead" | "second">) {
+  const { main, proposals } = useLeads(asked);
+  const { room } = asked;
+  if (proposals !== undefined) {
     return (
       <>
         <Button href={proposals} pad="wide" emphasis="solid" icon="arrow">
@@ -73,16 +62,9 @@ function Leads({
       </>
     );
   }
-  const main = lead ?? {
-    label: first ? "Be the first to say hi" : (say ?? "Say hi in the chat"),
-    href: "#chat",
-    icon: "chat" as const,
-  };
   return (
     <>
-      <Button href={main.href} pad="wide" emphasis="solid" icon={main.icon ?? "arrow"}>
-        {main.label}
-      </Button>
+      <MainAction main={main} />
       {second === undefined ? null : (
         <Button href={second.href} pad="wide" icon={second.icon ?? "arrow"}>
           {second.label}
@@ -92,7 +74,8 @@ function Leads({
   );
 }
 
-export function Actions({ place, follow, className, ...leads }: ActionsProps) {
+export function Actions(props: ActionsProps) {
+  const { place, follow, className, ...leads } = props;
   // The focus follows the link to the chat's composer.
   useEffect(() => {
     document.addEventListener("click", toComposer);
@@ -100,13 +83,21 @@ export function Actions({ place, follow, className, ...leads }: ActionsProps) {
       document.removeEventListener("click", toComposer);
     };
   }, []);
+  if (useMedia(PHONE_QUERY)) {
+    return (
+      <Suspense fallback={<div data-row="" className={[styles["line"], className].join(" ")} />}>
+        <PhoneActions {...props} />
+      </Suspense>
+    );
+  }
   return (
-    <Cluster space="2xs" className={className}>
+    <Cluster space="2xs" wrap="scroll" className={className}>
       <Leads {...leads} />
       {/* Follow and Share in words, as frame 30 draws them: icons alone left what each does unclear. */}
       <FollowButton kind="worlds" id={follow} size="m" />
       <Button
         icon="share"
+        size="m"
         onClick={() => {
           sharePlace(place);
         }}

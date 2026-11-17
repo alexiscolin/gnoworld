@@ -289,17 +289,25 @@ test.describe("Popover", () => {
   });
 
   test("follows its trigger as the window narrows", async ({ page }) => {
-    const { panel } = await anchored(
+    const { trigger, panel } = await anchored(
       page,
       1280,
       pinned({ insetBlockStart: "100px", insetInlineEnd: `${String(STEP)}px` }),
     );
-    for (const width of [1280, 800]) {
+    for (const width of [1280, 960]) {
       await page.setViewportSize({ width, height: 700 });
       await expect
         .poll(async () => Math.abs((await box(panel)).x + (await box(panel)).width - (width - STEP)), String(width))
         .toBeLessThanOrEqual(0.5);
     }
+    // A phone's width (under 900 px): the menu keeps 16 px off the screen's edge (D13712), still a step under its trigger.
+    const edge = 16;
+    await page.setViewportSize({ width: 800, height: 700 });
+    await expect
+      .poll(async () => Math.abs((await box(panel)).x + (await box(panel)).width - (800 - edge)), "800")
+      .toBeLessThanOrEqual(0.5);
+    const [t, p] = [await box(trigger), await box(panel)];
+    expect(Math.abs(p.y - (t.y + t.height) - STEP), "a step under its trigger").toBeLessThanOrEqual(0.5);
   });
 
   test("follows its trigger as a box it sits in scrolls", async ({ page }) => {

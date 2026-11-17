@@ -26,6 +26,21 @@ describe("Chip", () => {
     expect(chip.getAttribute("type")).toBe("button");
   });
 
+  it("marks its count as new only when told, as the bell's is", () => {
+    const { container, rerender } = render(
+      <Chip count={3} onClick={vi.fn()}>
+        A
+      </Chip>,
+    );
+    expect(container.querySelector("[data-tone='new']")).toBeNull();
+    rerender(
+      <Chip count={3} countTone="new" href="/a">
+        A
+      </Chip>,
+    );
+    expect(container.querySelector("a [data-tone='new']")?.textContent).toBe("3");
+  });
+
   it("says it opens a dialog only when told", () => {
     const { rerender } = render(<Chip onClick={vi.fn()}>More</Chip>);
     expect(screen.getByRole("button").hasAttribute("aria-haspopup")).toBe(false);
@@ -86,7 +101,7 @@ describe("Chip", () => {
     ).flat();
     expect(shown.some((c) => c.control && c.pressed === "true")).toBe(true);
     expect(shown.some((c) => c.control && c.counted)).toBe(true);
-    for (const tone of ["neutral", "mine", "warm", "signal", "danger"])
+    for (const tone of ["neutral", "mine", "warm", "signal", "danger", "new"])
       expect(shown.some((c) => !c.control && c.tone === tone)).toBe(true);
   });
 });
@@ -131,5 +146,22 @@ describe("the dot's pulse", () => {
     expect(view.container.querySelector("i")).toBe(dot);
     view.rerender(<Chip dot>Live · last call 4 hours ago</Chip>);
     expect(view.container.querySelector("i")).not.toBe(dot);
+  });
+});
+
+describe("Chip's phone box", () => {
+  it("a pressing chip wears the 44 px hit box, its mark and its dock pill do not", () => {
+    render(
+      <>
+        <Chip onClick={vi.fn()}>A</Chip>
+        <Chip onClick={vi.fn()} size="chip">
+          B
+        </Chip>
+        <Chip>C</Chip>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "A" }).classList.contains("hit")).toBe(true);
+    expect(screen.getByRole("button", { name: "B" }).classList.contains("hit")).toBe(false);
+    expect(screen.getByText("C").classList.contains("hit")).toBe(false);
   });
 });

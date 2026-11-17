@@ -4,8 +4,8 @@ import { Address, Ticket } from "@gnoworld/schemas";
 import { z } from "zod";
 import { adena } from "./adena.ts";
 import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { accountPill, connectButton } from "./account.ts";
+import { test, type Page } from "./fixtures.ts";
+import { connectAtComputer } from "./account.ts";
 
 // Each step is a line sent once a received line matches its pattern ("" waits for none).
 export type Step = readonly [after: string, line: string];
@@ -57,10 +57,7 @@ export const login = (account: string, passphrase: string): Step[] => [
 // An account in a page that logged in with Adena's stand-in, the test wallet of that name: its address.
 export async function logIn(page: Page, as = ""): Promise<string> {
   await adena(page, "signs", as);
-  await page.goto("/");
-  await hydrated(page);
-  await connectButton(page).click();
-  await expect(accountPill(page)).toBeVisible();
+  await connectAtComputer(page);
   const named = `/__wallet?as=${encodeURIComponent(as)}`;
   const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());
   return wallet.address;

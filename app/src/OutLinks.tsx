@@ -12,7 +12,7 @@ export function OutLinks({ links }: { links: readonly { label: string; href: str
     <Cluster as="ul" space="xl">
       {shown.map(({ label, href }) => (
         <li key={label}>
-          <a className={`label ${String(styles["out"])}`} href={href} {...NEW_TAB}>
+          <a className={`label hit ${String(styles["out"])}`} href={href} {...NEW_TAB}>
             <Cluster space="3xs">
               {label}
               <Icon name="arrow-up-right" />

@@ -11,6 +11,13 @@
     --motion-wait: 0s;
   }
 
+  /* A phone keeps the shell header's row above the chat (ChatScreen.module.css): the skeleton starts under it too. */
+  @media (width < 900px) {
+    .shape {
+      inset-block-start: calc(var(--flash-room) + var(--shell-head));
+    }
+  }
+
   .shape[data-leaving] {
     animation: gone calc(var(--motion-slow) * var(--motion-scale)) var(--ease-emphasized) forwards;
   }

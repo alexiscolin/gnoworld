@@ -1,4 +1,4 @@
-/* The welcome card: over space at the bottom left, above the dock's line and clear of the chat column; a bottom sheet on a phone. */
+/* The welcome card: over space at the bottom left, above the dock's line and clear of the chat column; a bottom sheet under 900 px, a phone's. */
 @layer components {
   .welcome {
     position: fixed;
@@ -25,13 +25,55 @@
     visibility: visible;
   }
 
-  @media (width <= 40rem) {
+  /* A phone: a sheet at the screen's foot, clear of the notch, its controls 44 px targets. Its top is the composer's (Welcome.tsx sets --welcome-top
+     from the chat's dock), so it covers the composer and the row of worlds whole and the lines above it stay clear; where the chat has no dock
+     it is as tall as its words, to 70 % of the screen, and scrolls where the text is zoomed. */
+  @media (width < 900px) {
     .welcome {
       inset-inline: 0;
-      inset-block-end: 0;
+      /* raw: over the full chat (3, ChatScreen.module.css) a phone lands in, which the card covers at its foot */
+      z-index: 4;
       inline-size: auto;
+      inset-block-start: var(--welcome-top, auto);
+      inset-block-end: 0;
+      /* raw: the sheet leaves the top 30% of the screen visible; no token holds a share of the screen */
+      max-block-size: 70dvb;
+      overflow: auto;
+      padding-block-end: env(safe-area-inset-bottom);
       border-end-start-radius: 0;
       border-end-end-radius: 0;
+    }
+
+    /* A small button is 32 px with a 44 px hit box: here its box is the 44 px target. */
+    .welcome button {
+      min-block-size: var(--control-m);
+      min-inline-size: var(--control-m);
+    }
+
+    /* The page keeps room under its end while the sheet shows, so its last rows scroll clear of it. */
+    :root:has(.welcome[data-open]) main {
+      /* raw: the sheet's height with its text, 14.5 rem; no token holds a share of a sheet */
+      padding-block-end: 15rem;
+    }
+  }
+
+  /* A short screen (a landscape phone, a small one): the sheet is its title and its buttons; the page's first rows stay in view. */
+  @media (width < 900px) and (height < 600px) {
+    .welcome p {
+      display: none;
+    }
+
+    .welcome h2 {
+      /* layout: one line of title, cut */
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+    }
+
+    :root:has(.welcome[data-open]) main {
+      /* raw: the sheet with no text, 9.5 rem */
+      padding-block-end: 9.5rem;
     }
   }
 }

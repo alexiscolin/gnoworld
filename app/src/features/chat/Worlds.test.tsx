@@ -7,6 +7,7 @@ import { all, button, click, modals, mount as draw, one, settled } from "../../.
 import { pictureOf } from "../../lib/worldPictures.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { inRailOrder, Worlds } from "./Worlds.tsx";
+import { WorldRows } from "./WorldRows.tsx";
 
 // The full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
 const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
@@ -165,5 +166,40 @@ describe("Worlds, the unread pills", () => {
 
   it("shows no pill when no count is given: a guest's column", () => {
     expect(pills(mount(<Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" />))).toEqual([]);
+  });
+});
+
+// A phone has no column: the worlds are rows of a navigation, each its planet and its name, in the rail's order.
+describe("Worlds, as rows (a phone's drawer)", () => {
+  const rows = (current = "bubble") =>
+    mount(<WorldRows universe={UNIVERSE} worlds={[BUBBLE, EARTH, GOVDAO]} current={current} />);
+
+  it("is the navigation named Worlds, one link to each world with its name in words, the Earth first", () => {
+    const nav = one(rows(), 'nav[aria-label="Worlds"]');
+    const links = all(nav, "a");
+    expect(links.map((link) => link.textContent)).toEqual(["Earth", "Bubble", "GovDAO"]);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/earth", "/w/bubble", "/w/govdao"]);
+  });
+
+  it("marks the world in view as the current page, and no other", () => {
+    const current = all(rows("govdao"), 'a[aria-current="page"]');
+    expect(current.map((link) => link.textContent)).toEqual(["GovDAO"]);
+  });
+
+  it("holds under the rows what the column holds: the places followed and opened, the way to Discover, and the credits", async () => {
+    modals();
+    const box = rows();
+    const nav = one(box, 'nav[aria-label="Worlds"]');
+    expect(nav.querySelector("hr")).not.toBeNull();
+    expect(button(nav, "Find more worlds")).toBeDefined();
+    const credits = button(box, "Credits");
+    expect(all(nav, ":scope > *").at(-1)).toBe(credits);
+    click(credits);
+    await settled(() => all(box, "dialog[open]").length === 1);
+    expect(one(box, "dialog").textContent).toContain("Solar System Scope");
+  });
+
+  it("makes the credits a row's height, as the rows are", () => {
+    expect(button(rows(), "Credits")?.className).toContain("creditsRow");
   });
 });

@@ -63,7 +63,9 @@ export function ago(at: number, now: number): { value: number; unit: string } {
   const minutes = Math.max(0, Math.round((now - at) / MINUTE_MS));
   if (minutes < 60) return { value: minutes, unit: "min ago" };
   const hours = Math.round(minutes / 60);
-  return hours < 48 ? { value: hours, unit: "hours ago" } : { value: Math.round(hours / 24), unit: "days ago" };
+  return hours < 48
+    ? { value: hours, unit: hours === 1 ? "hour ago" : "hours ago" }
+    : { value: Math.round(hours / 24), unit: "days ago" };
 }
 
 /** The same as one line: "5 min ago". */

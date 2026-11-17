@@ -77,7 +77,7 @@ function PassportFile({ passport, onRead }: { passport: Passport; onRead: (file:
           Your passport holds {count} {count === 1 ? "stamp" : "stamps"}. It stays in this browser unless you export it.
         </p>
       </Stack>
-      <Cluster space="2xs">
+      <Cluster space="2xs" wrap="scroll">
         <Button
           size="s"
           onClick={() => {

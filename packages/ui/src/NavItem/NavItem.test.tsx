@@ -92,6 +92,20 @@ describe("NavItem", () => {
     expect(screen.getByText("2 unread")).toBeTruthy();
   });
 
+  it("marks an unseen badge, a count or a dot, so it wears the coral of what is new, and a state's dot not", () => {
+    const { container } = render(
+      <>
+        <NavItem href="/a" badge={{ said: "2 unread" }}>
+          noor
+        </NavItem>
+        <NavItem href="/b" badge={{ said: "online", status: true }}>
+          sam
+        </NavItem>
+      </>,
+    );
+    expect(container.querySelectorAll("[data-unseen]")).toHaveLength(1);
+  });
+
   it("keeps its words as text, whatever they hold", () => {
     staysText((words) => <NavItem href="/a">{words}</NavItem>);
   });

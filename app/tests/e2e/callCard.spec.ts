@@ -17,8 +17,9 @@ import {
   writeTab,
   type Wallet,
 } from "./callCard.ts";
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page } from "./fixtures.ts";
 import { connectButton } from "./account.ts";
+import { openPlacePage } from "./realmRoom.ts";
 
 // A realm's write function: the card under its row, the signature in a stand-in for Adena (../fakeAdena.ts),
 // the hash followed to its block. Nothing shows as done before the chain's answer.
@@ -222,8 +223,7 @@ test.describe("a write function's call card", () => {
     await adena(phone);
     await callWallet(phone);
     await writeChain(phone);
-    await phone.goto(`/r/${REALM.slice("gno.land/r/".length)}`);
-    await hydrated(phone);
+    await openPlacePage(phone, `/r/${REALM.slice("gno.land/r/".length)}`, REALM);
     await writeTab(phone);
     await openCall(phone, "SetBio", "tap");
     await expect(card(phone)).toContainText("To sign, use a computer");

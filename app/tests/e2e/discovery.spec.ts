@@ -50,22 +50,18 @@ test.describe("the settings", () => {
     await dialog.getByRole("switch", { name: /^Reduce animations/ }).check();
     await expect.poll(() => root(page, "motion")).toBe("reduce");
     await expect.poll(() => motionFast(page)).toBe("0s");
-    await dialog.getByRole("switch", { name: /^Space in 3D on a phone/ }).check();
-    await expect.poll(() => root(page, "phone3d")).toBe("on");
     await expect(testnet).toBeVisible();
-    expect(await held(page, "settings")).toEqual({ quality: "low", calm: true, phone3d: true });
+    expect(await held(page, "settings")).toEqual({ quality: "low", calm: true });
     await page.reload();
     await hydrated(page);
     await expect.poll(() => root(page, "quality")).toBe("low");
     await expect.poll(() => root(page, "motion")).toBe("reduce");
-    await expect.poll(() => root(page, "phone3d")).toBe("on");
     await expect(testnet).toBeVisible();
     // The page came back at its address, #settings: the dialog opens over it. Back to the defaults: the marks go, the device forgets the key.
     const again = page.getByRole("dialog", { name: "Settings" });
     await expect(again).toBeVisible();
     await again.getByRole("radio", { name: /^Auto/ }).check();
     await again.getByRole("switch", { name: /^Reduce animations/ }).uncheck();
-    await again.getByRole("switch", { name: /^Space in 3D on a phone/ }).uncheck();
     await expect.poll(() => root(page, "quality")).toBeNull();
     await expect.poll(() => root(page, "motion")).toBeNull();
     await expect.poll(() => motionFast(page)).toBe(before);
@@ -133,7 +129,7 @@ test.describe("the menu", () => {
     expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);
     await page.keyboard.press("Escape");
     const dialog = await settings(page);
-    await expect(dialog.getByRole("switch", { name: /^Space in 3D on a phone/ })).toBeVisible();
+    await expect(dialog.getByRole("switch", { name: /^Reduce animations/ })).toBeVisible();
   });
 });
 

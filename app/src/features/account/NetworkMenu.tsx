@@ -1,6 +1,6 @@
 // The network's menu itself, asked at its trigger's first press and drawn in its place, open (Network.tsx): the networks of the data, the
 // current one checked; choosing one goes by networkSwitch.ts.
-import { Menu } from "@gnoworld/ui";
+import { Menu, type MenuItem } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import universes from "../../../data/universes.json" with { type: "json" };
@@ -24,7 +24,9 @@ async function holds(universe: string, realm: string, signal: AbortSignal): Prom
   return read.ok || knownOf(false, { state: "failed", failure: read.failure }) === "yes";
 }
 
-export function NetworkMenu({ name }: { name: string }) {
+/** The networks as the menu's choices, the current one checked, and whether a switch is under way: the network's own menu draws them, and
+ * a phone's account menu, which holds the network, as rows among its own. */
+export function useNetworkItems(): { items: MenuItem[]; busy: boolean } {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -38,37 +40,35 @@ export function NetworkMenu({ name }: { name: string }) {
     [pathname],
   );
   const here = site.universeAt(pathname).id;
+  const items = site.universes.map((each) => ({
+    label: each.name,
+    checked: each.id === here,
+    ...(each.testnet ? { note: "Testnet" } : {}),
+    onSelect: () => {
+      goingRef.current?.abort();
+      const stop = new AbortController();
+      goingRef.current = stop;
+      setBusy(true);
+      switchTo({ site, pathname, to: each.id, holds: (universe, realm) => holds(universe, realm, stop.signal) })
+        .then(({ path, line }) => {
+          if (stop.signal.aborted) return undefined;
+          if (line !== undefined) raisePill({ title: line });
+          return navigate(path);
+        })
+        .catch((error: unknown) => {
+          if (!stop.signal.aborted) reportError(error);
+        })
+        .finally(() => {
+          if (!stop.signal.aborted) setBusy(false);
+        });
+    },
+  }));
+  return { items, busy };
+}
+
+export function NetworkMenu({ name }: { name: string }) {
+  const { items, busy } = useNetworkItems();
   return (
-    <Menu
-      trigger={name}
-      label="Choose the network"
-      emphasis="plain"
-      size="s"
-      openAtOnce
-      busy={busy}
-      items={site.universes.map((each) => ({
-        label: each.name,
-        checked: each.id === here,
-        ...(each.testnet ? { note: "Testnet" } : {}),
-        onSelect: () => {
-          goingRef.current?.abort();
-          const stop = new AbortController();
-          goingRef.current = stop;
-          setBusy(true);
-          switchTo({ site, pathname, to: each.id, holds: (universe, realm) => holds(universe, realm, stop.signal) })
-            .then(({ path, line }) => {
-              if (stop.signal.aborted) return undefined;
-              if (line !== undefined) raisePill({ title: line });
-              return navigate(path);
-            })
-            .catch((error: unknown) => {
-              if (!stop.signal.aborted) reportError(error);
-            })
-            .finally(() => {
-              if (!stop.signal.aborted) setBusy(false);
-            });
-        },
-      }))}
-    />
+    <Menu trigger={name} label="Choose the network" emphasis="plain" size="s" openAtOnce busy={busy} items={items} />
   );
 }

@@ -53,4 +53,21 @@
     font: var(--font-body);
     font-weight: var(--_weight);
   }
+
+  /* A phone's finger: a row that is a link or a button is 44 px high, its words on the middle, the row's own padding given to the link. */
+  @media (width < 900px) {
+    .row:has(:is(a, button).link) {
+      padding-block: 0;
+    }
+
+    :is(a, button).link {
+      /* layout: the words on the middle of the 44 px */
+      display: grid;
+      /* layout: the words on the middle of the 44 px */
+      align-content: center;
+      /* layout: the one track shrinks below its words' length, so a cut title never pushes the row past its box */
+      grid-template-columns: minmax(0, 1fr);
+      min-block-size: var(--control-m);
+    }
+  }
 }

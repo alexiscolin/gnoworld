@@ -60,4 +60,11 @@
       inset-inline-start var(--_time) var(--ease-standard),
       border-color var(--_time) var(--ease-standard);
   }
+
+  /* A phone's finger (utilities.css, .hit): the track is 40 wide, so its box stands 2 px out each side to reach 44. */
+  @media (width < 900px) {
+    .switch {
+      --hit-inline: calc((100% - var(--control-m)) / 2);
+    }
+  }
 }
