@@ -22,7 +22,7 @@ export const ready = ({ compiled, uploads, wanted, alone, index }: Readiness): b
   compiled && uploads === 0 && wanted && (alone < 0 || alone === index);
 
 /** The longest frame the fade counts: a stalled frame (a first draw, an upload) never swallows it. */
-const LONGEST_S = 1 / 20;
+export const LONGEST_S = 1 / 20;
 
 /** The share `share` (0 to 1) of a planet's arrival, `delta` seconds on. */
 export const advance = (share: number, delta: number, still: boolean): number =>

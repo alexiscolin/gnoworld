@@ -10,6 +10,7 @@ import { LIVELY_PX, napFor } from "./rest.ts";
 import type { Moment, Need } from "./redraw.ts";
 import { shownOf } from "./shown.ts";
 import { fading, openedOf } from "./open.ts";
+import { bringsEarth, planetAt, type Place } from "./place.ts";
 
 // A slow planet's spin, in radians a second, at most (shaders/planets.ts): the pixels it moves a second are its radius's.
 const SPIN_MOST = 0.08;
@@ -197,6 +198,15 @@ export const tick = (
  * KHR_parallel_shader_compile), a planet made would hold a frame of it while its programs compile (parts/wanted.ts, madeOnly). */
 export const waitsToMake = (flying: boolean, renderer: Pick<WebGLRenderer, "extensions">): boolean =>
   flying && !renderer.extensions.has("KHR_parallel_shader_compile");
+
+/** Whether `place`'s planet is made whole (the flight makes it ahead), or not to be waited for: none to draw, or one made only once the
+ * flight lands (no parallel compile: waitsToMake), which a longer flight would not bring. Not yet, the flight lands more gently
+ * (rig/flight.ts). Made, not shown: a planet is wanted only once it is a few pixels, near the middle of a long flight. */
+export function landsReady(space: Space, place: Place): boolean {
+  const planet = bringsEarth(place) ? space.universe?.earth : planetAt(space.universe, place);
+  const near = space.stage.near;
+  return planet === undefined || near === undefined || near.made(planet.index) || waitsToMake(true, space.renderer);
+}
 
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */
 export function choose(space: Space, state: State, now: number): void {

@@ -1,7 +1,7 @@
 // The generated worlds' maps, shared by every world that names them and kept once loaded (a world's look names a few of a small
 // library), and the Earth's own. A map that fails is asked again after two seconds.
 import type { Texture, WebGLRenderer } from "three";
-import { afterLoad } from "../../afterLoad.ts";
+import { afterLoad, onLoad } from "../../afterLoad.ts";
 import { fastLink, savesData } from "../../lib/saveData.ts";
 import type { MapSet, Planet } from "../planet/planet.ts";
 import { freeMap, loadMap, mapUrl, type MapLoad } from "../planet/maps.ts";
@@ -145,7 +145,9 @@ export class Maps {
     }
   }
 
-  // A late set: asked once the Earth's first maps are in, in the browser's idle time, and again after a failure.
+  // A late set: asked once the Earth's first maps are in, and again after a failure, once the page has loaded; in the browser's idle time,
+  // unless the Earth is gone to: a flight leaves Firefox no rest, and the full maps waited up to 2 s for one, to come after the Earth was
+  // made (Alexis saw it sharpen).
   #late<T>(
     state: Late<T>,
     load: (base: string, how: Pick<MapLoad, "anisotropy" | "signal">) => Promise<T>,
@@ -154,7 +156,7 @@ export class Maps {
     if (state.asked || this.#earth === undefined || lowQuality() || blocked()) return state.value;
     state.asked = true;
     const { signal } = this.#leaving;
-    afterLoad(() => {
+    const ask = () => {
       load(this.#base, { anisotropy: ANISOTROPY, signal }).then(
         (value) => {
           state.value = value;
@@ -163,7 +165,9 @@ export class Maps {
           if (!signal.aborted) setTimeout(() => (state.asked = false), AGAIN_MS);
         },
       );
-    }, signal);
+    };
+    if (this.#ahead) onLoad(ask, signal);
+    else afterLoad(ask, signal);
     return state.value;
   }
 
