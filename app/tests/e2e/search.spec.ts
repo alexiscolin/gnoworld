@@ -2,6 +2,7 @@ import { inGames, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { axeOf } from "./axe.ts";
+import { ownContext } from "./deployed.ts";
 
 // The search palette: ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
 // typing sends no request (the places are in the page); arrows, Enter and Escape work, and the focus goes back to the opener.
@@ -256,7 +257,7 @@ test.describe("rooms and people", () => {
     if (baseURL === undefined) throw new Error("no baseURL");
     const browser = await playwright.chromium.launch(launchOptions);
     try {
-      const second = await (await browser.newContext({ baseURL })).newPage();
+      const second = await (await ownContext(browser, { baseURL })).newPage();
       const other = await logIn(second, word("kin"));
       await second.goto("/w/bubble?room=games&chat=full");
       await hydrated(second);

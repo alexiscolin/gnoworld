@@ -10,6 +10,7 @@ import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { violations } from "./axe.ts";
 import { field, GUEST, HISTORY, ROOM, T, tagged } from "./talk.ts";
 import { chipOf, closeButton, panel } from "./thread.ts";
+import { ownContext } from "./deployed.ts";
 
 // The phone app's critical flows (D13710 to D13728), each at three phone sizes: a phone opens straight into a chat (the last world's, else the
 // Earth's), whose place band opens the place's one sheet. Only the first-screen test, at 390, is @gate: it proves a phone loads no 3D before
@@ -68,7 +69,7 @@ const handed = async (page: Page, { playwright, launchOptions }: Launcher): Prom
   session ??= (async () => {
     const browser = await playwright.chromium.launch(launchOptions);
     try {
-      const computer = await (await browser.newContext({ baseURL, viewport: { width: 1280, height: 900 } })).newPage();
+      const computer = await (await ownContext(browser, { baseURL, viewport: { width: 1280, height: 900 } })).newPage();
       const address = await logIn(computer, `phone-${crypto.randomUUID().slice(0, 8)}`);
       return { address, cookies: (await computer.context().storageState()).cookies };
     } finally {

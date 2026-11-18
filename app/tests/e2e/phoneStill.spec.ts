@@ -3,6 +3,7 @@ import { lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { GUEST, T } from "./talk.ts";
+import { ownContext } from "./deployed.ts";
 
 // A phone's screen stands still (Safari on iPhone): the document never scrolls on a view with the chat and takes no pull past its ends;
 // the lines alone scroll, and hand no scroll on. Walked with an iPhone's profile in WebKit (outside the sandbox, which starts none) and
@@ -45,7 +46,7 @@ for (const engine of ENGINES) {
     test.beforeEach(async ({ playwright, launchOptions, baseURL }) => {
       // Chromium's one-process flag is its own (playwright.config.ts); WebKit takes none.
       browser = await playwright[engine].launch(engine === "chromium" ? launchOptions : {});
-      const context = await browser.newContext({
+      const context = await ownContext(browser, {
         ...devices["iPhone 14"],
         ...(baseURL === undefined ? {} : { baseURL }),
       });
