@@ -198,3 +198,20 @@ test("a room that opens with a card shows its lines once, the card filled, at th
   await expect.poll(() => gap(list)).toBeLessThan(4);
   expect(await page.evaluate(() => (Reflect.get(window, "heights") as Set<number>).size)).toBe(1);
 });
+
+// A history that never comes (Ergo refused the room, or answers nothing) leaves no skeleton for good: the empty room's words after 10 s.
+test("a room whose history never comes says it holds no message after 10 s", async ({ page }) => {
+  await page.clock.install();
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, "guest-zzzzzz", { historyAfter: new Promise<void>(() => undefined) });
+  });
+  await page.goto("/w/bubble?room=games&chat=full");
+  await hydrated(page);
+  const skeleton = page.locator('[data-chat-state="connected"] [aria-busy="true"] [data-shape="disc"]');
+  await expect(skeleton.first()).toBeAttached();
+  await page.clock.fastForward(9_000);
+  await expect(page.getByText("No messages yet.")).toHaveCount(0);
+  await page.clock.fastForward(1_500);
+  await expect(page.getByText("No messages yet.")).toBeVisible();
+  await expect(skeleton).toHaveCount(0);
+});

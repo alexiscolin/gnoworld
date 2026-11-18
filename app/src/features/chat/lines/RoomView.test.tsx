@@ -1,10 +1,14 @@
 import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { MEMBERS_SHOWN, People, type PeopleProps } from "../rooms/People.tsx";
+import { Lines } from "./Lines.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
+
+// The lines view as it is, its calls kept: what the room tells it.
+vi.mock("./Lines.tsx", { spy: true });
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -381,6 +385,15 @@ describe("RoomView", () => {
     expect(said(html)).not.toContain("No messages yet.");
     expect(html).toMatch(/<div [^>]*aria-busy="true"[^>]*>.*data-shape="disc"/s);
     expect(view({ state: { ...ROOM, lines: [], paged: true } })).not.toContain('data-shape="disc"');
+  });
+
+  // The search's jump puts the list on a found message: the list held at its end is told, and leaves it there (heldAtEnd.ts).
+  it("tells its lines a room read around a found message, and no other", () => {
+    const told = () => vi.mocked(Lines).mock.lastCall?.[0].jumped;
+    view({ state: { ...ROOM, paged: true, jump: "a" } });
+    expect(told()).toBe(true);
+    view({ state: { ...ROOM, paged: true } });
+    expect(told()).toBe(false);
   });
 
   it("shows no skeleton while the chat is not connected, which its status says", () => {
