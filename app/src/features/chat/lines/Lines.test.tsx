@@ -23,6 +23,11 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
     threadsOf: vi.fn(real.threadsOf),
   };
 });
+// A card line's card, without its chunk or its read: the element the list looks for, empty until `card.filled`.
+const card = vi.hoisted(() => ({ filled: false }));
+vi.mock("./SharedCard.tsx", () => ({
+  SharedCard: () => <div data-shared-card="market">{card.filled ? "GNOT 0.43" : null}</div>,
+}));
 vi.mock("./ThreadChip.tsx", async (importOriginal) => {
   const real = await importOriginal<typeof threadChipModule>();
   return { ...real, ThreadChip: vi.fn(real.ThreadChip) };
@@ -373,6 +378,49 @@ describe("the list held at its end", () => {
       client = CLIENT;
       strayed(0);
       expect(top).toBe(600);
+    });
+
+    // A room with cards shows once, whole: its lines wait, unseen, for their cards to fill, a short capped time.
+    describe("a room whose lines hold a card", () => {
+      const CARD = "💹 Market prices";
+      const shown = () => list().style.getPropertyValue("visibility") !== "hidden";
+
+      it("keeps its lines unseen until the list is quiet", () => {
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        expect(shown()).toBe(false);
+        grown(200);
+        vi.advanceTimersByTime(150);
+        expect(shown()).toBe(false);
+        vi.advanceTimersByTime(100);
+        expect(shown()).toBe(true);
+      });
+
+      it("shows them after 400 ms at most, though the list still grows", () => {
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        for (let waited = 0; waited < 350; waited += 50) {
+          grown(10);
+          vi.advanceTimersByTime(50);
+        }
+        expect(shown()).toBe(false);
+        grown(10);
+        vi.advanceTimersByTime(50);
+        expect(shown()).toBe(true);
+      });
+
+      // A room the page already holds (after a flight, a room switch): its cards' code and data are there, and nothing will grow.
+      it("shows at once a room whose cards are filled as it opens", () => {
+        card.filled = true;
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        card.filled = false;
+        expect(shown()).toBe(true);
+      });
+
+      it("shows at once a room with no card, and a card line that comes later", () => {
+        draw({ paged: true });
+        expect(shown()).toBe(true);
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        expect(shown()).toBe(true);
+      });
     });
 
     it("waits for the room's history", () => {

@@ -1,7 +1,7 @@
 // A room's list held at its end (its newest line) while the reader is there: as a line comes, as a card, a preview or an image
 // grows one, as the composer takes room. Once the reader scrolls up, the list is left where they are.
 import type { Line, Reaction } from "@gnoworld/core";
-import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, type RefObject } from "react";
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -24,6 +24,25 @@ const toEnd = (box: HTMLElement, top: { current: number }) => {
 
 // How long a list keeps its size before its room has arrived, in ms: the cards of a room come within a frame or two of each other.
 const QUIET_MS = 200;
+// How long, at most, a room that opens with cards among its lines waits for them, unseen, in ms: its cards fill 60 to 300 ms
+// after its lines, and a room shown at once would grow under the reader's eyes meanwhile.
+const CARDS_WAIT_MS = 400;
+const show = (box: HTMLElement | null) => box?.style.removeProperty("visibility");
+
+// A room that opens with a card not drawn yet among its lines (its code has not come: the first of a visit) shows once, whole:
+// unseen until its list is quiet (the net's wait, below), CARDS_WAIT_MS at most. Cards the page already holds wait for nothing.
+function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const box = listRef.current;
+    if (box === null) return;
+    if (box.querySelector("[data-shared-card]:empty") === null) return;
+    box.style.setProperty("visibility", "hidden");
+    const latest = setTimeout(() => show(box), CARDS_WAIT_MS);
+    return () => {
+      clearTimeout(latest);
+    };
+  }, [listRef]);
+}
 // What a reader moves a list by.
 const BY_HAND = ["wheel", "touchmove", "keydown", "pointerdown"] as const;
 
@@ -53,12 +72,14 @@ export function useNewestInView({
   const arrivingRef = useRef(true);
   const settle = useEffectEvent(() => {
     const box = listRef.current;
+    show(box);
     if (box === null || box.clientHeight === 0 || !arrived || !arrivingRef.current) return;
     arrivingRef.current = false;
     if (handRef.current || placedRef.current) return;
     atEndRef.current = true;
     toEnd(box, topRef);
   });
+  useCardsAwaited(listRef);
   useLayoutEffect(() => {
     const box = listRef.current;
     if (box === null) return;
@@ -85,14 +106,8 @@ export function useNewestInView({
       quiet = setTimeout(settle, QUIET_MS);
     });
     const hand = new AbortController();
-    for (const type of BY_HAND)
-      box.addEventListener(
-        type,
-        () => {
-          handRef.current = true;
-        },
-        { passive: true, signal: hand.signal },
-      );
+    const byHand = () => (handRef.current = true);
+    for (const type of BY_HAND) box.addEventListener(type, byHand, { passive: true, signal: hand.signal });
     watch.observe(box);
     for (const line of box.children) watch.observe(line);
     const added = new MutationObserver((changes) => {
