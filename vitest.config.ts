@@ -16,9 +16,9 @@ if (process.version !== PINNED)
 const STRYKER_TMP = "**/.stryker-tmp/**";
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
-// The tests marked display-only: props, classes, variants, markup, the look
-// of a world, small view components. They stay in the repository, and run in the `display` and `display_ui` projects, on demand
-// (`vitest run --project display --project display_ui`) and at night (nightly.yml), not in the default `test` and `coverage` runs.
+// The tests marked display-only: props, classes, variants, markup, the look of a world, small view components. They run with the
+// others in `node` and `ui`, so in GitHub's gate: left to projects of their own, which the night alone ran, red ones stayed on main.
+// The `display` and `display_ui` projects keep them alone, on demand (`vitest run --project display --project display_ui`).
 const DISPLAY_UI = [
   "packages/ui/src/{Avatar,Breadcrumb,Button,Card,ChatLayout,Chip,EmptyState,Kicker,Logo,NavItem,Overview,Panel,PlanetThumb,Row,Skeleton,Sparkline,Stat,TokensPage,compositions,icons}/**/*.test.{ts,tsx}",
 ];
@@ -112,12 +112,11 @@ export default defineConfig({
             "app/src/features/chat/composer/composing.test.tsx",
             "app/src/features/chat/lines/lineFlash.test.tsx",
             ...SLOW,
-            ...DISPLAY,
           ],
         },
       },
       {
-        // The display-only tests of the app, on demand (see DISPLAY).
+        // The display-only tests of the app alone, on demand (see DISPLAY).
         extends: true,
         test: { name: "display", include: DISPLAY, exclude: [...configDefaults.exclude, "packages/ui/**"] },
       },
@@ -132,7 +131,6 @@ export default defineConfig({
         test: {
           name: "ui",
           include: ["packages/ui/src/**/*.test.{ts,tsx}"],
-          exclude: [...configDefaults.exclude, ...DISPLAY_UI],
           environment: "jsdom",
           setupFiles: ["packages/ui/src/testSetup.ts"],
           // Vitest reads a stylesheet as empty unless named here: the token page reads the token file.
@@ -140,7 +138,7 @@ export default defineConfig({
         },
       },
       {
-        // The design system's display-only tests, on demand (see DISPLAY_UI): the same environment as `ui`.
+        // The design system's display-only tests alone, on demand (see DISPLAY_UI): the same environment as `ui`.
         extends: true,
         test: {
           name: "display_ui",

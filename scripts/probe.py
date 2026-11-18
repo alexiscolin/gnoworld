@@ -351,6 +351,17 @@ try:
         expect(states == {"ui probe one": "passed", "ui probe two": "passed", "ui probe fails": "failed"}, f"vitest runs ui's tests in jsdom, each on an empty page: {states}")
         shutil.rmtree(UI)
 
+    if part("display_in_gate"):
+        # The display-only tests (vitest.config.ts's DISPLAY and DISPLAY_UI) run in GitHub's gate: the projects its unit job names list
+        # them. Left to projects the night alone ran, red ones stayed on main (tokens.test.ts, home.test.tsx, world.test.tsx).
+        with open(".github/workflows/gate.yml") as f:
+            unit = next(line for line in f if "pnpm exec vitest run --project" in line)
+        projects = [word for flag, word in zip(unit.split(), unit.split()[1:]) if flag == "--project"]
+        out = run(["node_modules/.bin/vitest", "list", "--filesOnly", "--json", *[a for p in projects for a in ("--project", p)]])
+        listed = {os.path.relpath(entry["file"]) for entry in json.loads(out.stdout or "[]")}
+        for file in ("app/src/routes/home.test.tsx", "packages/ui/src/TokensPage/tokens.test.ts"):
+            expect(file in listed, f"the gate's unit projects ({', '.join(projects)}) run the display test {file}")
+
     if part("prettier"):
         # Prettier: a file that is not formatted.
         plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
