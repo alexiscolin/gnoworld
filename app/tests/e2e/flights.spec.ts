@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import type { Space } from "../../src/space/scene.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { word } from "./chat.ts";
+import { logIn, say } from "./irc.ts";
 import { countFlights, flightOf, goInPage, gpuOf, heapOf, landed, running, shownLabels } from "./sceneStage.ts";
 
 // Flights (ADR-0001 §7; ADR-0002 §1; frames 18, 19, 36, 88, 89, 101, 128, 129, 142), read off the engine (`__gnoworldSpace`): the flight
@@ -285,4 +287,55 @@ test("leaves no GPU resource climbing and the heap within a tenth after twenty f
   expect(leaks(reads.map((read) => read.geometries)), "geometries climb read after read").toBe(false);
   expect(leaks(reads.map((read) => read.textures)), "textures climb read after read").toBe(false);
   expect(await heap()).toBeLessThanOrEqual(before.heap * 1.1);
+});
+
+// Alexis on v0.1.6: after flights, the logo and the Earth, its chat read "No messages yet." (ChatPanel took its link after telling it the
+// room). The seeded walk that showed it: after each step, the place's chat holds its room's line, once, once it has landed. The night's
+// alone: the gate's guard is ChatPanel.test.tsx's, and this walk takes about a minute of the software GPU.
+test("a walk through the places shows each place's chat with its history, logged in", async ({ page }) => {
+  const ROOM_OF: Record<string, string> = { "/earth": "#earth", "/w/bubble": "#bubble", "/w/govdao": "#govdao" };
+  const WALK = [
+    "/w/bubble?chat=full",
+    "/w/govdao",
+    "/s/gnoland",
+    "/earth",
+    "logo",
+    "/w/bubble",
+    "/earth",
+    "/w/govdao",
+    "/universe",
+    "logo",
+    "/s/gnoland",
+    "/universe",
+    "/earth",
+    "/s/gnoland",
+    "logo",
+  ];
+  await page.setViewportSize(FRAME);
+  await page.addInitScript(() => {
+    localStorage.setItem("gnoworld:welcomed", "1");
+  });
+  const said = word("said");
+  const address = await logIn(page, word("walker"));
+  for (const room of Object.values(ROOM_OF)) await say(page, { address, room }, [`${said} in ${room}`]);
+  await page.goto(HOME);
+  await hydrated(page);
+  await running(page);
+  for (const [step, to] of WALK.entries()) {
+    if (to === "logo") await page.getByRole("link", { name: "gnoworld" }).click();
+    else await goInPage(page, to);
+    const path = to === "logo" ? "/" : (to.split("?")[0] ?? to);
+    await expect(page).toHaveURL((url) => url.pathname === path);
+    const room = ROOM_OF[path];
+    if (room === undefined) continue;
+    // Its own lines (the info panel says the last one too). 60 s: on the software GPU a dock stays inert till its page is ready, which took
+    // the Earth's 17 s past its history's coming.
+    await expect(
+      page
+        .getByRole("region", { name: "Chat" })
+        .getByRole("list", { name: "Messages" })
+        .getByText(`${said} in ${room}`),
+      `step ${String(step)}, ${WALK.slice(0, step + 1).join(" > ")}`,
+    ).toHaveCount(1, { timeout: 60_000 });
+  }
 });

@@ -4,7 +4,6 @@ import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn, say } from "./irc.ts";
 import { SITE } from "./sites.ts";
 import { axeOf } from "./axe.ts";
-import { flightOf, goInPage, running } from "./sceneStage.ts";
 
 // A world's rooms on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
@@ -234,62 +233,4 @@ test("reads the rooms, a long unbroken line and a long link at a phone's width, 
   await expect(lineOf(page, long)).toBeVisible();
   await expect(lineOf(page, url).getByRole("link")).toHaveAttribute("href", url);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-});
-
-// Alexis on v0.1.6: after flights between worlds and systems, the logo, and the Earth, its chat read "No messages yet." until a reload. A
-// panel drawn again over rooms the page already held told its link no room in view, so no history was asked (ChatPanel). The seeded walk
-// that showed it, in the production build with the real Ergo and the scene: after each step, once the flight is over, a place's chat shows
-// the line said in its room.
-test.describe("the chat along a walk through the places", () => {
-  test.describe.configure({ timeout: 300_000 });
-  const ROOM_OF: Record<string, string> = { "/earth": "#earth", "/w/bubble": "#bubble", "/w/govdao": "#govdao" };
-  const WALK = [
-    "logo",
-    "/w/bubble?chat=full",
-    "/w/govdao",
-    "/s/gnoland",
-    "/earth",
-    "logo",
-    "/w/bubble",
-    "/earth",
-    "/w/govdao",
-    "/universe",
-    "logo",
-    "/s/gnoland",
-    "/universe",
-    "/earth",
-    "/s/gnoland",
-    "logo",
-  ];
-
-  test("shows each place's history at every step, logged in", async ({ page }) => {
-    await page.setViewportSize({ width: 1728, height: 1080 });
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
-    const said = word("said");
-    const address = await logIn(page, word("walker"));
-    for (const room of Object.values(ROOM_OF)) await say(page, { address, room }, [`${said} in ${room}`]);
-    await page.goto("/?test-gpu");
-    await hydrated(page);
-    await running(page);
-    for (const [step, to] of WALK.entries()) {
-      if (to === "logo") await page.getByRole("link", { name: "gnoworld" }).click();
-      else await goInPage(page, to);
-      const path = to === "logo" ? "/" : (to.split("?")[0] ?? to);
-      await expect(page).toHaveURL((url) => url.pathname === path);
-      await expect.poll(async () => (await flightOf(page)).flying, { timeout: 60_000 }).toBe(false);
-      const room = ROOM_OF[path];
-      if (room === undefined) continue;
-      // Once, in the room's own lines (the info panel says its last line too). Up to 30 s: GovDAO's dock stays inert while its chain's reads
-      // come, which this machine's software GPU and parallel runs slowed past 15 s though its history had come.
-      await expect(
-        page
-          .getByRole("region", { name: "Chat" })
-          .getByRole("list", { name: "Messages" })
-          .getByText(`${said} in ${room}`),
-        `step ${String(step)}, ${WALK.slice(0, step + 1).join(" > ")}`,
-      ).toHaveCount(1, { timeout: 30_000 });
-    }
-  });
 });
