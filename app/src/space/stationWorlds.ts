@@ -25,3 +25,7 @@ export const STATION_WORLDS: readonly CosmosWorld[] = SHOWN_STATIONS.map((id) =>
   namespace: "gnoland",
   realms: [],
 }));
+
+/** The hubs that list no realm, so the worlds' file has none of their worlds (it is made of realms): laid out from the start, each a system
+ * of its own, so a flight to one's page lays nothing again. */
+export const HUB_WORLDS: readonly CosmosWorld[] = [{ id: "bubble", namespace: "bubble", realms: [] }];
