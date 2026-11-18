@@ -129,7 +129,7 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   };
 }
 
-// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton or a moon. A planet framed close
+// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in over its stand-in or a moon. A planet framed close
 // turns slowly: it is lively (below), drawn at 15 frames a second once the view is still; its moons cross it far faster, and stepped at 15
 // they jerked across it, so a moon keeps every frame while the clock runs, and none once it stopped.
 const moves = ({ rig, stage, seconds }: Space): boolean =>

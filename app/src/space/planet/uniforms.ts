@@ -73,7 +73,7 @@ export function sharedUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     relief: { value: look.relief },
     // 1 draws the relief's shadows and the real height's cavities near the terminator; a Low setting turns it to 0 (setDepth).
     depth: { value: 1 },
-    // How far the planet has come in from its skeleton, 0 to 1 (Planet.setArrive).
+    // How far the planet has come in over its stand-in, 0 to 1 (Planet.setArrive).
     arrive: { value: 1 },
     // Up to four moons, each x, y, z and radius in world units; a radius of 0 is none (Planet.setMoons).
     moonShadows: { value: Array.from({ length: MOONS_MOST }, () => new Vector4(0, 0, 0, 0)) },
