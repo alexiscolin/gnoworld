@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
 import { useFocusKept } from "./lines/useFocusKept.ts";
-import { useLate } from "./useLate.ts";
 
 export interface EmbedProps {
   embed: Player;
@@ -43,10 +42,24 @@ export function PlayerFrame({ embed }: { embed: Player }) {
 /** How long a card waits on its line's verdict before saying it could not check it. */
 const CHECK_WAIT_MS = 15_000;
 
+// Whether a verdict has been awaited past CHECK_WAIT_MS: the stream down and the server silent leave a line unchecked.
+function useLate(waiting: boolean): boolean {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => {
+      setLate(true);
+    }, CHECK_WAIT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [waiting]);
+  return late && waiting;
+}
+
 export function Embed({ embed, verdict }: EmbedProps) {
   const [playing, setPlaying] = useState(false);
-  // The stream down and the server silent leave a line unchecked.
-  const late = useLate(verdict === undefined, CHECK_WAIT_MS);
+  const late = useLate(verdict === undefined);
   const kept = useFocusKept(verdict === "hidden");
   // The card's own box, and whether its Play takes the focus back as the player closes.
   const cardRef = useRef<HTMLDivElement>(null);
