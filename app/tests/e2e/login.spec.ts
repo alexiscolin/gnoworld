@@ -174,9 +174,9 @@ test("draws the header's Connect Adena 44 px tall at 390 px", async ({ page }) =
   await page.goto("/");
   await hydrated(page);
   await page.getByRole("button", { name: "Menu" }).click();
-  expect((await page.getByRole("menuitem", { name: /^Connect Adena/ }).boundingBox())?.height).toBeGreaterThanOrEqual(
-    44,
-  );
+  // Polled: the menu comes in scaled up from a little smaller (surface.module.css), and a slow machine measured 43.9 px mid-way.
+  const row = page.getByRole("menuitem", { name: /^Connect Adena/ });
+  await expect.poll(async () => (await row.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
 // The way out is in the account's menu, which a phone given a computer's session must still reach.

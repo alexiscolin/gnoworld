@@ -94,3 +94,35 @@ export async function another({ playwright, launchOptions }: Launcher, as: strin
   const second = await (await browser.newContext({ baseURL })).newPage();
   return { address: await logIn(second, as), page: second, close: () => browser.close() };
 }
+
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// The account logs in to Ergo with the ticket, joins the room, says each text, and waits for Ergo's echo of the last.
+function saying(
+  { address, ticket }: { address: string; ticket: string },
+  room: string,
+  texts: readonly string[],
+): [Step[], string] {
+  const steps: Step[] = [
+    ["", "CAP LS 302"],
+    ["", "CAP REQ :message-tags sasl echo-message"],
+    ["CAP \\S+ ACK", "AUTHENTICATE PLAIN"],
+    ["AUTHENTICATE \\+", `AUTHENTICATE ${btoa(`\0${address}\0${ticket}`)}`],
+    ["\\s903\\s", `NICK ${address}`],
+    ["\\s903\\s", "USER u 0 * :u"],
+    ["\\s903\\s", "CAP END"],
+    ["\\s001\\s", `JOIN ${room}`],
+    ...texts.map((text): Step => ["\\s366\\s", `PRIVMSG ${room} :${text}`]),
+  ];
+  return [steps, `PRIVMSG ${escaped(room)} :${escaped(texts.at(-1) ?? "")}$`];
+}
+
+// The page, logged in as `address`, says these lines in the room; the page stays where it is.
+export async function say(
+  page: Page,
+  { address, room }: { address: string; room: string },
+  texts: readonly string[],
+): Promise<void> {
+  const [steps, until] = saying({ address, ticket: await ticketOf(page) }, room, texts);
+  await talk(page, steps, until);
+}
