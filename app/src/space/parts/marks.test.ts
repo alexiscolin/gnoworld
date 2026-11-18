@@ -61,17 +61,14 @@ describe("how strong the Map draws a system's orbits", () => {
   const shown = (planets: number, ratio: number) =>
     orbitGain(planets, ratio) * (0.2126 * red + 0.7152 * green + 0.0722 * blue) * 255;
 
-  it.each([5, 20, 50, 500])(
-    "shows a system of %i well over what was too pale, on a screen of ratio 1 or 2",
-    (planets) => {
-      expect(shown(planets, 1)).toBeGreaterThan(1.5 * PALE);
-      expect(shown(planets, 2)).toBeGreaterThan(1.5 * PALE);
-    },
-  );
+  it.each([5, 20, 48])("shows a system of %i well over what was too pale, on a screen of ratio 1 or 2", (planets) => {
+    expect(shown(planets, 1)).toBeGreaterThan(1.5 * PALE);
+    expect(shown(planets, 2)).toBeGreaterThan(1.5 * PALE);
+  });
 
   it("gives a line half as thick, on a screen of ratio 2, twice the light (the screen's light goes by its value's power 2.2)", () => {
     expect((orbitGain(5, 2) / orbitGain(5, 1)) ** 2.2).toBeCloseTo(2, 5);
-    expect((orbitGain(500, 1.5) / orbitGain(500, 1)) ** 2.2).toBeCloseTo(1.5, 5);
+    expect((orbitGain(48, 1.5) / orbitGain(48, 1)) ** 2.2).toBeCloseTo(1.5, 5);
   });
 
   it("takes no light off a line drawn wider than a page pixel", () => {
@@ -80,6 +77,13 @@ describe("how strong the Map draws a system's orbits", () => {
 
   it("stays under the screen's white, and a crowded system's under a small one's", () => {
     expect(orbitGain(5, 2) * Math.max(red, green, blue)).toBeLessThan(0.6);
-    expect(orbitGain(500, 2)).toBeLessThan(orbitGain(5, 2));
+    expect(orbitGain(48, 2)).toBeLessThan(orbitGain(5, 2));
+  });
+
+  // Measured at ratio 1 in a window 1048 wide: 50 orbits stand apart (3 of 255 between them), 80 merge (11), 127 are a grey disc (22).
+  it("draws none past 48 planets, whose orbits would merge into a disc", () => {
+    expect(orbitGain(48, 1)).toBeGreaterThan(0);
+    expect(orbitGain(49, 1)).toBe(0);
+    expect(orbitGain(500, 2)).toBe(0);
   });
 });
