@@ -1,45 +1,13 @@
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { connectButton, logOutHere } from "./account.ts";
 import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
-import { logIn, talk, ticketOf, type Step } from "./irc.ts";
+import { logIn, say } from "./irc.ts";
 import { SITE } from "./sites.ts";
 import { axeOf } from "./axe.ts";
 
 // A world's rooms on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
 // says the lines over a socket of the page's: a guest cannot, open rooms being +M.
-
-const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// The account logs in to Ergo with the ticket, joins the room, says each text, and waits for Ergo's echo of the last.
-function saying(
-  { address, ticket }: { address: string; ticket: string },
-  room: string,
-  texts: readonly string[],
-): [Step[], string] {
-  const steps: Step[] = [
-    ["", "CAP LS 302"],
-    ["", "CAP REQ :message-tags sasl echo-message"],
-    ["CAP \\S+ ACK", "AUTHENTICATE PLAIN"],
-    ["AUTHENTICATE \\+", `AUTHENTICATE ${btoa(`\0${address}\0${ticket}`)}`],
-    ["\\s903\\s", `NICK ${address}`],
-    ["\\s903\\s", "USER u 0 * :u"],
-    ["\\s903\\s", "CAP END"],
-    ["\\s001\\s", `JOIN ${room}`],
-    ...texts.map((text): Step => ["\\s366\\s", `PRIVMSG ${room} :${text}`]),
-  ];
-  return [steps, `PRIVMSG ${escaped(room)} :${escaped(texts.at(-1) ?? "")}$`];
-}
-
-// The page, logged in as `address`, says these lines in the room; the page stays where it is.
-async function say(
-  page: Page,
-  { address, room }: { address: string; room: string },
-  texts: readonly string[],
-): Promise<void> {
-  const [steps, until] = saying({ address, ticket: await ticketOf(page) }, room, texts);
-  await talk(page, steps, until);
-}
 
 // A tag for the test's pages, which /__drop names to end their sockets alone (api.mjs).
 async function tagged(page: Page): Promise<string> {
