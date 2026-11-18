@@ -1,4 +1,4 @@
-import { openPlacePage } from "./realmRoom.ts";
+import { openPlacePage, pageSheet } from "./realmRoom.ts";
 import type { Locator } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { violations } from "./axe.ts";
@@ -172,10 +172,11 @@ test.describe("who is here right now", () => {
   });
 });
 
-// While nobody is counted, the band still draws its first cell with its zero (a count that was read is a value), at every width:
-// the chat's socket answers nothing and the server counts nobody.
+// While nobody is counted, the band still draws its first cell with its zero (a count that was read is a value), at every width that
+// has a plate: the chat's socket answers nothing and the server counts nobody. A phone's sheet drops that cell, its foot saying who is
+// here once (Plate.test.tsx).
 test.describe("who is here while nobody is counted", () => {
-  for (const width of [390, 1279, 1280, 1728] as const)
+  for (const width of [1279, 1280, 1728] as const)
     test(`at ${String(width)} px the band's "Here now" reads zero`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.routeWebSocket(/\/ws$/, () => undefined);
@@ -183,7 +184,6 @@ test.describe("who is here while nobody is counted", () => {
       await page.route("**/api/presence", (route) =>
         route.fulfill({ json: { worlds: [{ world: "bubble", here: 0, perHour: 0, rise: 0 }] } }),
       );
-      // A phone has the plate in its page sheet.
       await openPlacePage(page, "/w/bubble");
       const band = page.locator("[data-look='plate'] section[aria-label='Figures']");
       await expect(band.getByText("Here now")).toBeVisible();
@@ -296,9 +296,13 @@ for (const width of [390, 1280] as const) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
-    // A phone has the plate in its page sheet.
+    // A phone has the plate in its page sheet, whose foot says who is here; a computer's plate says it in its figures band.
     await openPlacePage(page, "/w/bubble");
-    await expect(page.locator("[data-look='plate'] section[aria-label='Figures']")).toBeVisible();
+    await expect(
+      width < 900
+        ? pageSheet(page).getByRole("heading", { name: "Here now" })
+        : page.locator("[data-look='plate'] section[aria-label='Figures']"),
+    ).toBeVisible();
     expect(await violations(page)).toHaveLength(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
