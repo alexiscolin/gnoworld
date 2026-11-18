@@ -9,18 +9,29 @@ describe("the build's folder", () => {
     expect(buildDirectoryOf(undefined, APP)).toBe("build");
   });
 
-  it.each(["/tmp/gnoworld-build", "/repo/app/build-gate/ci"])("is GNOWORLD_BUILD's absolute folder: %s", (asked) => {
-    expect(buildDirectoryOf(asked, APP)).toBe(asked);
-  });
+  it.each(["/tmp/gnoworld-build", "/repo/app/build-gate/ci", "/repo/app/build", "/repo/app/build/x", "/repo/other"])(
+    "is GNOWORLD_BUILD's absolute folder: %s",
+    (asked) => {
+      expect(buildDirectoryOf(asked, APP)).toBe(asked);
+    },
+  );
 
   it.each(["", "  ", ".", "./", "src"])("stops the build when GNOWORLD_BUILD is not absolute (%j)", (asked) => {
     expect(() => buildDirectoryOf(asked, APP)).toThrow(/GNOWORLD_BUILD must be an absolute folder/);
   });
 
-  it.each(["/repo/app", "/repo/app/", "/repo/app/src/.."])(
-    "stops the build when GNOWORLD_BUILD is the app itself (%s)",
+  // A folder holding the app: the build would write its client and server there, among the repository's own folders.
+  it.each(["/repo/app", "/repo/app/", "/repo/app/src/..", "/repo", "/repo/", "/"])(
+    "stops the build when GNOWORLD_BUILD is the app or a folder holding it (%s)",
     (asked) => {
-      expect(() => buildDirectoryOf(asked, APP)).toThrow(/GNOWORLD_BUILD must not be the app's own folder/);
+      expect(() => buildDirectoryOf(asked, APP)).toThrow(/GNOWORLD_BUILD must not be the app or a folder holding it/);
+    },
+  );
+
+  it.each(["/repo/app/src", "/repo/app/public", "/repo/app/builder", "/repo/app/data/build"])(
+    "stops the build when GNOWORLD_BUILD is in the app but under no build or build-* folder (%s)",
+    (asked) => {
+      expect(() => buildDirectoryOf(asked, APP)).toThrow(/in the app, only under build or build-\*/);
     },
   );
 });
@@ -31,7 +42,8 @@ describe("the build's config", () => {
     vi.unstubAllEnvs();
   });
 
-  it("stops when GNOWORLD_BUILD is set but empty", async () => {
+  // Up to 20 s: the import compiles the config's modules (1.3 s alone, 5 s seen on a loaded machine).
+  it("stops when GNOWORLD_BUILD is set but empty", { timeout: 20_000 }, async () => {
     vi.stubEnv("GNOWORLD_BUILD", "");
     vi.resetModules();
     await expect(import("../react-router.config.ts")).rejects.toThrow(/GNOWORLD_BUILD must be an absolute folder/);

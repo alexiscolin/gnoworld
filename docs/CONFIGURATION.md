@@ -212,7 +212,7 @@ The app reads no `VITE_*` setting for production. What it reads:
 | Name | Where | Effect |
 |---|---|---|
 | `GNOWORLD_DATA` | `app/react-router.config.ts` line 14, `app/vite.config.ts` line 55 | The data folder (default `app/data`) |
-| `GNOWORLD_BUILD` | `app/src/buildDirectory.ts`, read by `app/react-router.config.ts` | The build folder (default `build`): an absolute folder that is not the app itself, or the build stops, since a build empties its folder |
+| `GNOWORLD_BUILD` | `app/src/buildDirectory.ts`, read by `app/react-router.config.ts` | The build folder (default `build`): an absolute folder outside the app and every folder holding it, or in the app under a first folder named `build` or `build-*`; any other stops the build, since a build empties its folder |
 | `import.meta.env.BASE_URL`, `MODE`, `PROD` | `app/src/` | Vite's own: the base path of the files and of the data, the mode |
 | `VITE_GNOWORLD_TEST_GPU` | `app/src/features/universe/gpu.ts` line 25 | `1`: lets a test use the GPU path outside development |
 | `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR` | `app/vite.config.ts` lines 93 to 153 | The workshop's dev server |
