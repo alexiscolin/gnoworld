@@ -21,10 +21,10 @@ async function guest(page: Page, say: (route: Route) => Promise<void> | void): P
   return said;
 }
 
-/** The Earth's chat, its box clicked as a reader would. */
+/** The Earth's full chat, where the welcome card's Say hi led, its box clicked as a reader would. */
 async function sayHi(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/earth");
+  await page.goto("/earth?chat=full");
   await hydrated(page);
   await expect(box(page)).toBeVisible({ timeout: 20_000 });
   await box(page).click();
