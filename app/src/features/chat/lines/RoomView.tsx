@@ -18,6 +18,7 @@ import { chunked } from "../Failing.tsx";
 import { NO_ROOM_YET } from "../loginWords.ts";
 import { SkeletonLines } from "../dock/SkeletonBits.tsx";
 import { useMedia } from "../dock/useMedia.ts";
+import { useLate } from "../useLate.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12). One boundary for every feature of a line.
@@ -165,10 +166,16 @@ function Silence({ word }: { word: string }) {
   );
 }
 
-// What a connected room with no line is: arriving while its history is on its way, empty once its page came.
-function noneOf(connected: boolean, lines: number, paged: true | undefined): "arriving" | "empty" | undefined {
+/** How long a room waits for its history before it says it holds no line: Ergo may refuse the room, or answer nothing. */
+const HISTORY_WAIT_MS = 10_000;
+
+// What a connected room with no line is: arriving while its history is on its way, HISTORY_WAIT_MS at most, empty once its
+// page came.
+function useNone(connected: boolean, lines: number, paged: true | undefined): "arriving" | "empty" | undefined {
+  const waiting = connected && lines === 0 && paged !== true;
+  const late = useLate(waiting, HISTORY_WAIT_MS);
   if (!connected || lines > 0) return undefined;
-  return paged === true ? "empty" : "arriving";
+  return waiting && !late ? "arriving" : "empty";
 }
 
 export function RoomView(props: RoomViewProps) {
@@ -178,7 +185,7 @@ export function RoomView(props: RoomViewProps) {
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact, jump } = state ?? {};
   const connected = chat === "connected";
-  const none = noneOf(connected, lines.length, paged);
+  const none = useNone(connected, lines.length, paged);
   return (
     <div className={styles["main"]} data-chat-state={chat}>
       <Lead status={connected ? null : NOTICES[chat]} />
