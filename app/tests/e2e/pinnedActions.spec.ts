@@ -21,10 +21,6 @@ for (const width of [390, 1280] as const) {
   test(`GovDAO's pinned Vote at ${String(width)} px: on the page under Read the proposals and in the pinned row over the composer, with no violation`, async ({
     page,
   }) => {
-    // A phone's first visit shows the welcome card over the composer and the row over it (D13729): it is told away.
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await opened(page, width);
     // A phone has the plate in its page sheet over the chat: read there first, then the sheet is closed to reach the pinned row.
     if (width < 900) await openPageSheet(page);
