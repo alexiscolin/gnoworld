@@ -5,7 +5,7 @@ const FRESH_MS = 5000;
 
 /** Where each list of `root` is scrolled, by its place among its parts: a node taken out of the document starts again at the top. */
 export const scrollsOf = (root: Element): (readonly [number, number])[] =>
-  [...root.querySelectorAll("*")].flatMap((part, at) => (part.scrollTop > 0 ? [[at, part.scrollTop] as const] : []));
+  [...root.querySelectorAll("*")].flatMap((part, at) => (part.scrollTop !== 0 ? [[at, part.scrollTop] as const] : []));
 
 /** Puts the lists of `root`, now in the document, back where `scrolls` says. */
 export function restoreScrolls(root: Element, scrolls: readonly (readonly [number, number])[]): void {

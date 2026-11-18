@@ -215,38 +215,47 @@ describe("the lines view, compiled", () => {
   });
 });
 
-// WebKit anchors no scroll: a card that grows leaves the list's place where it was, and the scroll event of the list's own
-// move to its end, which comes a frame late, then finds the list off its end (Safari opened a room mid-history).
-describe("the list held at its end", () => {
-  const CLIENT = 400;
-  let height: number;
-  let client: number;
+// The list opens at its end by CSS alone (its scroll origin is its foot): what is left to script is a reader's own place, which
+// WebKit would not keep (it anchors no scroll, and the list's anchoring is off in every engine). jsdom lays nothing out: the
+// geometry is told, `scrollTop` counting from the foot (0 there, below 0 above it).
+describe("the list's reader kept in place", () => {
+  const BOX_TOP = 100;
+  const BOX = 400;
   let top: number;
   let resized: (() => void)[];
-  const list = () => {
-    const box = host.querySelector("ol");
-    if (box === null) throw new Error("no list");
+  // Each line's top, by its place in the list; every line is 20 px high.
+  let tops: number[];
+  const lines = () => [...host.querySelectorAll("ol > li")];
+  const scroller = () => {
+    const box = host.querySelector("ol")?.parentElement;
+    if (box === null || box === undefined) throw new Error("no scrolling box");
     return box;
   };
-  const scrolled = () => {
-    act(() => {
-      list().dispatchEvent(new Event("scroll"));
-    });
-  };
-  const grown = (by: number) => {
-    height += by;
+  // What grew under the lines the reader sees: every line pushed up by as much, in the engine's own layout.
+  const pushed = (by: number) => {
+    tops = tops.map((at) => at - by);
     for (const tell of resized) tell();
   };
+  // The reader scrolls up to `to`, and the browser tells it.
+  const scrolledTo = (to: number) => {
+    top = to;
+    act(() => {
+      scroller().dispatchEvent(new Event("scroll"));
+    });
+  };
   beforeEach(() => {
-    height = 1000;
     top = 0;
     resized = [];
-    client = CLIENT;
-    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(() => client);
-    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(() => height);
+    tops = Array.from({ length: LINES + 20 }, (_, n) => BOX_TOP + n * 20 - 3000);
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(BOX);
     vi.spyOn(Element.prototype, "scrollTop", "get").mockImplementation(() => top);
     vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation((to: number) => {
-      top = Math.max(0, Math.min(to, height - CLIENT));
+      top = Math.min(0, to);
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.matches("li[data-new]")) return new DOMRect(0, newTop, 0, 20);
+      const at = tops[lines().indexOf(this)];
+      return at === undefined ? new DOMRect(0, BOX_TOP, 0, BOX) : new DOMRect(0, at, 0, 20);
     });
     vi.stubGlobal(
       "ResizeObserver",
@@ -259,74 +268,71 @@ describe("the list held at its end", () => {
       },
     );
   });
+  let newTop = BOX_TOP;
   afterEach(() => {
+    newTop = BOX_TOP;
     vi.restoreAllMocks();
   });
 
-  it("stays at the end when a card grows before the scroll event of its own move there comes", () => {
+  it("moves nothing for a reader at the end, whatever grows: the foot holds them", () => {
     draw();
-    expect(top).toBe(600);
-    height += 300;
-    scrolled();
-    grown(0);
-    expect(top).toBe(900);
+    pushed(300);
+    expect(top).toBe(0);
   });
 
-  it("stays at the end through a second card that grows in the frame the first one's move is told", () => {
+  it("keeps the lines a reader scrolled up reads still as something grows under them", () => {
     draw();
-    grown(300);
-    height += 200;
-    scrolled();
-    grown(0);
-    expect(top).toBe(1100);
+    scrolledTo(-500);
+    pushed(300);
+    expect(top).toBe(-800);
   });
 
-  // Chromium and Firefox anchor the scroll: a card that grows above moves the list down by as much, in the reader's own frame.
-  it("lets go of the reader who scrolls up as an anchored card grows above", () => {
+  // The scroll event comes before the frame's resize: the growth the frame holds is undone, the reader's own scroll kept.
+  it("undoes what grew in the frame of a scroll, and keeps the scroll", () => {
     draw();
-    scrolled();
-    top = 500;
-    height += 300;
-    top += 300;
-    scrolled();
-    grown(0);
-    expect(top).toBe(800);
+    scrolledTo(-500);
+    tops = tops.map((at) => at + 100 - 300);
+    scrolledTo(-600);
+    expect(top).toBe(-900);
+    for (const tell of resized) tell();
+    expect(top).toBe(-900);
   });
 
-  // A room opened on its New line near its end shows its end too: it is held there as any other.
-  it("stays at the end it opened on with its New line, when a card grows before that move's scroll event", () => {
-    height = 420;
-    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-      return new DOMRect(0, this.matches("li[data-new]") ? 10 : 0, 0, 0);
-    });
-    draw({ paged: true, read: at(100) });
-    expect(top).toBe(10);
-    height += 300;
-    scrolled();
-    grown(0);
-    expect(top).toBe(320);
-  });
-
-  // A phone may tell a place snapped to its own pixels: a fraction off where the list was put is no reader's move.
-  it("takes a place told a fraction of a pixel off its own for its own", () => {
+  // The box grows (the composer shrinks) near the oldest end: the browser clamps the scroll, the lines do not move by script.
+  it("leaves a reader the browser moved by clamping the scroll", () => {
     draw();
-    height += 300;
-    top += 0.4;
-    scrolled();
-    grown(0);
-    expect(top).toBe(900);
+    scrolledTo(-500);
+    tops = tops.map((at) => at - 20);
+    top = -480;
+    for (const tell of resized) tell();
+    expect(top).toBe(-480);
   });
 
-  // The safety net: whatever moved the list off its end, if it was not the reader, the room that has arrived ends at its end.
-  describe("once the room has arrived and its list is quiet", () => {
-    const QUIET = 250;
-    // The list moved off its end by no reader (an engine that forgets a hidden list's place), then a resize, then quiet.
-    const strayed = (to: number) => {
-      top = to;
-      scrolled();
-      grown(0);
-      vi.advanceTimersByTime(QUIET);
-    };
+  it("leaves a reader alone when something grows above what they read", () => {
+    draw();
+    scrolledTo(-500);
+    for (const tell of resized) tell();
+    expect(top).toBe(-500);
+  });
+
+  it("marks a list that came after the skeleton, to fade in over it, and no other", () => {
+    draw({ after: true });
+    expect(scroller().hasAttribute("data-after")).toBe(true);
+    draw({ after: false });
+    expect(scroller().hasAttribute("data-after")).toBe(false);
+  });
+
+  it("opens a room with news on its New line: its top at the list's", () => {
+    newTop = BOX_TOP - 600;
+    draw({ paged: true, read: at(99) });
+    expect(host.querySelectorAll("ol > li[data-new]")).toHaveLength(1);
+    expect(top).toBe(-600);
+  });
+
+  describe("a room whose lines hold a card", () => {
+    const CARD = "💹 Market prices";
+    const CAP = 400;
+    const waiting = () => host.querySelector("[data-awaiting]") !== null;
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -334,176 +340,42 @@ describe("the list held at its end", () => {
       vi.useRealTimers();
     });
 
-    it("puts the list at its end again when the reader has not moved it", () => {
-      draw({ paged: true });
-      top = 0;
-      scrolled();
-      grown(0);
-      expect(top).toBe(0);
-      vi.advanceTimersByTime(QUIET);
-      expect(top).toBe(600);
-    });
-
-    it.each(["wheel", "touchmove", "keydown", "pointerdown"])(
-      "leaves the reader who moved the list by a %s",
-      (type) => {
-        draw({ paged: true });
-        list().dispatchEvent(new Event(type));
-        strayed(100);
-        expect(top).toBe(100);
-      },
-    );
-
-    it("leaves a room read around a found message where the search put it", () => {
-      draw({ paged: true, jumped: true });
-      strayed(300);
-      expect(top).toBe(300);
-    });
-
-    it("leaves a room opened on its New line there", () => {
-      draw({ paged: true, read: at(100) });
-      expect(host.querySelectorAll("ol > li[data-new]")).toHaveLength(1);
-      strayed(250);
-      expect(top).toBe(250);
-    });
-
-    // Once an arrival: what moves the list later with no hand on it (the browser's find in page) is left alone.
-    it("moves the list once, not again when it is moved later", () => {
-      draw({ paged: true });
-      strayed(0);
-      expect(top).toBe(600);
-      strayed(100);
-      expect(top).toBe(100);
-    });
-
-    // The quiet wait may run out while the list is hidden: the arrival is still to come, when it is shown.
-    it("keeps its one move for the list shown again, when it is quiet while it has no height", () => {
-      draw({ paged: true });
-      client = 0;
-      grown(0);
-      vi.advanceTimersByTime(QUIET);
-      client = CLIENT;
-      strayed(0);
-      expect(top).toBe(600);
-    });
-
-    it("leaves a list shown again where it was, when it was not at its end as it lost its height", () => {
-      draw({ paged: true });
-      grown(0);
-      vi.advanceTimersByTime(QUIET);
-      top = 100;
-      scrolled();
-      client = 0;
-      grown(0);
-      client = CLIENT;
-      strayed(100);
-      expect(top).toBe(100);
-    });
-
-    it("holds the end it put the list at, when a card grows before that move's scroll event", () => {
-      draw({ paged: true });
-      strayed(0);
-      height += 300;
-      scrolled();
-      grown(0);
-      expect(top).toBe(900);
-    });
-
-    it("does nothing once the room is left: no move, no hand heard", () => {
-      draw({ paged: true });
-      const box = list();
-      top = 0;
-      scrolled();
-      grown(0);
+    it("keeps the list faded out while a card reads its data, then in, at the cap at latest", () => {
+      card.reading = true;
+      draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+      card.reading = false;
+      expect(waiting()).toBe(true);
       act(() => {
-        root.unmount();
+        vi.advanceTimersByTime(CAP - 1);
       });
-      vi.advanceTimersByTime(QUIET);
-      box.dispatchEvent(new Event("wheel"));
-      expect(top).toBe(0);
-      root = createRoot(host);
+      expect(waiting()).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(waiting()).toBe(false);
     });
 
-    it("moves it again when the list is shown after it had no height", () => {
+    it("shows it as the card fills, before the cap", async () => {
+      card.reading = true;
+      draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+      card.reading = false;
+      card.filled = true;
+      draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      card.filled = false;
+      expect(waiting()).toBe(false);
+    });
+
+    it("waits for nothing when no card is unfilled, or none is among the lines", () => {
       draw({ paged: true });
-      strayed(0);
-      client = 0;
-      grown(0);
-      client = CLIENT;
-      strayed(0);
-      expect(top).toBe(600);
+      expect(waiting()).toBe(false);
+      card.filled = true;
+      draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+      card.filled = false;
+      expect(waiting()).toBe(false);
     });
-
-    // A room with cards shows once, whole: its lines wait, unseen, for their cards to fill, a short capped time.
-    describe("a room whose lines hold a card", () => {
-      const CARD = "💹 Market prices";
-      const shown = () => list().style.getPropertyValue("visibility") !== "hidden";
-
-      it("keeps its lines unseen until the list is quiet", () => {
-        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
-        expect(shown()).toBe(false);
-        grown(200);
-        vi.advanceTimersByTime(150);
-        expect(shown()).toBe(false);
-        vi.advanceTimersByTime(100);
-        expect(shown()).toBe(true);
-      });
-
-      it("shows them after 400 ms at most, though the list still grows", () => {
-        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
-        for (let waited = 0; waited < 350; waited += 50) {
-          grown(10);
-          vi.advanceTimersByTime(50);
-        }
-        expect(shown()).toBe(false);
-        grown(10);
-        vi.advanceTimersByTime(50);
-        expect(shown()).toBe(true);
-      });
-
-      it("keeps its lines unseen while a card reads its data, its code come", () => {
-        card.reading = true;
-        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
-        card.reading = false;
-        expect(shown()).toBe(false);
-        vi.advanceTimersByTime(400);
-        expect(shown()).toBe(true);
-      });
-
-      // A room the page already holds (after a flight, a room switch): its cards' code and data are there, and nothing will grow.
-      it("shows at once a room whose cards are filled as it opens", () => {
-        card.filled = true;
-        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
-        card.filled = false;
-        expect(shown()).toBe(true);
-      });
-
-      it("shows at once a room with no card, and a card line that comes later", () => {
-        draw({ paged: true });
-        expect(shown()).toBe(true);
-        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
-        expect(shown()).toBe(true);
-      });
-    });
-
-    it("waits for the room's history", () => {
-      draw();
-      strayed(0);
-      expect(top).toBe(0);
-    });
-  });
-
-  it("leaves the reader who scrolled up where they are as a card grows, and holds the end again once back there", () => {
-    draw();
-    scrolled();
-    top = 200;
-    scrolled();
-    grown(300);
-    expect(top).toBe(200);
-    top = 900;
-    scrolled();
-    grown(300);
-    expect(top).toBe(1200);
   });
 });
 

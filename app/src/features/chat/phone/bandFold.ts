@@ -6,12 +6,8 @@ import { useEffect, useState, type RefObject } from "react";
 export const FAR = 240;
 export const NEAR = 48;
 
-/** How far a scrolled list is from its end. */
-export const awayFromEnd = ({
-  scrollHeight,
-  scrollTop,
-  clientHeight,
-}: Pick<Element, "scrollHeight" | "scrollTop" | "clientHeight">) => scrollHeight - scrollTop - clientHeight;
+/** How far a scrolled list is from its end: its scroll origin is its foot (RoomView.module.css), `scrollTop` 0 there, below 0 above. */
+export const awayFromEnd = ({ scrollTop }: Pick<Element, "scrollTop">) => Math.max(0, -scrollTop);
 
 /** Whether the band is folded next, given whether it is and how far the lines are from their end. */
 export const nextFold = (folded: boolean, away: number): boolean => (folded ? away > NEAR : away > FAR);
@@ -25,7 +21,8 @@ export function followLines(
   screen.addEventListener(
     "scroll",
     ({ target }) => {
-      if (!(target instanceof HTMLElement) || !target.matches('ol[aria-label="Messages"]')) return;
+      if (!(target instanceof HTMLElement) || target.querySelector(':scope > ol[aria-label="Messages"]') === null)
+        return;
       // The control in use stays where it is: no fold under the keyboard's focus on the band's own chips and buttons (a tapped one keeps the
       // focus on Android, and must not hold the band open).
       const used = document.activeElement;

@@ -1,5 +1,5 @@
 import type { WebSocketRoute } from "@playwright/test";
-import { lineOf, lines } from "./chat.ts";
+import { lineOf, lines, scrolling } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { calmed } from "./figures.ts";
 import { logIn } from "./irc.ts";
@@ -153,8 +153,8 @@ test("opens a room on its newest line, and keeps the newest in view as lines com
 // A reader who scrolled up is left where they are as lines come (useNewestInView).
 test("leaves a reader who scrolled up where they are as a line comes", async ({ page }) => {
   const ergo = await sixtyLines(page);
-  await page.getByRole("list", { name: "Messages" }).evaluate((list) => {
-    list.scrollTop = 0;
+  await scrolling(page.getByRole("list", { name: "Messages" })).evaluate((list) => {
+    list.scrollTop = -list.scrollHeight;
     list.dispatchEvent(new Event("scroll"));
   });
   await expect(page.getByText("Line 0 of the room's history")).toBeInViewport();

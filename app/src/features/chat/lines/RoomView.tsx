@@ -14,6 +14,7 @@ import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { useJarvisItems } from "../../../jarvisHere.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
+import shared from "../lists.module.css";
 import { chunked } from "../Failing.tsx";
 import { NO_ROOM_YET } from "../loginWords.ts";
 import { SkeletonLines } from "../dock/SkeletonBits.tsx";
@@ -41,7 +42,7 @@ const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).
 function TypistsHere({ typing }: { typing: Typing | undefined }) {
   return Object.keys(typing ?? {}).length === 0 ? NOBODY : <Typists typing={typing} />;
 }
-const LINES = [styles["lines"], styles["fill"]].join(" ");
+const LINES = [styles["fill"], shared["plain"]].join(" ");
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
@@ -67,8 +68,10 @@ function Arriving({ word }: { word: string }) {
       </>
     );
   return (
-    <div aria-busy="true" className={[styles["fill"], styles["arriving"]].join(" ")}>
-      <SkeletonLines />
+    <div aria-busy="true" className={styles["stage"]}>
+      <div data-shown="" className={styles["skeleton"]}>
+        <SkeletonLines />
+      </div>
     </div>
   );
 }
@@ -80,11 +83,13 @@ function RoomLines({ arriving, ...props }: LinesProps & { arriving: string | und
   const place = use(ChainPlaceContext);
   const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
   const asked = useJarvisItems(props.room, props.me).length > 0;
+  // The room opened on its skeleton: its lines then fade in over it.
+  const [after] = useState(arriving !== undefined);
   if (props.lines.length === 0 && !told && !asked)
     return arriving === undefined ? waiting(false) : <Arriving word={arriving} />;
   return (
     <Suspense fallback={waiting(true)}>
-      <Lines {...props} />
+      <Lines {...props} after={after} />
     </Suspense>
   );
 }
@@ -197,7 +202,7 @@ export function RoomView(props: RoomViewProps) {
   const { onReact, onReply, onThread, onEdit, partner } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
-  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact, jump } = state ?? {};
+  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   const none = noneOf(connected, lines.length, paged);
   return (
@@ -218,7 +223,6 @@ export function RoomView(props: RoomViewProps) {
         onDismiss={onDismiss}
         read={read}
         paged={paged === true}
-        jumped={jump !== undefined}
         onRead={onRead}
         verdicts={verdicts}
         saving={saving}

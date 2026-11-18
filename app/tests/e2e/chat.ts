@@ -35,3 +35,7 @@ export async function inGames(page: Page): Promise<string> {
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
   return address;
 }
+
+/** The box that scrolls a room's Messages list: the list's parent. Its scroll origin is its foot (RoomView.module.css): `scrollTop`
+ * is 0 at the newest line and below 0 above it. */
+export const scrolling = (list: Locator) => list.locator("xpath=..");

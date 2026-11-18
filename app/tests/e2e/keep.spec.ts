@@ -1,4 +1,4 @@
-import { lineOf, lines, word } from "./chat.ts";
+import { lineOf, lines, scrolling, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { phoneWith } from "./account.ts";
 import { logIn } from "./irc.ts";
@@ -33,8 +33,8 @@ async function openByKeys(page: Page, at: number) {
 }
 const news = (page: Page) => page.locator("[data-new]");
 const toEnd = (page: Page) =>
-  page.getByRole("list", { name: "Messages" }).evaluate((box) => {
-    box.scrollTop = box.scrollHeight;
+  scrolling(page.getByRole("list", { name: "Messages" })).evaluate((box) => {
+    box.scrollTop = 0;
   });
 const savedButton = (page: Page) => page.getByRole("button", { name: /^Saved/ });
 const savedDialog = (page: Page) => page.getByRole("dialog", { name: "Saved messages" });

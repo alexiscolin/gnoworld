@@ -21,7 +21,9 @@ function useInside() {
   useLayoutEffect(() => {
     const bar = barRef.current;
     const list = bar?.closest("ol");
-    if (bar != null && list != null) setInside(bar.getBoundingClientRect().top < list.getBoundingClientRect().top);
+    // The room's list sits in the box that scrolls it; a thread's list scrolls itself.
+    const box = list != null && getComputedStyle(list).overflowY === "visible" ? list.parentElement : list;
+    if (bar != null && box != null) setInside(bar.getBoundingClientRect().top < box.getBoundingClientRect().top);
   }, []);
   return { barRef, inside };
 }
