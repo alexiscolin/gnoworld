@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { orbitCrowd, Plate } from "./marks.ts";
+import { ORBIT_COLOUR, Orbits, orbitCrowd, orbitGain, Plate } from "./marks.ts";
+
+// three keys a program by whether its geometry holds a position (WebGLPrograms.js, hasPositionAttribute): the lines' program made ahead
+// with none (programs.ts) was not the one a system's orbits drew with, linked in the flight that opened it.
+it("gives the orbits' lines a position before any system opens", () => {
+  expect(new Orbits().lines.geometry.getAttribute("position").count).toBe(0);
+});
 
 describe("Plate.sync", () => {
   it("is not drawn while its fill is under half a level, and is once it rises", () => {
@@ -50,5 +56,40 @@ describe("a system's orbits' share of their light", () => {
   it("falls with the planets' count between the two", () => {
     expect(orbitCrowd(20)).toBeLessThan(orbitCrowd(15));
     expect(orbitCrowd(20)).toBeGreaterThan(0.5);
+  });
+});
+
+// The Map's orbits are lines one buffer pixel wide, written as they show (no grade): gno.land's seventeen measured 24 of 255 on the
+// screen, half a page pixel wide on a screen of ratio 2, and were not seen.
+describe("how strong the Map draws a system's orbits", () => {
+  const PALE = 24;
+  const [red, green, blue] = ORBIT_COLOUR;
+  const shown = (planets: number, ratio: number) =>
+    orbitGain(planets, ratio) * (0.2126 * red + 0.7152 * green + 0.0722 * blue) * 255;
+
+  it.each([5, 20, 48])("shows a system of %i well over what was too pale, on a screen of ratio 1 or 2", (planets) => {
+    expect(shown(planets, 1)).toBeGreaterThan(1.5 * PALE);
+    expect(shown(planets, 2)).toBeGreaterThan(1.5 * PALE);
+  });
+
+  it("gives a line half as thick, on a screen of ratio 2, twice the light (the screen's light goes by its value's power 2.2)", () => {
+    expect((orbitGain(5, 2) / orbitGain(5, 1)) ** 2.2).toBeCloseTo(2, 5);
+    expect((orbitGain(48, 1.5) / orbitGain(48, 1)) ** 2.2).toBeCloseTo(1.5, 5);
+  });
+
+  it("takes no light off a line drawn wider than a page pixel", () => {
+    expect(orbitGain(5, 0.8)).toBe(orbitGain(5, 1));
+  });
+
+  it("stays under the screen's white, and a crowded system's under a small one's", () => {
+    expect(orbitGain(5, 2) * Math.max(red, green, blue)).toBeLessThan(0.6);
+    expect(orbitGain(48, 2)).toBeLessThan(orbitGain(5, 2));
+  });
+
+  // Measured at ratio 1 in a window 1048 wide: 50 orbits stand apart (3 of 255 between them), 80 merge (11), 127 are a grey disc (22).
+  it("draws none past 48 planets, whose orbits would merge into a disc", () => {
+    expect(orbitGain(48, 1)).toBeGreaterThan(0);
+    expect(orbitGain(49, 1)).toBe(0);
+    expect(orbitGain(500, 2)).toBe(0);
   });
 });

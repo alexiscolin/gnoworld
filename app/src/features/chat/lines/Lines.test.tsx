@@ -204,6 +204,120 @@ describe("the lines view, compiled", () => {
   });
 });
 
+// WebKit anchors no scroll: a card that grows leaves the list's place where it was, and the scroll event of the list's own
+// move to its end, which comes a frame late, then finds the list off its end (Safari opened a room mid-history).
+describe("the list held at its end", () => {
+  const CLIENT = 400;
+  let height: number;
+  let top: number;
+  let resized: (() => void)[];
+  const list = () => {
+    const box = host.querySelector("ol");
+    if (box === null) throw new Error("no list");
+    return box;
+  };
+  const scrolled = () => {
+    act(() => {
+      list().dispatchEvent(new Event("scroll"));
+    });
+  };
+  const grown = (by: number) => {
+    height += by;
+    for (const tell of resized) tell();
+  };
+  beforeEach(() => {
+    height = 1000;
+    top = 0;
+    resized = [];
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(CLIENT);
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(() => height);
+    vi.spyOn(Element.prototype, "scrollTop", "get").mockImplementation(() => top);
+    vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation((to: number) => {
+      top = Math.max(0, Math.min(to, height - CLIENT));
+    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(tell: () => void) {
+          resized.push(tell);
+        }
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("stays at the end when a card grows before the scroll event of its own move there comes", () => {
+    draw();
+    expect(top).toBe(600);
+    height += 300;
+    scrolled();
+    grown(0);
+    expect(top).toBe(900);
+  });
+
+  it("stays at the end through a second card that grows in the frame the first one's move is told", () => {
+    draw();
+    grown(300);
+    height += 200;
+    scrolled();
+    grown(0);
+    expect(top).toBe(1100);
+  });
+
+  // Chromium and Firefox anchor the scroll: a card that grows above moves the list down by as much, in the reader's own frame.
+  it("lets go of the reader who scrolls up as an anchored card grows above", () => {
+    draw();
+    scrolled();
+    top = 500;
+    height += 300;
+    top += 300;
+    scrolled();
+    grown(0);
+    expect(top).toBe(800);
+  });
+
+  // A room opened on its New line near its end shows its end too: it is held there as any other.
+  it("stays at the end it opened on with its New line, when a card grows before that move's scroll event", () => {
+    height = 420;
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      return new DOMRect(0, this.matches("li[data-new]") ? 10 : 0, 0, 0);
+    });
+    draw({ paged: true, read: at(100) });
+    expect(top).toBe(10);
+    height += 300;
+    scrolled();
+    grown(0);
+    expect(top).toBe(320);
+  });
+
+  // A phone may tell a place snapped to its own pixels: a fraction off where the list was put is no reader's move.
+  it("takes a place told a fraction of a pixel off its own for its own", () => {
+    draw();
+    height += 300;
+    top += 0.4;
+    scrolled();
+    grown(0);
+    expect(top).toBe(900);
+  });
+
+  it("leaves the reader who scrolled up where they are as a card grows, and holds the end again once back there", () => {
+    draw();
+    scrolled();
+    top = 200;
+    scrolled();
+    grown(300);
+    expect(top).toBe(200);
+    top = 900;
+    scrolled();
+    grown(300);
+    expect(top).toBe(1200);
+  });
+});
+
 // The device's place forgotten when the room is read through, once: a mark another tab sets after it is the reader's,
 // and the next line this tab reads must not erase it.
 describe("reading a room through", () => {

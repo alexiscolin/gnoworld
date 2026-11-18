@@ -1,6 +1,6 @@
 // The links between worlds, drawn while the Map shows a system, the home or a world: a line from each world to those it is built on
 // and those built on it, from the worlds' file's imports (cosmosWorld.ts's usesOf), the planets' ends following their orbits. One
-// preallocated, bounded buffer, written each frame; the orbits' colour, their faint strength for a system's own links, a world's brighter.
+// preallocated, bounded buffer, written each frame; the orbits' colour, a faint strength for a system's own links, a world's brighter.
 import { damp } from "@gnoworld/core";
 import { BufferAttribute, BufferGeometry, DynamicDrawUsage, LineSegments, ShaderMaterial, Vector3 } from "three";
 import { placeOf, type Planet, type System, type Universe, type Vec } from "../layout.ts";
@@ -12,7 +12,7 @@ import { Strip } from "./strip.ts";
 // ceiling: a place draws this many links at most; a kit of hundreds of copies importing each other shows its first ones. Raise it
 // with the buffer's size if a real system needs more.
 const MOST = 2048;
-// raw: a world's own links over a system's faint ones, which share the orbits' strength
+// raw: a world's own links over a system's faint ones
 const BRIGHT = 4 * ORBIT_GAIN;
 const FAINT = ORBIT_GAIN;
 const EASE_S = 0.3;

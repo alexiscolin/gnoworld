@@ -16,14 +16,14 @@ export interface Held extends Warming {
   shown: boolean;
   /** Not shown, its fade out still running: it stays drawn, its air with it, until it is gone, over the quad that took its place. */
   leaving: boolean;
-  /** Its quad stays drawn beneath while it comes in over it, hidden once it is whole: no bare skeleton stands between the two. */
+  /** Its quad stays drawn beneath while it comes in over it, hidden once it is whole. */
   over: boolean;
   /** Just shown: its first frame stands at 0, whatever the frame before cost. */
   fresh: boolean;
   /** The full-size maps still to go to the GPU, and whether they were swapped in (the Earth's). */
   pending?: Texture[];
   upgraded: boolean;
-  /** How far it has come in from its skeleton, 0 to 1. */
+  /** How far it has come in over its stand-in, 0 to 1. */
   arrive: number;
 }
 
@@ -53,9 +53,8 @@ export function holdOf(
     upgraded: false,
     arrive: 0,
   };
-  drawn.group.visible = false;
-  stage.add(drawn.group);
-  // Its programs as the blur draws them too: hidden till it shows, the warm-up at rest (rig/speed.ts) never draws it.
+  // Its programs as the blur draws them too: hidden till it shows, the warm-up at rest (rig/speed.ts) never draws it. Compiled while it
+  // shows and before it joins the stage: three keys its programs by the lamps that show, the colony's own counted once so.
   inBlurPixel(renderer, () => {
     renderer.compile(drawn.group, camera, stage);
   });
@@ -65,6 +64,8 @@ export function holdOf(
     },
     () => undefined,
   );
+  drawn.group.visible = false;
+  stage.add(drawn.group);
   return held;
 }
 
