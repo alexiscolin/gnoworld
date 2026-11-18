@@ -19,9 +19,9 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 // four caps were their measured weight and 256 B; a new chunk's cap is round, about a tenth over its measure, rounded up to the hundred, and
 // a cap moves only by the owner's recorded decision (D13750). The first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 198,827 B or 199,117 B measured, by how a build
-  // splits one commit (F13995), the cap the owner's (D13751, D13773): three's classes for gnosh's colony, the planets' programs made ahead.
-  { chunk: "scene", after: ["root", "universe"], cap: 199_500 },
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: about 199,500 B measured, some 300 B apart between
+  // builds of one commit (F13995); the cap the owner's (D13751, D13773, and 2026-11-18: the focus pull, the adaptive dive, the chat's foot).
+  { chunk: "scene", after: ["root", "universe"], cap: 200_000 },
   // On the home's first screen: 19,888 B measured beyond `root` and `universe` (its worlds, their thumbs, the home's views and the follow
   // chunks it imports; the phone's worlds row reads the rail, D13719), 256 B ahead.
   { chunk: "Rail", after: ["root", "universe"], cap: 20_144 },
