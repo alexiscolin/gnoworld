@@ -236,6 +236,8 @@ function orbits(space: Space, delta: number): void {
     return;
   }
   const near = (system.reach * 14 - distance(space.camera.position, system.place)) / (system.reach * 9);
-  const to = planned ? orbitGain(system.planets.length) * Math.min(1, Math.max(0, near)) : 0;
+  const to = planned
+    ? orbitGain(system.planets.length, space.renderer.getPixelRatio()) * Math.min(1, Math.max(0, near))
+    : 0;
   ease(stage.orbits.gain, to, damp(delta / 1000, ORBITS_S));
 }

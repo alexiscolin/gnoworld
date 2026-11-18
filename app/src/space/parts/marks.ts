@@ -19,7 +19,7 @@ import { beforeGrade } from "../renderer.ts";
 import { ADDITIVE } from "../additive.ts";
 
 const SEGMENTS = 128;
-/** The orbits' colour and their strength at full, which the Map's links share (links.ts). */
+/** The orbits' colour, which the Map's links share, and the strength the links count theirs from (links.ts): not the Map's orbits'. */
 export const ORBIT_COLOUR = [0.75, 0.78, 0.9] as const;
 export const ORBIT_GAIN = 0.13;
 // raw: how many orbits a system draws at their full strength, and the least share of it any keeps
@@ -30,8 +30,13 @@ const LEAST_CROWD = 0.5;
  * disc, but never under half, or a large system's are too pale to read (D13756). */
 export const orbitCrowd = (planets: number): number =>
   Math.max(LEAST_CROWD, Math.min(1, Math.sqrt(CLEAR_ORBITS / Math.max(planets, 1))));
-/** How strong a system of `planets` draws its orbits in the Map, before its distance fades them. */
-export const orbitGain = (planets: number): number => ORBIT_GAIN * orbitCrowd(planets);
+// raw: the Map's orbits' strength at full, as the screen shows it (a line's shader writes no grade), and the power its light goes by
+const MAP_GAIN = 0.4;
+const SCREEN_POWER = 2.2;
+/** How strong a system of `planets` draws its orbits in the Map, before its distance fades them, at `ratio` buffer pixels a page pixel:
+ * a line is one buffer pixel wide, so half as thick on a screen of ratio 2, where it gets twice the light and reads as on any other. */
+export const orbitGain = (planets: number, ratio: number): number =>
+  MAP_GAIN * orbitCrowd(planets) * Math.max(1, ratio) ** (1 / SCREEN_POWER);
 // The orbit round a planet framed close: its radius in the planet's, how high the eye stands over its plane (sin 5°: nearly edge
 // on, its near side passing low over the planet, its far side behind it), how it leans across the view, its strength, and its moment.
 const ROUND = { radii: 1.25, over: 0.087, lean: -0.3, gain: 0.2, ease: 0.3 } as const;
