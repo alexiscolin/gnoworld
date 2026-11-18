@@ -23,6 +23,7 @@ function make(over: Partial<Beat> = {}) {
     freed: 0,
     resized: 0,
     roused: 0,
+    taken: [] as boolean[],
     naps: [] as number[],
   };
   const state = { need: "full" as Need, nap: undefined as number | undefined, unseen: false, lively: false };
@@ -37,8 +38,9 @@ function make(over: Partial<Beat> = {}) {
     },
     nap: () => state.nap,
     lively: () => state.lively,
-    rouse: () => {
+    rouse: (taken) => {
       log.roused += 1;
+      log.taken.push(taken);
     },
     free: () => {
       log.freed += 1;
@@ -144,6 +146,14 @@ describe("loop", () => {
       expect(l.log.roused).toBe(1);
     },
   );
+
+  it("tells the beat the hand takes the view on a press, the wheel, a key or a touch; never on a pointer's move nor a resize", () => {
+    const l = make();
+    for (const type of ["pointerdown", "wheel", "keydown", "touchstart", "pointermove"])
+      l.page.dispatchEvent(new Event(type));
+    l.window.dispatchEvent(new Event("resize"));
+    expect(l.log.taken).toEqual([true, true, true, true, false, false]);
+  });
 
   it("paces a lively view by naps, and an input then draws at once (D13013)", () => {
     const l = make();
