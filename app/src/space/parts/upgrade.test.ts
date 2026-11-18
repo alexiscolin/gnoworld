@@ -75,7 +75,9 @@ describe("upgradeStep", () => {
 
   it("brings no focus to an Earth made from the full set already", () => {
     const full = fullSet();
-    const group = new Group().add(new Mesh(undefined, new ShaderMaterial({ uniforms: { surface: { value: full.day } } })));
+    const group = new Group().add(
+      new Mesh(undefined, new ShaderMaterial({ uniforms: { surface: { value: full.day } } })),
+    );
     const settleFull = vi.fn();
     const maps = { fullEarth: () => full, fullCame: full, settleFull } as unknown as Maps;
     const setEarthMaps = vi.fn();

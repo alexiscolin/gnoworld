@@ -298,6 +298,8 @@ describe("the Earth's full-size maps coming into focus", () => {
 
   it("mixes every read of the day, the night and the clouds with the map it replaced", () => {
     expect(SURFACE_FRAGMENT).not.toMatch(/\bread\((?:surface|cloudMap|nightMap),/);
-    expect(SURFACE_FRAGMENT.match(/\breadIn\((?:surface, surfaceWas|cloudMap, cloudWas|nightMap, nightWas),/g)?.length).toBe(7);
+    expect(
+      SURFACE_FRAGMENT.match(/\breadIn\((?:surface, surfaceWas|cloudMap, cloudWas|nightMap, nightWas),/g)?.length,
+    ).toBe(7);
   });
 });

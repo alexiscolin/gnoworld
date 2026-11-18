@@ -164,7 +164,8 @@ class LivePlanet implements Planet {
       const [now, before] = [uniforms[name], uniforms[was]];
       if (now === undefined) continue;
       // The map replaced is kept till the focus is whole, then let go: freed, it must be bound nowhere.
-      if (before !== undefined && (focus >= 1 || now.value !== map)) before.value = focus >= 1 ? map : (now.value as Texture);
+      if (before !== undefined && (focus >= 1 || now.value !== map))
+        before.value = focus >= 1 ? map : (now.value as Texture);
       now.value = map;
     }
     setUniform(uniforms, "focus", focus);
