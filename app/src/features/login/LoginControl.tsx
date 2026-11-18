@@ -4,8 +4,8 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { reportedOr } from "../../lib/reported.ts";
+import { onAsked } from "../../pageAsks.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { GET_STARTED } from "./getStartedAsk.ts";
 import { knowSession, logIn, logOut, pageClock, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
 
@@ -70,15 +70,19 @@ export function LoginControl({
   const [was, setWas] = useState(false);
   // Drawn from the first ask on and kept, so that its closing fades as its opening does.
   const [drawn, setDrawn] = useState(false);
-  // A phone menu's "Get started" (getStartedAsk.ts) opens the same dialog.
+  // A phone menu's "Get started" (pageAsks.ts) opens the same dialog.
   useEffect(() => {
-    const ask = () => {
-      setOpen(true);
-      setDrawn(true);
-    };
-    window.addEventListener(GET_STARTED, ask);
+    const stop = new AbortController();
+    onAsked(
+      "get-started",
+      () => {
+        setOpen(true);
+        setDrawn(true);
+      },
+      stop.signal,
+    );
     return () => {
-      window.removeEventListener(GET_STARTED, ask);
+      stop.abort();
     };
   }, []);
   if (missing !== was) {

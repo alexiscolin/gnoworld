@@ -95,6 +95,9 @@ describe("the account's menu", () => {
     expect(items(mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} phone />))).not.toContain(
       "Get started",
     );
+    // An account has its way in already: no Get started, whatever it is handed.
+    const account = <Opened address={ADDRESS} lead={null} onLogOut={() => undefined} onGetStarted={ask} phone />;
+    expect(items(mount(account))).not.toContain("Get started");
   });
 
   it("on a narrow computer offers Log in with gnokey after Connect Adena, and on a touch phone none", () => {

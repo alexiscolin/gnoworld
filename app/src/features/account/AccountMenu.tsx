@@ -6,9 +6,9 @@ import { shortAddress, type Address } from "@gnoworld/schemas";
 import { Button, IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";
-import { onAsked } from "../../pageAsks.ts";
+import { askFor, onAsked } from "../../pageAsks.ts";
 import { JARVIS_ASKS, loadListener, type FirstAsk } from "../jarvis/index.ts";
-import { adenaHere, askGetStarted, LoginControl, useLogin } from "../login/index.ts";
+import { adenaHere, LoginControl, useLogin } from "../login/index.ts";
 import styles from "./AccountPill.module.css";
 import { useNaming, useNamelessTold } from "./naming.ts";
 
@@ -105,7 +105,10 @@ function LateDoors({ justIn, address }: { justIn: boolean; address: Address | un
 // A phone's header holds no button for the way in: where Adena is found, it is the menu's first row (a phone's browser has none).
 const wayIn = (phone: boolean | undefined, logIn: () => void) => (phone && adenaHere() ? logIn : undefined);
 // Where it finds none, the steps (Get started), which the header's control opens.
-const stepsIn = (phone: boolean | undefined) => (phone && !adenaHere() ? askGetStarted : undefined);
+const askSteps = () => {
+  askFor("get-started");
+};
+const stepsIn = (phone: boolean | undefined) => (phone && !adenaHere() ? askSteps : undefined);
 
 // The dialog that registers a name, brought once asked; `onSettled` counts a name settled, `onClose` is told false.
 function NamingDoor({
