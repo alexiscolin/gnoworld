@@ -173,3 +173,28 @@ test("a room shows a skeleton until its history came, then its lines at their en
   await expect.poll(() => gap(list)).toBeLessThan(4);
   await expect(page.locator('[aria-busy="true"] [data-shape="disc"]')).toHaveCount(0);
 });
+
+// A room that opens with a card still reading its data shows once, whole: each height its list had while in view, frame by frame.
+test("a room that opens with a card shows its lines once, the card filled, at their end", async ({ page }) => {
+  await page.addInitScript(() => {
+    const heights = new Set<number>();
+    Object.assign(window, { heights });
+    const look = () => {
+      const box = document.querySelector<HTMLElement>('ol[aria-label="Messages"]');
+      if (box !== null && box.children.length > 0 && getComputedStyle(box).visibility !== "hidden")
+        heights.add(box.scrollHeight);
+      requestAnimationFrame(() => setTimeout(look, 0));
+    };
+    look();
+  });
+  await page.route("**/markets.json", async (route) => {
+    await new Promise((done) => setTimeout(done, 60));
+    await route.fulfill({ json: MARKETS, headers: { "access-control-allow-origin": "*" } });
+  });
+  await page.route("**/api/markets/history", (route) => route.fulfill({ status: 404, json: { error: "not_ready" } }));
+  await room(page, { history: HISTORY });
+  await expect(page.locator('[data-market-card] [data-token="GNOT"]')).toBeVisible();
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  expect(await page.evaluate(() => (Reflect.get(window, "heights") as Set<number>).size)).toBe(1);
+});

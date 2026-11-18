@@ -23,10 +23,16 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
     threadsOf: vi.fn(real.threadsOf),
   };
 });
-// A card line's card, without its chunk or its read: the element the list looks for, empty until `card.filled`.
-const card = vi.hoisted(() => ({ filled: false }));
+// A card line's card, without its chunk or its read: the element the list looks for, empty while its code comes, busy while
+// its data does (`card.reading`), then filled (`card.filled`).
+const card = vi.hoisted(() => ({ filled: false, reading: false }));
 vi.mock("./SharedCard.tsx", () => ({
-  SharedCard: () => <div data-shared-card="market">{card.filled ? "GNOT 0.43" : null}</div>,
+  SharedCard: () => (
+    <div data-shared-card="trending">
+      {card.reading ? <div aria-busy="true">Reading the ranking</div> : null}
+      {card.filled ? "Boards 12 calls" : null}
+    </div>
+  ),
 }));
 vi.mock("./ThreadChip.tsx", async (importOriginal) => {
   const real = await importOriginal<typeof threadChipModule>();
@@ -452,6 +458,15 @@ describe("the list held at its end", () => {
         expect(shown()).toBe(false);
         grown(10);
         vi.advanceTimersByTime(50);
+        expect(shown()).toBe(true);
+      });
+
+      it("keeps its lines unseen while a card reads its data, its code come", () => {
+        card.reading = true;
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        card.reading = false;
+        expect(shown()).toBe(false);
+        vi.advanceTimersByTime(400);
         expect(shown()).toBe(true);
       });
 

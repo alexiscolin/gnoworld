@@ -29,13 +29,16 @@ const QUIET_MS = 200;
 const CARDS_WAIT_MS = 400;
 const show = (box: HTMLElement | null) => box?.style.removeProperty("visibility");
 
-// A room that opens with a card not drawn yet among its lines (its code has not come: the first of a visit) shows once, whole:
-// unseen until its list is quiet (the net's wait, below), CARDS_WAIT_MS at most. Cards the page already holds wait for nothing.
+// A card that will still grow: its code has not come (empty), or its data has not (its body says busy, the prices say loading).
+const UNFILLED = '[data-shared-card]:empty, [data-shared-card] :is([aria-busy="true"], [data-markets="loading"])';
+
+// A room that opens with such a card among its lines shows once, whole: unseen until its list is quiet (the net's wait, below),
+// CARDS_WAIT_MS at most. Cards the page already holds wait for nothing.
 function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const box = listRef.current;
     if (box === null) return;
-    if (box.querySelector("[data-shared-card]:empty") === null) return;
+    if (box.querySelector(UNFILLED) === null) return;
     box.style.setProperty("visibility", "hidden");
     const latest = setTimeout(() => show(box), CARDS_WAIT_MS);
     return () => {
