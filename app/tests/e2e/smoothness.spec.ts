@@ -141,19 +141,29 @@ async function barAndPill(page: Page, name: string) {
     await views(page).locator("a[href*='chat=full']").click();
     await wait(page, 2000);
   });
+  // In the full chat each level's name is folded whole, at every width (under 1340 px the word beside it is hidden).
+  const widths = await views(page)
+    .locator("a .truncate")
+    .evaluateAll((names) => names.map((each) => each.getBoundingClientRect().width));
+  expect(
+    widths.filter((width) => width > 0.5),
+    `${name}: the names folded in the full chat`,
+  ).toEqual([]);
+  // The world's link by its address: under 1340 px its word is hidden, and its folded name says nothing yet.
   await flow(page, [`${name}-to-page`, PILL, BAR], async () => {
-    await views(page)
-      .getByRole("link", { name: /^world/i })
-      .click();
+    await views(page).locator("a[href='/w/bubble']").click();
     await wait(page, 2000);
   });
 }
 
-test("4b a world's page with no scene: the chat full and back, the bar and the pill gliding", async ({ page }) => {
-  await open(page, { width: 1366, as: ACCOUNT, height: 768, full: false });
-  await wait(page, 1500);
-  await barAndPill(page, "4b-world");
-});
+for (const width of [1366, 1280])
+  test(`4b a world's page with no scene at ${String(width)} px: the chat full and back, the bar and the pill gliding`, async ({
+    page,
+  }) => {
+    await open(page, { width, as: ACCOUNT, height: 768, full: false });
+    await wait(page, 1500);
+    await barAndPill(page, `4b-world-${String(width)}`);
+  });
 
 test("5 the plate: a card alone, closed; Try it's tabs", async ({ page }) => {
   await adena(page);
