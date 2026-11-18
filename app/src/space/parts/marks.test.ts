@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { orbitCrowd, Plate } from "./marks.ts";
+import { Orbits, orbitCrowd, Plate } from "./marks.ts";
+
+// three keys a program by whether its geometry holds a position (WebGLPrograms.js, hasPositionAttribute): the lines' program made ahead
+// with none (programs.ts) was not the one a system's orbits drew with, linked in the flight that opened it.
+it("gives the orbits' lines a position before any system opens", () => {
+  expect(new Orbits().lines.geometry.getAttribute("position").count).toBe(0);
+});
 
 describe("Plate.sync", () => {
   it("is not drawn while its fill is under half a level, and is once it rises", () => {

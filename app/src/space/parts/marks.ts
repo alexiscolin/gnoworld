@@ -54,8 +54,9 @@ export function ringOf({ place, across, along }: Pick<System, "place" | "across"
 
 export class Orbits {
   readonly gain = { value: 0 };
+  // With a position from the first, as `of` leaves it: three keys the lines' program by it, and the one made ahead is the one they draw with.
   readonly lines = new LineSegments(
-    new BufferGeometry(),
+    new BufferGeometry().setAttribute("position", new Float32BufferAttribute([], 3)),
     new ShaderMaterial({
       uniforms: { uColour: { value: new Vector3(...ORBIT_COLOUR) }, uGain: this.gain },
       vertexShader: LINE_VERTEX,
