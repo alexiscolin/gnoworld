@@ -56,6 +56,15 @@ for (const path of ["/universe", "/s/gnoland"])
     expect(logo, "the logo where the header's stands").toEqual(header);
   });
 
+// The code may never come: the fallback's loader then gives way after 6 s, as the header's hold does (shellHeader.module.css), its links usable.
+test("with no script, the fallback's loader gives way after 6 s and the header shows", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/universe");
+  await expect(loader(page)).toBeVisible();
+  await expect(loader(page)).toHaveCount(0, { timeout: 8000 });
+  expect(await page.locator("header").evaluate(opacityOf)).toBe(1);
+});
+
 test("a page written ahead keeps its own first paint: no fallback's loader over it", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   for (const path of ["/earth", "/w/bubble"]) {

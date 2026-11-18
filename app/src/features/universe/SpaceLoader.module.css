@@ -93,6 +93,15 @@
     :root[data-first]:has(main:empty) .loader[data-first-loader] {
       opacity: 1;
       visibility: visible;
+      /* raw: the header's hold's last word (shellHeader.module.css), 6 s: if the code never comes, the page it holds shows */
+      animation: first-held 0s 6s forwards;
+    }
+  }
+
+  @keyframes first-held {
+    to {
+      opacity: 0;
+      visibility: hidden;
     }
   }
 
