@@ -13,36 +13,71 @@ const PAGES = ["/", "/w/bubble", "/nowhere"];
 
 // Every visible word (a text node's lines, one box each) and every visible control, as a box's top, left and right edge. The full-bleed chat
 // screen is not counted: the top gutter is the site header's, and the chat's own geometry is chatGeometry's and the phone picture's.
-const edgesOf = (page: Page) =>
+const pageEdges = (page: Page) =>
+  page.evaluate(
+    (apart) => {
+      const found: { what: string; top: number; left: number; right: number }[] = [];
+      const take = (what: string, rect: DOMRect) => {
+        if (rect.width > 0 && rect.height > 0) found.push({ what, top: rect.top, left: rect.left, right: rect.right });
+      };
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const text = (node.textContent ?? "").trim();
+        const parent = node.parentElement;
+        // The bell's count overhangs its button's corner by design (the video's frames): the button, measured below, carries it.
+        if (
+          text === "" ||
+          parent?.closest("script, style, [hidden], .visually-hidden, [data-full], [data-tone=new][aria-hidden]") !==
+            null
+        )
+          continue;
+        if (getComputedStyle(parent).visibility === "hidden") continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
+      }
+      // The full chat spans the screen, edge to edge by design; a phone's header is measured by its ink (headInk).
+      for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
+        if (control.closest(apart) === null)
+          take(
+            `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
+            control.getBoundingClientRect(),
+          );
+      return found;
+    },
+    (page.viewportSize()?.width ?? 0) < 900 ? "[data-full], header" : "[data-full]",
+  );
+
+// A phone's header targets hang past the safe lines by their side room, the glyph on the line, and its row stands its own padding down,
+// the notch's room or the step (shellHeader.module.css): there each control's ink (its marks and words) keeps the side gutters, and the
+// header's padding is the top's, so a word on it reads 16 px down, as elsewhere.
+const headInk = (page: Page) =>
   page.evaluate(() => {
-    const found: { what: string; top: number; left: number; right: number }[] = [];
-    const take = (what: string, rect: DOMRect) => {
-      if (rect.width > 0 && rect.height > 0) found.push({ what, top: rect.top, left: rect.left, right: rect.right });
-    };
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      const text = (node.textContent ?? "").trim();
-      const parent = node.parentElement;
-      // The bell's count overhangs its button's corner by design (the video's frames): the button, measured below, carries it.
-      if (
-        text === "" ||
-        parent?.closest("script, style, [hidden], .visually-hidden, [data-full], [data-tone=new][aria-hidden]") !== null
-      )
-        continue;
-      if (getComputedStyle(parent).visibility === "hidden") continue;
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
-    }
-    // The full chat spans the screen, edge to edge by design.
-    for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      if (control.closest("[data-full]") === null)
-        take(
-          `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
-          control.getBoundingClientRect(),
-        );
-    return found;
+    const header = document.querySelector("header");
+    if (innerWidth >= 900 || header === null) return [];
+    const shift = 16 - Number.parseFloat(getComputedStyle(header).paddingTop);
+    return [...header.querySelectorAll("a[href], button, input, textarea, select, [tabindex]")].flatMap((control) => {
+      const boxes = [...control.querySelectorAll("svg")].map((mark) => mark.getBoundingClientRect());
+      const words = document.createTreeWalker(control, NodeFilter.SHOW_TEXT);
+      for (let node = words.nextNode(); node !== null; node = words.nextNode())
+        if (node.parentElement?.closest(".visually-hidden") === null && (node.textContent ?? "").trim() !== "") {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          boxes.push(range.getBoundingClientRect());
+        }
+      const seen = boxes.filter(({ width, height }) => width > 0 && height > 0);
+      if (seen.length === 0) return [];
+      const what = `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`;
+      const [top, left, right] = [
+        Math.min(...seen.map((box) => box.top)),
+        Math.min(...seen.map((box) => box.left)),
+        Math.max(...seen.map((box) => box.right)),
+      ];
+      return [{ what, top: top + shift, left, right }];
+    });
   });
+
+const edgesOf = async (page: Page) => [...(await pageEdges(page)), ...(await headInk(page))];
 
 // On a phone a world's chat is a block under the plate, drawn once its code is in: the measure waits for that, so it is always of the same page.
 async function chatOpened(page: Page, path: string, width: number): Promise<void> {
@@ -144,11 +179,14 @@ for (const width of WIDTHS) {
         await controlled(page);
         await hydrated(page);
         if (name !== "") {
+          // A phone cannot log in (D13881): the login is a computer's, the page then read at the width under test.
+          await page.setViewportSize({ width: 1280, height: 844 });
           await adena(page);
           await page.reload();
           await hydrated(page);
           await connectAdena(page);
           await expect(accountPill(page)).toBeVisible();
+          await page.setViewportSize({ width, height: 844 });
           if (path !== "/") {
             await page.goto(`${UPDATING}${path}`);
             await hydrated(page);
