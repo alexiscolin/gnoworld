@@ -1,6 +1,6 @@
 import { axeOf } from "./axe.ts";
 import type { Locator, WebSocketRoute } from "@playwright/test";
-import { lineOf, lines, word } from "./chat.ts";
+import { lineOf, lines, scrolling, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
@@ -181,15 +181,15 @@ test.describe("the reading place", () => {
     ]);
     const { sent, ergo } = await room(page, { me: address, history, read: T(59) });
     const list = page.getByRole("list", { name: "Messages" });
-    await list.evaluate((box) => {
-      box.scrollTop = 0;
+    await scrolling(list).evaluate((box) => {
+      box.scrollTop = -box.scrollHeight;
       box.dispatchEvent(new Event("scroll"));
     });
     ergo().send(live("late", "2026-10-25T11:00:00.000Z"));
     await expect(lineOf(page, "late")).toHaveCount(1);
     expect(marks(await sentBefore(page, sent))).toEqual([]);
-    await list.evaluate((box) => {
-      box.scrollTop = box.scrollHeight;
+    await scrolling(list).evaluate((box) => {
+      box.scrollTop = 0;
       box.dispatchEvent(new Event("scroll"));
     });
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=2026-10-25T11:00:00.000Z`]);
@@ -210,8 +210,8 @@ test.describe("the reading place", () => {
     await expect(fresh).toContainText("New from here");
     await expect(fresh).toHaveAttribute("tabindex", "0");
     expect(marks(await sentBefore(page, sent))).toEqual([]);
-    await page.getByRole("list", { name: "Messages" }).evaluate((box) => {
-      box.scrollTop = box.scrollHeight;
+    await scrolling(page.getByRole("list", { name: "Messages" })).evaluate((box) => {
+      box.scrollTop = 0;
     });
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(59)}`]);
   });
@@ -244,7 +244,7 @@ test.describe("the reading place", () => {
       await line.focus();
       const ring = await page.evaluate(() => {
         const item = document.activeElement;
-        const list = item?.parentElement;
+        const list = item?.parentElement?.parentElement;
         if (!(item instanceof HTMLElement) || list == null) return null;
         const style = getComputedStyle(item);
         const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);

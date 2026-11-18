@@ -25,18 +25,39 @@
     container-type: inline-size;
     display: flex;
     flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    /* Fills the scrolling box when the room is short, as a list at the box's top did; never shrinks under its lines */
+    flex: 1 0 auto;
     /* No gap: each line holds its own padding, so the pointer crosses between lines and bar without leaving a row */
     gap: 0;
   }
 
-  /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
-     the page; the thread's list keeps its own height. */
+  /* The conversation's own list, with the skeleton that stands in for it: they take what the pins above and the composer
+     below leave. */
+  .stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  /* The scrolling box, alone, never the page. Its scroll origin is its foot (column-reverse over one list in the lines' own
+     order): every engine opens the room at its end and keeps it there, with no script; scrollTop is 0 there, below 0 above. */
   .fill {
     margin: 0;
     list-style: none;
     flex: 1;
     min-block-size: 0;
     overflow: auto;
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  .fill,
+  .skeleton {
     /* raw: 20 px above the first line and below the last (the prototype's #chatList padding) */
     --_pad: 20px;
     padding-block: var(--_pad);
@@ -49,12 +70,49 @@
     font: var(--font-chat);
   }
 
-  /* The list's place while the room's history comes: its skeleton stands at the foot, where the newest lines will. */
-  .arriving {
+  /* The room's list and its skeleton cross-fade, opacity alone: the list in once its history and cards are in, the skeleton out.
+     While cards wait (`data-awaiting`, heldAtEnd.ts) the list is out and the skeleton in; the fade runs as the wait ends. */
+  .fill {
+    animation: appear calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  .fill[data-awaiting] {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* The skeleton's place: the same box as the list, its shapes at the foot where the newest lines stand, drawn at once. */
+  .skeleton {
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     overflow: hidden;
+    pointer-events: none;
+    /* raw: its shapes stand at once, not after the skeleton's 300 ms wait */
+    --motion-wait: 0s;
+    --play: paused;
+    animation: vanish calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  .fill[data-awaiting] + .skeleton,
+  .skeleton[data-shown] {
+    --play: running;
+    animation: none;
+  }
+
+  @keyframes appear {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes vanish {
+    to {
+      opacity: 0;
+      visibility: hidden;
+    }
   }
 
   .lines > li {
@@ -372,7 +430,8 @@
    under the band. */
 @layer components {
   @media (width < 900px) {
-    .fill {
+    .fill,
+    .skeleton {
       --_room: var(--chat-inset);
     }
 
@@ -388,7 +447,7 @@
       padding-block-start: 0;
     }
 
-    .fill > li:first-child {
+    .lines > li:first-child {
       /* The list's room above its first line goes to the lines' top, so few lines settle at the foot */
       margin-block-start: auto;
     }

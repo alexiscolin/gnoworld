@@ -103,8 +103,8 @@ test.describe("threads, from the review", () => {
       lines(page)
         .first()
         .evaluate((item) => {
-          const list = item.parentElement;
-          return list !== null && list.scrollHeight - list.scrollTop - list.clientHeight < 32;
+          const list = item.parentElement?.parentElement;
+          return list !== null && list !== undefined && list.scrollTop > -32;
         });
 
     // The reader at the end of forty lines, read to the reply, then the panel opened: the list hidden.

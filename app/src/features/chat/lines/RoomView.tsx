@@ -41,7 +41,7 @@ const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).
 function TypistsHere({ typing }: { typing: Typing | undefined }) {
   return Object.keys(typing ?? {}).length === 0 ? NOBODY : <Typists typing={typing} />;
 }
-const LINES = [styles["lines"], styles["fill"]].join(" ");
+const LINES = styles["fill"];
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
@@ -67,8 +67,10 @@ function Arriving({ word }: { word: string }) {
       </>
     );
   return (
-    <div aria-busy="true" className={[styles["fill"], styles["arriving"]].join(" ")}>
-      <SkeletonLines />
+    <div aria-busy="true" className={styles["stage"]}>
+      <div data-shown="" className={styles["skeleton"]}>
+        <SkeletonLines />
+      </div>
     </div>
   );
 }
@@ -197,7 +199,7 @@ export function RoomView(props: RoomViewProps) {
   const { onReact, onReply, onThread, onEdit, partner } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
-  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact, jump } = state ?? {};
+  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   const none = noneOf(connected, lines.length, paged);
   return (
@@ -218,7 +220,6 @@ export function RoomView(props: RoomViewProps) {
         onDismiss={onDismiss}
         read={read}
         paged={paged === true}
-        jumped={jump !== undefined}
         onRead={onRead}
         verdicts={verdicts}
         saving={saving}

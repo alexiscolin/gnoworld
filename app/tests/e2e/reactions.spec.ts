@@ -1,4 +1,4 @@
-import { buttonsOf, lineOf, lines, word } from "./chat.ts";
+import { buttonsOf, lineOf, lines, scrolling, word } from "./chat.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
@@ -91,7 +91,7 @@ test.describe("reactions", () => {
     const history = Array.from({ length: 40 }, (_, n): HistoryLine => [`h${String(n)}`, T(n), `line ${String(n)}`]);
     const { ergo } = await asAccount(page, () => ({ history }), 40);
     const list = page.getByRole("list", { name: "Messages" });
-    const left = () => list.evaluate((box) => box.scrollHeight - box.scrollTop - box.clientHeight);
+    const left = () => scrolling(list).evaluate((box) => -box.scrollTop);
     await expect.poll(left).toBeLessThan(2);
     ergo().send(tagmsg("r1", "+draft/react=👍;+reply=h39", { at: 50, who: OTHER }));
     await expect(lines(page).nth(39).getByRole("button", { name: "👍, 1" })).toBeVisible();

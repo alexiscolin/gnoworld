@@ -1,11 +1,12 @@
 import type { Locator } from "@playwright/test";
 import { expect, hydrated, test } from "./fixtures.ts";
-import { word } from "./chat.ts";
+import { scrolling, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { live, room, T } from "./scriptedRoom.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 
 // A room opens at its newest line and stays there as that line's card comes late; a reader who scrolled up is left where they are.
+// The list's scroll origin is its foot (CSS), the same in every engine: `scrollTop` is 0 at the newest line and below 0 above it.
 const MARKETS = {
   source: "CoinGecko",
   updated: new Date().toISOString(),
@@ -15,7 +16,13 @@ const HISTORY: readonly HistoryLine[] = [
   ...Array.from({ length: 30 }, (_, i): HistoryLine => [`h${String(i)}`, T(i), `line number ${String(i)}`]),
   ["card", T(31), "💹 Market prices"],
 ];
-const gap = (list: Locator) => list.evaluate((box) => Math.round(box.scrollHeight - box.scrollTop - box.clientHeight));
+const gap = (list: Locator) => scrolling(list).evaluate((box) => Math.round(-box.scrollTop));
+// Where the room's first line stands: a reader who scrolled up keeps it still.
+const firstAt = (list: Locator) =>
+  list
+    .locator(":scope > li")
+    .first()
+    .evaluate((line) => Math.round(line.getBoundingClientRect().top));
 
 test("a room opens at its end and stays there as a late card comes in", async ({ page }) => {
   let release: () => void = () => undefined;
@@ -35,16 +42,16 @@ test("a room opens at its end and stays there as a late card comes in", async ({
   await expect(page.locator('[data-market-card] [data-token="GNOT"]')).toBeVisible();
   expect(await list.evaluate((box) => box.scrollHeight)).toBeGreaterThan(before);
   await expect.poll(() => gap(list)).toBeLessThan(4);
-  // Scrolled up, a line that comes moves nothing.
-  // The scroll event comes with the next frame: wait for it before the line.
-  await list.evaluate(async (box) => {
-    box.scrollTop = 0;
+  // Scrolled up, a line that comes moves nothing the reader sees.
+  await scrolling(list).evaluate(async (box) => {
+    box.scrollTop = -box.scrollHeight;
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
-  await expect.poll(() => list.evaluate((box) => box.scrollTop)).toBe(0);
+  const first = await firstAt(list);
   ergo().send(live("later", T(40), { text: "a later line" }));
   await expect(page.getByText("a later line")).toBeAttached();
-  expect(await list.evaluate((box) => box.scrollTop)).toBe(0);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  expect(await firstAt(list)).toBe(first);
 });
 
 // In the page: the lines at `first` grow by 200 px, then those at `then` (-1 is the newest) once the list has moved to its end for
@@ -70,32 +77,19 @@ const grownApart = (list: Locator, first: readonly number[], then: readonly numb
     [first, then],
   );
 
-// WebKit anchors no scroll, and Chromium is asked not to here: a second card grows after the list moved to its end for the
-// first and before that move's scroll event, which then finds the list off its end (Safari showed a room mid-history).
-test("a room stays at its end when two cards grow a frame apart, with no scroll anchoring", async ({ page }) => {
+// Cards grow after the lines are drawn (a phone's top worlds and proposals filling 60 to 300 ms later): the room ends at its end,
+// whatever grows and wherever, the lines above or the newest one, a frame apart or together.
+test("a room stays at its end when cards grow after its lines, above and at the newest line", async ({ page }) => {
   await room(page, { history: HISTORY.slice(0, 30) });
   const list = page.getByRole("list", { name: "Messages" });
   await expect.poll(() => gap(list)).toBeLessThan(4);
-  await list.evaluate((box) => {
-    box.style.setProperty("overflow-anchor", "none");
-  });
   expect(await grownApart(list, [5], [10])).toBeGreaterThan(400);
   expect(await gap(list)).toBeLessThan(4);
-});
-
-// Chromium and Firefox anchor the scroll: a line above the view grows with the newest one, after the list moved to its end and
-// before that move's scroll event. The anchoring moves the list by the first, and the second leaves it off its end.
-test("a room stays at its end when a line above and the newest one grow together, the scroll anchored", async ({
-  page,
-}) => {
-  await room(page, { history: HISTORY.slice(0, 30) });
-  const list = page.getByRole("list", { name: "Messages" });
-  await expect.poll(() => gap(list)).toBeLessThan(4);
-  await grownApart(list, [5], [6, -1]);
+  await grownApart(list, [6], [-1]);
   expect(await gap(list)).toBeLessThan(4);
 });
 
-// A reader who wheels up is let go, and keeps their place as the newest line grows.
+// A reader who wheels up keeps their place as the newest line grows under them, and as a line grows above them.
 test("a reader who scrolls up by the wheel keeps their place as a card grows", async ({ page }) => {
   await room(page, { history: HISTORY.slice(0, 30) });
   const list = page.getByRole("list", { name: "Messages" });
@@ -103,18 +97,32 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
   await list.hover();
   await page.mouse.wheel(0, -150);
   await expect.poll(() => gap(list)).toBeGreaterThan(100);
-  const before = await list.evaluate((box) => box.scrollTop);
+  const newest = list.locator(":scope > li").last();
+  const at = () => newest.evaluate((line) => Math.round(line.getBoundingClientRect().top));
+  const readerAt = () =>
+    list
+      .locator(":scope > li")
+      .nth(24)
+      .evaluate((line) => Math.round(line.getBoundingClientRect().top));
+  const before = await readerAt();
   await list.evaluate(async (box) => {
     const line = box.children[box.children.length - 1];
     if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "300px");
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
-  expect(await list.evaluate((box) => box.scrollTop)).toBe(before);
+  expect(await at()).toBeGreaterThan(0);
+  // Within a pixel: the page puts a scroll on its device pixels.
+  expect(Math.abs((await readerAt()) - before)).toBeLessThanOrEqual(1);
+  await list.evaluate(async (box) => {
+    const line = box.children[2];
+    if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "300px");
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  expect(Math.abs((await readerAt()) - before)).toBeLessThanOrEqual(1);
 });
 
-// The safety net: a list shown again after it had no height (a phone's panel), its place lost meanwhile as an engine may lose
-// it, is put at its end once it is quiet; no reader moved it.
-test("a room shown again after its list had no height ends at its end, its place lost meanwhile", async ({ page }) => {
+// A list shown again after it had no height (a phone's panel) is at its end again: a hidden box loses its place, and its place is its foot.
+test("a room shown again after its list had no height is at its end", async ({ page }) => {
   await room(page, { history: HISTORY.slice(0, 30) });
   const list = page.locator('ol[aria-label="Messages"]');
   await expect.poll(() => gap(list)).toBeLessThan(4);
@@ -128,7 +136,6 @@ test("a room shown again after its list had no height ends at its end, its place
     region.style.removeProperty("display");
     await frame();
     await frame();
-    box.scrollTop = 0;
   });
   await expect.poll(() => gap(list)).toBeLessThan(4);
 });
@@ -141,12 +148,12 @@ test("a room opened on its New line stays there once it is quiet", async ({ page
   const fromTop = () =>
     list.evaluate((box) => {
       const mark = box.querySelector(":scope > li[data-new]");
-      return mark === null
+      const view = box.parentElement;
+      return mark === null || view === null
         ? -1
-        : Math.abs(Math.round(mark.getBoundingClientRect().top - box.getBoundingClientRect().top));
+        : Math.abs(Math.round(mark.getBoundingClientRect().top - view.getBoundingClientRect().top));
     });
   await expect.poll(fromTop).toBe(0);
-  // Past the net's wait (heldAtEnd.ts, QUIET_MS).
   await page.waitForTimeout(600);
   expect(await fromTop()).toBe(0);
   expect(await gap(list)).toBeGreaterThan(100);
@@ -181,8 +188,9 @@ test("a room that opens with a card shows its lines once, the card filled, at th
     Object.assign(window, { heights });
     const look = () => {
       const box = document.querySelector<HTMLElement>('ol[aria-label="Messages"]');
-      if (box !== null && box.children.length > 0 && getComputedStyle(box).visibility !== "hidden")
-        heights.add(box.scrollHeight);
+      const scroller = box?.parentElement;
+      if (box && scroller && box.children.length > 0 && !scroller.hasAttribute("data-awaiting"))
+        heights.add(scroller.scrollHeight);
       requestAnimationFrame(() => setTimeout(look, 0));
     };
     look();

@@ -4,7 +4,6 @@ import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { MEMBERS_SHOWN, People, type PeopleProps } from "../rooms/People.tsx";
-import { Lines } from "./Lines.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 // The lines view as it is, its calls kept: what the room tells it.
@@ -387,15 +386,6 @@ describe("RoomView", () => {
     expect(view({ state: { ...ROOM, lines: [], paged: true } })).not.toContain('data-shape="disc"');
   });
 
-  // The search's jump puts the list on a found message: the list held at its end is told, and leaves it there (heldAtEnd.ts).
-  it("tells its lines a room read around a found message, and no other", () => {
-    const told = () => vi.mocked(Lines).mock.lastCall?.[0].jumped;
-    view({ state: { ...ROOM, paged: true, jump: "a" } });
-    expect(told()).toBe(true);
-    view({ state: { ...ROOM, paged: true } });
-    expect(told()).toBe(false);
-  });
-
   it("shows no skeleton while the chat is not connected, which its status says", () => {
     expect(view({ chat: "connecting", state: { ...ROOM, lines: [] } })).not.toContain('data-shape="disc"');
   });
@@ -529,7 +519,7 @@ describe("RoomView", () => {
   it("shows what it is given under the lines, before who is here: the composer, or a word for a guest", () => {
     const html = view({ composer: <p>Log in to write in this room.</p> });
     expect(html).toMatch(
-      /aria-label="Messages".*<\/ol>(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><section aria-label="Who/s,
+      /aria-label="Messages".*<\/ol>.*?(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><section aria-label="Who/s,
     );
   });
 

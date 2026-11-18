@@ -1,6 +1,7 @@
 // A room's lines: the newest the store holds (the window), held at the newest while the reader is there; a line's
 // text is Markdown, built into elements from an allowlist (Message.tsx); one that mentions the reader says so. The
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
+import { useRef, type ReactNode, type RefObject } from "react";
 import { foldEdits, reactionsOn, threadsOf, type Line, type Reacting } from "@gnoworld/core";
 import { useEntries } from "./chainEntries.ts";
 import { useSaidAnswers, withJarvis } from "./jarvisEntries.tsx";
@@ -30,12 +31,11 @@ import { TranslationHalt } from "../rooms/TranslationHalt.tsx";
 import { mentionable } from "../rooms/names.ts";
 import { chipsOn, firstWordsOf, groupedOf, votesOf, withDays } from "./lineMarks.ts";
 import { useListRead } from "../rooms/reading.ts";
+import { SkeletonLines } from "../dock/SkeletonBits.tsx";
 import { useNow } from "../useNow.ts";
 import styles from "./RoomView.module.css";
 
 export type { LinesProps } from "./lineList.ts";
-
-const LINES = [styles["lines"], styles["fill"]].join(" ");
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
@@ -84,12 +84,21 @@ export function Lines(props: LinesProps) {
   );
 }
 
+// The list's name, how the keyboard moves among its lines (which nothing else tells a screen reader) and that it grows.
+const ABOUT = {
+  "aria-label": "Messages",
+  "aria-description": "Up and down arrows move between messages; Tab reaches a message's actions.",
+  "aria-live": "polite",
+  "aria-relevant": "additions",
+} as const;
+
 function List(props: ListProps) {
   const { room, partner, known, me, refused, connected, cannotReact, lines, shown, lineOf, newest } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { verdicts, saving = false, keeping, byId, votes, repliesOf, onThread, onEdit } = props;
   const { fresh, listRef, onScroll } = useListRead(props);
-  const { stop, mounted, on, leave, asked } = useLineFocus(lines, listRef, fresh);
+  const olRef = useRef<HTMLOListElement>(null);
+  const { stop, mounted, on, leave, asked } = useLineFocus(lines, olRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room });
   const react = (reaction: Reacting) => {
@@ -124,44 +133,59 @@ function List(props: ListProps) {
   return (
     <>
       <Told refused={refused} cannotReact={cannotReact} said={said} setSaid={setSaid} onDismiss={onDismiss} />
-      <ol
-        ref={listRef}
-        onScroll={onScroll}
-        {...on}
-        aria-label="Messages"
-        // How the keyboard moves among the lines, which nothing else tells a screen reader.
-        aria-description="Up and down arrows move between messages; Tab reaches a message's actions."
-        aria-live="polite"
-        aria-relevant="additions"
-        className={LINES}
-      >
-        {props.entries.map((entry) =>
-          !("line" in entry) ? (
-            <Beside key={entry.key} entry={entry} />
-          ) : (
-            <LineView
-              key={entry.line.id}
-              line={entry.line}
-              me={me}
-              members={known}
-              stop={entry.line.id === stop}
-              actions={
-                (room !== undefined || partner !== undefined) && mounted(entry.line.id) ? actionsOf(entry.line) : null
-              }
-              fresh={entry.line.id === fresh}
-              grouped={props.grouped.has(entry.line.id)}
-              verdict={verdictIn(verdicts, newest, entry.line.id)}
-              players={room !== undefined && !saving}
-              {...keptOf(keeping, entry.line.id)}
-              {...marksOf(props, entry.line.id)}
-              react={me === undefined || (!shown.has(entry.line.id) && !votes.has(entry.line.id)) ? undefined : react}
-              answers={answeredBy(entry.line, byId, lineOf)}
-              replies={repliesOf.get(entry.line.id)?.length}
-              onThread={onThread}
-            />
-          ),
-        )}
-      </ol>
+      <Stage listRef={listRef} onScroll={onScroll}>
+        <ol ref={olRef} {...on} {...ABOUT} className={styles["lines"]}>
+          {props.entries.map((entry) =>
+            !("line" in entry) ? (
+              <Beside key={entry.key} entry={entry} />
+            ) : (
+              <LineView
+                key={entry.line.id}
+                line={entry.line}
+                me={me}
+                members={known}
+                stop={entry.line.id === stop}
+                actions={
+                  (room !== undefined || partner !== undefined) && mounted(entry.line.id) ? actionsOf(entry.line) : null
+                }
+                fresh={entry.line.id === fresh}
+                grouped={props.grouped.has(entry.line.id)}
+                verdict={verdictIn(verdicts, newest, entry.line.id)}
+                players={room !== undefined && !saving}
+                {...keptOf(keeping, entry.line.id)}
+                {...marksOf(props, entry.line.id)}
+                react={me === undefined || (!shown.has(entry.line.id) && !votes.has(entry.line.id)) ? undefined : react}
+                answers={answeredBy(entry.line, byId, lineOf)}
+                replies={repliesOf.get(entry.line.id)?.length}
+                onThread={onThread}
+              />
+            ),
+          )}
+        </ol>
+      </Stage>
     </>
+  );
+}
+
+// The list in its scrolling box, its scroll origin its foot: the room opens at its end (RoomView.module.css). The skeleton beside
+// it stands in while the room's cards come; the list fades in over it once they are filled.
+function Stage({
+  listRef,
+  onScroll,
+  children,
+}: {
+  listRef: RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={styles["stage"]}>
+      <div ref={listRef} onScroll={onScroll} className={styles["fill"]}>
+        {children}
+      </div>
+      <div aria-hidden="true" className={styles["skeleton"]}>
+        <SkeletonLines />
+      </div>
+    </div>
   );
 }

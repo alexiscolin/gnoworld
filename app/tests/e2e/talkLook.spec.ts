@@ -1,4 +1,4 @@
-import { inGames, lineOf, lines, word } from "./chat.ts";
+import { inGames, lineOf, lines, scrolling, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Scripted } from "./scripted.ts";
 import { asAccount, barOf, field, OTHER, T, tagged, tagmsg } from "./talk.ts";
@@ -36,7 +36,7 @@ test.describe("reactions, replies and edits, as they look", () => {
   test("look as the prototype's on a computer's screen", async ({ page }) => {
     // The first line by its place: the reply quotes its words too.
     await pointedFirst(page);
-    await expect(page.getByRole("list", { name: "Messages" })).toHaveScreenshot("talk-computer.png");
+    await expect(scrolling(page.getByRole("list", { name: "Messages" }))).toHaveScreenshot("talk-computer.png");
   });
 
   // The prototype's quote, a rule at its start and its author in bold.
@@ -129,10 +129,10 @@ test.describe("reactions, replies and edits, as they look", () => {
         .locator("button:not([aria-haspopup])")
         .filter({ hasNotText: /^\d+ repl/ }),
     ).toHaveCount(20);
-    expect(await list.evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);
+    expect(await scrolling(list).evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await axeOf(page).include("main").analyze()).violations).toEqual([]);
-    await expect(list).toHaveScreenshot("talk-phone.png");
+    await expect(scrolling(list)).toHaveScreenshot("talk-phone.png");
   });
 });
 
