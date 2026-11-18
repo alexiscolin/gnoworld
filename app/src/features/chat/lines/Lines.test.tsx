@@ -23,6 +23,17 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
     threadsOf: vi.fn(real.threadsOf),
   };
 });
+// A card line's card, without its chunk or its read: the element the list looks for, empty while its code comes, busy while
+// its data does (`card.reading`), then filled (`card.filled`).
+const card = vi.hoisted(() => ({ filled: false, reading: false }));
+vi.mock("./SharedCard.tsx", () => ({
+  SharedCard: () => (
+    <div data-shared-card="trending">
+      {card.reading ? <div aria-busy="true">Reading the ranking</div> : null}
+      {card.filled ? "Boards 12 calls" : null}
+    </div>
+  ),
+}));
 vi.mock("./ThreadChip.tsx", async (importOriginal) => {
   const real = await importOriginal<typeof threadChipModule>();
   return { ...real, ThreadChip: vi.fn(real.ThreadChip) };
@@ -209,6 +220,7 @@ describe("the lines view, compiled", () => {
 describe("the list held at its end", () => {
   const CLIENT = 400;
   let height: number;
+  let client: number;
   let top: number;
   let resized: (() => void)[];
   const list = () => {
@@ -229,7 +241,8 @@ describe("the list held at its end", () => {
     height = 1000;
     top = 0;
     resized = [];
-    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(CLIENT);
+    client = CLIENT;
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(() => client);
     vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(() => height);
     vi.spyOn(Element.prototype, "scrollTop", "get").mockImplementation(() => top);
     vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation((to: number) => {
@@ -302,6 +315,182 @@ describe("the list held at its end", () => {
     scrolled();
     grown(0);
     expect(top).toBe(900);
+  });
+
+  // The safety net: whatever moved the list off its end, if it was not the reader, the room that has arrived ends at its end.
+  describe("once the room has arrived and its list is quiet", () => {
+    const QUIET = 250;
+    // The list moved off its end by no reader (an engine that forgets a hidden list's place), then a resize, then quiet.
+    const strayed = (to: number) => {
+      top = to;
+      scrolled();
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+    };
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("puts the list at its end again when the reader has not moved it", () => {
+      draw({ paged: true });
+      top = 0;
+      scrolled();
+      grown(0);
+      expect(top).toBe(0);
+      vi.advanceTimersByTime(QUIET);
+      expect(top).toBe(600);
+    });
+
+    it.each(["wheel", "touchmove", "keydown", "pointerdown"])(
+      "leaves the reader who moved the list by a %s",
+      (type) => {
+        draw({ paged: true });
+        list().dispatchEvent(new Event(type));
+        strayed(100);
+        expect(top).toBe(100);
+      },
+    );
+
+    it("leaves a room read around a found message where the search put it", () => {
+      draw({ paged: true, jumped: true });
+      strayed(300);
+      expect(top).toBe(300);
+    });
+
+    it("leaves a room opened on its New line there", () => {
+      draw({ paged: true, read: at(100) });
+      expect(host.querySelectorAll("ol > li[data-new]")).toHaveLength(1);
+      strayed(250);
+      expect(top).toBe(250);
+    });
+
+    // Once an arrival: what moves the list later with no hand on it (the browser's find in page) is left alone.
+    it("moves the list once, not again when it is moved later", () => {
+      draw({ paged: true });
+      strayed(0);
+      expect(top).toBe(600);
+      strayed(100);
+      expect(top).toBe(100);
+    });
+
+    // The quiet wait may run out while the list is hidden: the arrival is still to come, when it is shown.
+    it("keeps its one move for the list shown again, when it is quiet while it has no height", () => {
+      draw({ paged: true });
+      client = 0;
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+      client = CLIENT;
+      strayed(0);
+      expect(top).toBe(600);
+    });
+
+    it("leaves a list shown again where it was, when it was not at its end as it lost its height", () => {
+      draw({ paged: true });
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+      top = 100;
+      scrolled();
+      client = 0;
+      grown(0);
+      client = CLIENT;
+      strayed(100);
+      expect(top).toBe(100);
+    });
+
+    it("holds the end it put the list at, when a card grows before that move's scroll event", () => {
+      draw({ paged: true });
+      strayed(0);
+      height += 300;
+      scrolled();
+      grown(0);
+      expect(top).toBe(900);
+    });
+
+    it("does nothing once the room is left: no move, no hand heard", () => {
+      draw({ paged: true });
+      const box = list();
+      top = 0;
+      scrolled();
+      grown(0);
+      act(() => {
+        root.unmount();
+      });
+      vi.advanceTimersByTime(QUIET);
+      box.dispatchEvent(new Event("wheel"));
+      expect(top).toBe(0);
+      root = createRoot(host);
+    });
+
+    it("moves it again when the list is shown after it had no height", () => {
+      draw({ paged: true });
+      strayed(0);
+      client = 0;
+      grown(0);
+      client = CLIENT;
+      strayed(0);
+      expect(top).toBe(600);
+    });
+
+    // A room with cards shows once, whole: its lines wait, unseen, for their cards to fill, a short capped time.
+    describe("a room whose lines hold a card", () => {
+      const CARD = "💹 Market prices";
+      const shown = () => list().style.getPropertyValue("visibility") !== "hidden";
+
+      it("keeps its lines unseen until the list is quiet", () => {
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        expect(shown()).toBe(false);
+        grown(200);
+        vi.advanceTimersByTime(150);
+        expect(shown()).toBe(false);
+        vi.advanceTimersByTime(100);
+        expect(shown()).toBe(true);
+      });
+
+      it("shows them after 400 ms at most, though the list still grows", () => {
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        for (let waited = 0; waited < 350; waited += 50) {
+          grown(10);
+          vi.advanceTimersByTime(50);
+        }
+        expect(shown()).toBe(false);
+        grown(10);
+        vi.advanceTimersByTime(50);
+        expect(shown()).toBe(true);
+      });
+
+      it("keeps its lines unseen while a card reads its data, its code come", () => {
+        card.reading = true;
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        card.reading = false;
+        expect(shown()).toBe(false);
+        vi.advanceTimersByTime(400);
+        expect(shown()).toBe(true);
+      });
+
+      // A room the page already holds (after a flight, a room switch): its cards' code and data are there, and nothing will grow.
+      it("shows at once a room whose cards are filled as it opens", () => {
+        card.filled = true;
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        card.filled = false;
+        expect(shown()).toBe(true);
+      });
+
+      it("shows at once a room with no card, and a card line that comes later", () => {
+        draw({ paged: true });
+        expect(shown()).toBe(true);
+        draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
+        expect(shown()).toBe(true);
+      });
+    });
+
+    it("waits for the room's history", () => {
+      draw();
+      strayed(0);
+      expect(top).toBe(0);
+    });
   });
 
   it("leaves the reader who scrolled up where they are as a card grows, and holds the end again once back there", () => {

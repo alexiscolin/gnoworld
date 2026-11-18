@@ -49,6 +49,14 @@
     font: var(--font-chat);
   }
 
+  /* The list's place while the room's history comes: its skeleton stands at the foot, where the newest lines will. */
+  .arriving {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
   .lines > li {
     /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (nine
        small controls and its inset) and the times' column it keeps clear, so the bar covers no word and no time. */

@@ -13,6 +13,8 @@ import { trendingOptions } from "./trendingQueries.ts";
 
 const calls = (n: number): string => `${grouped(n)} ${n === 1 ? "call" : "calls"}`;
 
+const READING = "Reading the ranking";
+
 export default function TrendingCard() {
   const universe = site.universeAt(useLocation().pathname);
   // Only the default universe's worlds are read by the server's job.
@@ -21,12 +23,13 @@ export default function TrendingCard() {
   let words: string | undefined;
   if (!universe.isDefault) words = "Only gno.land's worlds are ranked.";
   else if (isError) words = "The ranking is not available yet. Check back in a few minutes.";
-  else if (data === undefined) words = "Reading the ranking";
+  else if (data === undefined) words = READING;
   else if (items.length === 0) words = "No world was called this week.";
   return (
     <Card compact>
       <Card.Header icon="chart" kicker="Last 7 days" title="Most called worlds" />
-      <div data-trending-card="" className={styles["body"]}>
+      {/* Busy while the ranking is read: the room's list waits for it before it shows (heldAtEnd.ts). */}
+      <div data-trending-card="" className={styles["body"]} aria-busy={words === READING}>
         {words === undefined ? (
           <ol className={shared["plain"]}>
             {items.map((item, at) => (

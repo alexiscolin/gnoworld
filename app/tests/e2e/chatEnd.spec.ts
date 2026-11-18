@@ -1,7 +1,9 @@
 import type { Locator } from "@playwright/test";
-import { expect, test } from "./fixtures.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
+import { word } from "./chat.ts";
+import { logIn } from "./irc.ts";
 import { live, room, T } from "./scriptedRoom.ts";
-import type { HistoryLine } from "./scripted.ts";
+import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 
 // A room opens at its newest line and stays there as that line's card comes late; a reader who scrolled up is left where they are.
 const MARKETS = {
@@ -108,4 +110,108 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
   expect(await list.evaluate((box) => box.scrollTop)).toBe(before);
+});
+
+// The safety net: a list shown again after it had no height (a phone's panel), its place lost meanwhile as an engine may lose
+// it, is put at its end once it is quiet; no reader moved it.
+test("a room shown again after its list had no height ends at its end, its place lost meanwhile", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.locator('ol[aria-label="Messages"]');
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.evaluate(async (box) => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    const region = box.closest("[data-chat-layout]");
+    if (!(region instanceof HTMLElement)) throw new Error("no chat layout");
+    region.style.setProperty("display", "none");
+    await frame();
+    await frame();
+    region.style.removeProperty("display");
+    await frame();
+    await frame();
+    box.scrollTop = 0;
+  });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+});
+
+// The net leaves the one exception alone: an account's room with unread lines opens on its New line and stays there.
+test("a room opened on its New line stays there once it is quiet", async ({ page }) => {
+  const address = await logIn(page, word("arrive"));
+  await room(page, { me: address, history: HISTORY.slice(0, 30), read: T(5) });
+  const list = page.getByRole("list", { name: "Messages" });
+  const fromTop = () =>
+    list.evaluate((box) => {
+      const mark = box.querySelector(":scope > li[data-new]");
+      return mark === null
+        ? -1
+        : Math.abs(Math.round(mark.getBoundingClientRect().top - box.getBoundingClientRect().top));
+    });
+  await expect.poll(fromTop).toBe(0);
+  // Past the net's wait (heldAtEnd.ts, QUIET_MS).
+  await page.waitForTimeout(600);
+  expect(await fromTop()).toBe(0);
+  expect(await gap(list)).toBeGreaterThan(100);
+});
+
+// Until its history came a room shows the chat's skeleton, never the empty room's words; then its lines, at their end.
+test("a room shows a skeleton until its history came, then its lines at their end", async ({ page }) => {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, "guest-zzzzzz", { history: HISTORY.slice(0, 30), historyAfter: held });
+  });
+  await page.goto("/w/bubble?room=games&chat=full");
+  await hydrated(page);
+  await expect(
+    page.locator('[data-chat-state="connected"] [aria-busy="true"] [data-shape="disc"]').first(),
+  ).toBeAttached();
+  await expect(page.getByText("No messages yet.")).toHaveCount(0);
+  release();
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect(list.locator(":scope > li").first()).toBeAttached();
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await expect(page.locator('[aria-busy="true"] [data-shape="disc"]')).toHaveCount(0);
+});
+
+// A room that opens with a card still reading its data shows once, whole: each height its list had while in view, frame by frame.
+test("a room that opens with a card shows its lines once, the card filled, at their end", async ({ page }) => {
+  await page.addInitScript(() => {
+    const heights = new Set<number>();
+    Object.assign(window, { heights });
+    const look = () => {
+      const box = document.querySelector<HTMLElement>('ol[aria-label="Messages"]');
+      if (box !== null && box.children.length > 0 && getComputedStyle(box).visibility !== "hidden")
+        heights.add(box.scrollHeight);
+      requestAnimationFrame(() => setTimeout(look, 0));
+    };
+    look();
+  });
+  await page.route("**/markets.json", async (route) => {
+    await new Promise((done) => setTimeout(done, 60));
+    await route.fulfill({ json: MARKETS, headers: { "access-control-allow-origin": "*" } });
+  });
+  await page.route("**/api/markets/history", (route) => route.fulfill({ status: 404, json: { error: "not_ready" } }));
+  await room(page, { history: HISTORY });
+  await expect(page.locator('[data-market-card] [data-token="GNOT"]')).toBeVisible();
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  expect(await page.evaluate(() => (Reflect.get(window, "heights") as Set<number>).size)).toBe(1);
+});
+
+// A history that never comes (Ergo refused the room, or answers nothing) leaves no skeleton for good: the empty room's words after 10 s.
+test("a room whose history never comes says it holds no message after 10 s", async ({ page }) => {
+  await page.clock.install();
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, "guest-zzzzzz", { historyAfter: new Promise<void>(() => undefined) });
+  });
+  await page.goto("/w/bubble?room=games&chat=full");
+  await hydrated(page);
+  const skeleton = page.locator('[data-chat-state="connected"] [aria-busy="true"] [data-shape="disc"]');
+  await expect(skeleton.first()).toBeAttached();
+  await page.clock.fastForward(9_000);
+  await expect(page.getByText("No messages yet.")).toHaveCount(0);
+  await page.clock.fastForward(1_500);
+  await expect(page.getByText("No messages yet.")).toBeVisible();
+  await expect(skeleton).toHaveCount(0);
 });

@@ -64,7 +64,8 @@ export default function ChatProposals() {
   return (
     <Card compact>
       <Card.Header icon="check" kicker="GovDAO" title="Proposals" />
-      <div data-proposals-card="">
+      {/* Busy while the proposals are read: the room's list waits for them before it shows (heldAtEnd.ts). */}
+      <div data-proposals-card="" aria-busy={at !== undefined && read === undefined ? true : undefined}>
         <Stack space="s">
           {words === undefined ? null : (
             <p className="meta" role="status">

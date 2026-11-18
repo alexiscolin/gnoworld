@@ -137,9 +137,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // A page that holds the chat and space (the Earth's, a world's): its chat waits for space's first frame, or 2.5 s once the page is on screen
 // (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open: 53,696 B measured (Poll's dialog lazy, D13719), 256 B
-// ahead.
-const LATE_CHAT_JS = 53_952;
+// What leaves the first screen keeps a cap of its own, with what it asks once open: 54,100 B, the owner's (2026-11-18), for the room's
+// skeleton, its one draw and its end held on arrival (54,099 B measured).
+const LATE_CHAT_JS = 54_100;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own.
