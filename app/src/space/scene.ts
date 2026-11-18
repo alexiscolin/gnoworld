@@ -15,7 +15,7 @@ import { createRenderer } from "./renderer.ts";
 import { REACH, Rig, type Goal } from "./rig/rig.ts";
 import { chatHides } from "./motion.ts";
 import { Stage } from "./stage.ts";
-import { ratioOf } from "./view.ts";
+import { landsReady, ratioOf } from "./view.ts";
 import { Upkeep, type Plated } from "./upkeep.ts";
 import { See } from "./see.ts";
 import type { SpaceOptions } from "./spaceOptions.ts";
@@ -136,7 +136,7 @@ export class Space {
     }
     this.#trip.from.copy(this.rig.eye);
     // Flown where space is in sight, set there at once where it is not.
-    this.rig[this.seen ? "fly" : "jump"](goal);
+    this.rig[this.seen ? "fly" : "jump"]({ ...goal, ready: () => landsReady(this, place) });
     slideFor(this, place);
     return this.rig.flying;
   }

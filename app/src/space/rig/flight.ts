@@ -13,6 +13,8 @@ export interface Goal {
   readonly landed?: (() => void) | undefined;
   /** A turn round what the eye looks at, as far off: the field of view stays, so it never seems to step back. */
   readonly turn?: boolean;
+  /** Whether what it lands on is drawn (none: always): asked once, as the flight starts slowing; not yet, it lands more gently. */
+  readonly ready?: () => boolean;
 }
 
 const NEAR = 0.68;
@@ -24,6 +26,16 @@ const inOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2)
 const EASE_PEAK = 3;
 const TURN_RATE = Math.PI;
 const outOnly = (t: number): number => 1 - (1 - t) ** 3;
+// Where the flight starts slowing, as a share of it, and the most a landing on a place not ready yet is drawn out, in seconds (Alexis).
+const SLOWING = 0.5;
+const SLACK_S = 1;
+
+/** The share `t` of a flight drawn out from `from` by `extra` seconds over its `rest` seconds left: the same speed where it starts, slowing
+ * more gently, never back (`extra` at most twice `rest`), whole at the end. `u` is the share of the drawn-out rest flown. */
+function drawnOut(u: number, { from, rest, extra }: { from: number; rest: number; extra: number }): number {
+  const more = extra / rest;
+  return from + (1 - from) * (u + more * u * (1 - u) ** 2);
+}
 
 export class Flight {
   readonly goal: Goal;
@@ -47,6 +59,8 @@ export class Flight {
   #time = 0;
   #waited = 0;
   #near = false;
+  // Drawn out, from where it started slowing, by how much: decided once (undefined: not yet; false: kept as it was).
+  #slack: { from: number; rest: number; extra: number } | false | undefined;
   /** How far along, eased, 0 to 1. */
   along = 0;
 
@@ -96,8 +110,7 @@ export class Flight {
       copyPose(this.#from, out);
       return this.#waited > WAIT_S;
     }
-    this.#time = still ? this.#seconds : Math.min(this.#seconds, this.#time + delta / 1000);
-    const t = this.#time / this.#seconds;
+    const t = this.#share(still ? Infinity : this.#time + delta / 1000);
     this.along = this.#moving ? outOnly(t) : inOut(t);
     this.#pose(t, out);
     if (!this.#near && this.along >= NEAR) {
@@ -105,6 +118,20 @@ export class Flight {
       this.goal.near?.();
     }
     return t >= 1;
+  }
+
+  // The flight's share at `time` seconds in, 0 to 1. As it starts slowing, a place not ready draws the rest out by up to SLACK_S.
+  #share(time: number): number {
+    const slack = this.#slack;
+    if (slack === undefined && time / this.#seconds >= SLOWING) {
+      const from = Math.min(1, this.#time / this.#seconds);
+      const rest = (1 - from) * this.#seconds;
+      this.#slack = this.goal.ready?.() === false && rest > 0 ? { from, rest, extra: Math.min(SLACK_S, 2 * rest) } : false;
+      return this.#share(time);
+    }
+    this.#time = Math.min(this.#seconds + (slack === false || slack === undefined ? 0 : slack.extra), time);
+    if (slack === false || slack === undefined) return this.#time / this.#seconds;
+    return drawnOut((this.#time - slack.from * this.#seconds) / (slack.rest + slack.extra), slack);
   }
 
   #pose(t: number, out: Pose): void {

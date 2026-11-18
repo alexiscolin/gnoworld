@@ -71,3 +71,54 @@ describe("Flight turns", () => {
     expect(out.up.y).toBeCloseTo(1, 6);
   });
 });
+
+describe("a landing on a place not ready", () => {
+  // Alexis: a dive a little longer gives the place time to be drawn, but only where it is not ready as the flight starts slowing; ready, the
+  // flight keeps its length, so a fast machine never waits.
+  const fly = (ready?: () => boolean) => {
+    const from = at([0, 0, -1], [0, 1, 0]);
+    from.distance = 4;
+    const to = at([0, 0, -1], [0, 1, 0]);
+    Object.assign(to.look, { x: 40, y: 0, z: 0 });
+    to.distance = 1;
+    const goal = goalOf(to);
+    const flight = new Flight(from, {
+      pose: (out) => goal.pose(out) && ((out.distance = to.distance), true),
+      ...(ready === undefined ? {} : { ready }),
+    });
+    const out = blankPose();
+    const steps: number[] = [];
+    let last = 0;
+    for (let frame = 1; frame < 2000; frame += 1) {
+      const landed = flight.advance(MS, false, out);
+      steps.push(flight.along - last);
+      last = flight.along;
+      if (landed) return { seconds: (frame * MS) / 1000, steps };
+    }
+    return { seconds: Infinity, steps };
+  };
+
+  it("keeps its length where the place is ready as the flight starts slowing", () => {
+    expect(fly(() => true).seconds).toBe(fly().seconds);
+  });
+
+  it("lands at most a second later where it is not, slowing more gently, never stopping nor jumping", () => {
+    const plain = fly();
+    const slowed = fly(() => false);
+    expect(slowed.seconds).toBeGreaterThan(plain.seconds + 0.5);
+    expect(slowed.seconds).toBeLessThanOrEqual(plain.seconds + 1 + MS / 1000);
+    const peak = Math.max(...slowed.steps);
+    slowed.steps.slice(0, -1).forEach((step, frame) => {
+      expect(step).toBeGreaterThan(0);
+      // Its speed changes smoothly: no frame steps it by more than a twentieth of its fastest.
+      if (frame > 0) expect(Math.abs(step - (slowed.steps[frame - 1] ?? 0))).toBeLessThan(peak / 20);
+    });
+  });
+
+  it("asks once, as it starts slowing: ready later, it keeps the gentler landing it took", () => {
+    let asked = 0;
+    const once = fly(() => (asked += 1) > 1);
+    expect(asked).toBe(1);
+    expect(once.seconds).toBeGreaterThan(fly().seconds + 0.5);
+  });
+});
