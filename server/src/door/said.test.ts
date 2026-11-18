@@ -198,6 +198,9 @@ describe("a refused answer", () => {
   it("is public with no provider, moderation off", async () => {
     const none = setup({ provider: undefined });
     expect(await none.said.offer(offered("fine"))).toBe("public");
+    // The world's rules still judge it.
+    expect(await none.said.offer(offered("a perfect scam"))).toBe("private");
+    expect(none.relays).toHaveLength(1);
   });
 
   it("stays private when the relay is refused or unsure, and keeps nothing", async () => {

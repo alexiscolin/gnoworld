@@ -1892,6 +1892,29 @@ describe("the chat, as the server starts it", () => {
       await expect.poll(() => chat.said?.get("#bubble", "b1")).toBeUndefined();
     });
 
+    // No provider is moderation off, where an answer goes public unchecked: the chat must hand the door the provider its
+    // lines have, or a host with moderation on would publish Jarvis's answers unchecked.
+    it("checks Jarvis's public answers with the chat's own provider: a flagged answer stays private", async () => {
+      const asked: string[] = [];
+      const flagging = {
+        provider: (text: string) => {
+          asked.push(text);
+          return Promise.resolve(answer({ hate: true }, { hate: 0.9 }));
+        },
+      };
+      const door = { heard: { said: () => undefined }, changed: () => undefined, said: { hosts: ["gno.land"] } };
+      const { chat } = await linked({ worlds: worlds("bubble"), moderation: OFF }, flagging, { door });
+      const offered = {
+        room: "#bubble",
+        who: Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
+        started: T0,
+        question: "what did they decide?",
+        answer: { status: "answered" as const, markdown: "Something hateful.", buttons: [] },
+      };
+      expect(await chat.said?.offer(offered)).toBe("private");
+      expect(asked.some((text) => text.includes("Something hateful."))).toBe(true);
+    });
+
     it("drops a line its author deletes, and one its author edits, at once", async () => {
       const { chat, peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
       peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "first"]));
