@@ -287,6 +287,27 @@ describe("the list's reader kept in place", () => {
     expect(top).toBe(-800);
   });
 
+  // The scroll event comes before the frame's resize: the growth the frame holds is undone, the reader's own scroll kept.
+  it("undoes what grew in the frame of a scroll, and keeps the scroll", () => {
+    draw();
+    scrolledTo(-500);
+    tops = tops.map((at) => at + 100 - 300);
+    scrolledTo(-600);
+    expect(top).toBe(-900);
+    for (const tell of resized) tell();
+    expect(top).toBe(-900);
+  });
+
+  // The box grows (the composer shrinks) near the oldest end: the browser clamps the scroll, the lines do not move by script.
+  it("leaves a reader the browser moved by clamping the scroll", () => {
+    draw();
+    scrolledTo(-500);
+    tops = tops.map((at) => at - 20);
+    top = -480;
+    for (const tell of resized) tell();
+    expect(top).toBe(-480);
+  });
+
   it("leaves a reader alone when something grows above what they read", () => {
     draw();
     scrolledTo(-500);

@@ -128,8 +128,29 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
   expect(Math.abs((await readerAt()) - before)).toBeLessThanOrEqual(1);
 });
 
-// The box shrinks under a reader scrolled up (a six-line draft grows the composer): their lines stay where they are. The bottom
-// origin would carry them up with the box's foot.
+// The box shrinks (a six-line draft grows the composer, 72 px here, a spacer under the list): the bottom origin would carry a
+// reader's lines up with the box's foot. In the page: the box is shrunk, and the newest line grown too when `card` says so, in one
+// frame; the box's height lost and the reader's line moved, once the frame is drawn.
+const shrunk = (list: Locator, at: number, card: boolean) =>
+  scrolling(list).evaluate(
+    async (box, [nth, grow]) => {
+      const frame = () => new Promise((done) => requestAnimationFrame(done));
+      const reader = box.querySelectorAll("ol > li")[nth];
+      const top = () => Math.round(reader?.getBoundingClientRect().top ?? 0);
+      const [height, was] = [box.clientHeight, top()];
+      const spacer = document.createElement("div");
+      spacer.style.setProperty("block-size", "72px");
+      box.parentElement?.after(spacer);
+      const last = box.querySelector("ol")?.lastElementChild;
+      if (grow && last instanceof HTMLElement) last.style.setProperty("min-block-size", "300px");
+      await frame();
+      await frame();
+      await frame();
+      return { lost: height - box.clientHeight, moved: top() - was };
+    },
+    [at, card] as const,
+  );
+
 test("a reader scrolled up keeps their place as the box shrinks under them", async ({ page }) => {
   await room(page, { history: HISTORY.slice(0, 30) });
   const list = page.getByRole("list", { name: "Messages" });
@@ -139,16 +160,61 @@ test("a reader scrolled up keeps their place as the box shrinks under them", asy
     // The scroll is told, and the place noted, a frame later.
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
-  const reader = list.locator(":scope > li").nth(20);
-  const at = () => reader.evaluate((line) => Math.round(line.getBoundingClientRect().top));
-  await expect.poll(() => gap(list)).toBe(300);
-  const before = await at();
+  const { lost, moved } = await shrunk(list, 20, false);
+  expect(lost).toBeGreaterThan(60);
+  expect(Math.abs(moved)).toBeLessThanOrEqual(1);
+});
+
+test("a reader scrolled up keeps their place as the box shrinks and the newest line grows in one frame", async ({
+  page,
+}) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
   await scrolling(list).evaluate(async (box) => {
-    const below = box.nextElementSibling?.nextElementSibling ?? box.parentElement?.nextElementSibling;
-    if (below instanceof HTMLElement) below.style.setProperty("margin-block-start", "72px");
+    box.scrollTop = -300;
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
-  expect(Math.abs((await at()) - before)).toBeLessThanOrEqual(1);
+  const { lost, moved } = await shrunk(list, 20, true);
+  expect(lost).toBeGreaterThan(60);
+  expect(Math.abs(moved)).toBeLessThanOrEqual(1);
+});
+
+test("a reader scrolling as a card grows keeps their place: the scroll is told in the frame of the growth", async ({
+  page,
+}) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await scrolling(list).evaluate(async (box) => {
+    box.scrollTop = -300;
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  const moved = await scrolling(list).evaluate(async (box) => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    const reader = box.querySelectorAll("ol > li")[20];
+    const last = box.querySelector("ol")?.lastElementChild;
+    const was = reader?.getBoundingClientRect().top ?? 0;
+    // The reader scrolls 100 px up and the newest line grows 268 px, both before the frame: the scroll event comes first.
+    box.scrollTop -= 100;
+    if (last instanceof HTMLElement) last.style.setProperty("min-block-size", "300px");
+    await frame();
+    await frame();
+    await frame();
+    // The scroll alone moves the line down by 100.
+    return Math.round((reader?.getBoundingClientRect().top ?? 0) - was);
+  });
+  expect(Math.abs(moved - 100)).toBeLessThanOrEqual(1);
+});
+
+// At the end the foot holds the reader: a box that shrinks moves nothing by script.
+test("a reader at the end stays at the end as the box shrinks", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  const { lost } = await shrunk(list, 29, false);
+  expect(lost).toBeGreaterThan(60);
+  expect(await gap(list)).toBeLessThan(4);
 });
 
 // A list shown again after it had no height (a phone's panel) is at its end again: a hidden box loses its place, and its place is its foot.

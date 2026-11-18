@@ -41,32 +41,39 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
   }, [listRef]);
 }
 
-// How far a line's foot is above the list's foot: only what grows under the line changes it, not a scroll, so a scroll the
-// engine tells late (WebKit's wheel is animated) leaves the note true.
-const awayOf = (list: Element, line: Element) =>
-  list.getBoundingClientRect().bottom - line.getBoundingClientRect().bottom;
-
 interface Anchor {
-  current: { line: Element; away: number; height: number } | undefined;
+  current: { line: Element; top: number; scroll: number } | undefined;
 }
 
-// The first line the reader sees, noted with its distance from the list's foot and the box's height.
+// The first line the reader sees (a search from the one noted before), noted with its top in the box and the box's scroll.
 function note(box: HTMLElement, anchor: Anchor) {
   const top = box.getBoundingClientRect().top;
-  for (const line of box.firstElementChild?.children ?? []) {
-    if (line.getBoundingClientRect().bottom <= top) continue;
-    anchor.current = {
-      line,
-      away: awayOf(line.parentElement ?? line, line),
-      height: box.getBoundingClientRect().height,
-    };
-    return;
+  const seen = (line: Element) => line.getBoundingClientRect().bottom > top;
+  let line = anchor.current?.line.isConnected === true ? anchor.current.line : box.firstElementChild?.firstElementChild;
+  while (line?.previousElementSibling && seen(line.previousElementSibling)) line = line.previousElementSibling;
+  while (line && !seen(line)) line = line.nextElementSibling;
+  if (line) anchor.current = { line, top: line.getBoundingClientRect().top - top, scroll: box.scrollTop };
+}
+
+// A reader scrolled up keeps the line they see where it was: what the scroll explains is theirs (it moved the line by as much as
+// it moved), the rest (a card grown under the line, a box shrunk, a composer grown) is undone. At the end the foot holds them.
+function keep(box: HTMLElement, anchor: Anchor) {
+  const noted = anchor.current;
+  if (noted?.line.isConnected === true && !atEnd(box)) {
+    const moved =
+      noted.line.getBoundingClientRect().top -
+      box.getBoundingClientRect().top -
+      noted.top +
+      box.scrollTop -
+      noted.scroll;
+    if (Math.abs(moved) >= 1) box.scrollTop += moved;
   }
+  note(box, anchor);
 }
 
 /** The list of a room: it opens on its New line when there is one (`fresh`), else at its end (CSS). A reader scrolled up keeps
  * their place as a line, a card or an image grows under them, or the box shrinks: the first line they see is kept where it is
- * (the box's first child is the list, whose height tells every change). */
+ * (the box's first child is the list). */
 export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const listRef = useRef<HTMLDivElement>(null);
   const placedRef = useRef(false);
@@ -89,14 +96,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const list = box?.firstElementChild;
     if (box === null || list === null || list === undefined || typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(() => {
-      const anchor = anchorRef.current;
-      // At the end the foot holds the reader; above it, what grew under the lines they read moved them up by as much, and so did
-      // a box that shrank (the composer grew): its foot carries the lines, its top does not.
-      if (anchor?.line.isConnected === true && !atEnd(box)) {
-        const moved = awayOf(list, anchor.line) - anchor.away + anchor.height - box.getBoundingClientRect().height;
-        if (Math.abs(moved) >= 1) box.scrollTop -= moved;
-      }
-      note(box, anchorRef);
+      keep(box, anchorRef);
     });
     watch.observe(list);
     watch.observe(box);
@@ -109,8 +109,9 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const box = listRef.current;
     return box !== null && box.clientHeight > 0 && atEnd(box);
   };
+  // A scroll is told before the frame's resize: the growth the frame holds is undone then, the reader's own scroll kept.
   const onScroll = () => {
-    if (listRef.current !== null) note(listRef.current, anchorRef);
+    if (listRef.current !== null) keep(listRef.current, anchorRef);
   };
   return { listRef, seesEnd, onScroll };
 }
