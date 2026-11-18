@@ -69,6 +69,14 @@ describe("PhoneWorlds", () => {
     expect(links.map((link) => link.textContent)).toEqual(["Earth", "Bubble", "GovDAO"]);
   });
 
+  // Alexis: the row is narrow, gnosh.ai is cut there (D13754): its name before its first dot, the whole one kept for a screen reader.
+  it("names a world by its name's first part in the row, gnosh for gnosh.ai, its whole name kept for a screen reader", () => {
+    const gnosh = { slug: "gnosh-ai", name: "gnosh.ai", href: "/w/gnosh-ai" };
+    const links = all(mount("earth", { worlds: [EARTH, gnosh] }), "a");
+    expect(links.map((link) => link.textContent)).toEqual(["Earth", "gnosh"]);
+    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([null, "gnosh.ai"]);
+  });
+
   it("follows the desktop column's order: the Earth, the worlds followed, then the rest", () => {
     const box = mount("earth", { followed: ["govdao"] });
     expect(all(box, "a").map((link) => link.textContent)).toEqual(["Earth", "GovDAO", "Bubble"]);

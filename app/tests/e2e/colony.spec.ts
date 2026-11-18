@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, hydrated, scriptsAsked, test, type Page } from "./fixtures.ts";
 import { flightOf } from "./sceneStage.ts";
 
@@ -14,6 +15,52 @@ async function visit(page: Page, path: string) {
   await page.goto(path);
   await hydrated(page);
 }
+
+// gno.land's system as the live file can hold it: the recorded worlds and sixty more of its own, each called, so the colony, used by no
+// one yet, is the last by use and its system's reach wide.
+const RECORDED = JSON.parse(readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8")) as {
+  worlds: unknown[];
+};
+const CROWDED = JSON.stringify({
+  ...RECORDED,
+  worlds: [
+    ...RECORDED.worlds,
+    ...Array.from({ length: 60 }, (_, at) => ({
+      id: `gnoland/w${String(at)}`,
+      namespace: "gnoland",
+      realms: [
+        { path: `gno.land/r/gnoland/w${String(at)}`, functions: [], imports: [], calls: 5 + at, callers: 3 + at },
+      ],
+    })),
+  ],
+});
+
+// The colony's name in the view, on screen: in the window and not past its edges.
+async function namedOnScreen(page: Page) {
+  const label = page.getByRole("button", { name: /^gnosh\.ai/ });
+  await expect(label).toBeVisible(SLOW);
+  const box = await label.boundingBox();
+  const size = page.viewportSize();
+  expect(
+    box !== null &&
+      size !== null &&
+      box.x >= 0 &&
+      box.y >= 0 &&
+      box.x + box.width <= size.width &&
+      box.y + box.height <= size.height,
+  ).toBe(true);
+}
+
+test.describe("in gno.land's system as full as the live file holds it", () => {
+  test.use({ viewport: { width: 1491, height: 932 } });
+
+  for (const path of ["/s/gnoland?test-gpu", "/s/gnoland?view=map&test-gpu"])
+    test(`names the colony on screen in ${path}`, async ({ page }) => {
+      await page.route("**/worlds.json", (route) => route.fulfill({ body: CROWDED, contentType: "application/json" }));
+      await visit(page, path);
+      await namedOnScreen(page);
+    });
+});
 
 test.describe("on a computer's screen", () => {
   test.use({ viewport: { width: 1491, height: 932 } });

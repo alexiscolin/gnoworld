@@ -59,7 +59,8 @@ function glowsOf(universe: Universe): InstancedBufferGeometry {
 }
 
 export class Sky {
-  readonly #scene = new Scene();
+  /** What it draws, for its programs to be made ahead (programs.ts). */
+  readonly scene = new Scene();
   readonly #heart = new Vector3(HEART.x, HEART.y, HEART.z);
   readonly #glows: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   readonly #grains: Points<BufferGeometry, ShaderMaterial>;
@@ -86,7 +87,7 @@ export class Sky {
       drawn.material.depthTest = false;
       drawn.frustumCulled = false;
     }
-    this.#scene.add(this.#grains, this.#glows);
+    this.scene.add(this.#grains, this.#glows);
     this.#watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-quality"] });
   }
 
@@ -104,7 +105,7 @@ export class Sky {
   draw(renderer: WebGLRenderer, camera: Camera): void {
     if (camera.position.distanceTo(this.#heart) <= this.#disc.value) return;
     renderer.autoClear = false;
-    renderer.render(this.#scene, camera);
+    renderer.render(this.scene, camera);
     renderer.autoClear = true;
   }
 
@@ -117,7 +118,7 @@ export class Sky {
 
   dispose(): void {
     this.#watch.disconnect();
-    this.#scene.clear();
+    this.scene.clear();
     for (const drawn of [this.#glows, this.#grains]) {
       drawn.geometry.dispose();
       drawn.material.dispose();

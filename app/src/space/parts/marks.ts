@@ -19,9 +19,27 @@ import { beforeGrade } from "../renderer.ts";
 import { ADDITIVE } from "../additive.ts";
 
 const SEGMENTS = 128;
-/** The orbits' colour and their strength at full, which the Map's links share (links.ts). */
+/** The orbits' colour, which the Map's links share, and the strength the links count theirs from (links.ts): not the Map's orbits'. */
 export const ORBIT_COLOUR = [0.75, 0.78, 0.9] as const;
 export const ORBIT_GAIN = 0.13;
+// raw: how many orbits a system draws at their full strength, and the least share of it any keeps
+const CLEAR_ORBITS = 12;
+const LEAST_CROWD = 0.5;
+
+/** The share of their light a system's orbits keep: a crowded system's each fainter, so that together they stay lines and never a grey
+ * disc, but never under half, or a large system's are too pale to read (D13756). */
+export const orbitCrowd = (planets: number): number =>
+  Math.max(LEAST_CROWD, Math.min(1, Math.sqrt(CLEAR_ORBITS / Math.max(planets, 1))));
+// raw: the Map's orbits' strength at full, as the screen shows it (a line's shader writes no grade), and the power its light goes by
+const MAP_GAIN = 0.4;
+const SCREEN_POWER = 2.2;
+// raw: the most planets a system draws orbits for: past it they merge into a grey disc (measured: 50 stand apart, 80 merge), so it draws none
+const MOST_ORBITS = 48;
+/** How strong a system of `planets` draws its orbits in the Map, before its distance fades them, at `ratio` buffer pixels a page pixel:
+ * a line is one buffer pixel wide, so half as thick on a screen of ratio 2, where it gets twice the light and reads as on any other.
+ * Nothing for a system past MOST_ORBITS. */
+export const orbitGain = (planets: number, ratio: number): number =>
+  planets > MOST_ORBITS ? 0 : MAP_GAIN * orbitCrowd(planets) * Math.max(1, ratio) ** (1 / SCREEN_POWER);
 // The orbit round a planet framed close: its radius in the planet's, how high the eye stands over its plane (sin 5°: nearly edge
 // on, its near side passing low over the planet, its far side behind it), how it leans across the view, its strength, and its moment.
 const ROUND = { radii: 1.25, over: 0.087, lean: -0.3, gain: 0.2, ease: 0.3 } as const;
@@ -29,7 +47,7 @@ const Y = new Vector3(0, 1, 0);
 const FLAT = { place: { x: 0, y: 0, z: 0 }, across: { x: 1, y: 0, z: 0 }, along: { x: 0, y: 0, z: 1 } } as const;
 
 // The orbit `orbit` of `system` as line segments: each segment's two ends, x, y, z.
-export function ringOf({ place, across, along }: Pick<System, "place" | "across" | "along">, orbit: number): number[] {
+function ringOf({ place, across, along }: Pick<System, "place" | "across" | "along">, orbit: number): number[] {
   const points: number[] = [];
   for (let at = 0; at < SEGMENTS; at += 1)
     for (const step of [at, at + 1]) {
@@ -46,8 +64,9 @@ export function ringOf({ place, across, along }: Pick<System, "place" | "across"
 
 export class Orbits {
   readonly gain = { value: 0 };
+  // With a position from the first, as `of` leaves it: three keys the lines' program by it, and the one made ahead is the one they draw with.
   readonly lines = new LineSegments(
-    new BufferGeometry(),
+    new BufferGeometry().setAttribute("position", new Float32BufferAttribute([], 3)),
     new ShaderMaterial({
       uniforms: { uColour: { value: new Vector3(...ORBIT_COLOUR) }, uGain: this.gain },
       vertexShader: LINE_VERTEX,

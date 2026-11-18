@@ -89,7 +89,7 @@ export class Scan {
     this.#undraw.value = sineInOut(share(t, UNDRAW));
     const { up, way } = rig.pose;
     shell.position.set(at.x, at.y, at.z);
-    // In the planet's own frame, as its skeleton stands, so the one grid hands over to the other with no change of tilt; upright to the
+    // In the planet's own frame (planetFrame.ts), so the grid never changes its tilt in one frame as the planet turns; upright to the
     // rig's up where no planet's frame is known.
     if (frame === undefined) shell.quaternion.setFromUnitVectors(Y, this.#up.set(up.x, up.y, up.z));
     else shell.quaternion.copy(frame);

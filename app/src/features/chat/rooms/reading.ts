@@ -1,7 +1,8 @@
 // A room's reading place on its page (Ergo's draft/read-marker): the line marked New while the room is
 // open, and the room marked read to its newest line while the reader is at the end and the page shows.
 import { newMarkAfter, type Line, type NewMark, type Reaction } from "@gnoworld/core";
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useEffectEvent, useState, type RefObject } from "react";
+import { useNewestInView } from "./heldAtEnd.ts";
 
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
  * while the room is open, as the place moves on and lines come; moved to the line a reader asks to go back to (the
@@ -91,70 +92,21 @@ function useLookWhenResized(listRef: RefObject<HTMLElement | null>, look: () => 
   }, [listRef]);
 }
 
-// How near the end, in pixels, the reader still reads the newest line.
-const AT_END = 32;
-
-// Whether a list is scrolled to its end, or within AT_END of it.
-const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
-
-// The lines held at their newest while the reader is there, as a line comes or a reaction grows one;
-// once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once,
-// and the reader is at the end only if that shows it.
-function useNewestInView(
-  lines: readonly Line[],
-  fresh: string | undefined,
-  reactions: readonly Reaction[] | undefined,
-) {
-  const listRef = useRef<HTMLOListElement>(null);
-  const atEndRef = useRef(true);
-  const placedRef = useRef(false);
-  useLayoutEffect(() => {
-    const box = listRef.current;
-    if (box === null) return;
-    const item = fresh === undefined || placedRef.current ? null : box.querySelector(":scope > li[data-new]");
-    if (item !== null) {
-      placedRef.current = true;
-      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
-      atEndRef.current = atEnd(box);
-    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
-  }, [lines, fresh, reactions]);
-  // The list shrinks as the composer grows (a six-line draft), and a line grows as its card, preview or image comes: no
-  // scroll event comes for either, so a reader at the end is kept there by the new size, else the newest lines are lost
-  // under the composer or below the fold. The box and each line are watched; a line that comes is watched as it does.
-  useEffect(() => {
-    const box = listRef.current;
-    if (box === null || typeof ResizeObserver === "undefined") return;
-    const watch = new ResizeObserver(() => {
-      if (atEndRef.current) box.scrollTop = box.scrollHeight;
-    });
-    watch.observe(box);
-    for (const line of box.children) watch.observe(line);
-    const added = new MutationObserver((changes) => {
-      for (const change of changes)
-        for (const node of change.addedNodes) if (node instanceof Element) watch.observe(node);
-    });
-    added.observe(box, { childList: true });
-    return () => {
-      added.disconnect();
-      watch.disconnect();
-    };
-  }, []);
-  const onScroll = () => {
-    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
-  };
-  // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
-  const seesEnd = () => atEndRef.current && (listRef.current?.clientHeight ?? 0) > 0;
-  return { listRef, seesEnd, onScroll };
-}
-
 // The list held at its newest and the room read to it: what a scroll or a change of the list's size does to both.
 function useListReading(
   list: Pick<Parameters<typeof useReading>[0], "lines" | "paged" | "onRead" | "keeping"> & {
     fresh: string | undefined;
     reactions: readonly Reaction[] | undefined;
+    jumped: boolean;
   },
 ) {
-  const { listRef, seesEnd, onScroll } = useNewestInView(list.lines, list.fresh, list.reactions);
+  const { lines, fresh, reactions } = list;
+  const { listRef, seesEnd, onScroll } = useNewestInView({
+    lines,
+    fresh,
+    reactions,
+    arrived: list.paged && !list.jumped,
+  });
   const look = useReading({
     lines: list.lines,
     seesEnd,
@@ -183,10 +135,11 @@ export function useListRead(list: {
   reactions?: readonly Reaction[] | undefined;
   read?: string | undefined;
   paged?: boolean | undefined;
+  jumped?: boolean | undefined;
   onRead?: ((id: string) => void) | undefined;
   keeping?: Parameters<typeof useReading>[0]["keeping"];
 }) {
-  const { lines, me, reactions, read, paged = false, onRead, keeping } = list;
+  const { lines, me, reactions, read, paged = false, jumped = false, onRead, keeping } = list;
   const fresh = useNewMark(lines, placeOf(paged, read, keeping?.unread), me);
-  return { fresh, ...useListReading({ lines, fresh, reactions, paged, onRead, keeping }) };
+  return { fresh, ...useListReading({ lines, fresh, reactions, paged, jumped, onRead, keeping }) };
 }

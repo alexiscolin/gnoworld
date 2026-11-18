@@ -55,10 +55,6 @@ for (const width of [1280]) {
     // The hero as the frames draw it (2 to 8), with a count: from its kicker to its actions, the live line and the ticker left out.
     test("the hero as it looks with its number", async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
-      // A first visit's welcome card is not the hero: it is told away.
-      await page.addInitScript(() => {
-        localStorage.setItem("gnoworld:welcomed", "1");
-      });
       await served(page);
       await page.goto("/");
       await hydrated(page);
@@ -99,10 +95,6 @@ test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("the home opens the Earth's general room, with no View in space and no scene", async ({ page }) => {
-    // A first visit's welcome card is not the page under test: it is told away.
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await served(page);
     await page.goto("/?test-gpu");
     await hydrated(page);

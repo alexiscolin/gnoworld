@@ -227,3 +227,23 @@ describe("the colony's signs on its hull as drawn", () => {
     body.dispose();
   });
 });
+
+// The colony comes in itself, over its stand-in, unfolding from a little smaller, its signs with it, and stands whole once come;
+// nothing jumps.
+describe("the colony coming in", () => {
+  it("is not shown before it starts coming, grows to its size as it comes, and tells its hull's share", async () => {
+    const { ColonyBody } = await import("./gnoshColony.ts");
+    const body = new ColonyBody({ lean: 0, tilt: 0 } as never);
+    const colony = body.group.getObjectByName("colony");
+    body.setArrive(0);
+    expect(colony?.visible).toBe(false);
+    body.setArrive(0.5);
+    expect(colony?.visible).toBe(true);
+    const half = body.hull.scale;
+    expect(half).toBeGreaterThan(0.8);
+    expect(half).toBeLessThan(1);
+    body.setArrive(1);
+    expect(body.hull.scale).toBe(1);
+    body.dispose();
+  });
+});

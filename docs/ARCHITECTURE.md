@@ -88,7 +88,7 @@ app/                         the web client
     features/                one folder per feature: chat, universe, home, world, realms, jarvis, explain (a realm's or world's
                              explanation), calls (the call card), passport, quests, expedition, follow, notifications, events, search (the
                              palette and the chat's search), previews (a realm's capture), names, account, login (with its Get started
-                             dialog), welcome, share, settings, credits, list; update (the new version's notice) and errors (the one
+                             dialog), share, settings, credits, list; update (the new version's notice) and errors (the one
                              error view and every route's boundary). The chat holds the composer (on Lexical, loaded with it alone) and
                              the cards under a line (link, market, trending, proposals, call detail, person, Jarvis's)
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)

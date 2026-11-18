@@ -39,7 +39,9 @@ export const jumpSlice: StateCreator<ChatSlice & JumpSlice, [], [], JumpSlice> =
         put(id, (room) => windowed(room, { id, jump, messages }));
       },
       left: (id) => {
-        put(id, (room) => (room.jump === undefined ? undefined : { ...room, lines: [], jump: undefined }));
+        put(id, (room) =>
+          room.jump === undefined ? undefined : { ...room, lines: [], jump: undefined, paged: undefined },
+        );
       },
     },
   };

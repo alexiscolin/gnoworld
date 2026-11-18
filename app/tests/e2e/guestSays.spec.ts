@@ -1,7 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 import { expect, hydrated, test } from "./fixtures.ts";
 
-// A guest's first line from the welcome card to the server, /api/guest and /api/guest/say stubbed (the real ones need a moderation
+// A guest's first line from the Earth's chat to the server, /api/guest and /api/guest/say stubbed (the real ones need a moderation
 // provider): the name asked as the box takes the focus, the line sent as typed, and what a refusal says in the field's own words.
 const json =
   (body: unknown, status = 200) =>
@@ -21,14 +21,13 @@ async function guest(page: Page, say: (route: Route) => Promise<void> | void): P
   return said;
 }
 
-/** The welcome card's Say hi, then the guest's box. */
+/** The Earth's full chat, where the welcome card's Say hi led, its box clicked as a reader would. */
 async function sayHi(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/earth");
+  await page.goto("/earth?chat=full");
   await hydrated(page);
-  const card = page.getByRole("article", { name: "Every world here is a program on gno.land" });
-  await expect(card).toBeVisible({ timeout: 20_000 });
-  await card.getByRole("button", { name: "Say hi" }).click();
+  await expect(box(page)).toBeVisible({ timeout: 20_000 });
+  await box(page).click();
   await expect(box(page)).toBeFocused({ timeout: 15_000 });
 }
 

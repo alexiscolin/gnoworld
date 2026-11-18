@@ -32,7 +32,7 @@ export function moonOf(room: string, { maps, sphere }: Made): Drawn | undefined 
   return drawn;
 }
 
-function realMoon(maps: Maps, sphere: BufferGeometry): Drawn | undefined {
+function realMoon(maps: Made["maps"], sphere: BufferGeometry): Drawn | undefined {
   const earth = maps.earth();
   if (earth === undefined) return undefined;
   const drawn = createPlanet(MOON, { map: () => earth.moon, clouds: earth.clouds, ring: earth.clouds }, sphere);
@@ -41,7 +41,7 @@ function realMoon(maps: Maps, sphere: BufferGeometry): Drawn | undefined {
   return drawn;
 }
 
-function generatedMoon(room: string, maps: Maps, sphere: BufferGeometry): Drawn | undefined {
+function generatedMoon(room: string, maps: Made["maps"], sphere: BufferGeometry): Drawn | undefined {
   const path = asciiBytes(`moon/${room}`);
   const anchor = KINDS[Math.floor(hashOf(room, 7) * KINDS.length)] ?? "rocky";
   const world = { look: planetLook(path, anchor), recipe: planetRecipe(path, anchor) };
@@ -51,6 +51,6 @@ function generatedMoon(room: string, maps: Maps, sphere: BufferGeometry): Drawn 
 }
 
 export interface Made {
-  readonly maps: Maps;
+  readonly maps: Pick<Maps, "earth" | "setOf">;
   readonly sphere: BufferGeometry;
 }

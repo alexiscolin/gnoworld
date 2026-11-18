@@ -6,9 +6,6 @@ for (const width of [390, 320])
   test(`draws no views pill and no View in space on a phone ${String(width)} px wide, and no sideways scroll`, async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/");
     await hydrated(page);
