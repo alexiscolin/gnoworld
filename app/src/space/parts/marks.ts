@@ -30,6 +30,8 @@ const LEAST_CROWD = 0.5;
  * disc, but never under half, or a large system's are too pale to read (D13756). */
 export const orbitCrowd = (planets: number): number =>
   Math.max(LEAST_CROWD, Math.min(1, Math.sqrt(CLEAR_ORBITS / Math.max(planets, 1))));
+/** How strong a system of `planets` draws its orbits in the Map, before its distance fades them. */
+export const orbitGain = (planets: number): number => ORBIT_GAIN * orbitCrowd(planets);
 // The orbit round a planet framed close: its radius in the planet's, how high the eye stands over its plane (sin 5°: nearly edge
 // on, its near side passing low over the planet, its far side behind it), how it leans across the view, its strength, and its moment.
 const ROUND = { radii: 1.25, over: 0.087, lean: -0.3, gain: 0.2, ease: 0.3 } as const;
