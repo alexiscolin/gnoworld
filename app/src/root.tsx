@@ -7,6 +7,7 @@ import { LATIN_FONTS } from "@gnoworld/ui/fonts";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 import { RouteError } from "./features/errors/index.ts";
+import { FirstLoader } from "./features/universe/LoaderMarks.tsx";
 import { WRITTEN } from "./useDrawnPath.ts";
 import { markFullEarly } from "./fullChat.ts";
 import { Shell } from "./shell.tsx";
@@ -36,6 +37,8 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body>
+        {/* Drawn from the first paint of the host's fallback page alone, till its route draws (SpaceLoader.module.css). */}
+        <FirstLoader />
         <Shell>{children}</Shell>
         <ScrollRestoration />
         <Scripts />
