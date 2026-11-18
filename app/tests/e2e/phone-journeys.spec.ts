@@ -90,11 +90,6 @@ const phone = (viewport: { width: number; height: number }, isMobile: boolean) =
   locale: "en-GB",
 });
 
-const welcomed = (page: Page) =>
-  page.addInitScript(() => {
-    localStorage.setItem("gnoworld:welcomed", "1");
-  });
-
 // A place's sheet, closed three ways, each back on the chat as it was: the room's address and the draft in its field. `place` names the band.
 async function closedThreeWays(page: Page, place: string, draft: string) {
   const path = new URL(page.url()).pathname;
@@ -128,11 +123,6 @@ async function closedThreeWays(page: Page, place: string, draft: string) {
 for (const size of SIZES) {
   test.describe(`the phone app at ${String(size.width)}x${String(size.height)}`, () => {
     test.use(phone(size, true));
-
-    // A first visit's welcome sheet would cover the first tap: every journey but the welcome's own is told it was seen.
-    test.beforeEach(async ({ page }) => {
-      await welcomed(page);
-    });
 
     test("opens straight into a chat: the Earth's, then the last world's, and a shared link lands in its world's", async ({
       page,
@@ -312,7 +302,6 @@ for (const size of SIZES) {
     test.use(phone(size, false));
 
     test.beforeEach(async ({ page }) => {
-      await welcomed(page);
       // The band's 3D comes once the page is idle (planetGate.ts): idle never comes here, so this is the first screen's claim alone.
       await page.addInitScript(() => {
         window.requestIdleCallback = () => 0;
@@ -360,7 +349,6 @@ test.describe("the phone app in landscape, 844x390", () => {
   test.use(phone(SIDE, true));
 
   test.beforeEach(async ({ page }) => {
-    await welcomed(page);
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       scriptedErgo(ergo, GUEST, {
         history: LONG,
@@ -429,7 +417,6 @@ test.describe("search on a phone", () => {
   test.use({ viewport: SIZES[1], isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: AGENT });
 
   test("opens from the header, finds a world and opens it in its full chat", async ({ page }) => {
-    await welcomed(page);
     await scripted(page, GUEST);
     await page.goto("/");
     await hydrated(page);
@@ -456,7 +443,6 @@ test.describe("the home on a phone", () => {
   test.use({ viewport: SIZES[1], isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: AGENT });
 
   test("never shows the hero's heading on the way into the chat", async ({ page }) => {
-    await welcomed(page);
     await scripted(page, GUEST);
     await page.addInitScript(() => {
       const seen: string[] = [];

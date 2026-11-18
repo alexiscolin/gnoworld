@@ -193,10 +193,7 @@ test.describe("a realm's view", () => {
       test(`a recorded realm page, on a ${name}'s screen`, async ({ page }) => {
         await page.setViewportSize({ width, height });
         await chain(page, { "gno.land/r/gnoland/coins": COINS });
-        // A first visit's welcome card is not the page: it is told away, and the arrival's pill, which stands for five seconds, is masked.
-        await page.addInitScript(() => {
-          localStorage.setItem("gnoworld:welcomed", "1");
-        });
+        // The arrival's pill, which stands for five seconds, is masked.
         await openPlacePage(page, "/r/gnoland/coins", "gno.land/r/gnoland/coins");
         await expect(page.getByRole(width < 900 ? "dialog" : "main")).toContainText("Read at block");
         await expect(page).toHaveScreenshot(`realm-view-${name}.png`, {

@@ -146,9 +146,6 @@ test.describe("a touch screen", () => {
 
   test("keeps Credits in the Rooms drawer, a finger's size", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await page.goto("/earth");
     await hydrated(page);
     await expect(page).toHaveURL(/\/earth\?.*chat=full/);

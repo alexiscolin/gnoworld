@@ -152,10 +152,6 @@ test.describe("Go explore", () => {
     await page.setViewportSize(COMPUTER);
     // A day whose first stop is a world's page (the pool's order follows the date: another day's may be a realm's, which reads the chain).
     await page.clock.setFixedTime("2026-11-13T12:00:00Z");
-    // The welcome card of a first visit stands over the hero; this journey is about the call under it.
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await page.route("**/api/presence", (route) => route.fulfill({ json: { worlds: [] } }));
     await page.goto("/");
     await hydrated(page);

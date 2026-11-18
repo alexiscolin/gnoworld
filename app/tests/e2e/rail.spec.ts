@@ -266,9 +266,6 @@ test("stands no rail on a phone, which keeps its plain list and asks none of the
 }) => {
   const asked: string[] = [];
   page.on("request", (request) => asked.push(request.url()));
-  await page.addInitScript(() => {
-    localStorage.setItem("gnoworld:welcomed", "1");
-  });
   await served(page);
   await page.setViewportSize(PHONE);
   await page.goto(HOME);
