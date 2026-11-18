@@ -6,6 +6,7 @@ import { adena } from "./adena.ts";
 import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { test, type Page } from "./fixtures.ts";
 import { connectAtComputer } from "./account.ts";
+import { ownContext } from "./deployed.ts";
 
 // Each step is a line sent once a received line matches its pattern ("" waits for none).
 export type Step = readonly [after: string, line: string];
@@ -91,7 +92,7 @@ export async function another({ playwright, launchOptions }: Launcher, as: strin
   const { baseURL } = test.info().project.use;
   if (baseURL === undefined) throw new Error("no baseURL");
   const browser = await playwright.chromium.launch(launchOptions);
-  const second = await (await browser.newContext({ baseURL })).newPage();
+  const second = await (await ownContext(browser, { baseURL })).newPage();
   return { address: await logIn(second, as), page: second, close: () => browser.close() };
 }
 

@@ -4,7 +4,7 @@
 import { worldsDrawn } from "@gnoworld/core";
 import { WorldsCount } from "@gnoworld/schemas";
 import { NetworkAnswer, Worlds } from "@gnoworld/schemas/indexer";
-import type { BrowserContext } from "@playwright/test";
+import type { Browser, BrowserContext } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import universes from "../../data/universes.json" with { type: "json" };
 import { connectOrigins } from "../../src/cspOrigins.ts";
@@ -52,3 +52,13 @@ export const refuseChains = (context: BrowserContext) =>
   Promise.all(
     connectOrigins(universes).map((origin) => context.route(`${origin}/**`, (route) => route.abort("blockedbyclient"))),
   );
+
+/** A context of a browser a journey launches itself (a second account, a phone), as refused every chain as the test's own. */
+export async function ownContext(
+  browser: Browser,
+  options: Parameters<Browser["newContext"]>[0],
+): Promise<BrowserContext> {
+  const context = await browser.newContext(options);
+  await refuseChains(context);
+  return context;
+}
