@@ -519,9 +519,10 @@
   }
 
   /* A page opened from its URL: the header and the page's column wait out of sight with the scene (root.tsx's data-first) till the arrival takes it (arrival.ts);
-     if the code never does, it shows after 6 s. */
+     if the code never does, it shows after 6 s. A page whose first HTML holds the loader holds nothing: the loader is inside the column, which
+     would hide it too, and it covers the page itself from the first paint. */
   @media (prefers-reduced-motion: no-preference) {
-    :root[data-first] :is(.header, .page) {
+    :root[data-first]:not(:has([role="status"][aria-label="Loading space"])) :is(.header, .page) {
       opacity: 0;
       /* raw: the hold's last word, 6 s, past the slowest first draw */
       animation: held 0s 6s forwards;
