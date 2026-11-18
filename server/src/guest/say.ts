@@ -84,15 +84,17 @@ export function makeSay(deps: SayDeps): (guest: Guest, room: string, text: strin
     const rules = guestRules(rulesOf(world), defaults);
     return rules === undefined ? refused(403, "forbidden") : { rules, world };
   };
-  // The rules' verdict, then the provider's: the reply that refuses the line, or nothing.
+  // The rules' verdict, then the provider's: the reply that refuses the line, or nothing. No provider is moderation off
+  // (MODERATION=off): the rules alone judge. A provider that cannot answer refuses, as ever.
   const judged = async (guest: Guest, { rules, world }: { rules: Rules; world: string }, text: string) => {
     const fault = guestVerdict(text, rules);
     if (fault !== undefined) {
       if (struck(fault)) mutes.strike(guest, world);
       return refused(400, "refused", fault);
     }
-    const answer = await ask?.(text);
-    if (answer === undefined || answer === "unchecked") return refused(503, "not_ready", "unchecked");
+    if (ask === undefined) return undefined;
+    const answer = await ask(text);
+    if (answer === "unchecked") return refused(503, "not_ready", "unchecked");
     if (decide(answer, thresholds).action === "pass") return undefined;
     mutes.strike(guest, world);
     return refused(400, "refused", "moderation");

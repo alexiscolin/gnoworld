@@ -131,10 +131,12 @@ export function makeSaid(db: DatabaseSync, deps: SaidDeps): Answers {
     byBoth.take(both, at);
     return verdict;
   };
-  // The provider's word on the whole answer: a failure keeps it private.
+  // The provider's word on the whole answer: a failure keeps it private. No provider is moderation off (MODERATION=off):
+  // the answer goes out as any line does.
   const checked = async (text: string): Promise<"pass" | "moderation" | "unchecked"> => {
-    const answer = await provider?.(text).catch(() => "unchecked" as const);
-    if (answer === undefined || answer === "unchecked") return "unchecked";
+    if (provider === undefined) return "pass";
+    const answer = await provider(text).catch(() => "unchecked" as const);
+    if (answer === "unchecked") return "unchecked";
     return decide(answer, thresholds).action === "pass" ? "pass" : "moderation";
   };
   const keep = ({ room, who, question }: Offered, answer: Answered, msgid: string): boolean =>

@@ -656,13 +656,21 @@ describe("POST /api/guest/say: the provider's check, before the relay", () => {
     expect(relay).not.toHaveBeenCalled();
   });
 
-  it("does not relay when no provider is set, or when it throws", async () => {
-    const none = setup({ provider: "none" });
-    expect((await say(none.app, await arrive(none.app), "hi")).status).toBe(503);
+  it("does not relay when the provider throws", async () => {
     const throws = setup({ provider: () => Promise.reject(new Error("boom")) });
     expect((await say(throws.app, await arrive(throws.app), "hi")).status).toBe(503);
-    expect(none.relay).not.toHaveBeenCalled();
     expect(throws.relay).not.toHaveBeenCalled();
+  });
+
+  // No provider is moderation off (MODERATION=off): OpenAI's check is skipped, the world's rules still judge.
+  it("relays with no provider, moderation off: the world's rules alone judge the line", async () => {
+    const { app, relay } = setup({ provider: "none" });
+    const guest = await arrive(app);
+    expect([(await say(app, guest, "hi")).status, (await said(await say(app, guest, "spam!"))).cause]).toEqual([
+      200,
+      "banned_word",
+    ]);
+    expect(relay).toHaveBeenCalledExactlyOnceWith("#earth", `anon/${guest.name}`, "hi");
   });
 
   it.each([

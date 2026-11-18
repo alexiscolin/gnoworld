@@ -50,7 +50,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 | `INSIDE_SUBNET`, `JARVIS_SUBNET`, `JARVIS_OUT_SUBNET`, `READER_SUBNET`, `READER_OUT_SUBNET`, `LINKS_SUBNET`, `LINKS_OUT_SUBNET`, `ADMIN_SUBNET` | `172.30.89.0/24`, `.91.0/24`, `.95.0/24`, `.97.0/24`, `.99.0/24`, `.101.0/24`, `.103.0/24`, `.92.0/24` | Each network's subnet; change an address and its subnet together |
 | `JARVIS` | `off` | Section 4 |
 | `LINK_CARDS` | `0` | Section 4 |
-| `MODERATION` | none, required | `on` or `off`. On, `openai_api_key` is read and every line and preview page checked; off: account lines unchecked, guests cannot speak (503), no public room can be made, no previews, `LINK_CARDS=1` stops the server |
+| `MODERATION` | none, required | `on` or `off`. On, `openai_api_key` is read and every line and preview page checked; off: OpenAI's check skipped: lines, guests' lines, rooms' names and Jarvis's answers judged by the world's rules alone; no previews, `LINK_CARDS=1` stops the server |
 | `HOST_PUBLIC_ADDRESSES` | none | The host's own public IPv4 addresses, spaces between, which the guard refuses: set them when a public front runs on this host |
 | `JARVIS_GNOSCOPE` | `off` | Jarvis's gnoscope tools: `on` or `off` |
 | `JARVIS_BUDGET_USD`, `JARVIS_TRANSLATION_BUDGET_USD` | `3`, `1` | A day's budgets in whole dollars, kept from the first start (an admin changes them after) |
@@ -85,7 +85,7 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `MARKETS_FILE`, `WORLDS_FILE`, `PREVIEWS_FILE` | none: no timer or job | absolute path | Files the prices timer, the worlds job and the preview job write (compose: `/markets/markets.json`, `worlds.json`, `previews.json`) |
 | `UNIVERSES_FILE` | none | absolute path | The universes' data file (compose: `/app/app/data/universes.json`) |
 | `HUBS_FILE` | none | absolute path | The hubs' data file; set without `UNIVERSES_FILE` stops the server. Not set by compose |
-| `MODERATION` | off (compose requires it) | `on` or `off`, any other value stops the server | On, `OPENAI_API_KEY_FILE` is read (unset, the server stops). Off: account lines unchecked, guests cannot speak (503), no public room can be made, no previews, `LINK_CARDS=1` stops the server |
+| `MODERATION` | off (compose requires it) | `on` or `off`, any other value stops the server | On, `OPENAI_API_KEY_FILE` is read (unset, the server stops). Off: OpenAI's check skipped: lines, guests' lines, rooms' names and Jarvis's answers judged by the world's rules alone; no previews, `LINK_CARDS=1` stops the server |
 | `OPENAI_API_KEY_FILE` | none | secret file | OpenAI's key, read with `MODERATION=on` alone |
 | `MODERATION_THRESHOLDS` | `{}` | JSON, a score above 0 and at most 1 per category | A score that hides a category instead of OpenAI's own flag; `sexual/minors` always hides on OpenAI's flag. Categories: `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `self-harm`, `self-harm/instructions`, `self-harm/intent`, `sexual`, `sexual/minors`, `violence`, `violence/graphic` |
 | `NEW_ACCOUNT_HOURS` | `24` | 1 to 720 | How long an account is "new" |
@@ -158,7 +158,7 @@ All required: `READER_LISTEN` (`host:port`), `READER_PROXY` (`guard:4753`), `REA
 
 | Switch | Off by default | To turn on | Undo |
 |---|---|---|---|
-| Moderation | none: `MODERATION` is required, `on` or `off` | `MODERATION=on`, OpenAI's key in `deploy/secrets/openai_api_key`. Guests, public rooms, previews and link cards need it | `MODERATION=off` |
+| Moderation | none: `MODERATION` is required, `on` or `off` | `MODERATION=on`, OpenAI's key in `deploy/secrets/openai_api_key`. Previews and link cards need it | `MODERATION=off` |
 | Guest chat | on by default | `GUEST_CHAT=off` is the undo: read-only guests | remove the line |
 | Link cards | `LINK_CARDS=0` | `LINK_CARDS=1` in `.env`, and `--profile links`. The server stops at start with `LINK_CARDS=1` and no `LINK_READER_URL` (compose sets it), or without `MODERATION=on` | `LINK_CARDS=0` |
 | Jarvis | `JARVIS=off` | The evals gate (D13987) passes, then `sh deploy/jarvis-on.sh`, which writes `JARVIS=on` in `deploy/.env` only then (never by hand); then `--profile jarvis`. Without the profile the door answers `not_ready` | `JARVIS=off`, drop the profile |

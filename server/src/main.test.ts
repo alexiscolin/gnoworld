@@ -483,7 +483,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
-  it("serves the guest chat over the real process: a members room never reaches the link, an open room fails closed with no key, GUEST_CHAT=off is 404 (D430)", async () => {
+  it("serves the guest chat over the real process: a members room never reaches the link, an open room's line does with no key (moderation off), GUEST_CHAT=off is 404 (D430)", async () => {
     const origin = "http://gnoworld.test";
     const ergo = await fakeErgo();
     const oper = join(folder("gnoworld-oper-"), "oper");
@@ -521,11 +521,14 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(cookie).toMatch(/^__Host-guest=/);
     const members = await post("/api/guest/say", { room: "#bubble/crew", text: "hi" }, cookie);
     expect([members.status, await members.json()]).toEqual([404, { error: "not_found" }]);
-    const open = await post("/api/guest/say", { room: "#bubble", text: "hi" }, cookie);
-    expect([open.status, await open.json()]).toEqual([503, { error: "not_ready", cause: "unchecked" }]);
-    peer.say("PING :sync");
-    await peer.next(/^PONG sync$/);
-    expect(peer.lines.filter((line) => line.includes("RELAYMSG"))).toEqual([]);
+    const opening = post("/api/guest/say", { room: "#bubble", text: "hi" }, cookie);
+    // Ergo's answer to the relay: the line back, with the label it was sent with.
+    const sent = await peer.next(/RELAYMSG/);
+    const [, label = "", nick = ""] = /^@label=(\S+) RELAYMSG #bubble (\S+) :?hi$/.exec(sent) ?? [];
+    peer.say(`@label=${label};msgid=m1 :${nick}!~u@h PRIVMSG #bubble :hi`);
+    const open = await opening;
+    expect([open.status, await open.json(), nick.startsWith("anon/")]).toEqual([200, { ok: true }, true]);
+    expect(peer.lines.filter((line) => line.includes("RELAYMSG"))).toHaveLength(1);
     const off = await listening(start({ ...settings(), ORIGINS: origin, GUEST_CHAT: "off" }));
     const refused = await fetch(`http://127.0.0.1:${String(off)}/api/guest`, {
       method: "POST",

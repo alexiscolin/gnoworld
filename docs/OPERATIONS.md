@@ -99,8 +99,8 @@ and `link_reader` as 65530, users of their own.
    nginx reads it as its own user, and it holds a hash, not the password.
 3. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own https origin, the address visitors will
    type (required: Ergo refuses a WebSocket from any other site, and the server any POST), and `MODERATION`, `on` or
-   `off` (required: on checks every public line with OpenAI's key, step 4; off leaves account lines unchecked and
-   closes the guests' chat and the public rooms); the internal network's addresses may change there.
+   `off` (required: on checks every public line with OpenAI's key, step 4; off skips that check, and the world's rules
+   alone judge each line); the internal network's addresses may change there.
 4. The chat's and the moderation's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
    (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
    deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
@@ -277,8 +277,9 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 ### The moderation check
 
 - **Its settings.** `MODERATION`, `on` or `off`, chosen in `deploy/.env` (compose refuses a stack with neither): on reads
-  OpenAI's key from `OPENAI_API_KEY_FILE` (one word, 32 characters at least); off, nothing leaves the server, account
-  lines are unchecked, guests cannot speak, no public room can be made, and the alert says so at the start.
+  OpenAI's key from `OPENAI_API_KEY_FILE` (one word, 32 characters at least); off, nothing leaves the server: every
+  line, guests' included, every room's name and Jarvis's answers are judged by the world's rules alone, there are no
+  previews, and the alert says so at the start.
   The thresholds that replace OpenAI's own flag and the hours an account counts as new are the server's defaults: compose does not
   forward `MODERATION_THRESHOLDS` or `NEW_ACCOUNT_HOURS`, so `deploy/.env` cannot set them
   ([CONFIGURATION.md](CONFIGURATION.md), section 3).
@@ -491,7 +492,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   where ops' log backend sets them.
 - **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
   `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
-  `moderation_off` (`MODERATION` not on: account lines unchecked, guests and public rooms closed), `moderation_refused` (OpenAI refused the key or the
+  `moderation_off` (`MODERATION` not on: every line judged by the world's rules alone), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_category` (a category beyond the 13, ignored: its name in the log's reason field, once a process, to add to the list), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
