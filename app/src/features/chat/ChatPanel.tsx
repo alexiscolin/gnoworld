@@ -6,7 +6,7 @@
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { ErrorView, errorKind } from "../errors/index.ts";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { roomsOptions } from "../../lib/query/apiReads.ts";
@@ -73,44 +73,46 @@ function useRoomVerdicts(
   return { saving, verdicts };
 }
 
-// The link told the rooms to follow and the room in view.
-function useLinkAt(
-  linkRef: RefObject<ChatLink | undefined>,
+// The page's link, taken as the panel mounts, and told the rooms to follow and the room in view: as they change, and again as it is taken,
+// whatever the effects' order, or a link taken after them never hears them and the room's history is never asked. Before the room's lines'
+// own effects, which read it to the link (a child's effects run before its parent's).
+function usePanelLink(
+  store: ReturnType<typeof useAppStore>,
   sections: RoomList["sections"] | undefined,
   current: string | undefined,
-) {
-  useEffect(() => {
-    if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
-  }, [linkRef, sections]);
-  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's. Said again as the rooms come:
-  // a session change makes the link forget the room in view, which the new list gives back (its history is asked on the new connection).
+): RefObject<ChatLink | undefined> {
+  const linkRef = useRef<ChatLink>(undefined);
+  const tell = useEffectEvent((link: ChatLink | undefined) => {
+    if (sections !== undefined) link?.follow(roomIds(sections), groupRooms(sections));
+    link?.show(current);
+  });
   useLayoutEffect(() => {
-    linkRef.current?.show(current);
-  }, [linkRef, current, sections]);
+    linkRef.current = takeLink(store);
+    tell(linkRef.current);
+    return dropLink;
+  }, [store]);
+  // Said again as the rooms come: a session change makes the link forget the room in view, which the new list gives back.
+  useLayoutEffect(() => {
+    tell(linkRef.current);
+  }, [current, sections]);
+  return linkRef;
 }
 
 export function ChatPanel({ world, place, room }: { world: string; place: ChatPlace; room?: string | undefined }) {
   const store = useAppStore();
-  // The page's link to Ergo, made once the page runs: never in the build's pre-render.
-  const linkRef = useRef<ChatLink>(undefined);
   const [attempt, setAttempt] = useState(0);
   const [params] = useSearchParams();
   const session = useApp(({ login }) => login.session);
   const query = roomsQuery(world, session, attempt);
-  // Taken in a layout effect, before useLinkAt's: rooms the page already holds come at the first draw, and the room in view is told the
-  // link then, once; taken in a later effect, the link never heard it and the room's history was never asked.
-  useLayoutEffect(() => {
-    linkRef.current = takeLink(store);
-    return dropLink;
-  }, [store]);
   const asked = useRoomsAsked(store, world, query);
   const { shown, loaded } = useDrawn(asked, { world, place, room: room ?? params.get("room") });
   const { sections, current } = shown;
+  // The page's link to Ergo, taken once the page runs: never in the build's pre-render.
+  const linkRef = usePanelLink(store, sections, current);
   // The page hidden: the reading places waiting their 2 s go at once.
   useOnHide(() => {
     linkRef.current?.flush();
   });
-  useLinkAt(linkRef, sections, current);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
   const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
