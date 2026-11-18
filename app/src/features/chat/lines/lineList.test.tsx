@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+// What a room's view gives its list (lineList.ts's props) and puts in its place, drawn in a page: RoomView.test.tsx draws markup alone.
 import type { Line } from "@gnoworld/core";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
