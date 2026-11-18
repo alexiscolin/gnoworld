@@ -133,6 +133,28 @@ test("4 a world's page: the chat full and back, the pill gliding", async ({ page
   );
 });
 
+// The views' bar and its pill with no scene: the page at the browser's own 60 frames a second, where a transition is read whole (on the
+// software GPU the scene's frames draw it in a few).
+const BAR = "nav[aria-label='Views']";
+async function barAndPill(page: Page, name: string) {
+  await flow(page, [`${name}-to-chat`, PILL, BAR], async () => {
+    await views(page).locator("a[href*='chat=full']").click();
+    await wait(page, 2000);
+  });
+  await flow(page, [`${name}-to-page`, PILL, BAR], async () => {
+    await views(page)
+      .getByRole("link", { name: /^world/i })
+      .click();
+    await wait(page, 2000);
+  });
+}
+
+test("4b a world's page with no scene: the chat full and back, the bar and the pill gliding", async ({ page }) => {
+  await open(page, { width: 1366, as: ACCOUNT, height: 768, full: false });
+  await wait(page, 1500);
+  await barAndPill(page, "4b-world");
+});
+
 test("5 the plate: a card alone, closed; Try it's tabs", async ({ page }) => {
   await adena(page);
   await callWallet(page, {});
