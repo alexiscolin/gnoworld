@@ -270,3 +270,36 @@ describe("the surface programs", () => {
     expect(RING_FRAGMENT).toContain("float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));");
   });
 });
+
+describe("the Earth's full-size maps coming into focus", () => {
+  // Alexis on v0.1.8 in Firefox: the Earth sharpened in one frame once its full maps came. Its half-size day is softer than any level of the
+  // full one (158 kB against 802 kB): a limit on the full one's finest level still jumped, measured. The two are mixed instead.
+  it("reads the maps it replaced under the new ones until the focus is whole, then lets them go", () => {
+    const planet = createPlanet(EARTH, { ...fixed(), night: new Texture() }, sphere);
+    const names = ["surface", "nightMap", "cloudMap"];
+    const was = ["surfaceWas", "nightWas", "cloudWas"];
+    const values = (of: string[]) => of.map((name) => read(planet.surface, name));
+    const half = values(names);
+    const full = { day: new Texture(), night: new Texture(), clouds: new Texture() };
+    const fullList = [full.day, full.night, full.clouds];
+    const same = (seen: unknown[], wanted: unknown[]) => seen.every((value, at) => value === wanted[at]);
+    expect(read(planet.surface, "focus")).toBe(1);
+    planet.setEarthMaps(full, 0);
+    expect(same(values(names), fullList)).toBe(true);
+    expect(same(values(was), half)).toBe(true);
+    expect(read(planet.surface, "focus")).toBe(0);
+    planet.setEarthMaps(full, 0.5);
+    expect(same(values(was), half)).toBe(true);
+    expect(read(planet.surface, "focus")).toBe(0.5);
+    planet.setEarthMaps(full, 1);
+    expect(same(values(was), fullList)).toBe(true);
+    expect(read(planet.surface, "focus")).toBe(1);
+  });
+
+  it("mixes every read of the day, the night and the clouds with the map it replaced", () => {
+    expect(SURFACE_FRAGMENT).not.toMatch(/\bread\((?:surface|cloudMap|nightMap),/);
+    expect(
+      SURFACE_FRAGMENT.match(/\breadIn\((?:surface, surfaceWas|cloudMap, cloudWas|nightMap, nightWas),/g)?.length,
+    ).toBe(7);
+  });
+});

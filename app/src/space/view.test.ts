@@ -5,7 +5,7 @@ import { Free } from "./rig/free.ts";
 import { blankPose } from "./rig/pose.ts";
 import { advance, paint } from "./move.ts";
 import { openOf } from "./open.ts";
-import { choose, livelyOf, napOf, stateOf, tick, waitsToMake } from "./view.ts";
+import { choose, landsReady, livelyOf, napOf, stateOf, tick, waitsToMake } from "./view.ts";
 
 // view.ts reads the pointer's media query as it loads.
 vi.hoisted(() => {
@@ -237,5 +237,26 @@ describe("waitsToMake", () => {
     expect(waitsToMake(true, renderer(false) as never)).toBe(true);
     expect(waitsToMake(false, renderer(false) as never)).toBe(false);
     expect(waitsToMake(true, renderer(true) as never)).toBe(false);
+  });
+});
+
+describe("landsReady", () => {
+  const space = ({ parallel = true, made = false } = {}) =>
+    ({
+      universe: { earth: { index: 0 }, byId: new Map([["gnoswap", { index: 3 }]]) },
+      stage: { near: { made: (index: number) => made && index >= 0, shows: () => false } },
+      renderer: { extensions: { has: (name: string) => parallel && name === "KHR_parallel_shader_compile" } },
+    }) as unknown as Space;
+
+  it("waits for a world's planet, or the Earth, not yet made whole, where a flight makes it; made, not yet shown, it waits no more", () => {
+    expect(landsReady(space(), { kind: "world", id: "gnoswap" })).toBe(false);
+    expect(landsReady(space(), { kind: "home" })).toBe(false);
+    expect(landsReady(space({ made: true }), { kind: "world", id: "gnoswap" })).toBe(true);
+  });
+
+  it("waits for nothing where no planet is to be drawn, or where it is made only once the flight lands", () => {
+    expect(landsReady(space(), { kind: "universe" })).toBe(true);
+    expect(landsReady(space(), { kind: "system", id: "gnoswap" })).toBe(true);
+    expect(landsReady(space({ parallel: false }), { kind: "world", id: "gnoswap" })).toBe(true);
   });
 });
