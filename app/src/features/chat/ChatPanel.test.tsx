@@ -144,6 +144,44 @@ describe("the room's history after the connection changes from guest to account"
   });
 });
 
+// A panel drawn again on a world whose rooms the page already holds (a flight back to it, the logo and a click on it): its rooms come
+// at its first draw, before it has taken the page's link, and the room in view must still reach the link, or its history is never
+// asked and the room reads "No messages yet." (Alexis on v0.1.6, after flights and the logo, the Earth's #general).
+describe("a panel drawn again with its rooms already held", () => {
+  const panel = (shown: boolean) => (
+    <MemoryRouter>
+      <StoreProvider>
+        <Grab />
+        {shown ? <ChatPanel world="bubble" place={place} /> : null}
+      </StoreProvider>
+    </MemoryRouter>
+  );
+
+  it("tells the link the room in view, whose history is asked on the new connection", async () => {
+    vi.stubGlobal("fetch", roomsAnswer(200));
+    const draw = drawer();
+    draw(panel(true));
+    act(() => {
+      state().loginActions.signedOut();
+    });
+    await settled(() => made().length === 1 && document.body.textContent.includes("#bubble"));
+    draw(panel(false));
+    draw(panel(true));
+    await settled(() => made().length === 2);
+    const again = made()[1];
+    if (again === undefined) throw new Error("no second connection");
+    again.me = "guest-aaaaaa";
+    act(() => {
+      again.state("connected");
+    });
+    await settled(() => again.sent.some((line) => line.startsWith("JOIN #bubble")));
+    act(() => {
+      again.line(":guest-aaaaaa!u@h JOIN #bubble");
+    });
+    expect(history(again)).toEqual([expect.stringContaining("CHATHISTORY LATEST #bubble")]);
+  });
+});
+
 // The dock's frame (ChatLayout's [data-chat-layout]: its surface, its column, its padding) holds the error state too: a failed list left
 // "The server is not answering." bare over the planet (the workshop, 2026-11-16, realm-dao at 1491 by 920).
 describe("the dock when the server does not answer", () => {
