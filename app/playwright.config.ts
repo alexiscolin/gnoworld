@@ -32,7 +32,12 @@ export default defineConfig({
         launchOptions: { args: [...ONE_PROCESS, ...(TLS ? ["--ignore-certificate-errors"] : [])] },
       },
     },
-    ...(process.env["E2E_WEBKIT"] === "1" ? [{ name: "webkit", use: { ...devices["Desktop Safari"] } }] : []),
+    // WebKit sends a page's requests through the worker that controls it, where page.route no longer reaches them
+    // (Playwright's types.d.ts, page.route's note): the journeys' mocks would miss and the real server answer. So WebKit's
+    // project registers no worker; pwa.spec's journeys of the worker stay Chromium's.
+    ...(process.env["E2E_WEBKIT"] === "1"
+      ? [{ name: "webkit", use: { ...devices["Desktop Safari"], serviceWorkers: "block" as const } }]
+      : []),
   ],
   webServer: {
     command: "node_modules/.bin/react-router build && node tests/e2e/serve.mjs",
