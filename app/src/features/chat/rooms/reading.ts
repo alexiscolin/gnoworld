@@ -97,8 +97,15 @@ const AT_END = 32;
 // Whether a list is scrolled to its end, or within AT_END of it.
 const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
 
+// A list held at its end anchors no scroll: a line that grows above then moves it in no engine, as in WebKit, and the place
+// noted is the place found. Let go, it anchors again, so a reader up the room keeps their lines still.
+const hold = (box: HTMLElement, held: boolean) => {
+  box.style.setProperty("overflow-anchor", held ? "none" : "");
+};
+
 // Moves a list to its end, and notes where that is.
 const toEnd = (box: HTMLElement, top: { current: number }) => {
+  hold(box, true);
   box.scrollTop = box.scrollHeight;
   top.current = box.scrollTop;
 };
@@ -124,6 +131,7 @@ function useNewestInView(
       placedRef.current = true;
       box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
       atEndRef.current = atEnd(box);
+      hold(box, atEndRef.current);
       topRef.current = box.scrollTop;
     } else if (atEndRef.current) toEnd(box, topRef);
   }, [lines, fresh, reactions]);
@@ -155,6 +163,7 @@ function useNewestInView(
     if (box === null) return;
     if (atEnd(box)) atEndRef.current = true;
     else if (box.scrollTop !== topRef.current) atEndRef.current = false;
+    hold(box, atEndRef.current);
   };
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
   const seesEnd = () => atEndRef.current && (listRef.current?.clientHeight ?? 0) > 0;

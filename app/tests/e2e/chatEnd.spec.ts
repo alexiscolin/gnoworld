@@ -70,3 +70,47 @@ test("a room stays at its end when two cards grow a frame apart, with no scroll 
   expect(height).toBeGreaterThan(400);
   expect(await gap(list)).toBeLessThan(4);
 });
+
+// Chromium and Firefox anchor the scroll: a line above the view grows with the newest one, after the list moved to its end and
+// before that move's scroll event. The anchoring moves the list by the first, and the second leaves it off its end.
+test("a room stays at its end when a line above and the newest one grow together, the scroll anchored", async ({
+  page,
+}) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.evaluate(async (box) => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    const grow = (at: number) => {
+      const line = box.children[at];
+      if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "200px");
+    };
+    grow(5);
+    await frame();
+    // After this frame's ResizeObserver, before the next frame's scroll event.
+    await new Promise((done) => setTimeout(done, 0));
+    grow(6);
+    grow(box.children.length - 1);
+    await frame();
+    await frame();
+    await frame();
+  });
+  expect(await gap(list)).toBeLessThan(4);
+});
+
+// A reader who wheels up is let go, and keeps their place as the newest line grows.
+test("a reader who scrolls up by the wheel keeps their place as a card grows", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.hover();
+  await page.mouse.wheel(0, -150);
+  await expect.poll(() => gap(list)).toBeGreaterThan(100);
+  const before = await list.evaluate((box) => box.scrollTop);
+  await list.evaluate(async (box) => {
+    const line = box.children[box.children.length - 1];
+    if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "300px");
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  expect(await list.evaluate((box) => box.scrollTop)).toBe(before);
+});
