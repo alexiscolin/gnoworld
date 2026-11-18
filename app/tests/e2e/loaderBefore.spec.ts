@@ -53,3 +53,11 @@ for (const path of ["/s/demo", "/universe", "/s/gnoland"])
   test(`${path}: no frame shows the interface before the loader stands over it`, async ({ page }) => {
     expect(await watch(page, `${path}?test-gpu`)).toEqual([]);
   });
+
+// The fallback's loader (LoaderMarks.tsx) stands only till its page draws: a page with no scene comes in under its fade, and leaves none behind.
+for (const path of ["/nowhere", "/r/gno.land/r/gov/dao"])
+  test(`${path}: the fallback's loader gives way once the page has drawn`, async ({ page }) => {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("status", { name: "Loading space" })).toHaveCount(0);
+  });

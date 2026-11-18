@@ -5,4 +5,5 @@ export { useLoaded } from "./useLoaded.ts";
 export { useResting, useRestingWorlds } from "./views.ts";
 export { useWorldsCount } from "./worldsCount.ts";
 export { holdsShell, revealShell } from "./firstLook.ts";
+export { FirstLoader } from "./LoaderMarks.tsx";
 export { warmWorld } from "./space.ts";
