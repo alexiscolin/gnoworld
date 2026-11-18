@@ -1,6 +1,6 @@
 // A room's reading place on its page (Ergo's draft/read-marker): the line marked New while the room is
 // open, and the room marked read to its newest line while the reader is at the end and the page shows.
-import { newMarkAfter, type Line, type NewMark, type Reaction } from "@gnoworld/core";
+import { newMarkAfter, type Line, type NewMark } from "@gnoworld/core";
 import { useEffect, useEffectEvent, useState, type RefObject } from "react";
 import { useNewestInView } from "./heldAtEnd.ts";
 
@@ -92,21 +92,13 @@ function useLookWhenResized(listRef: RefObject<HTMLElement | null>, look: () => 
   }, [listRef]);
 }
 
-// The list held at its newest and the room read to it: what a scroll or a change of the list's size does to both.
+// The list opened on its New line or at its end, and the room read to its end: what a scroll or a change of the list's size does.
 function useListReading(
   list: Pick<Parameters<typeof useReading>[0], "lines" | "paged" | "onRead" | "keeping"> & {
     fresh: string | undefined;
-    reactions: readonly Reaction[] | undefined;
-    jumped: boolean;
   },
 ) {
-  const { lines, fresh, reactions } = list;
-  const { listRef, seesEnd, onScroll } = useNewestInView({
-    lines,
-    fresh,
-    reactions,
-    arrived: list.paged && !list.jumped,
-  });
+  const { listRef, seesEnd, onScroll, awaiting } = useNewestInView({ fresh: list.fresh });
   const look = useReading({
     lines: list.lines,
     seesEnd,
@@ -117,6 +109,7 @@ function useListReading(
   useLookWhenResized(listRef, look);
   return {
     listRef,
+    awaiting,
     onScroll: () => {
       onScroll();
       look();
@@ -128,18 +121,16 @@ function useListReading(
 const placeOf = (paged: boolean, read: string | undefined, unread: string | undefined) =>
   paged ? { read, unread } : { read: undefined, unread: undefined };
 
-/** What a list reads of its room: the line marked New, the list held at its newest and the room read to it. */
+/** What a list reads of its room: the line marked New, the list opened there or at its end, and the room read to it. */
 export function useListRead(list: {
   lines: readonly Line[];
   me: string | undefined;
-  reactions?: readonly Reaction[] | undefined;
   read?: string | undefined;
   paged?: boolean | undefined;
-  jumped?: boolean | undefined;
   onRead?: ((id: string) => void) | undefined;
   keeping?: Parameters<typeof useReading>[0]["keeping"];
 }) {
-  const { lines, me, reactions, read, paged = false, jumped = false, onRead, keeping } = list;
+  const { lines, me, read, paged = false, onRead, keeping } = list;
   const fresh = useNewMark(lines, placeOf(paged, read, keeping?.unread), me);
-  return { fresh, ...useListReading({ lines, fresh, reactions, paged, jumped, onRead, keeping }) };
+  return { fresh, ...useListReading({ lines, fresh, paged, onRead, keeping }) };
 }

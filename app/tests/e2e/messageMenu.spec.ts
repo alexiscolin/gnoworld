@@ -1,6 +1,6 @@
 import type { BrowserContext, Locator, WebSocketRoute } from "@playwright/test";
 import { axeOf, violations } from "./axe.ts";
-import { beforeTheList, inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
+import { beforeTheList, inGames, lineOf, lines, roomsNav, scrolling, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { tabsTo } from "./talk.ts";
@@ -57,7 +57,7 @@ const stops = (page: Page) => lines(page).and(page.locator("[tabindex='0']"));
 const ringOf = (page: Page) =>
   page.evaluate(() => {
     const line = document.activeElement;
-    const list = line?.parentElement;
+    const list = line?.parentElement?.parentElement;
     if (!(line instanceof HTMLElement) || list == null) return null;
     const style = getComputedStyle(line);
     const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
@@ -72,7 +72,7 @@ const ringOf = (page: Page) =>
 // Whether the `at`th line's bar lies whole inside the list's box.
 async function barInside(page: Page, at: number) {
   const [outer, bar] = [
-    await page.getByRole("list", { name: "Messages" }).boundingBox(),
+    await scrolling(page.getByRole("list", { name: "Messages" })).boundingBox(),
     await barOf(page, at).boundingBox(),
   ];
   if (outer === null || bar === null) throw new Error("no box");
@@ -80,8 +80,8 @@ async function barInside(page: Page, at: number) {
 }
 // The list scrolled so its `at`th line's top is the list's top edge.
 async function toTop(page: Page, at: number) {
-  await page.getByRole("list", { name: "Messages" }).evaluate((box, line) => {
-    const item = box.children[line];
+  await scrolling(page.getByRole("list", { name: "Messages" })).evaluate((box, line) => {
+    const item = box.querySelector("ol")?.children[line];
     if (item instanceof HTMLElement)
       box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
   }, at);
@@ -464,8 +464,8 @@ test.describe("a line's actions", () => {
     const ergo = await room(page, { history: SIXTY });
     await lines(page).first().focus();
     await expect(lines(page).first()).toBeInViewport();
-    await page.getByRole("list", { name: "Messages" }).evaluate((list) => {
-      list.scrollTop = list.scrollHeight;
+    await scrolling(page.getByRole("list", { name: "Messages" })).evaluate((list) => {
+      list.scrollTop = 0;
       list.dispatchEvent(new Event("scroll"));
     });
     ergo().send(`@msgid=live;time=${T(59)};account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :A live line`);
@@ -480,9 +480,10 @@ test.describe("a line's actions", () => {
   }) => {
     await room(page);
     const overflow = () =>
-      page
-        .getByRole("list", { name: "Messages" })
-        .evaluate((list) => [list.scrollTop, list.scrollHeight - list.clientHeight]);
+      scrolling(page.getByRole("list", { name: "Messages" })).evaluate((list) => [
+        list.scrollTop,
+        list.scrollHeight - list.clientHeight,
+      ]);
     for (const at of [2, 0]) {
       await lines(page).nth(at).focus();
       await expect(barOf(page, at)).toBeVisible();
@@ -609,7 +610,9 @@ test.describe("a line's actions", () => {
     await room(page);
     await lineOf(page, "the second").hover();
     await expect(bars(page)).toBeVisible();
-    await expect(page.getByRole("list", { name: "Messages" })).toHaveScreenshot("message-actions-computer.png");
+    await expect(scrolling(page.getByRole("list", { name: "Messages" }))).toHaveScreenshot(
+      "message-actions-computer.png",
+    );
   });
 });
 

@@ -91,7 +91,7 @@
       overscroll-behavior: none;
     }
 
-    ol[aria-label="Messages"] {
+    :has(> ol[aria-label="Messages"]) {
       overscroll-behavior: contain;
     }
   }

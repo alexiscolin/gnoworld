@@ -39,10 +39,10 @@ export interface LinesProps {
   onEdit?: ((id: string) => void) | undefined;
   /** The time of the last line the account read here, Ergo's; none while unknown. */
   read?: string | undefined;
+  /** The room's list came after its skeleton: it fades in over it. */
+  after?: boolean;
   /** The room's history page came: the New mark waits on it, as a live line may come before it. */
   paged?: boolean;
-  /** The room is read around a found message (the search's jump): its list stays where the jump put it. */
-  jumped?: boolean;
   /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
   onRead?: ((id: string) => void) | undefined;
   /** The room's lines' verdicts, by msgid, from the server's stream. */

@@ -1,4 +1,4 @@
-import { lines } from "./chat.ts";
+import { lines, scrolling } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
@@ -115,7 +115,12 @@ test.describe("the chat as the video shows it", () => {
     // The child order of the conversation's room, not the markup's words: the pin comes before the lines' own list.
     const labels = await conversation
       .locator(":scope > * > *")
-      .evaluateAll((children) => children.map((child) => child.getAttribute("aria-label")));
+      .evaluateAll((children) =>
+        children.map(
+          (child) =>
+            child.getAttribute("aria-label") ?? child.querySelector("[aria-label]")?.getAttribute("aria-label"),
+        ),
+      );
     expect(labels.indexOf("Pinned messages")).toBeGreaterThanOrEqual(0);
     expect(labels.indexOf("Pinned messages")).toBeLessThan(labels.indexOf("Messages"));
   });
@@ -162,12 +167,15 @@ test.describe("the chat as the video shows it", () => {
     await hydrated(page);
     const list = page.getByRole("list", { name: "Messages" });
     await expect(list.locator(":scope > li")).toHaveCount(40);
-    const sizes = await list.evaluate((element) => ({ scroll: element.scrollHeight, client: element.clientHeight }));
+    const sizes = await scrolling(list).evaluate((element) => ({
+      scroll: element.scrollHeight,
+      client: element.clientHeight,
+    }));
     expect(sizes.scroll).toBeGreaterThan(sizes.client);
     const composer = page.getByRole("group", { name: "Message box" });
     const before = await box(composer);
-    await list.evaluate((element) => {
-      element.scrollTop = 0;
+    await scrolling(list).evaluate((element) => {
+      element.scrollTop = -element.scrollHeight;
     });
     expect(await box(composer)).toEqual(before);
     // The document does not scroll and the box is the window's: the composer is in view, at 1280 by 600 as at any size.
