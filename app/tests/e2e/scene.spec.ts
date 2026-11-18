@@ -277,9 +277,6 @@ test.describe("a phone", () => {
 
   test("loads nothing of the 3D, the worker included, and draws no View in space", async ({ page }) => {
     const asked = asks(page, SCENE);
-    await page.addInitScript(() => {
-      localStorage.setItem("gnoworld:welcomed", "1");
-    });
     await page.goto(HOME);
     await hydrated(page);
     await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);

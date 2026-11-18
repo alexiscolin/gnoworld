@@ -160,12 +160,13 @@ test.describe("a message of several lines", () => {
     await page.setViewportSize({ width: 320, height: 700 });
     await opened(page);
     const height = () => field(page).evaluate((box) => box.getBoundingClientRect().height);
+    // A phone 700 px tall rests at four lines (D13727): eight lines are four more.
     const empty = await height();
-    await field(page).fill(draft(6));
-    const six = await height();
-    expect(six).toBeGreaterThan(empty + 40);
+    await field(page).fill(draft(8));
+    const eight = await height();
+    expect(eight).toBeGreaterThan(empty + 40);
     await field(page).fill(draft(60));
-    expect(await height()).toBeGreaterThan(six);
+    expect(await height()).toBeGreaterThan(eight);
     expect(await height()).toBeLessThan(350);
     expect(await field(page).evaluate((box) => box.scrollHeight > box.clientHeight)).toBe(true);
     // CSS sizes the box, so a long line counts as the lines it wraps to; ten lines is the cap, and the

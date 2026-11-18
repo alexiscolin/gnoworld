@@ -6,7 +6,7 @@ import { expect, hydrated, test } from "./fixtures.ts";
 /** The account's pill in the header once logged in (frame 17): its face and short address, opening the menu that holds the way out. */
 export const accountPill = (page: Page) => page.getByRole("button", { name: /Your account/ });
 
-/** The header's Connect button for a reader logged out (the welcome card holds another named alike, so it is read in the banner). */
+/** The header's Connect button for a reader logged out, read in the banner. */
 export const connectButton = (page: Page) =>
   page.getByRole("banner").getByRole("button", { name: "Connect", exact: true });
 

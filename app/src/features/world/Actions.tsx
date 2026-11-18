@@ -18,7 +18,7 @@ const PhoneActions = lazy(async () => ({ default: (await import("./PhoneActions.
 // not loaded, or a guest reads), the link keeps its jump.
 const toComposer = (event: MouseEvent) => {
   if (!(event.target instanceof Element) || !event.target.closest("[href='#chat']")) return;
-  const composer = composerBox(false);
+  const composer = composerBox();
   if (composer === null) return;
   event.preventDefault();
   composer.focus();
