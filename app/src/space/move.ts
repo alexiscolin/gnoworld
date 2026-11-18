@@ -5,7 +5,7 @@ import type { Space } from "./scene.ts";
 import type { Place } from "./place.ts";
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import { orbitGain } from "./parts/marks.ts";
-import { frameOf } from "./parts/bones.ts";
+import { frameOf } from "./parts/planetFrame.ts";
 import { Quaternion } from "three";
 import { HOME_SYSTEM } from "../cosmosAt.ts";
 import { aloneOf, homeFrame, nearAlone } from "./framing.ts";
