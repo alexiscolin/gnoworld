@@ -4,9 +4,8 @@
 // link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link;
 // a guest reads, a room letting accounts alone speak.
 import type { Line } from "@gnoworld/core";
-import type { RoomList } from "@gnoworld/schemas";
 import { ErrorView, errorKind } from "../errors/index.ts";
-import { lazy, Suspense, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { roomsOptions } from "../../lib/query/apiReads.ts";
@@ -14,15 +13,14 @@ import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
 import { savesData } from "../../lib/saveData.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import type { ChatLink } from "./connection/link.ts";
-import { dropLink, takeLink } from "./connection/pageLink.ts";
 import { GuestLoaded } from "./rooms/GuestLoaded.tsx";
 import { LOADING } from "./dock/Loading.tsx";
-import { groupRooms, roomIds, roomsQuery } from "./rooms/names.ts";
+import { roomsQuery } from "./rooms/names.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { watchRoomsChanged } from "./rooms/roomsListed.ts";
 import { useDrawn } from "./useDrawn.ts";
 import { useOnHide } from "./useOnHide.ts";
+import { usePanelLink } from "./usePanelLink.ts";
 import { useVerdicts } from "./lines/useVerdicts.ts";
 
 // An account's chat, its code asked once the session is an account's (the first screen's budget, ADR-0001 §12).
@@ -71,31 +69,6 @@ function useRoomVerdicts(
   useVerdicts(store, { room, lines, reader, saving });
   const verdicts = useApp((app) => (room === undefined ? undefined : app.verdicts[room]));
   return { saving, verdicts };
-}
-
-// The page's link, taken as the panel mounts, and told the rooms to follow and the room in view: as they change, and again as it is taken,
-// whatever the effects' order, or a link taken after them never hears them and the room's history is never asked. Before the room's lines'
-// own effects, which read it to the link (a child's effects run before its parent's).
-function usePanelLink(
-  store: ReturnType<typeof useAppStore>,
-  sections: RoomList["sections"] | undefined,
-  current: string | undefined,
-): RefObject<ChatLink | undefined> {
-  const linkRef = useRef<ChatLink>(undefined);
-  const tell = useEffectEvent((link: ChatLink | undefined) => {
-    if (sections !== undefined) link?.follow(roomIds(sections), groupRooms(sections));
-    link?.show(current);
-  });
-  useLayoutEffect(() => {
-    linkRef.current = takeLink(store);
-    tell(linkRef.current);
-    return dropLink;
-  }, [store]);
-  // Said again as the rooms come: a session change makes the link forget the room in view, which the new list gives back.
-  useLayoutEffect(() => {
-    tell(linkRef.current);
-  }, [current, sections]);
-  return linkRef;
 }
 
 export function ChatPanel({ world, place, room }: { world: string; place: ChatPlace; room?: string | undefined }) {
