@@ -62,6 +62,49 @@ test("the measure sees a planted jump, a bounce and a stall, and none in an ease
   const stepped = eased.map((v, i) => (i > 20 ? v + 0.5 : v));
   expect(continuity(stalled, stepped, { floor: 0.01, unseen: 32 }).jumps).toEqual([]);
   expect(continuity(times, stepped, { floor: 0.01, unseen: 32 }).jumps.length).toBeGreaterThan(0);
+  // The Earth's facing comes in degrees: 30 degrees turned slowly is no bounce and no whole turn.
+  const turning: Raw = {
+    frames: times.map((t, i) => ({ t, lat: 10, lon: i * 0.75, earthShown: true, watched: {} })),
+    long: [],
+    shifts: [],
+  };
+  expect(analyse(turning).lon).toEqual({ jumps: [], bounces: [] });
+  expect(analyse(turning).turns).toBeLessThan(0.1);
+  // A camera that jumps under the opaque full chat is not seen; the same jump uncovered is one.
+  const posed = (covered: boolean): Raw => ({
+    frames: times.map((t, i) => ({
+      t,
+      eye: [i < 20 ? i : i + 1000, 0, 0],
+      covered: covered && i >= 19 && i <= 21,
+      watched: {},
+    })),
+    long: [],
+    shifts: [],
+  });
+  expect(analyse(posed(true)).eye?.jumps).toEqual([]);
+  expect(analyse(posed(false)).eye?.jumps.length).toBeGreaterThan(0);
+  // What is seen is judged: an element at 1 under a hidden parent shows nothing; a swap for another element in sight is judged.
+  const part = (seen: number, left: number, id: number) => ({
+    opacity: 1,
+    seen,
+    scale: 1,
+    x: 0,
+    y: 0,
+    left,
+    width: 10,
+    id,
+  });
+  const watched = (at: (i: number) => ReturnType<typeof part>): Raw => ({
+    frames: times.map((t, i) => ({ t, watched: { "#p": at(i) } })),
+    long: [],
+    shifts: [],
+  });
+  expect(
+    analyse(watched((i) => part(i < 20 ? 0 : Math.min(1, (i - 19) / 10), 0, 1))).watched["#p"]?.opacity.jumps,
+  ).toEqual([]);
+  expect(
+    analyse(watched((i) => part(1, i < 20 ? 100 : 300, i < 20 ? 1 : 2))).watched["#p"]?.left.jumps.length,
+  ).toBeGreaterThan(0);
   const raw: Raw = { frames: times.map((t, i) => ({ t: i > 20 ? t + 100 : t, watched: {} })), long: [], shifts: [] };
   expect(analyse(raw).stalls.count).toBe(1);
 });
@@ -250,7 +293,7 @@ test("8 the dive into the Earth's page and out, lines from far countries during 
   await flow(page, ["8-earth-dive"], async () => {
     await page.locator("a[href='/earth']").first().dispatchEvent("click");
     // The home opens no chat: the Earth's page joins #earth as the dive comes, and its first line is said once it has.
-    await expect.poll(() => sent.some((line) => line.startsWith("JOIN ")), SLOW).toBe(true);
+    await expect.poll(() => sent.some((line) => line.startsWith("JOIN #earth")), SLOW).toBe(true);
     say("d1", "from Japan, in the dive", "JP");
     await wait(page, 3000);
     say("d2", "from Brazil, in the dive", "BR");

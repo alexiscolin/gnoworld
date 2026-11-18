@@ -105,6 +105,27 @@ const observe = (page: Page) =>
     });
   });
 
+// The readers a sample shares: what the reader sees of an element (its opacity and its ancestors' multiplied, 0 where one is hidden), and
+// whether the full chat covers the scene: opaque, whole (no clip as it grows from the dock) and the window's width.
+const readers = (page: Page) =>
+  page.evaluate(() => {
+    const seenOf = (element: Element) => {
+      let seen = 1;
+      for (let at: Element | null = element; at !== null; at = at.parentElement) {
+        const own = getComputedStyle(at);
+        seen *= own.visibility === "hidden" ? 0 : Number(own.opacity);
+      }
+      return seen;
+    };
+    Reflect.set(globalThis, "__seenOf", seenOf);
+    Reflect.set(globalThis, "__covered", () => {
+      const full = document.querySelector("[data-chat-screen][data-full]:not([data-ghost] *)");
+      if (full === null || getComputedStyle(full).clipPath !== "none") return false;
+      const { left, right } = full.getBoundingClientRect();
+      return left <= 0 && right >= innerWidth && seenOf(full) > 0.99;
+    });
+  });
+
 // A sample of every frame: what moves, read once the frame's own callbacks have run (a message after the animation frame), as the reader
 // sees the frame: a read inside the frame's callbacks comes before the page's own corrections of it.
 const sampling = (page: Page, selectors: readonly string[]) =>
@@ -116,21 +137,16 @@ const sampling = (page: Page, selectors: readonly string[]) =>
       Reflect.set(element, "__smoothId", ++ids);
       return ids;
     };
+    const seenOf = Reflect.get(globalThis, "__seenOf") as (element: Element) => number;
     const sample = (selector: string) => {
       const element = document.querySelector(selector);
       if (element === null) return null;
       const style = getComputedStyle(element);
       const m = new DOMMatrixReadOnly(style.transform === "none" ? "" : style.transform);
       const box = element.getBoundingClientRect();
-      // What the reader sees: the opacities of the element and its ancestors multiplied, 0 where one is hidden.
-      let seen = 1;
-      for (let at: Element | null = element; at !== null; at = at.parentElement) {
-        const own = getComputedStyle(at);
-        seen *= own.visibility === "hidden" ? 0 : Number(own.opacity);
-      }
       return {
         opacity: Number(style.opacity),
-        seen,
+        seen: seenOf(element),
         scale: Math.hypot(m.a, m.b),
         x: m.e + Number.parseFloat(style.translate === "none" ? "0" : style.translate),
         y: m.f,
@@ -165,12 +181,7 @@ const sampling = (page: Page, selectors: readonly string[]) =>
       });
       frame.skeleton = gain;
     };
-    const covered = () => {
-      const full = document.querySelector("[data-chat-screen][data-full]:not([data-ghost] *)");
-      let opacity = full === null ? 0 : 1;
-      for (let node = full; node !== null; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
-      return opacity > 0.99;
-    };
+    const covered = Reflect.get(globalThis, "__covered") as () => boolean;
     const read = (t: number) => {
       const ctl = Reflect.get(globalThis, "__smooth") as { stop: boolean };
       if (ctl.stop) return false;
@@ -193,6 +204,7 @@ const sampling = (page: Page, selectors: readonly string[]) =>
 export const record = async (page: Page, selectors: readonly string[] = []) => {
   await installFramePump(page);
   await observe(page);
+  await readers(page);
   await sampling(page, selectors);
 };
 

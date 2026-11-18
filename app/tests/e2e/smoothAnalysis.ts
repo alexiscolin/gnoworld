@@ -1,17 +1,10 @@
+import { continuity, median, merged, type Odd, type Series } from "./smoothContinuity.ts";
 import type { Raw } from "./smoothness.ts";
+
+export { continuity };
 
 // The samples of smoothness.ts read in Node: a series' jumps and bounces, the frames' stalls, the shifts and the long frames.
 
-interface Odd {
-  at: number;
-  t: number;
-  value: number;
-  typical: number;
-}
-export interface Series {
-  jumps: Odd[];
-  bounces: Odd[];
-}
 export interface Report {
   frames: number;
   seconds: number;
@@ -35,49 +28,8 @@ export interface Report {
   watched: Record<string, { opacity: Series; scale: Series; left: Series; width: Series }>;
 }
 
-const median = (list: number[]): number => {
-  const sorted = [...list].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-};
 const norm = (v: readonly number[]): number => Math.hypot(...v);
 const minus = (a: readonly number[], b: readonly number[]): number[] => a.map((x, i) => x - (b[i] ?? 0));
-
-/**
- * A series' continuity, by frame time. A jump: a step over `factor` times its eight neighbours' median and over `floor`; a bounce: the velocity
- * turns, each side over `floor`. Steps are per second (a slow frame is no jump), and one over `unseen` ms is not judged: it was never drawn.
- */
-export function continuity(
-  times: readonly number[],
-  values: readonly number[],
-  { factor = 4, floor, unseen = Infinity }: { factor?: number; floor: number; unseen?: number },
-): Series {
-  const rates = values.slice(1).map((v, i) => {
-    const dt = Math.max(((times[i + 1] ?? 0) - (times[i] ?? 0)) / 1000, 1e-3);
-    return (v - (values[i] ?? 0)) / dt;
-  });
-  const jumps: Odd[] = [];
-  const bounces: Odd[] = [];
-  rates.forEach((rate, i) => {
-    const at = i + 1;
-    const t = times[at] ?? 0;
-    const dt = (t - (times[i] ?? 0)) / 1000;
-    if (!Number.isFinite(rate) || dt * 1000 > unseen) return;
-    const around = median(
-      rates
-        .slice(Math.max(0, i - 4), i + 5)
-        .filter((_, k) => k !== Math.min(i, 4))
-        .map(Math.abs),
-    );
-    if (Math.abs(rate) * dt > floor && Math.abs(rate) > factor * Math.max(around, floor / Math.max(dt, 1e-3) / 20))
-      jumps.push({ at, t, value: Math.abs(rate) * dt, typical: around * dt });
-    const before = rates[i - 1];
-    if (before !== undefined && Math.sign(before) * Math.sign(rate) < 0) {
-      const small = Math.min(Math.abs(before) * dt, Math.abs(rate) * dt);
-      if (small > floor) bounces.push({ at, t, value: rate * dt, typical: before * dt });
-    }
-  });
-  return { jumps, bounces };
-}
 
 // The eye's way: its speed per frame is a series (a jump is a step in the speed's own steps), and its reversals (a step against the one before)
 // are the bounces, counted only where both steps are over `floor`.
@@ -97,15 +49,24 @@ function wayOf(times: readonly number[], points: readonly (readonly number[])[],
 }
 
 // The camera under the opaque full chat (`covered`) is not seen: those frames are left out.
+
 const pose = (raw: Raw, key: "eye" | "look", floor: number): Series | null => {
-  const kept = raw.frames.filter((frame) => frame[key] !== undefined && frame.covered !== true);
-  return kept.length > 3
-    ? wayOf(
-        kept.map(({ t }) => t),
-        kept.map((frame) => [...(frame[key] ?? [])]),
+  // A cover cuts the way in two: what moved under it was not seen, and the frames on either side are not one step.
+  const runs = raw.frames.reduce<Raw["frames"][]>(
+    (all, frame) =>
+      frame[key] === undefined || frame.covered === true ? [...all, []] : (all.at(-1)?.push(frame), all),
+    [[]],
+  );
+  const ways = runs
+    .filter((run) => run.length > 3)
+    .map((run) =>
+      wayOf(
+        run.map(({ t }) => t),
+        run.map((frame) => [...(frame[key] ?? [])]),
         floor,
-      )
-    : null;
+      ),
+    );
+  return ways.length > 0 ? merged(ways) : null;
 };
 
 // What faces the eye on the Earth, in radians (ground.ts gives degrees): latitude, the longitude unwrapped and its whole turns; only where the
@@ -146,9 +107,9 @@ function facingOf(raw: Raw): Pick<Report, "lat" | "lon" | "turns" | "lead"> {
   };
 }
 
-// The page's parts, one element at a time (a page drawn anew matches another), read where they are drawn: a stall of the scene's
-// software GPU (a frame over twice the median) draws none of a transition that runs in it, which the same flow with no scene draws
-// whole (the views' bar's 120 px in 350 ms, 60 frames a second).
+// The page's parts, read where they are drawn: where the scene runs, a stall of its software GPU (a frame over twice the median) draws none
+// of a transition that runs in it, which the same flow with no scene draws whole (4b: the views' bar's 120 px in 350 ms, 60 frames a
+// second); with no scene, every step is judged.
 function watchedOf(raw: Raw, unseen: number): Report["watched"] {
   const watched: Report["watched"] = {};
   for (const selector of new Set(raw.frames.flatMap(({ watched: seen }) => Object.keys(seen)))) {
@@ -156,9 +117,10 @@ function watchedOf(raw: Raw, unseen: number): Report["watched"] {
       const one = seen[selector];
       return one == null ? [] : [{ t, ...one }];
     });
+    // A new element starts a run of its own only where the one before was no longer seen: a swap in sight is judged.
     const runs = own.reduce<(typeof own)[]>((all, frame) => {
-      const last = all.at(-1);
-      if (last?.at(-1)?.id === frame.id) last.push(frame);
+      const [last, before] = [all.at(-1), all.at(-1)?.at(-1)];
+      if (last !== undefined && (before?.id === frame.id || (before?.seen ?? 0) >= 0.05)) last.push(frame);
       else all.push([frame]);
       return all;
     }, []);
@@ -170,7 +132,7 @@ function watchedOf(raw: Raw, unseen: number): Report["watched"] {
           { floor, unseen },
         ),
       );
-      return { jumps: each.flatMap(({ jumps }) => jumps), bounces: each.flatMap(({ bounces }) => bounces) };
+      return merged(each);
     };
     watched[selector] = {
       // What the reader sees, its parents' opacity in: an element at 1 under a hidden parent is not shown.
@@ -213,7 +175,7 @@ export function analyse(raw: Raw, { eyeFloor = 0.02, lookFloor = 0.003 } = {}): 
     earthDrops: raw.frames.flatMap(({ t, earthShown }, i) =>
       earthShown === false && raw.frames[i - 1]?.earthShown === true ? [t] : [],
     ),
-    watched: watchedOf(raw, 2 * mid),
+    watched: watchedOf(raw, raw.frames.some(({ eye }) => eye !== undefined) ? 2 * mid : Infinity),
   };
 }
 

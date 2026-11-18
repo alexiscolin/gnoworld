@@ -204,6 +204,8 @@ test(`${String(ROUNDS)} rounds of a long visit leave no stuck screen and no leak
   expect(last.listeners, "the DOM's listeners").toBeLessThanOrEqual(base.listeners * MARGIN);
   expect(last.documents, "the documents").toBeLessThanOrEqual(base.documents);
   expect(last.planets, "the planets kept, near.ts's 24 at most").toBeLessThanOrEqual(KEPT);
+  // A planet owns two geometries at most (planet.ts: its glow, its rings): no more hides behind the kept ones.
+  expect(last.kept, "the kept planets' own geometries, two a planet at most").toBeLessThanOrEqual(2 * last.planets);
   expect(last.geometries - last.kept, "the GPU's geometries, the kept planets' apart").toBeLessThanOrEqual(
     base.geometries - base.kept,
   );
