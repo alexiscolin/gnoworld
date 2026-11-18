@@ -98,7 +98,7 @@ function useListReading(
     fresh: string | undefined;
   },
 ) {
-  const { listRef, seesEnd, onScroll } = useNewestInView({ fresh: list.fresh });
+  const { listRef, seesEnd, onScroll, awaiting } = useNewestInView({ fresh: list.fresh });
   const look = useReading({
     lines: list.lines,
     seesEnd,
@@ -109,6 +109,7 @@ function useListReading(
   useLookWhenResized(listRef, look);
   return {
     listRef,
+    awaiting,
     onScroll: () => {
       onScroll();
       look();

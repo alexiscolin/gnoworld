@@ -34,6 +34,7 @@ import { useListRead } from "../rooms/reading.ts";
 import { SkeletonLines } from "../dock/SkeletonBits.tsx";
 import { useNow } from "../useNow.ts";
 import styles from "./RoomView.module.css";
+import shared from "../lists.module.css";
 
 export type { LinesProps } from "./lineList.ts";
 
@@ -96,7 +97,7 @@ function List(props: ListProps) {
   const { room, partner, known, me, refused, connected, cannotReact, lines, shown, lineOf, newest } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { verdicts, saving = false, keeping, byId, votes, repliesOf, onThread, onEdit } = props;
-  const { fresh, listRef, onScroll } = useListRead(props);
+  const { fresh, listRef, onScroll, awaiting } = useListRead(props);
   const olRef = useRef<HTMLOListElement>(null);
   const { stop, mounted, on, leave, asked } = useLineFocus(lines, olRef, fresh);
   const { said, setSaid, copy } = useCopy();
@@ -133,8 +134,8 @@ function List(props: ListProps) {
   return (
     <>
       <Told refused={refused} cannotReact={cannotReact} said={said} setSaid={setSaid} onDismiss={onDismiss} />
-      <Stage listRef={listRef} onScroll={onScroll} after={props.after === true}>
-        <ol ref={olRef} {...on} {...ABOUT} className={styles["lines"]}>
+      <Stage listRef={listRef} onScroll={onScroll} awaiting={awaiting} after={props.after === true}>
+        <ol ref={olRef} {...on} {...ABOUT} className={[styles["lines"], shared["plain"]].join(" ")}>
           {props.entries.map((entry) =>
             !("line" in entry) ? (
               <Beside key={entry.key} entry={entry} />
@@ -172,17 +173,25 @@ function List(props: ListProps) {
 function Stage({
   listRef,
   onScroll,
+  awaiting,
   after,
   children,
 }: {
   listRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
+  awaiting: boolean;
   after: boolean;
   children: ReactNode;
 }) {
   return (
     <div className={styles["stage"]}>
-      <div ref={listRef} onScroll={onScroll} data-after={after ? "" : undefined} className={styles["fill"]}>
+      <div
+        ref={listRef}
+        onScroll={onScroll}
+        data-awaiting={awaiting ? "" : undefined}
+        data-after={after ? "" : undefined}
+        className={styles["fill"]}
+      >
         {children}
       </div>
       <div aria-hidden="true" className={styles["skeleton"]}>

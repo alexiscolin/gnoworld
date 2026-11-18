@@ -1,4 +1,4 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { scrolling, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
@@ -151,45 +151,33 @@ const shrunk = (list: Locator, at: number, card: boolean) =>
     [at, card] as const,
   );
 
-test("a reader scrolled up keeps their place as the box shrinks under them", async ({ page }) => {
+// A room opened, its reader scrolled 300 px up from the end, the scroll told and the place noted.
+async function readerUp(page: Page) {
   await room(page, { history: HISTORY.slice(0, 30) });
   const list = page.getByRole("list", { name: "Messages" });
   await expect.poll(() => gap(list)).toBeLessThan(4);
   await scrolling(list).evaluate(async (box) => {
     box.scrollTop = -300;
-    // The scroll is told, and the place noted, a frame later.
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
-  const { lost, moved } = await shrunk(list, 20, false);
-  expect(lost).toBeGreaterThan(60);
-  expect(Math.abs(moved)).toBeLessThanOrEqual(1);
-});
+  return list;
+}
 
-test("a reader scrolled up keeps their place as the box shrinks and the newest line grows in one frame", async ({
-  page,
-}) => {
-  await room(page, { history: HISTORY.slice(0, 30) });
-  const list = page.getByRole("list", { name: "Messages" });
-  await expect.poll(() => gap(list)).toBeLessThan(4);
-  await scrolling(list).evaluate(async (box) => {
-    box.scrollTop = -300;
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+for (const [name, card] of [
+  ["as the box shrinks under them", false],
+  ["as the box shrinks and the newest line grows in one frame", true],
+] as const) {
+  test(`a reader scrolled up keeps their place ${name}`, async ({ page }) => {
+    const { lost, moved } = await shrunk(await readerUp(page), 20, card);
+    expect(lost).toBeGreaterThan(60);
+    expect(Math.abs(moved)).toBeLessThanOrEqual(1);
   });
-  const { lost, moved } = await shrunk(list, 20, true);
-  expect(lost).toBeGreaterThan(60);
-  expect(Math.abs(moved)).toBeLessThanOrEqual(1);
-});
+}
 
 test("a reader scrolling as a card grows keeps their place: the scroll is told in the frame of the growth", async ({
   page,
 }) => {
-  await room(page, { history: HISTORY.slice(0, 30) });
-  const list = page.getByRole("list", { name: "Messages" });
-  await expect.poll(() => gap(list)).toBeLessThan(4);
-  await scrolling(list).evaluate(async (box) => {
-    box.scrollTop = -300;
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-  });
+  const list = await readerUp(page);
   const moved = await scrolling(list).evaluate(async (box) => {
     const frame = () => new Promise((done) => requestAnimationFrame(done));
     const reader = box.querySelectorAll("ol > li")[20];

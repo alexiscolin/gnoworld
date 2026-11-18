@@ -25,9 +25,6 @@
     container-type: inline-size;
     display: flex;
     flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
     /* No gap: each line holds its own padding, so the pointer crosses between lines and bar without leaving a row */
     gap: 0;
   }
@@ -41,8 +38,8 @@
      below leave. */
   .stage {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-block-size: 0;
   }
@@ -50,9 +47,8 @@
   /* The scrolling box, alone, never the page. Its scroll origin is its foot (column-reverse over one list in the lines' own
      order): every engine opens the room at its end and keeps it there, with no script; scrollTop is 0 there, below 0 above. */
   .fill {
-    margin: 0;
-    list-style: none;
-    flex: 1;
+    flex-grow: 1;
+    flex-basis: 0;
     min-block-size: 0;
     overflow: auto;
     display: flex;
@@ -97,15 +93,20 @@
     flex-direction: column;
     justify-content: flex-end;
     overflow: hidden;
-    pointer-events: none;
     opacity: 0;
     visibility: hidden;
+    /* raw: 0 s, the box hides once its fade is done */
     transition:
       opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
       visibility 0s calc(var(--motion-base) * var(--motion-scale));
-    /* raw: its shapes stand at once, not after the skeleton's 300 ms wait */
-    --motion-wait: 0s;
     --play: paused;
+  }
+
+  /* The skeleton takes no pointer (the list under it is the reader's), and its shapes stand at once, not after its 300 ms wait. */
+  .skeleton {
+    pointer-events: none;
+    /* raw: no wait */
+    --motion-wait: 0s;
   }
 
   .fill[data-awaiting] + .skeleton,

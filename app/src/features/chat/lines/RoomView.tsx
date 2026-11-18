@@ -14,6 +14,7 @@ import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { useJarvisItems } from "../../../jarvisHere.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
+import shared from "../lists.module.css";
 import { chunked } from "../Failing.tsx";
 import { NO_ROOM_YET } from "../loginWords.ts";
 import { SkeletonLines } from "../dock/SkeletonBits.tsx";
@@ -41,7 +42,7 @@ const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).
 function TypistsHere({ typing }: { typing: Typing | undefined }) {
   return Object.keys(typing ?? {}).length === 0 ? NOBODY : <Typists typing={typing} />;
 }
-const LINES = styles["fill"];
+const LINES = [styles["fill"], shared["plain"]].join(" ");
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;

@@ -345,9 +345,13 @@ describe("the list's reader kept in place", () => {
       draw({ paged: true, lines: [...ROOM, line(LINES + 1, { text: CARD })] });
       card.reading = false;
       expect(waiting()).toBe(true);
-      vi.advanceTimersByTime(CAP - 1);
+      act(() => {
+        vi.advanceTimersByTime(CAP - 1);
+      });
       expect(waiting()).toBe(true);
-      vi.advanceTimersByTime(1);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(waiting()).toBe(false);
     });
 

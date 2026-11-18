@@ -1,7 +1,7 @@
 // A room's list opens at its end and stays there with no script: its scroll origin is its foot (RoomView.module.css, `.fill`:
 // column-reverse), so what grows above never moves the end. What is left here is a reader's own place: a reader scrolled up keeps
 // their lines still as something below them grows (the browser's scroll anchoring is off there: WebKit has none).
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -17,6 +17,7 @@ const CARDS_WAIT_MS = 400;
 // A room that opens with such a card among its lines shows once, whole: faded out (the list's `data-awaiting`, and its skeleton
 // beside it) until no card is unfilled, CARDS_WAIT_MS at most, then faded in. The list stays at its foot meanwhile.
 function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
+  const [awaiting, setAwaiting] = useState(false);
   useLayoutEffect(() => {
     const box = listRef.current;
     const unfilled = box?.querySelector(UNFILLED);
@@ -28,9 +29,9 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
     function show() {
       watch.disconnect();
       clearTimeout(latest);
-      box?.removeAttribute("data-awaiting");
+      setAwaiting(false);
     }
-    box.setAttribute("data-awaiting", "");
+    setAwaiting(true);
     watch.observe(box, {
       subtree: true,
       childList: true,
@@ -39,6 +40,7 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
     });
     return show;
   }, [listRef]);
+  return awaiting;
 }
 
 interface Anchor {
@@ -78,7 +80,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const listRef = useRef<HTMLDivElement>(null);
   const placedRef = useRef(false);
   const anchorRef: Anchor = useRef(undefined);
-  useCardsAwaited(listRef);
+  const awaiting = useCardsAwaited(listRef);
   // The browser's own anchoring would move the reader's place a second time (a property CSS lints as not baseline).
   useLayoutEffect(() => {
     listRef.current?.style.setProperty("overflow-anchor", "none");
@@ -113,5 +115,5 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const onScroll = () => {
     if (listRef.current !== null) keep(listRef.current, anchorRef);
   };
-  return { listRef, seesEnd, onScroll };
+  return { listRef, seesEnd, onScroll, awaiting };
 }
