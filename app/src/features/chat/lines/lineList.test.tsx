@@ -37,6 +37,7 @@ describe("a room that arrives", () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   // A history that never comes (Ergo refused the room, or answers nothing) must not leave a skeleton for good.
