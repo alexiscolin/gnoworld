@@ -1,3 +1,5 @@
+import universes from "../../data/universes.json" with { type: "json" };
+import { connectOrigins } from "../../src/cspOrigins.ts";
 import { adena, changeAccount } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
@@ -219,4 +221,25 @@ test.describe("Adena's code", () => {
     const after = (await Promise.all(bodies)).join("\n");
     expect(after.includes(ADENA_CALLS), "the click loaded Adena's calls").toBe(true);
   });
+});
+
+// No journey reaches a real chain: GitHub's runner has a network and the sandbox none, so a node's answer, and its latency, would time a
+// journey there and never here (the name's ask once opened over the account's menu and its Log out). A journey that reads one routes its own.
+test("a journey's page reaches no universe's RPC nor indexer: each is refused in the browser", async ({ page }) => {
+  await page.goto("/");
+  await hydrated(page);
+  for (const origin of connectOrigins(universes)) {
+    const failed = page.waitForEvent("requestfailed", (request) => request.url().startsWith(origin));
+    expect(
+      await page.evaluate(
+        (url) =>
+          fetch(url).then(
+            () => "answered",
+            () => "refused",
+          ),
+        `${origin}/status`,
+      ),
+    ).toBe("refused");
+    expect((await failed).failure()?.errorText, origin).toMatch(/^net::ERR_BLOCKED_BY_CLIENT/);
+  }
 });
