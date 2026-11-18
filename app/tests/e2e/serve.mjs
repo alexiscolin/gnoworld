@@ -228,32 +228,22 @@ function upgrade(request, socket, head) {
 const port = Number(process.env.E2E_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65533)
   throw new Error(`serve.mjs: E2E_PORT is no port base: ${process.env.E2E_PORT}`);
-// E2E_TLS=1 (sites.ts): the same hosts on https, under a key made at the start and gone at the end, never one kept in the
-// repository: WebKit keeps the server's Secure cookies (__Host-session, __Host-guest) on https alone.
+// E2E_TLS=1 (sites.ts): the same hosts on https, under a key openssl makes at the start. Its folder goes as soon as the key
+// is read, before any host listens, so the run holds it in memory alone and none is kept in the repository: WebKit keeps the
+// server's Secure cookies (__Host-session, __Host-guest) on https alone.
 const tls = process.env.E2E_TLS === "1";
 function serving() {
   if (!tls) return plainServer;
   const dir = mkdtempSync(join(tmpdir(), "gnoworld-e2e-tls-"));
-  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-  const [key, cert] = [join(dir, "key.pem"), join(dir, "cert.pem")];
-  const args = [
-    "req",
-    "-x509",
-    "-newkey",
-    "rsa:2048",
-    "-nodes",
-    "-days",
-    "1",
-    "-subj",
-    "/CN=localhost",
-    "-keyout",
-    key,
-    "-out",
-    cert,
-  ];
-  execFileSync("openssl", args, { stdio: "ignore" });
-  const keys = { key: readFileSync(key), cert: readFileSync(cert) };
-  return (handler) => tlsServer(keys, handler);
+  try {
+    const [key, cert] = [join(dir, "key.pem"), join(dir, "cert.pem")];
+    const args = ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=localhost"];
+    execFileSync("openssl", [...args, "-keyout", key, "-out", cert], { stdio: ["ignore", "ignore", "inherit"] });
+    const keys = { key: readFileSync(key), cert: readFileSync(cert) };
+    return (handler) => tlsServer(keys, handler);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 const createServer = serving();
 // Ergo and the server first: a journey starts once the site answers, and the site's /api and /ws must answer by then.

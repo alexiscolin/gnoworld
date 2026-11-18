@@ -19,8 +19,9 @@ declare global {
 }
 
 const ownBrowser = base.extend({
-  context: async ({ playwright, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {
-    const browser = await playwright.chromium.launch(launchOptions);
+  context: async ({ playwright, browserName, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {
+    // The project's own engine: Safari's fails at launch in the sandbox, never passes as Chromium in its clothes.
+    const browser = await playwright[browserName].launch(launchOptions);
     await use(
       await browser.newContext({ ...contextOptions, javaScriptEnabled, ...(baseURL === undefined ? {} : { baseURL }) }),
     );
