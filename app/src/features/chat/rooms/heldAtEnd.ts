@@ -47,21 +47,25 @@ const awayOf = (list: Element, line: Element) =>
   list.getBoundingClientRect().bottom - line.getBoundingClientRect().bottom;
 
 interface Anchor {
-  current: { line: Element; away: number } | undefined;
+  current: { line: Element; away: number; height: number } | undefined;
 }
 
-// The first line the reader sees, noted with its distance from the foot.
+// The first line the reader sees, noted with its distance from the list's foot and the box's height.
 function note(box: HTMLElement, anchor: Anchor) {
   const top = box.getBoundingClientRect().top;
   for (const line of box.firstElementChild?.children ?? []) {
     if (line.getBoundingClientRect().bottom <= top) continue;
-    anchor.current = { line, away: awayOf(line.parentElement ?? line, line) };
+    anchor.current = {
+      line,
+      away: awayOf(line.parentElement ?? line, line),
+      height: box.getBoundingClientRect().height,
+    };
     return;
   }
 }
 
 /** The list of a room: it opens on its New line when there is one (`fresh`), else at its end (CSS). A reader scrolled up keeps
- * their place as a line, a card or an image grows under them: the first line they see is kept as far from the foot as it was
+ * their place as a line, a card or an image grows under them, or the box shrinks: the first line they see is kept where it is
  * (the box's first child is the list, whose height tells every change). */
 export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -86,14 +90,16 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     if (box === null || list === null || list === undefined || typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(() => {
       const anchor = anchorRef.current;
-      // At the end the foot holds the reader; above it, what grew under the lines they read moved them up by as much.
+      // At the end the foot holds the reader; above it, what grew under the lines they read moved them up by as much, and so did
+      // a box that shrank (the composer grew): its foot carries the lines, its top does not.
       if (anchor?.line.isConnected === true && !atEnd(box)) {
-        const moved = awayOf(list, anchor.line) - anchor.away;
+        const moved = awayOf(list, anchor.line) - anchor.away + anchor.height - box.getBoundingClientRect().height;
         if (Math.abs(moved) >= 1) box.scrollTop -= moved;
       }
       note(box, anchorRef);
     });
     watch.observe(list);
+    watch.observe(box);
     return () => {
       watch.disconnect();
     };

@@ -128,6 +128,29 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
   expect(Math.abs((await readerAt()) - before)).toBeLessThanOrEqual(1);
 });
 
+// The box shrinks under a reader scrolled up (a six-line draft grows the composer): their lines stay where they are. The bottom
+// origin would carry them up with the box's foot.
+test("a reader scrolled up keeps their place as the box shrinks under them", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await scrolling(list).evaluate(async (box) => {
+    box.scrollTop = -300;
+    // The scroll is told, and the place noted, a frame later.
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  const reader = list.locator(":scope > li").nth(20);
+  const at = () => reader.evaluate((line) => Math.round(line.getBoundingClientRect().top));
+  await expect.poll(() => gap(list)).toBe(300);
+  const before = await at();
+  await scrolling(list).evaluate(async (box) => {
+    const below = box.nextElementSibling?.nextElementSibling ?? box.parentElement?.nextElementSibling;
+    if (below instanceof HTMLElement) below.style.setProperty("margin-block-start", "72px");
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  expect(Math.abs((await at()) - before)).toBeLessThanOrEqual(1);
+});
+
 // A list shown again after it had no height (a phone's panel) is at its end again: a hidden box loses its place, and its place is its foot.
 test("a room shown again after its list had no height is at its end", async ({ page }) => {
   await room(page, { history: HISTORY.slice(0, 30) });
