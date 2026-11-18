@@ -16,10 +16,12 @@ const RENDERER = {
 };
 
 describe("a wanted planet whose maps have not come", () => {
-  it("gets its quad back once it is no longer wanted", () => {
+  // Alexis in Firefox, landing in a system and on the Earth: the stand-in, then a wireframe of bones, then the surface.
+  it("keeps its stand-in on screen while it is made, never its bones, and keeps it once no longer wanted", () => {
     const shown = new Map<number, boolean>();
+    const added: unknown[] = [];
     const device = {
-      stage: { add: () => undefined, remove: () => undefined },
+      stage: { add: (part: unknown) => added.push(part), remove: () => undefined },
       renderer: RENDERER,
       camera: {},
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
@@ -41,10 +43,11 @@ describe("a wanted planet whose maps have not come", () => {
     const view = { alone: -1, close: undefined, delta: 0.016, still: false };
     near.choose(universe as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 }); // 2/(5*0.01)=40 px: wanted
     near.tick(0, view);
-    expect(shown.get(0)).toBe(false); // quad hidden, skeleton stands
-    near.choose(universe as never, { x: 0, y: 0, z: 390 }, { pxK: 0.01, seconds: 0 }); // ~0.5 px: not wanted, a quad again
+    expect(shown.get(0), "its stand-in stays").not.toBe(false);
+    expect(added, "no bones on the stage").toEqual([]);
+    near.choose(universe as never, { x: 0, y: 0, z: 390 }, { pxK: 0.01, seconds: 0 }); // ~0.5 px: not wanted, a quad still
     near.tick(0, view);
-    expect(shown.get(0)).toBe(true);
+    expect(shown.get(0)).not.toBe(false);
   });
 });
 
@@ -62,15 +65,15 @@ describe("a planet that was drawn as itself", () => {
     dispose: () => undefined,
   });
 
-  it("never falls back to its skeleton, even when it is made anew", async () => {
+  it("stands as its stand-in, never bones, while it is made anew", async () => {
     vi.mocked(drawnOf).mockImplementation(() => fakeDrawn() as never);
-    const added: Object3D[] = [];
+    const quad = new Map<number, boolean>();
     const device = {
-      stage: { add: (o: Object3D) => added.push(o), remove: () => undefined },
+      stage: { add: () => undefined, remove: () => undefined },
       renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
-      planets: { show: () => undefined },
+      planets: { show: (index: number, on: boolean) => quad.set(index, on) },
       plate: {},
       lens: { value: 0 },
     };
@@ -92,7 +95,6 @@ describe("a planet that was drawn as itself", () => {
     const lookAt = (index: number) => {
       near.choose({ systems } as never, { x: index * 1000, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
     };
-    const skeleton = () => added[0]?.children.some((each) => each.visible);
     // Each world comes in as itself in turn: 26 are made, 24 are kept, so the first one is let go.
     for (let index = 0; index < 26; index++) {
       lookAt(index);
@@ -102,15 +104,15 @@ describe("a planet that was drawn as itself", () => {
       near.tick(0, view);
     }
     expect(near.shows(25)).toBe(true);
-    // The eye comes back to the first: it is made anew and not yet compiled, which a planet never drawn would show as its skeleton.
+    // The eye comes back to the first: it is made anew and not yet compiled; its stand-in, given back as it was let go, stays.
     lookAt(0);
     near.tick(0, view);
     expect(near.shows(0)).toBe(false);
-    expect(skeleton()).toBe(false);
+    expect(quad.get(0)).toBe(true);
   });
 });
 
-describe("a planet coming in from its skeleton", () => {
+describe("a planet coming in over its stand-in", () => {
   // One world, the eye near it, four frames on: shown, a third of the way in.
   const comingIn = async () => {
     vi.mocked(drawnOf).mockImplementation(
@@ -127,12 +129,13 @@ describe("a planet coming in from its skeleton", () => {
         }) as never,
     );
     const added: Object3D[] = [];
+    const quad = new Map<number, boolean>();
     const device = {
       stage: { add: (o: Object3D) => added.push(o), remove: () => undefined },
       renderer: RENDERER,
       camera: new PerspectiveCamera(),
       maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
-      planets: { show: () => undefined },
+      planets: { show: (index: number, on: boolean) => quad.set(index, on) },
       plate: {},
       lens: { value: 0 },
     };
@@ -149,7 +152,7 @@ describe("a planet coming in from its skeleton", () => {
     near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
     await Promise.resolve();
     for (let frame = 0; frame < 4; frame++) near.tick(0, view);
-    return { near, view, skeleton: () => added[0]?.children.some((each) => each.visible) };
+    return { near, view, quad };
   };
 
   it("keeps the scene drawing until it is whole", async () => {
@@ -160,13 +163,58 @@ describe("a planet coming in from its skeleton", () => {
     expect(near.arriving).toBe(false);
   });
 
-  it("is made whole, its skeleton gone, when the scene goes unseen mid-way", async () => {
-    const { near, view, skeleton } = await comingIn();
-    expect(skeleton()).toBe(true);
+  it("keeps its stand-in beneath till it is whole, then lets it go; whole at once when the scene goes unseen mid-way", async () => {
+    const { near, view, quad } = await comingIn();
+    expect(quad.get(0), "the stand-in under the planet coming in").toBe(true);
     near.settle();
-    expect(skeleton()).toBe(false);
     near.tick(0, view);
     expect(near.arriving).toBe(false);
+    expect(quad.get(0), "the stand-in gone once the planet is whole").toBe(false);
+  });
+});
+
+describe("gnosh's colony coming in", () => {
+  it("lets its stand-in go the frame it shows: it unfolds on its own, never over a quad it would leave in one frame", async () => {
+    vi.mocked(drawnOf).mockImplementation(
+      () =>
+        ({
+          group: new Object3D(),
+          look: { lean: 0, tilt: 0 },
+          ...Object.fromEntries(
+            ["setPlate", "setArrive", "setSun", "setTime", "setFar", "setClose", "setMoons", "dispose"].map((name) => [
+              name,
+              () => undefined,
+            ]),
+          ),
+        }) as never,
+    );
+    const quad = new Map<number, boolean>();
+    const device = {
+      stage: { add: () => undefined, remove: () => undefined },
+      renderer: RENDERER,
+      camera: new PerspectiveCamera(),
+      maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
+      planets: { show: (index: number, on: boolean) => quad.set(index, on) },
+      plate: {},
+      lens: { value: 0 },
+    };
+    const system = {
+      place: { x: 0, y: 0, z: 0 },
+      across: { x: 1, y: 0, z: 0 },
+      along: { x: 0, y: 0, z: 1 },
+      reach: 10,
+      planets: [] as unknown[],
+    };
+    system.planets.push({ index: 0, id: "gnosh-ai", radius: 1, orbit: 0, phase: 0, speed: 0, system });
+    const near = new Near(device as never);
+    const view = { alone: -1, close: undefined, delta: 0.05, still: false };
+    near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
+    near.tick(0, view);
+    expect(quad.get(0), "its stand-in while it is made").not.toBe(false);
+    await Promise.resolve();
+    for (let frame = 0; frame < 3; frame++) near.tick(0, view);
+    expect(near.shows(0)).toBe(true);
+    expect(quad.get(0), "gone as it shows").toBe(false);
   });
 });
 
@@ -223,7 +271,15 @@ describe("a Near that adopts the last one's planets", () => {
     const fresh = { ...device, planets: { show: (i: number, s: boolean) => shownNow.set(i, s) } };
     const next = new Near(fresh as never, { near: old, before: before as never, now: now as never });
     expect(next.shows(1)).toBe(true); // "a" moved from index 0 to 1, still drawn as itself
-    expect(shownNow.get(1)).toBe(false); // and its quad stays hidden in the new stage
+    expect(shownNow.get(1)).toBe(true); // and its quad stays beneath in the new stage, as it comes in over it
+    // Whole, adopted again: its quad stays hidden in the next stage.
+    next.choose(now as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
+    for (let frame = 0; frame < 20; frame++) next.tick(0, { alone: -1, close: undefined, delta: 0.05, still: false });
+    expect(shownNow.get(1), "its quad gone once it is whole").toBe(false);
+    const shownLater = new Map<number, boolean>();
+    const later = { ...device, planets: { show: (i: number, s: boolean) => shownLater.set(i, s) } };
+    new Near(later as never, { near: next, before: now as never, now: now as never });
+    expect(shownLater.get(1), "a whole planet's quad stays hidden").toBe(false);
     old.dispose();
     expect(disposed).toEqual(["gone"]); // the old one lets go only of what the new universe lacks
   });
@@ -231,6 +287,7 @@ describe("a Near that adopts the last one's planets", () => {
 
 describe("from the galaxy", () => {
   it("draws no planet as itself, only the open system's", () => {
+    vi.mocked(drawnOf).mockReset();
     const shown = new Map<number, boolean>();
     const device = {
       stage: { add: () => undefined, remove: () => undefined },
@@ -259,10 +316,12 @@ describe("from the galaxy", () => {
     near.choose(universe as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0, open: -1 });
     near.tick(0, view);
     expect(shown.size).toBe(0);
+    expect(drawnOf).not.toHaveBeenCalled();
     near.choose(universe as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0, open: 1 });
     near.tick(0, view);
-    expect(shown.get(0)).toBeUndefined();
-    expect(shown.get(1)).toBe(false);
+    expect(vi.mocked(drawnOf).mock.calls.map(([planet]) => planet.id)).toEqual(["w1"]);
+    // Its stand-in stays till it is made whole.
+    expect(shown.size).toBe(0);
   });
 });
 
@@ -407,11 +466,11 @@ describe("a planet a few pixels across that the camera is flying towards", () =>
     for (let frame = 0; frame < 3; frame++) near.tick(0, view);
     expect(shown.has(0), "its quad stays while it is small").toBe(false);
     expect(near.shows(0)).toBe(false);
-    // The camera is on it: wanted at 40 px; the first frame draws it as itself, its skeleton never standing.
+    // The camera is on it: wanted at 40 px; the first frame draws it as itself.
     near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0 });
     near.tick(0, view);
     expect(near.shows(0)).toBe(true);
-    // It comes in over its quad, which stays beneath till it is whole: no bare skeleton between the two, no quad hidden at once.
+    // It comes in over its quad, which stays beneath till it is whole: no quad hidden at once.
     expect(shown.get(0), "the quad stays beneath").not.toBe(false);
     for (let frame = 0; frame < 60; frame++) near.tick(0, view);
     expect(shown.get(0), "the quad goes once it stands whole").toBe(false);
