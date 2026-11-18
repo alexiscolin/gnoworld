@@ -20,6 +20,7 @@ import { StoreProvider } from "./storeContext.tsx";
 import { PillHost } from "./topPill.tsx";
 
 const SHELL_HELD_MS = 350;
+const SHELL_RETRY_MS = 100;
 
 // The query client listens to the tab's focus and the network once mounted (QueryClientProvider does it for a provider's; the hooks here pass the
 // client themselves): a fresh read when the tab is seen again after fifteen seconds, and the paused ones when the network is back.
@@ -41,14 +42,18 @@ function Settled() {
 export function Shell({ children }: { children: ReactNode }) {
   useQueriesMounted();
   const universe = site.universeAt(useDrawnPath());
-  // The header was held out of sight at the first paint (root.tsx): a page with a scene to wait for lets it in with the scene; any other (or a
-  // page whose loader is slow, which mounts after this) lets it in once the page has had a moment to mount.
+  // The header was held out of sight at the first paint (root.tsx): a page with a scene to wait for lets it in with the scene; any other lets
+  // it in once the page has had a moment to mount. A column still empty is a route still loading (its loader reads the worlds' file): the home's
+  // loader mounts into it, and a header let in before would show the interface ahead of the loader.
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const start = performance.now();
+    const timer = setInterval(() => {
+      if (performance.now() - start < SHELL_HELD_MS || document.querySelector("main:empty") !== null) return;
+      clearInterval(timer);
       if (!holdsShell()) revealShell(true);
-    }, SHELL_HELD_MS);
+    }, SHELL_RETRY_MS);
     return () => {
-      clearTimeout(timer);
+      clearInterval(timer);
     };
   }, []);
   return (

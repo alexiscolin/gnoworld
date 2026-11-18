@@ -49,6 +49,7 @@ export function SpaceLoader({ waiting, ready }: { waiting: boolean; ready: numbe
       ref={boxRef}
       role="status"
       aria-label="Loading space"
+      data-loader=""
       tabIndex={-1}
       className={styles["loader"]}
       data-leaving={waiting ? undefined : ""}

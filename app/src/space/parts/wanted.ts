@@ -2,7 +2,7 @@
 import { placeOf, type Planet, type Universe, type Vec } from "../layout.ts";
 
 // A planet this many pixels across, or more, is drawn as itself; one this many has its maps asked ahead (warmRealm.ts), and, in the open system,
-// is made, uploaded and compiled ahead too: it is seen as itself soon, and never waits on screen as its skeleton.
+// is made, uploaded and compiled ahead too: it is seen as itself soon, its stand-in on screen meanwhile.
 const FROM_PX = 6;
 const WARM_PX = 2;
 
