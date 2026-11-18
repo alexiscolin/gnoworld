@@ -33,6 +33,12 @@ export function afterLoad(then: () => void, signal?: AbortSignal, wait = 0): voi
   else addEventListener("load", rest, { once: true, ...(signal === undefined ? {} : { signal }) });
 }
 
+/** Calls `then` once the page has loaded, no rest waited for, until `signal` aborts. */
+export function onLoad(then: () => void, signal?: AbortSignal): void {
+  if (document.readyState === "complete") then();
+  else addEventListener("load", then, { once: true, ...(signal === undefined ? {} : { signal }) });
+}
+
 /** False until the page has loaded and the browser has had a moment, and `wait` ms more. */
 export function useAfterLoad(wait = 0): boolean {
   const [now, setNow] = useState(false);

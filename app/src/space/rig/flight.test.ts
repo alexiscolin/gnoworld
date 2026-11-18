@@ -115,6 +115,22 @@ describe("a landing on a place not ready", () => {
     });
   });
 
+  // The review: rounding left a drawn-out flight one part in 2^52 short of its end, 75 of 1,015 never landed.
+  it("lands, drawn out, whatever its length and its frames", () => {
+    const never: string[] = [];
+    for (let far = 5; far <= 80; far += 3)
+      for (const ms of [7, 8.33, 11.1, 16, 16.67]) {
+        const to = at([0, 0, -1], [0, 1, 0]);
+        Object.assign(to.look, { x: far, y: 0, z: 0 });
+        const flight = new Flight(at([0, 0, -1], [0, 1, 0]), { ...goalOf(to), ready: () => false });
+        const out = blankPose();
+        let frame = 0;
+        while (!flight.advance(ms, false, out) && frame < 5000) frame += 1;
+        if (frame >= 5000) never.push(`${String(far)} at ${String(ms)} ms`);
+      }
+    expect(never).toEqual([]);
+  });
+
   it("asks once, as it starts slowing: ready later, it keeps the gentler landing it took", () => {
     let asked = 0;
     const once = fly(() => (asked += 1) > 1);

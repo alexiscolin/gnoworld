@@ -30,9 +30,16 @@ const outOnly = (t: number): number => 1 - (1 - t) ** 3;
 const SLOWING = 0.5;
 const SLACK_S = 1;
 
+/** A flight drawn out from its share `from`, its `rest` seconds left, by `extra` seconds. */
+interface Slack {
+  readonly from: number;
+  readonly rest: number;
+  readonly extra: number;
+}
+
 /** The share `t` of a flight drawn out from `from` by `extra` seconds over its `rest` seconds left: the same speed where it starts, slowing
  * more gently, never back (`extra` at most twice `rest`), whole at the end. `u` is the share of the drawn-out rest flown. */
-function drawnOut(u: number, { from, rest, extra }: { from: number; rest: number; extra: number }): number {
+function drawnOut(u: number, { from, rest, extra }: Slack): number {
   const more = extra / rest;
   return from + (1 - from) * (u + more * u * (1 - u) ** 2);
 }
@@ -60,7 +67,7 @@ export class Flight {
   #waited = 0;
   #near = false;
   // Drawn out, from where it started slowing, by how much: decided once (undefined: not yet; false: kept as it was).
-  #slack: { from: number; rest: number; extra: number } | false | undefined;
+  #slack: Slack | false | undefined;
   /** How far along, eased, 0 to 1. */
   along = 0;
 
@@ -120,17 +127,22 @@ export class Flight {
     return t >= 1;
   }
 
-  // The flight's share at `time` seconds in, 0 to 1. As it starts slowing, a place not ready draws the rest out by up to SLACK_S.
+  // Decided once, as the flight starts slowing: its rest drawn out by up to SLACK_S where the place is not ready, else kept.
+  #slackOf(): Slack | false {
+    const from = Math.min(1, this.#time / this.#seconds);
+    const rest = (1 - from) * this.#seconds;
+    return this.goal.ready?.() === false && rest > 0 ? { from, rest, extra: Math.min(SLACK_S, 2 * rest) } : false;
+  }
+
+  // The flight's share at `time` seconds in, 0 to 1.
   #share(time: number): number {
-    const slack = this.#slack;
-    if (slack === undefined && time / this.#seconds >= SLOWING) {
-      const from = Math.min(1, this.#time / this.#seconds);
-      const rest = (1 - from) * this.#seconds;
-      this.#slack = this.goal.ready?.() === false && rest > 0 ? { from, rest, extra: Math.min(SLACK_S, 2 * rest) } : false;
-      return this.#share(time);
-    }
-    this.#time = Math.min(this.#seconds + (slack === false || slack === undefined ? 0 : slack.extra), time);
-    if (slack === false || slack === undefined) return this.#time / this.#seconds;
+    if (this.#slack === undefined && time / this.#seconds >= SLOWING) this.#slack = this.#slackOf();
+    const slack = this.#slack === false ? undefined : this.#slack;
+    const end = this.#seconds + (slack?.extra ?? 0);
+    this.#time = Math.min(end, time);
+    // Whole at its end exactly: the drawn-out curve's rounding fell one part in 2^52 short, and the flight never landed.
+    if (this.#time >= end) return 1;
+    if (slack === undefined) return this.#time / this.#seconds;
     return drawnOut((this.#time - slack.from * this.#seconds) / (slack.rest + slack.extra), slack);
   }
 

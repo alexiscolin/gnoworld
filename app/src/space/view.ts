@@ -199,12 +199,13 @@ export const tick = (
 export const waitsToMake = (flying: boolean, renderer: Pick<WebGLRenderer, "extensions">): boolean =>
   flying && !renderer.extensions.has("KHR_parallel_shader_compile");
 
-/** Whether `place`'s planet is drawn as itself, or not to be waited for: none to draw, or one made only once the flight lands (no parallel
- * compile: waitsToMake), which a longer flight would not bring. Not yet, the flight lands more gently (rig/flight.ts). */
+/** Whether `place`'s planet is made whole (the flight makes it ahead), or not to be waited for: none to draw, or one made only once the
+ * flight lands (no parallel compile: waitsToMake), which a longer flight would not bring. Not yet, the flight lands more gently
+ * (rig/flight.ts). Made, not shown: a planet is wanted only once it is a few pixels, near the middle of a long flight. */
 export function landsReady(space: Space, place: Place): boolean {
   const planet = bringsEarth(place) ? space.universe?.earth : planetAt(space.universe, place);
   const near = space.stage.near;
-  return planet === undefined || near === undefined || near.shows(planet.index) || waitsToMake(true, space.renderer);
+  return planet === undefined || near === undefined || near.made(planet.index) || waitsToMake(true, space.renderer);
 }
 
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */

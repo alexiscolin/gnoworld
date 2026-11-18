@@ -24,7 +24,8 @@ void main() {
 `;
 
 // The Earth's full-size maps come into focus over the half-size ones they replace (parts/upgrade.ts): while `focus` is under 1 each read
-// of the day, the night or the clouds mixes in the map it replaced, read no more once it is 1.
+// of the day, the night or the clouds mixes in the map it replaced, read no more once it is 1 (the cities' spill, three levels blurred, is
+// the same in both).
 const FOCUS = /* glsl */ `
 uniform sampler2D surfaceWas;
 uniform sampler2D cloudWas;
@@ -33,10 +34,6 @@ uniform float focus;
 vec4 readIn(sampler2D map, sampler2D was, Lookup at) {
   vec4 now = read(map, at);
   return focus < 1.0 ? mix(read(was, at), now, focus) : now;
-}
-vec4 readIn(sampler2D map, sampler2D was, vec2 uv, float level) {
-  vec4 now = textureLod(map, uv, level);
-  return focus < 1.0 ? mix(textureLod(was, uv, level), now, focus) : now;
 }
 `;
 
@@ -153,7 +150,7 @@ void main() {
   }
   if (nightLights > 0.0) {
     vec3 cities = readIn(nightMap, nightWas, place).rgb;
-    vec3 spill = readIn(nightMap, nightWas, place.uv, 3.5).rgb;
+    vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
     float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
     colour += (cities * 2.6 + spill * 0.9) * CITY_LIGHT * dusk * (1.0 - 0.8 * overcast);
   }

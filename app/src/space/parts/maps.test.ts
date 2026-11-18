@@ -19,6 +19,10 @@ vi.mock("../../afterLoad.ts", () => ({
     if (idle.held) idle.waiting.push(then);
     else then();
   },
+  // The page loaded.
+  onLoad: (then: () => void) => {
+    then();
+  },
 }));
 const earth = vi.hoisted(() => ({ full: 0, relief: 0 }));
 vi.mock("../earth/maps.ts", () => ({
