@@ -4,10 +4,9 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { GUEST, T } from "./talk.ts";
 
-// A phone's screen stands still (Safari on iPhone): the document never scrolls on a view with the chat, and takes no pull past its ends, so
-// the header, the chat's frame and the composer cannot move; the lines alone scroll, and hand no scroll on. Walked in WebKit and in
-// Chromium with an iPhone's profile (Claude Code's sandbox starts no WebKit: its half runs outside it). No headless engine draws the
-// rubber band itself: a real iPhone alone shows it.
+// A phone's screen stands still (Safari on iPhone): the document never scrolls on a view with the chat and takes no pull past its ends;
+// the lines alone scroll, and hand no scroll on. Walked with an iPhone's profile in WebKit (outside the sandbox, which starts none) and
+// in Chromium. No headless engine draws the rubber band itself: a real iPhone alone shows it.
 const ENGINES = ["webkit", "chromium"] as const;
 // Where a phone's chat stands: its start (the Earth's), the Earth, a world, a world's room.
 const VIEWS = ["/", "/earth", "/w/govdao", "/w/bubble?room=games"];
