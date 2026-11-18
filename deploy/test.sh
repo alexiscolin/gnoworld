@@ -732,13 +732,13 @@ FAKE
 			"$(docker inspect --format '{{.Config.Image}}' "$guard")" -c 'said=$(sh /guard/guard.sh 2>&1 >/dev/null); code=$?; printf "%s\n" "$said" | tail -1; exit $code'
 	}
 	for list in '' '192.0.2.7 192.0.2.9'; do
-		expect "the guard takes the host addresses [$list] and goes on" "$(guard_alone "$list" 2>&1; echo "exit $?")" \
+		expect "the guard takes the host addresses [$list] and goes on" "$(guard_alone "$list" 2>&1 || echo "exit $?")" \
 			"guard: cannot find web's network
 exit 1"
 	done
 	for word in 192.0.2.256 example.com 2001:db8::1 192.0.2.7/32 1.2.3 01.2.3.4 '*'; do
 		expect "the guard does not start on a host address that is not one: $word" \
-			"$(guard_alone "192.0.2.7 $word" 2>&1; echo "exit $?")" "guard: HOST_PUBLIC_ADDRESSES: $word is not an IPv4 address
+			"$(guard_alone "192.0.2.7 $word" 2>&1 || echo "exit $?")" "guard: HOST_PUBLIC_ADDRESSES: $word is not an IPv4 address
 exit 1"
 	done
 	last_refusal=$(printf '%s\n' "$v4" | grep -n -- '-j REJECT' | tail -1 | cut -d: -f1)
