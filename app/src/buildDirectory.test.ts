@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildDirectoryOf } from "./buildDirectory.ts";
 
@@ -34,6 +37,28 @@ describe("the build's folder", () => {
       expect(() => buildDirectoryOf(asked, APP)).toThrow(/in the app, only under build or build-\*/);
     },
   );
+});
+
+// A folder named through a link is the folder it leads to: /tmp is /private/tmp on a Mac, and a $PWD under /tmp named the repository holding
+// an app the config reads at its real path, which the build then wrote its client and server into.
+describe("the build's folder named through a link", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "build-dir-")));
+  const app = join(base, "repo", "app");
+  mkdirSync(join(app, "src"), { recursive: true });
+  const link = join(base, "link");
+  symlinkSync(join(base, "repo"), link);
+
+  it("stops the build for the repository's root named through a link", () => {
+    expect(() => buildDirectoryOf(link, app)).toThrow(/GNOWORLD_BUILD must not be the app or a folder holding it/);
+  });
+
+  it("stops the build for the app's sources named through a link", () => {
+    expect(() => buildDirectoryOf(join(link, "app", "src"), app)).toThrow(/in the app, only under build or build-\*/);
+  });
+
+  it("takes a build-* folder of the app named through a link, though it does not exist yet", () => {
+    expect(buildDirectoryOf(join(link, "app", "build-gate", "ci"), app)).toBe(join(link, "app", "build-gate", "ci"));
+  });
 });
 
 // The build's own config reads it through this guard: set but empty, the config stops before any build.
