@@ -134,16 +134,30 @@ describe("Free's slow turn", () => {
       const [free, pose, full] = turning();
       free.rouse(true);
       expect(turnIn([free, pose], 0.016), "the frame after the hand").toBeGreaterThan(0.8 * (full / 16));
+      expect(free.turning, "still turning as it eases: the loop keeps drawing").toBe(true);
+      // A turn's inertia, 0.32 s: over the next quarter second it keeps about 0.66 of its way.
       const eased = turnIn([free, pose], 0.25);
-      expect(eased).toBeLessThan(0.8 * full);
-      expect(eased).toBeGreaterThan(0.2 * full);
+      expect(eased).toBeLessThan(0.75 * full);
+      expect(eased).toBeGreaterThan(0.55 * full);
       // A hold, as a drag is: the hand on the view each frame.
       const hold = () => {
         free.rouse(true);
       };
       turnIn([free, pose], 1.2, hold);
       expect(turnIn([free, pose], 0.25, hold), "held: no turn of its own").toBeLessThan(0.05 * full);
+      turnIn([free, pose], 2, hold);
+      expect(free.turning, "held long: it stops, and the loop may rest").toBe(false);
       idleFor(free, pose, wander.after + 3);
+      expect(turnIn([free, pose], 0.25), "back to its speed").toBeGreaterThan(0.95 * full);
+    });
+
+    it(`starts ${view} turning again by its ramp after the minute of rest, never at full speed in one frame`, () => {
+      const [free, pose, full] = turning();
+      idleFor(free, pose, 66);
+      expect(turnIn([free, pose], 0.25), "stopped").toBeLessThan(1e-9);
+      free.rouse();
+      expect(turnIn([free, pose], 0.25), "a pointer's move after the minute").toBeLessThan(0.2 * full);
+      idleFor(free, pose, 3);
       expect(turnIn([free, pose], 0.25), "back to its speed").toBeGreaterThan(0.95 * full);
     });
   }

@@ -107,11 +107,10 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     frames,
   ));
   const input = (event: Event) => {
-    // A press, the wheel, a key or a touch takes the view, answered at the next frame, never past an ambient gap; a pointer's move or a
-    // resize keeps the pace and the slow turn.
-    const taken = event.type !== "pointermove" && event.type !== "resize";
-    beat.rouse(taken);
-    if (taken) need = "full";
+    // Answered at the next frame, never past an ambient gap, but a pointer's move, which keeps the pace; a press, the wheel, a key or a
+    // touch takes the view, never a move nor a resize, which keep the slow turn.
+    if (event.type !== "pointermove") need = "full";
+    beat.rouse(event.type !== "pointermove" && event.type !== "resize");
     // A lively nap is no sleep: an input draws, and the changed time it sets keeps the full pace till the view is still again.
     if (beat.lively()) keep.touch();
     else keep.wake();

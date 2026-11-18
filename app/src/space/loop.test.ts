@@ -187,7 +187,7 @@ describe("loop", () => {
     for (const gap of gaps) expect(gap).toBeCloseTo(1000 / 30, 5);
   });
 
-  it.each(["pointerdown", "wheel", "keydown", "touchstart"])(
+  it.each(["pointerdown", "wheel", "keydown", "touchstart", "resize"])(
     "answers a %s after an ambient frame at the next frame, not past the ambient gap",
     (type) => {
       const l = make();
@@ -195,7 +195,7 @@ describe("loop", () => {
       l.frame(1000);
       l.frame(1010);
       expect(l.log.steps).toHaveLength(1);
-      l.page.dispatchEvent(new Event(type));
+      (type === "resize" ? l.window : l.page).dispatchEvent(new Event(type));
       l.frame(1017);
       expect(l.log.steps).toHaveLength(2);
     },

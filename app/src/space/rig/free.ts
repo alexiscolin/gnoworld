@@ -51,7 +51,6 @@ export class Free {
   #rate = 1;
   #pull = 0;
   #held = false;
-  #still = false;
   /** Where the zoom goes, on the stage; none, what the view looks at. */
   readonly anchor: Spot = { x: NaN, y: NaN, z: NaN };
   /** The point a turn goes round, on the stage (the galaxy's core in its own view); none, what the view looks at. */
@@ -118,7 +117,7 @@ export class Free {
 
   /** Whether the slow turn runs on its own now: each frame differs a little, so the loop does not sleep. */
   get turning(): boolean {
-    return this.wander.speed > 0 && !this.#still && this.#wandering > 0;
+    return this.#wandering > 0;
   }
 
   /** The share of real time the scene's clock runs at: 1, eased to 0 after a minute with no input, back up at the next; 0 under reduced motion. */
@@ -143,7 +142,6 @@ export class Free {
     still: boolean,
     { pose, reach, real = delta }: { readonly pose: Pose; readonly reach: Reach; readonly real?: number },
   ): void {
-    this.#still = still;
     const dt = Math.min(delta, 50) / 1000;
     // The rest is counted in real time: a slow machine's capped steps would stretch the minute.
     this.#idle += real / 1000;
@@ -164,16 +162,18 @@ export class Free {
     if (Math.abs(this.#zoom) > DONE) this.#zoomBy(dt, pose, reach);
   }
 
-  // The slow turn's share: up its ramp once its wait is past, down no faster than a turn's inertia, so the hand taking the view eases it out
-  // in a few hundred ms (v0.1.6 cut it in one frame); at once under reduced motion or with no turn here.
+  // The slow turn's share, never changed in one frame (v0.1.6 cut it as the mouse moved): held by the hand, it falls with a turn's inertia;
+  // past its wait it rises by its ramp, from wherever it stands (a minute of rest started over), and falls with the minute's own smoothstep.
   #wanderBy(dt: number, still: boolean): void {
     const { speed, after } = this.wander;
-    const ramp = Math.min(1, (this.#idle - after) / IDLE_RISE) * this.#hush();
-    const target = speed > 0 && !still && this.#idle > after ? ramp : 0;
-    const eased = this.#wandering * Math.exp(-dt / TURN_TAU);
-    // Only the hand's hold eases: the minute's own fall is a smoothstep already.
-    const easing = target < this.#wandering && this.#idle <= after && !still && speed > 0;
-    this.#wandering = easing ? Math.max(target, eased < DONE ? 0 : eased) : target;
+    if (still || speed === 0) this.#wandering = 0;
+    else if (this.#idle <= after) {
+      const eased = this.#wandering * Math.exp(-dt / TURN_TAU);
+      this.#wandering = eased < DONE ? 0 : eased;
+    } else {
+      const target = Math.min(1, (this.#idle - after) / IDLE_RISE) * this.#hush();
+      this.#wandering = Math.min(target, this.#wandering + dt / IDLE_RISE);
+    }
   }
 
   // The share of the slow turn left: all of it, then none once a minute of rest and the ease out are past.
