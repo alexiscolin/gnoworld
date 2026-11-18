@@ -1,4 +1,5 @@
 import type { CDPSession } from "@playwright/test";
+import { SHOWN_STATIONS } from "@gnoworld/core";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 import type { Space } from "../../src/space/scene.ts";
@@ -51,9 +52,14 @@ export const flightOf = (page: Page): Promise<Flight> =>
     };
   });
 
-/** How many worlds the engine's universe lays out, the Earth among them: none before the worlds' file came. */
+/** How many worlds the engine's universe lays out, the Earth among them, a shown station not (it is no world): none before the worlds' file came. */
 export const worldsDrawn = (page: Page) =>
-  page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).universe?.planets.length ?? 0);
+  page.evaluate(
+    (stations) =>
+      (Reflect.get(globalThis, "__gnoworldSpace") as Space).universe?.planets.filter(({ id }) => !stations.includes(id))
+        .length ?? 0,
+    [...SHOWN_STATIONS],
+  );
 
 /** Each name of the engine's own layer (`options.labels`), shown or not: its words, its opacity, whether it takes the pointer, its right edge. */
 export const labelsOf = (page: Page) =>
