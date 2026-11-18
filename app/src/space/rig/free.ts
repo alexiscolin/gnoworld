@@ -8,6 +8,10 @@ import type { Pose, Spot } from "./pose.ts";
 // A screen's height of drag turns the view once round.
 const TURN = 2 * Math.PI;
 const TURN_TAU = 0.32;
+// A hand's move reaches the view with a lag of twice the time since the move before it, between these (in seconds): a drag's turn is made over
+// the frames the moves are apart, never all in the frame of one, and the view trails the hand by about a move.
+const HAND_TAU_MIN = 0.03;
+const HAND_TAU_MAX = 0.08;
 const ZOOM_TAU = 0.18;
 // How fast the anchor's pull comes in and out where a view hands the wheel over (a system's middle, the pointer): never in one frame.
 const PULL_TAU = 0.4;
@@ -69,6 +73,8 @@ export class Free {
   readonly #yawed = new Quaternion();
   readonly #offset = new Vector3();
   readonly #pending = { yaw: 0, pitch: 0 };
+  // The lag of the pending turn, in seconds.
+  #handTau = HAND_TAU_MIN;
 
   /** A drag of `dx`, `dy` pixels on a screen `height` high, `seconds` since the last move: it turns at once and keeps its speed. */
   drag({ dx, dy, height, seconds }: { dx: number; dy: number; height: number; seconds: number }): void {
@@ -76,11 +82,14 @@ export class Free {
     const [yaw, pitch] = [(-TURN * dx) / height, (TURN * dy) / height];
     this.#held = true;
     this.#take();
+    // The hand has the view: the slow turn, which runs the other way as often as not, never reverses a frame the hand's move is not in.
+    this.#wandering = 0;
     const tilt = this.level ? 0 : pitch;
     this.#yaw = yaw / Math.max(seconds, 1 / 240);
     this.#pitch = tilt / Math.max(seconds, 1 / 240);
     this.#pending.yaw += yaw;
     this.#pending.pitch += tilt;
+    this.#handTau = Math.min(Math.max(2 * seconds, HAND_TAU_MIN), HAND_TAU_MAX);
   }
 
   /** The drag let go: what speed it had carries on, unless it stood still before letting go. */
@@ -112,7 +121,11 @@ export class Free {
 
   /** Whether the hand still moves the pose. */
   get moving(): boolean {
-    return Math.abs(this.#yaw) + Math.abs(this.#pitch) + Math.abs(this.#zoom) > DONE || this.#pending.yaw !== 0;
+    return (
+      Math.abs(this.#yaw) + Math.abs(this.#pitch) + Math.abs(this.#zoom) > DONE ||
+      this.#pending.yaw !== 0 ||
+      this.#pending.pitch !== 0
+    );
   }
 
   /** Whether the slow turn runs on its own now: each frame differs a little, so the loop does not sleep. */
@@ -147,16 +160,23 @@ export class Free {
     this.#idle += real / 1000;
     this.#quiet += real / 1000;
     this.#rate = still ? 0 : Math.min(this.#hush(), this.#rate + dt / RATE_RISE);
-    if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
+    // The hand's turn not yet made, a share of it each frame: the moves come when they come, the view turns each frame.
+    const pending = this.#pending;
+    const hand = damp(dt, this.#handTau);
+    const yaw = pending.yaw * hand;
+    const pitch = pending.pitch * hand;
+    pending.yaw -= yaw;
+    pending.pitch -= pitch;
+    if (Math.abs(pending.yaw) + Math.abs(pending.pitch) < DONE) pending.yaw = pending.pitch = 0;
+    if (this.#held) this.#turnBy(yaw, pitch, pose);
     else {
       const decay = Math.exp(-dt / TURN_TAU);
       // The turn the decaying speed makes over the frame, whole: the same distance at any frame rate (the speed times dt over-runs it).
       const run = TURN_TAU * (1 - decay);
-      this.#turnBy(this.#yaw * run, this.#pitch * run, pose);
+      this.#turnBy(this.#yaw * run + yaw, this.#pitch * run + pitch, pose);
       this.#yaw *= decay;
       this.#pitch *= decay;
     }
-    this.#pending.yaw = this.#pending.pitch = 0;
     this.#wanderBy(dt, still);
     if (this.#wandering > 0) this.#turnBy(this.wander.speed * dt * this.#wandering, 0, pose);
     if (Math.abs(this.#zoom) > DONE) this.#zoomBy(dt, pose, reach);
