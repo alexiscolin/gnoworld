@@ -96,6 +96,79 @@ describe("Free's slow turn", () => {
     expect(free.turning).toBe(false);
   });
 
+  // Alexis on v0.1.6: the galaxy, and a system's view, stopped dead the moment the mouse moved. The turn read over a quarter of a second
+  // (a system's is small), by atan2: acos loses an angle this small.
+  const turnIn = ([free, pose]: [Free, Pose], seconds: number, each?: () => void): number => {
+    const before = { ...pose.way };
+    for (let t = 0; t < seconds; t += 0.016) {
+      each?.();
+      free.advance(16, false, { pose, reach: REACH });
+    }
+    const { x, y, z } = pose.way;
+    const cross = Math.hypot(before.y * z - before.z * y, before.z * x - before.x * z, before.x * y - before.y * x);
+    return Math.atan2(cross, before.x * x + before.y * y + before.z * z);
+  };
+  for (const [view, wander] of [
+    ["the galaxy", WANDER.galaxy],
+    ["a system's view", WANDER.near],
+  ] as const) {
+    const turning = (): [Free, Pose, number] => {
+      const [free, pose] = galaxy();
+      free.wander = wander;
+      idleFor(free, pose, 8);
+      return [free, pose, turnIn([free, pose], 0.25)];
+    };
+
+    it(`keeps ${view} turning at its speed while the pointer moves: a move only starts the minute of rest over`, () => {
+      const [free, pose, full] = turning();
+      expect(full).toBeGreaterThan(0);
+      for (let at = 0; at < 8; at += 1)
+        expect(
+          turnIn([free, pose], 0.25, () => {
+            free.rouse();
+          }),
+        ).toBeGreaterThan(0.95 * full);
+    });
+
+    it(`eases ${view}'s turn down when the hand takes the view, never in one frame, and back up after its rest`, () => {
+      const [free, pose, full] = turning();
+      free.rouse(true);
+      expect(turnIn([free, pose], 0.016), "the frame after the hand").toBeGreaterThan(0.8 * (full / 16));
+      expect(free.turning, "still turning as it eases: the loop keeps drawing").toBe(true);
+      // A turn's inertia, 0.32 s: over the next quarter second it keeps about 0.66 of its way.
+      const eased = turnIn([free, pose], 0.25);
+      expect(eased).toBeLessThan(0.75 * full);
+      expect(eased).toBeGreaterThan(0.55 * full);
+      // A hold, as a drag is: the hand on the view each frame.
+      const hold = () => {
+        free.rouse(true);
+      };
+      turnIn([free, pose], 1.2, hold);
+      expect(turnIn([free, pose], 0.25, hold), "held: no turn of its own").toBeLessThan(0.05 * full);
+      turnIn([free, pose], 2, hold);
+      expect(free.turning, "held long: it stops, and the loop may rest").toBe(false);
+      idleFor(free, pose, wander.after + 3);
+      expect(turnIn([free, pose], 0.25), "back to its speed").toBeGreaterThan(0.95 * full);
+    });
+
+    it(`starts ${view} turning again by its ramp after the minute of rest, never at full speed in one frame`, () => {
+      const [free, pose, full] = turning();
+      idleFor(free, pose, 66);
+      expect(turnIn([free, pose], 0.25), "stopped").toBeLessThan(1e-9);
+      free.rouse();
+      expect(turnIn([free, pose], 0.25), "a pointer's move after the minute").toBeLessThan(0.2 * full);
+      idleFor(free, pose, 3);
+      expect(turnIn([free, pose], 0.25), "back to its speed").toBeGreaterThan(0.95 * full);
+    });
+  }
+
+  it("stops at once when a flight takes the pose: the flight moves it then", () => {
+    const [free, pose] = galaxy();
+    idleFor(free, pose, 8);
+    free.stop();
+    expect(turnIn([free, pose], 0.25)).toBeLessThan(1e-9);
+  });
+
   it("stops after a minute of real time at 12 frames a second, where each step is capped at 50 ms", () => {
     const [free, pose] = galaxy();
     for (let t = 0; t < 63.5; t += 1 / 12) free.advance(50, false, { pose, reach: REACH, real: 1000 / 12 });

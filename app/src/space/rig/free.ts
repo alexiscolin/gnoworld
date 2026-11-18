@@ -1,5 +1,6 @@
 // The reader's hand on the pose: a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
-// over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own, and stops after a minute.
+// over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); 4 s after the hand let go, the view turns slowly on its own,
+// and stops after a minute with no input.
 import { damp, smoothstep } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
 import type { Pose, Spot } from "./pose.ts";
@@ -41,11 +42,15 @@ export class Free {
   #yaw = 0;
   #pitch = 0;
   #zoom = 0;
+  // Since the hand last took the view (a drag, the wheel, a press, a key, a touch): the slow turn waits its `after` past it.
   #idle = 0;
+  // Since any input, a pointer's move included: the minute of rest.
+  #quiet = 0;
+  // The slow turn's share of its speed: it rises with its ramp and falls with a turn's inertia, never in one frame.
+  #wandering = 0;
   #rate = 1;
   #pull = 0;
   #held = false;
-  #still = false;
   /** Where the zoom goes, on the stage; none, what the view looks at. */
   readonly anchor: Spot = { x: NaN, y: NaN, z: NaN };
   /** The point a turn goes round, on the stage (the galaxy's core in its own view); none, what the view looks at. */
@@ -70,7 +75,7 @@ export class Free {
     // The view turns as if the hand held what it looks at: its surface follows the pointer, across and up or down alike.
     const [yaw, pitch] = [(-TURN * dx) / height, (TURN * dy) / height];
     this.#held = true;
-    this.#idle = 0;
+    this.#take();
     const tilt = this.level ? 0 : pitch;
     this.#yaw = yaw / Math.max(seconds, 1 / 240);
     this.#pitch = tilt / Math.max(seconds, 1 / 240);
@@ -86,7 +91,7 @@ export class Free {
 
   /** A wheel of `pixels` (in, negative), towards `anchor` if it is told. */
   wheel(pixels: number): void {
-    this.#idle = 0;
+    this.#take();
     // A zoom begun from rest pulls to its anchor whole; one running when the anchor comes eases it in (#zoomBy).
     if (Math.abs(this.#zoom) <= DONE) this.#pull = 1;
     this.#zoom = Math.max(-ZOOM_MOST, Math.min(ZOOM_MOST, this.#zoom + pixels * ZOOM_PER_PIXEL));
@@ -96,7 +101,8 @@ export class Free {
   stop(): void {
     this.#yaw = this.#pitch = this.#zoom = 0;
     this.#pending.yaw = this.#pending.pitch = 0;
-    this.#idle = 0;
+    this.#take();
+    this.#wandering = 0;
   }
 
   /** Whether the wheel brings the view nearer, now. */
@@ -111,7 +117,7 @@ export class Free {
 
   /** Whether the slow turn runs on its own now: each frame differs a little, so the loop does not sleep. */
   get turning(): boolean {
-    return this.wander.speed > 0 && !this.#still && this.#idle > this.wander.after && this.#hush() > 0;
+    return this.#wandering > 0;
   }
 
   /** The share of real time the scene's clock runs at: 1, eased to 0 after a minute with no input, back up at the next; 0 under reduced motion. */
@@ -119,9 +125,15 @@ export class Free {
     return this.#rate;
   }
 
-  /** Any input at all (a pointer move, a key, a touch): the minute of rest starts over. */
-  rouse(): void {
-    this.#idle = 0;
+  /** Any input at all (a pointer's move, a resize): the minute of rest starts over, and the slow turn goes on; with `taken`, the hand
+   * takes the view (a press, the wheel, a key, a touch): the slow turn eases out, and waits its `after` again. */
+  rouse(taken = false): void {
+    this.#quiet = 0;
+    if (taken) this.#idle = 0;
+  }
+
+  #take(): void {
+    this.#idle = this.#quiet = 0;
   }
 
   /** `delta` ms on, `still` under reduced motion, on `pose`, within `reach`. */
@@ -130,10 +142,10 @@ export class Free {
     still: boolean,
     { pose, reach, real = delta }: { readonly pose: Pose; readonly reach: Reach; readonly real?: number },
   ): void {
-    this.#still = still;
     const dt = Math.min(delta, 50) / 1000;
     // The rest is counted in real time: a slow machine's capped steps would stretch the minute.
     this.#idle += real / 1000;
+    this.#quiet += real / 1000;
     this.#rate = still ? 0 : Math.min(this.#hush(), this.#rate + dt / RATE_RISE);
     if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
     else {
@@ -145,15 +157,28 @@ export class Free {
       this.#pitch *= decay;
     }
     this.#pending.yaw = this.#pending.pitch = 0;
-    const { speed, after } = this.wander;
-    if (speed > 0 && !still && this.#idle > after)
-      this.#turnBy(speed * dt * Math.min(1, (this.#idle - after) / IDLE_RISE) * this.#hush(), 0, pose);
+    this.#wanderBy(dt, still);
+    if (this.#wandering > 0) this.#turnBy(this.wander.speed * dt * this.#wandering, 0, pose);
     if (Math.abs(this.#zoom) > DONE) this.#zoomBy(dt, pose, reach);
+  }
+
+  // The slow turn's share, never changed in one frame (v0.1.6 cut it as the mouse moved): held by the hand, it falls with a turn's inertia;
+  // past its wait it rises by its ramp, from wherever it stands (a minute of rest started over), and falls with the minute's own smoothstep.
+  #wanderBy(dt: number, still: boolean): void {
+    const { speed, after } = this.wander;
+    if (still || speed === 0) this.#wandering = 0;
+    else if (this.#idle <= after) {
+      const eased = this.#wandering * Math.exp(-dt / TURN_TAU);
+      this.#wandering = eased < DONE ? 0 : eased;
+    } else {
+      const target = Math.min(1, (this.#idle - after) / IDLE_RISE) * this.#hush();
+      this.#wandering = Math.min(target, this.#wandering + dt / IDLE_RISE);
+    }
   }
 
   // The share of the slow turn left: all of it, then none once a minute of rest and the ease out are past.
   #hush(): number {
-    return 1 - smoothstep(QUIET_AFTER, QUIET_AFTER + QUIET_FALL, this.#idle);
+    return 1 - smoothstep(QUIET_AFTER, QUIET_AFTER + QUIET_FALL, this.#quiet);
   }
 
   #zoomBy(dt: number, pose: Pose, reach: Reach): void {
