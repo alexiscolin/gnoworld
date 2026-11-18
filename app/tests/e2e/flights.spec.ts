@@ -312,9 +312,6 @@ test("a walk through the places shows each place's chat with its history, logged
     "logo",
   ];
   await page.setViewportSize(FRAME);
-  await page.addInitScript(() => {
-    localStorage.setItem("gnoworld:welcomed", "1");
-  });
   const said = word("said");
   const address = await logIn(page, word("walker"));
   for (const room of Object.values(ROOM_OF)) await say(page, { address, room }, [`${said} in ${room}`]);
