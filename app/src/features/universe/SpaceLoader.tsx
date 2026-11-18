@@ -2,13 +2,10 @@
 // draws is ready, or past its 2.5 s wait): the black of space, the logo where the header's stands, and one thin bar filling with the share of
 // what the first frame waits for. While it waits the page under it is inert, and its status holds the focus. It leaves by one fade, after the
 // bar has finished its fill. The one seam of the loading screen: its look is this component and its CSS alone. It names no network.
-import { Logo } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type TransitionEvent } from "react";
+import { LoaderMarks, STEPS } from "./LoaderMarks.tsx";
 import { holdChrome } from "./rise.ts";
 import styles from "./SpaceLoader.module.css";
-
-// The bar's fill, in quarters: a style attribute in the page's first HTML would be refused by its policy.
-const STEPS = 4;
 
 // Everything in the page but the loader and what holds it is inert (and so hidden from assistive technology); gives how to undo it.
 function shield(own: HTMLElement): () => void {
@@ -55,12 +52,7 @@ export function SpaceLoader({ waiting, ready }: { waiting: boolean; ready: numbe
       data-leaving={waiting ? undefined : ""}
       onTransitionEnd={left}
     >
-      <span className={styles["brand"]}>
-        <Logo wordmark />
-      </span>
-      <span className={styles["bar"]} aria-hidden="true">
-        <span className={styles["fill"]} data-step={Math.round((waiting ? Math.min(ready, 1) : 1) * STEPS)} />
-      </span>
+      <LoaderMarks step={Math.round((waiting ? Math.min(ready, 1) : 1) * STEPS)} />
     </div>
   );
 }

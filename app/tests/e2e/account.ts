@@ -2,6 +2,7 @@
 // phone given a computer's session, since a phone cannot log in.
 import type { Locator, Page, PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { expect, hydrated, test } from "./fixtures.ts";
+import { ownContext } from "./deployed.ts";
 
 /** The account's pill in the header once logged in (frame 17): its face and short address, opening the menu that holds the way out. */
 export const accountPill = (page: Page) => page.getByRole("button", { name: /Your account/ });
@@ -57,7 +58,7 @@ export async function phoneWith(
   if (baseURL === undefined) throw new Error("no baseURL");
   const browser = await playwright.chromium.launch(launchOptions);
   const storageState = await page.context().storageState();
-  const context = await browser.newContext({
+  const context = await ownContext(browser, {
     baseURL,
     storageState,
     hasTouch: true,
