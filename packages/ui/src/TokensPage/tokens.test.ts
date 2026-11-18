@@ -70,7 +70,6 @@ describe("parseTokens", () => {
     "--row-h",
     "--box-bleed",
     "--box-in",
-    "--welcome-top",
     "--d",
     "--play",
     "--n",
