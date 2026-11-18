@@ -16,6 +16,8 @@ const SHADOW = { box: 1.8, map: 1024 } as const;
 // raw: its size framed close on its page, a share of its sphere's (the preview's), and the share of the way it eases there each frame
 const PAGE = 0.6;
 const EASE = 0.06;
+// raw: its size as it starts coming in, a share of its own
+const RISE = 0.85;
 // What a world does that the colony has no part for.
 const none = (): void => undefined;
 
@@ -30,6 +32,8 @@ export class ColonyBody implements Drawn {
   readonly #back = new Quaternion();
   #size = 0;
   #close = 0;
+  // Whole until a view brings it in (a picture shows it so).
+  #arrive = 1;
 
   constructor(look: PlanetLook) {
     this.look = look;
@@ -65,7 +69,18 @@ export class ColonyBody implements Drawn {
   // Framed close on its page, it eases down to PAGE of its size, whole in the page's circle, and back as the page goes.
   setClose(share: number): void {
     this.#close += (share - this.#close) * EASE;
-    this.#colony.spin.scale.setScalar(1 - (1 - PAGE) * this.#close);
+    this.#sized();
+  }
+
+  // Coming in, it shows and unfolds from RISE of its size to all of it, as a planet fades in over its skeleton (it has none).
+  setArrive(share: number): void {
+    this.#arrive = share;
+    this.#colony.group.visible = share > 0;
+    this.#sized();
+  }
+
+  #sized(): void {
+    this.#colony.spin.scale.setScalar((1 - (1 - PAGE) * this.#close) * (RISE + (1 - RISE) * this.#arrive));
   }
 
   setTime(seconds: number): void {
@@ -77,7 +92,6 @@ export class ColonyBody implements Drawn {
   readonly setHeight = none;
   readonly setMoons = none;
   readonly setEarthMaps = none;
-  readonly setArrive = none;
   readonly setDepth = none;
   readonly setLimb = none;
   readonly setFar = none;

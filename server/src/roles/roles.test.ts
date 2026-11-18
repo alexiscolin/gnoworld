@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { hubWorlds } from "../prices/universes.ts";
 import { typedRooms } from "../rooms/wire.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -131,6 +132,20 @@ describe("loadRoles", () => {
       { name: "#gnosh-ai/showcase", world: "gnosh-ai" },
     ]);
     expect(gnosh.rules).toEqual({ bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 });
+  });
+
+  // Alexis: the same moderators as the Earth's (D13753): its rooms are watched as the Earth's are, the team's, and stay in step with it.
+  it("gives gnosh's colony the Earth's moderators, groups and rules", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    const [gnosh, earth] = [shipped.worlds.get("gnosh-ai"), shipped.worlds.get("earth")];
+    if (gnosh === undefined || earth === undefined) throw new Error("no gnosh-ai or earth in the shipped roles");
+    expect([...gnosh.moderators].toSorted()).toEqual([...earth.moderators].toSorted());
+    expect([...(gnosh.groups ?? new Map())]).toEqual([...(earth.groups ?? new Map())]);
+    expect(gnosh.rules).toEqual(earth.rules);
+    // A realm on its hub would make the realm's namespace holder a moderator of its rooms, as no one is on the Earth (mayModerate's owner).
+    expect(hubWorlds(fileURLToPath(new URL("../../../app/data/universes.json", import.meta.url))).has("gnosh-ai")).toBe(
+      false,
+    );
   });
 
   it("takes the smallest values each field allows", () => {

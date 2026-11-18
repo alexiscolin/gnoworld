@@ -4,7 +4,7 @@ import { damp } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
 import type { Place } from "./place.ts";
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
-import { ORBIT_GAIN } from "./parts/marks.ts";
+import { ORBIT_GAIN, orbitCrowd } from "./parts/marks.ts";
 import { frameOf } from "./parts/bones.ts";
 import { Quaternion } from "three";
 import { HOME_SYSTEM } from "../cosmosAt.ts";
@@ -31,8 +31,6 @@ const SCAN_FRAME = new Quaternion();
 const UNIVERSE: Place = { kind: "universe" };
 const LEAVE = 11;
 const ENTER = 1.2;
-// raw: how many orbits a system draws at their full strength
-const CLEAR_ORBITS = 12;
 
 // `slept` seconds more went by while the loop slept: the clock the orbits ride takes them at its rate; the steps (`delta`) never do.
 export function advance(
@@ -238,8 +236,6 @@ function orbits(space: Space, delta: number): void {
     return;
   }
   const near = (system.reach * 14 - distance(space.camera.position, system.place)) / (system.reach * 9);
-  // A crowded system's orbits each fainter, so that together they stay lines and never a grey disc.
-  const crowd = Math.min(1, Math.sqrt(CLEAR_ORBITS / system.planets.length));
-  const to = planned ? ORBIT_GAIN * crowd * Math.min(1, Math.max(0, near)) : 0;
+  const to = planned ? ORBIT_GAIN * orbitCrowd(system.planets.length) * Math.min(1, Math.max(0, near)) : 0;
   ease(stage.orbits.gain, to, damp(delta / 1000, ORBITS_S));
 }

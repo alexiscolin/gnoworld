@@ -27,6 +27,9 @@ interface Item {
   readonly seed?: true;
 }
 
+/** A world's name as the narrow row says it: its first part, before a dot (gnosh for gnosh.ai, D13754). */
+const shortOf = (name: string): string => name.split(".")[0] ?? name;
+
 /** The id of the world in view: its hub's world, else the slug itself (a realm's world the chat lists not). */
 const hereOf = (worlds: WorldsProps["worlds"], current: string): string => {
   const hub = worlds.find(({ slug }) => slug === current);
@@ -154,7 +157,13 @@ export function PhoneWorlds(props: WorldsProps) {
             <li key={item.id}>
               <RouterLink
                 href={item.href}
-                aria-label={item.unseen > 0 ? `${item.name}, ${String(item.unseen)} unseen` : undefined}
+                aria-label={
+                  item.unseen > 0
+                    ? `${item.name}, ${String(item.unseen)} unseen`
+                    : shortOf(item.name) === item.name
+                      ? undefined
+                      : item.name
+                }
                 aria-current={item.id === here ? "page" : undefined}
                 className={`${column["world"] ?? ""} ${styles["link"] ?? ""} no-edge`}
               >
@@ -172,7 +181,7 @@ export function PhoneWorlds(props: WorldsProps) {
                     <UnreadPill count={item.unseen} />
                   </span>
                 </span>
-                <span className={`${styles["name"] ?? ""} label truncate`}>{item.name}</span>
+                <span className={`${styles["name"] ?? ""} label truncate`}>{shortOf(item.name)}</span>
               </RouterLink>
             </li>
           ))}

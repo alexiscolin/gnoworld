@@ -1,6 +1,6 @@
 // The skeleton of a planet that is not yet ready to be seen: its meridians and parallels as thin lines in the orbits' colour, at its size
 // and tilt, turning with it; they fade out as the planet fades in inside them.
-import { EARTH } from "@gnoworld/core";
+import { EARTH, SHOWN_STATIONS } from "@gnoworld/core";
 import {
   BufferGeometry,
   Euler,
@@ -95,6 +95,8 @@ export class Bones {
       ahead = 0,
     }: { at: Vec; seconds: number; opacity: number; leaned?: Quaternion | undefined; ahead?: number },
   ): void {
+    // A colony is no sphere: it comes in itself (colony/gnoshColony.ts's setArrive), with no meridians to cross its wheels.
+    if (SHOWN_STATIONS.includes(planet.id)) return;
     const index = planet.index;
     this.#used.add(index);
     let frame = this.#frames.get(index);
