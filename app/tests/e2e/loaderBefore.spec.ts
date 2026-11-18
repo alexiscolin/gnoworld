@@ -3,8 +3,8 @@ import { expect, test, type Page } from "./fixtures.ts";
 
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 
-// The loader comes before the interface (SpaceLoader.tsx): on a page the host writes no HTML for (the fallback, which has no loader of its own), the
-// header and the column must not show while the route waits for its data and before the loader stands over them. The worlds' file is held back,
+// The loader comes before the interface (SpaceLoader.tsx): on a page the host writes no HTML for (the fallback), its loader covers from the first
+// paint (LoaderMarks.tsx) till the home's stands, no frame shown bare or black while the route waits for its data. The worlds' file is held back,
 // as a slow link holds it; every frame from the first paint to the loader's first standing is read, with scripts on.
 test.use({ viewport: { width: 1440, height: 900 } });
 const HELD_MS = 2500;
@@ -30,7 +30,6 @@ async function watch(page: Page, path: string) {
       for (let node = el; node !== null; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
       return opacity;
     };
-    const seen = (el: Element | null): boolean => opacityOf(el) > 0.05;
     const bad: number[] = [];
     let stood = false;
     Reflect.set(globalThis, "__bad", bad);
@@ -38,8 +37,11 @@ async function watch(page: Page, path: string) {
       const loader = document.querySelector("[data-loader]");
       const covered = opacityOf(loader) > 0.95;
       stood ||= covered;
-      const shown = seen(document.querySelector("header")) || seen(document.querySelector("main"));
-      if (shown && !stood) bad.push(Math.round(performance.now()));
+      // The fallback's loader (LoaderMarks.tsx) covers from the first paint till the home's stands: no frame before that is uncovered, the
+      // interface shown or black.
+      const first = document.querySelector("[data-first-loader]");
+      const firstCovers = first !== null && getComputedStyle(first).visibility === "visible" && opacityOf(first) > 0.95;
+      if (!stood && !firstCovers) bad.push(Math.round(performance.now()));
       requestAnimationFrame(poll);
     };
     requestAnimationFrame(poll);
