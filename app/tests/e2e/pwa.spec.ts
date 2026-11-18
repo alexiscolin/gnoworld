@@ -394,9 +394,12 @@ test("online, a path the build never made is the host's own answer: a 404, not t
 test.describe("updates", () => {
   test.describe.configure({ mode: "serial" });
   const site = UPDATING;
+  // The page these tests open: a page the worker holds, with no home's loader to wait out (it waits for a scene these pages do not
+  // run, 2.5 s at each load): what they try is the shell's, every page's.
+  const PAGE = "/earth";
 
   async function open(page: Page): Promise<void> {
-    await page.goto(`${site}/`);
+    await page.goto(`${site}${PAGE}`);
     await controlled(page);
     await hydrated(page);
     await page.evaluate(() => {
@@ -612,9 +615,9 @@ test.describe("updates", () => {
       other.on("response", (response) => {
         if (response.request().isNavigationRequest()) documents.push(documentOf(response));
       });
-      await other.goto(`${site}/`);
+      await other.goto(`${site}${PAGE}`);
       await hydrated(other);
-      expect(documents).toEqual([{ path: "/", fromWorker: true, policy: true, type: "text/html; charset=utf-8" }]);
+      expect(documents).toEqual([{ path: PAGE, fromWorker: true, policy: true, type: "text/html; charset=utf-8" }]);
       expect(await entries(other), "the new tab runs the version it was opened under").toEqual(before);
       await expect(noticeOf(other)).toBeVisible();
       await reload(other);
@@ -671,7 +674,7 @@ test.describe("updates", () => {
     });
     expect((await request.post(`${site}/__tamper`)).status()).toBe(204);
     try {
-      await page.goto(`${site}/`);
+      await page.goto(`${site}${PAGE}`);
       await hydrated(page);
       await expect(page.locator("html")).toHaveAttribute("data-install", /^(redundant|activated)$/);
       await expect(page.locator("html")).toHaveAttribute("data-install", "redundant");
