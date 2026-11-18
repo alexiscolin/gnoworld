@@ -1,5 +1,5 @@
 import type { Texture } from "three";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const loads = vi.hoisted(() => ({ asked: [] as string[], answer: new Map<string, (t: Texture) => void>() }));
 
@@ -12,9 +12,12 @@ vi.mock("../planet/maps.ts", async (original) => ({
     }),
 }));
 vi.mock("../quality.ts", () => ({ lowQuality: () => false }));
+// The browser's rest comes at once, or, `held`, when a test lets it.
+const idle = vi.hoisted(() => ({ held: false, waiting: [] as (() => void)[] }));
 vi.mock("../../afterLoad.ts", () => ({
   afterLoad: (then: () => void) => {
-    then();
+    if (idle.held) idle.waiting.push(then);
+    else then();
   },
 }));
 const earth = vi.hoisted(() => ({ full: 0, relief: 0 }));
@@ -31,6 +34,10 @@ vi.mock("../earth/maps.ts", () => ({
 }));
 
 const { Maps } = await import("./maps.ts");
+
+afterEach(() => {
+  [idle.held, idle.waiting] = [false, []];
+});
 const named = (name: string): string | undefined => loads.asked.find((url) => url.includes(`/${name}.`));
 
 describe("Maps priority", () => {
@@ -92,6 +99,28 @@ describe("the Earth's full-size maps", () => {
         maps.earthAhead();
       }),
     ).toEqual([1, 1]);
+  });
+
+  // Alexis on v0.1.8 in Firefox saw the Earth sharpen after its arrival: a flight leaves the browser no rest, and the full maps waited for
+  // one (up to 2 s) before they were asked.
+  it("are asked as the flight to the Earth starts, never after the browser's rest; what a planet asks still waits for it", async () => {
+    vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
+    [earth.full, earth.relief, idle.held, idle.waiting] = [0, 0, true, []];
+    const resting = new Maps("/");
+    resting.earth(false);
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    resting.fullEarth();
+    expect(earth.full).toBe(0);
+    const flying = new Maps("/");
+    flying.earth(false);
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    flying.earthAhead();
+    await new Promise((done) => setTimeout(done, 20));
+    expect([earth.full, earth.relief]).toEqual([1, 1]);
+    for (const then of idle.waiting) then();
+    expect(earth.full).toBe(2);
   });
 
   it("come at once where the Earth's first maps came before it was gone to (the galaxy warmed it)", async () => {

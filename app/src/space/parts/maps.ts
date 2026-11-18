@@ -145,7 +145,8 @@ export class Maps {
     }
   }
 
-  // A late set: asked once the Earth's first maps are in, in the browser's idle time, and again after a failure.
+  // A late set: asked once the Earth's first maps are in, and again after a failure; in the browser's idle time, unless the Earth is gone to:
+  // a flight leaves Firefox no rest, and the full maps waited up to 2 s for one, to come after the Earth was made (Alexis saw it sharpen).
   #late<T>(
     state: Late<T>,
     load: (base: string, how: Pick<MapLoad, "anisotropy" | "signal">) => Promise<T>,
@@ -154,7 +155,7 @@ export class Maps {
     if (state.asked || this.#earth === undefined || lowQuality() || blocked()) return state.value;
     state.asked = true;
     const { signal } = this.#leaving;
-    afterLoad(() => {
+    const ask = () => {
       load(this.#base, { anisotropy: ANISOTROPY, signal }).then(
         (value) => {
           state.value = value;
@@ -163,7 +164,9 @@ export class Maps {
           if (!signal.aborted) setTimeout(() => (state.asked = false), AGAIN_MS);
         },
       );
-    }, signal);
+    };
+    if (this.#ahead) ask();
+    else afterLoad(ask, signal);
     return state.value;
   }
 
