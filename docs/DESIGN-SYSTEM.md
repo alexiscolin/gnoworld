@@ -77,6 +77,7 @@ ten gives the value exactly, each with one role:
 | sky | `#5EAAFD` | `--world-earth`: the Earth's own colour, the frames' blue over its plate |
 | white | `#FFFFFF` | `--color-lit`: the light on a planet's lit side, the `Planet` stand-in's highlight |
 | mist | `#C8D0DE` | `--color-text-soft`: the soft grey of a line read under a figure or a title (the hero's line, the info panel's words) |
+| plate-scene | `#1E212D` | `--color-plate-scene`: the plate's fill the scene paints beside a planet, under its cards' wash (app's `space/parts/marks.ts`, whose test reads both) |
 
 Semantic roles, all computed from them:
 

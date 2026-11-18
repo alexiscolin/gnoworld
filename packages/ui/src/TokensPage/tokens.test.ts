@@ -19,6 +19,7 @@ const BASE: Record<string, string> = {
   sky: "#5EAAFD",
   white: "#FFFFFF",
   mist: "#C8D0DE",
+  "plate-scene": "#1E212D",
 };
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
