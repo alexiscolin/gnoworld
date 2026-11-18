@@ -331,6 +331,7 @@ def mutants():
     yield from each("vitest.config.ts", '            "server/src/**/*.test.ts",\n', "", "probe", "the server's tests are found")
     yield from each("vitest.config.ts", '            "jarvis/src/**/*.test.ts",\n', "", "probe", "Jarvis's tests are found")
     yield from each("vitest.config.ts", "            ...SLOW,\n          ],", "            ...SLOW,\n            ...DISPLAY,\n          ],", "probe", "the gate's node project runs the display tests")
+    yield from each("vitest.config.ts", "            ...SLOW,\n          ],", "            ...SLOW,\n            ...DISPLAY.slice(1),\n          ],", "probe", "the gate's node project runs every display test")
     yield from each("vitest.config.ts", 'include: ["packages/ui/src/**/*.test.{ts,tsx}"],\n          environment', 'include: ["packages/ui/src/**/*.test.{ts,tsx}"],\n          exclude: [...configDefaults.exclude, ...DISPLAY_UI],\n          environment', "probe", "the gate's ui project runs the design system's display tests")
     # Core's tests again in Chromium, only when asked, so no other Vitest run opens a browser.
     yield from each("vitest.config.ts", '...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),', "CORE_CHROMIUM,", "probe", "core_chromium exists only when CORE_CHROMIUM asks")

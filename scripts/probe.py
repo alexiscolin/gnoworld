@@ -352,15 +352,21 @@ try:
         shutil.rmtree(UI)
 
     if part("display_in_gate"):
-        # The display-only tests (vitest.config.ts's DISPLAY and DISPLAY_UI) run in GitHub's gate: the projects its unit job names list
-        # them. Left to projects the night alone ran, red ones stayed on main (tokens.test.ts, home.test.tsx, world.test.tsx).
+        # The display-only tests (vitest.config.ts's DISPLAY and DISPLAY_UI) run in GitHub's gate: every file the display projects list,
+        # the projects its unit job names list too. Left to projects the night alone ran, red ones stayed on main (tokens.test.ts).
         with open(".github/workflows/gate.yml") as f:
-            unit = next(line for line in f if "pnpm exec vitest run --project" in line)
+            unit = next((line for line in f if "pnpm exec vitest run --project" in line), "")
+        expect(unit != "", "gate.yml's unit job runs `pnpm exec vitest run --project ...`, which this block reads")
         projects = [word for flag, word in zip(unit.split(), unit.split()[1:]) if flag == "--project"]
-        out = run(["node_modules/.bin/vitest", "list", "--filesOnly", "--json", *[a for p in projects for a in ("--project", p)]])
-        listed = {os.path.relpath(entry["file"]) for entry in json.loads(out.stdout or "[]")}
-        for file in ("app/src/routes/home.test.tsx", "packages/ui/src/TokensPage/tokens.test.ts"):
-            expect(file in listed, f"the gate's unit projects ({', '.join(projects)}) run the display test {file}")
+
+        def files(*names):
+            out = run(["node_modules/.bin/vitest", "list", "--filesOnly", "--json", *[a for n in names for a in ("--project", n)]])
+            return {os.path.relpath(entry["file"]) for entry in json.loads(out.stdout or "[]")}, out.stderr[-300:]
+
+        (gate, said), (display, _) = files(*projects), files("display", "display_ui")
+        expect(len(display) > 0, "vitest lists the display projects' files")
+        left = sorted(display - gate)
+        expect(not left, f"the gate's unit projects ({', '.join(projects)}) run every display test, not {left[:3]} {said}")
 
     if part("prettier"):
         # Prettier: a file that is not formatted.
