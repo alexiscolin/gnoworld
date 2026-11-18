@@ -159,7 +159,8 @@ export class Near {
     const held = this.#held.get(planet.index);
     if (held?.shown !== true) return;
     this.#place(planet, held.drawn, this.#seconds);
-    if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device, this.#fade.flying === true);
+    const { delta, still, flying } = this.#fade;
+    if (planet.id === EARTH && upgradeStep(held, this.#device, { delta, still, busy: this.#sent || flying === true })) this.arriving = true;
     const share = step(held, this.#fade);
     held.drawn.setArrive(share);
     this.arriving ||= held.over && share < 1;
