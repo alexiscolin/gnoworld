@@ -255,15 +255,16 @@ test("6b the bubble on the Earth", async ({ page }) => {
   });
 });
 
-// The + is an account's: the page logs in for real (a scripted Ergo alone leaves it a guest), then opens the docked chat.
-test("7 a dialog, open and closed (poll)", async ({ page }) => {
+// The + is an account's: the page logs in for real (a scripted Ergo alone leaves it a guest), then opens the docked chat and its poll
+// dialog; 7 with the scene, its twin 7b with none, at 60 frames a second, where the dialog's opening and closing are judged.
+async function pollDialog(page: Page, name: string, scene: boolean) {
   await page.setViewportSize({ width: 1366, height: 768 });
   await logIn(page, word("poll"));
-  await page.goto("/w/bubble?room=games&test-gpu");
+  await page.goto(`/w/bubble?room=games${scene ? "&test-gpu" : ""}`);
   await hydrated(page);
-  await sceneOn(page);
+  if (scene) await sceneOn(page);
   await wait(page, 2000);
-  await flow(page, ["7-dialog", "[role='dialog']"], async () => {
+  await flow(page, [name, "[role='dialog']"], async () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByRole("menuitem", { name: "Poll" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
@@ -272,7 +273,11 @@ test("7 a dialog, open and closed (poll)", async ({ page }) => {
     await expect(page.getByRole("dialog")).toBeHidden();
     await wait(page, 1000);
   });
-});
+}
+
+test("7 a dialog, open and closed (poll)", ({ page }) => pollDialog(page, "7-dialog", true));
+
+test("7b a dialog with no scene, open and closed (poll)", ({ page }) => pollDialog(page, "7b-dialog", false));
 
 test("8 the dive into the Earth's page and out, lines from far countries during and after", async ({ page }) => {
   const { socket, sent } = await onEarth(page, {

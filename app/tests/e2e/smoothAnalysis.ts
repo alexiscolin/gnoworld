@@ -107,9 +107,9 @@ function facingOf(raw: Raw): Pick<Report, "lat" | "lon" | "turns" | "lead"> {
   };
 }
 
-// The page's parts, read where they are drawn: where the scene runs, a stall of its software GPU (a frame over twice the median) draws none
-// of a transition that runs in it, which the same flow with no scene draws whole (4b: the views' bar's 120 px in 350 ms, 60 frames a
-// second); with no scene, every step is judged.
+// The page's parts, read where they are drawn: where the scene's software GPU draws under 30 frames a second (13 to 170 ms, uneven) a
+// 300 ms transition is a few uneven steps no rule reads, so none is judged there, and a stall (twice the median) is not where it draws
+// faster; their twins with no scene are judged at 60 frames a second (4b: the views' bar and its pill; 7b: a dialog).
 function watchedOf(raw: Raw, unseen: number): Report["watched"] {
   const watched: Report["watched"] = {};
   for (const selector of new Set(raw.frames.flatMap(({ watched: seen }) => Object.keys(seen)))) {
@@ -175,7 +175,7 @@ export function analyse(raw: Raw, { eyeFloor = 0.02, lookFloor = 0.003 } = {}): 
     earthDrops: raw.frames.flatMap(({ t, earthShown }, i) =>
       earthShown === false && raw.frames[i - 1]?.earthShown === true ? [t] : [],
     ),
-    watched: watchedOf(raw, raw.frames.some(({ eye }) => eye !== undefined) ? 2 * mid : Infinity),
+    watched: watchedOf(raw, !raw.frames.some(({ eye }) => eye !== undefined) ? Infinity : mid > 33 ? 0 : 2 * mid),
   };
 }
 
