@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { button, choose, click, drawer, mount, popovers, settled } from "../../../tests/mount.tsx";
 import { GetStarted } from "./GetStarted.tsx";
 import { LoginControl } from "./LoginControl.tsx";
+import { askGetStarted, GET_STARTED } from "./getStartedAsk.ts";
 
 // A login with no Adena opens the steps; Adena's coming shows Connect, which is the header's login; a guest closes it.
 const out = { kind: "out" } as const;
@@ -127,6 +128,20 @@ describe("GetStarted watches for Adena only while it is open", () => {
 describe("the dialog Get started, opened and closed from the control", () => {
   const none = { session: out, step: "idle", problem: undefined, chat: "off" } as const;
   const isOpen = (box: HTMLElement) => box.querySelector("dialog[open]") !== null;
+
+  it("opens at the phone menu's ask, and stops hearing it once the control is gone", async () => {
+    const removed = vi.spyOn(window, "removeEventListener");
+    const draw = drawer();
+    draw(<LoginControl login={none} logIn={vi.fn()} />);
+    expect(isOpen(document.body)).toBe(false);
+    act(() => {
+      askGetStarted();
+    });
+    await settled(() => isOpen(document.body));
+    draw(null);
+    expect(removed).toHaveBeenCalledWith(GET_STARTED, expect.any(Function));
+    removed.mockRestore();
+  });
 
   it("closes on Connect, and logs in", async () => {
     const logIn = vi.fn();

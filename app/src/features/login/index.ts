@@ -2,4 +2,4 @@
 export { LoginControl, useLogin } from "./LoginControl.tsx";
 export { USE_A_COMPUTER } from "./LoginView.tsx";
 export { sayProblem } from "./problem.ts";
-export { adenaHere } from "./getStartedAsk.ts";
+export { adenaHere, askGetStarted } from "./getStartedAsk.ts";

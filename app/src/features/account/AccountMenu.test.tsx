@@ -84,6 +84,19 @@ describe("the account's menu", () => {
   });
 
   // PR #41's UX review: under 900 px a computer's header has no Connect; its menu holds the command line's way, a touch phone's none.
+  it("on a phone with no Adena offers Get started first, which asks for the steps once; with none given, no such row", () => {
+    const ask = vi.fn();
+    const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} onGetStarted={ask} phone />);
+    expect(items(box)[0]).toBe("Get started");
+    act(() => {
+      box.querySelector<HTMLElement>("[role='menuitem']")?.click();
+    });
+    expect(ask).toHaveBeenCalledOnce();
+    expect(items(mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} phone />))).not.toContain(
+      "Get started",
+    );
+  });
+
   it("on a narrow computer offers Log in with gnokey after Connect Adena, and on a touch phone none", () => {
     const pointer = (fine: boolean) => {
       Reflect.set(globalThis, "matchMedia", (query: string) => ({
