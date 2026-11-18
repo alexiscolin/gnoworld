@@ -34,14 +34,14 @@ describe("EarthGround", () => {
     ground.place(planet("a"), step, eye);
     ground.lead = 1;
     ground.grab.drag({ dx: 50, dy: 0, radius: 100, seconds: 0.016 });
-    ground.grab.advance(0.016, new Quaternion(), true);
+    for (let t = 0; t < 1; t += 0.016) ground.grab.advance(0.016, new Quaternion(), true);
     ground.place(planet("a"), step, eye);
     expect(ground.lead).toBe(1);
-    expect(ground.leaned.angleTo(new Quaternion())).toBeCloseTo(0.5, 6);
+    expect(ground.leaned.angleTo(new Quaternion())).toBeCloseTo(0.5, 3);
     ground.place(planet("b"), step, eye);
     expect(ground.leaned.angleTo(new Quaternion())).toBe(0);
     ground.place(planet("a"), step, eye);
-    expect(ground.leaned.angleTo(new Quaternion())).toBeCloseTo(0.5, 6);
+    expect(ground.leaned.angleTo(new Quaternion())).toBeCloseTo(0.5, 3);
   });
 
   // The ground under the eye, by facing() (the inverse path), is where a mark put there must stand: the middle of the planet's disc, in front,

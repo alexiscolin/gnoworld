@@ -12,6 +12,8 @@ const TURN_TAU = 0.32;
 // the frames the moves are apart, never all in the frame of one, and the view trails the hand by about a move.
 const HAND_TAU_MIN = 0.03;
 const HAND_TAU_MAX = 0.08;
+/** The lag of a hand's move, in seconds, `seconds` after the move before it: the planet's drag (earth/grab.ts) has it too. */
+export const handTau = (seconds: number): number => Math.min(Math.max(2 * seconds, HAND_TAU_MIN), HAND_TAU_MAX);
 const ZOOM_TAU = 0.18;
 // How fast the anchor's pull comes in and out where a view hands the wheel over (a system's middle, the pointer): never in one frame.
 const PULL_TAU = 0.4;
@@ -89,7 +91,7 @@ export class Free {
     this.#pitch = tilt / Math.max(seconds, 1 / 240);
     this.#pending.yaw += yaw;
     this.#pending.pitch += tilt;
-    this.#handTau = Math.min(Math.max(2 * seconds, HAND_TAU_MIN), HAND_TAU_MAX);
+    this.#handTau = handTau(seconds);
   }
 
   /** The drag let go: what speed it had carries on, unless it stood still before letting go. */
