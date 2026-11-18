@@ -8,6 +8,7 @@ import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, type Page } from "./fixtures.ts";
 import { axeOf } from "./axe.ts";
 import { isPhone, openPlacePage } from "./realmRoom.ts";
+import { ownContext } from "./deployed.ts";
 
 // The call card's journeys' world: Adena's stand-in (adena.ts) given the calls a signature needs, with the answers of
 // ../fakeAdena.ts, and the chain's RPC answering as a browser would get it.
@@ -217,7 +218,7 @@ export async function phoneOf(
   { playwright, launchOptions }: { playwright: { chromium: BrowserType }; launchOptions: LaunchOptions },
 ) {
   const browser: Browser = await playwright.chromium.launch(launchOptions);
-  const context = await browser.newContext({
+  const context = await ownContext(browser, {
     baseURL: new URL(page.url()).origin,
     storageState: await page.context().storageState(),
     hasTouch: true,
