@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { adena } from "./adena.ts";
 import { callWallet, connect, REALM, writeChain } from "./callCard.ts";
 import { open } from "./chatScreenOpen.ts";
+import { word } from "./chat.ts";
 import { onEarth, spaceReady as sceneOn } from "./earthStage.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { logIn } from "./irc.ts";
 import { analyse, continuity, odd } from "./smoothAnalysis.ts";
 import { record, stop, type Raw } from "./smoothness.ts";
 
@@ -55,6 +57,11 @@ test("the measure sees a planted jump, a bounce and a stall, and none in an ease
       { floor: 0.01 },
     ).bounces.length,
   ).toBeGreaterThan(0);
+  // A step over a stall is not judged: the stall drew none of it; the same step in a frame of its own is a jump.
+  const stalled = times.map((t, i) => (i > 20 ? t + 300 : t));
+  const stepped = eased.map((v, i) => (i > 20 ? v + 0.5 : v));
+  expect(continuity(stalled, stepped, { floor: 0.01, unseen: 32 }).jumps).toEqual([]);
+  expect(continuity(times, stepped, { floor: 0.01, unseen: 32 }).jumps.length).toBeGreaterThan(0);
   const raw: Raw = { frames: times.map((t, i) => ({ t: i > 20 ? t + 100 : t, watched: {} })), long: [], shifts: [] };
   expect(analyse(raw).stalls.count).toBe(1);
 });
@@ -95,7 +102,11 @@ test("3 the galaxy, dragged", async ({ page }) => {
     await wait(page, 2000);
     await page.mouse.move(480, 280);
     await page.mouse.down();
-    await page.mouse.move(640, 320, { steps: 20 });
+    // A hand's drag, a step a frame: twenty moves sent at once land in one frame after the press's, and the scene follows the hand there.
+    for (let step = 1; step <= 20; step += 1) {
+      await page.mouse.move(480 + 8 * step, 280 + 2 * step);
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+    }
     await page.mouse.up();
     await wait(page, 4000);
   });
@@ -169,12 +180,16 @@ test("6b the bubble on the Earth", async ({ page }) => {
   });
 });
 
+// The + is an account's: the page logs in for real (a scripted Ergo alone leaves it a guest), then opens the docked chat.
 test("7 a dialog, open and closed (poll)", async ({ page }) => {
-  await open(page, { width: 1366, as: ACCOUNT, height: 768, full: false, query: "&test-gpu" });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await logIn(page, word("poll"));
+  await page.goto("/w/bubble?room=games&test-gpu");
+  await hydrated(page);
   await sceneOn(page);
   await wait(page, 2000);
   await flow(page, ["7-dialog", "[role='dialog']"], async () => {
-    await page.getByRole("button", { name: /^add/i }).first().click();
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByRole("menuitem", { name: "Poll" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await wait(page, 1500);
@@ -185,7 +200,7 @@ test("7 a dialog, open and closed (poll)", async ({ page }) => {
 });
 
 test("8 the dive into the Earth's page and out, lines from far countries during and after", async ({ page }) => {
-  const { socket } = await onEarth(page, {
+  const { socket, sent } = await onEarth(page, {
     me: ACCOUNT,
     motion: true,
     ticking: true,
@@ -202,6 +217,8 @@ test("8 the dive into the Earth's page and out, lines from far countries during 
   };
   await flow(page, ["8-earth-dive"], async () => {
     await page.locator("a[href='/earth']").first().dispatchEvent("click");
+    // The home opens no chat: the Earth's page joins #earth as the dive comes, and its first line is said once it has.
+    await expect.poll(() => sent.some((line) => line.startsWith("JOIN ")), SLOW).toBe(true);
     say("d1", "from Japan, in the dive", "JP");
     await wait(page, 3000);
     say("d2", "from Brazil, in the dive", "BR");
