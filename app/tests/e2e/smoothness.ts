@@ -12,13 +12,15 @@ interface Frame {
   look?: [number, number, number];
   flying?: boolean;
   lead?: number;
-  /** What faces the eye on the Earth's ground, in radians. */
+  /** What faces the eye on the Earth's ground, in degrees (earth/ground.ts's facing). */
   lat?: number;
   lon?: number;
   /** The strongest skeleton line (a shader line set drawn first, in a group of its own) showing this frame. */
   skeleton?: number;
   /** Whether the Earth stands as itself (not its quad, not its skeleton) this frame. */
   earthShown?: boolean;
+  /** Whether the full chat, opaque, covers the scene this frame: what the camera does under it is not seen. */
+  covered?: boolean;
   /** Per watched selector: opacity, and the transform's [scale, x, y], of its first match (NaN when none). */
   watched: Record<
     string,
@@ -163,11 +165,17 @@ const sampling = (page: Page, selectors: readonly string[]) =>
       });
       frame.skeleton = gain;
     };
+    const covered = () => {
+      const full = document.querySelector("[data-chat-screen][data-full]:not([data-ghost] *)");
+      let opacity = full === null ? 0 : 1;
+      for (let node = full; node !== null; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+      return opacity > 0.99;
+    };
     const read = (t: number) => {
       const ctl = Reflect.get(globalThis, "__smooth") as { stop: boolean };
       if (ctl.stop) return false;
       const space = Reflect.get(globalThis, "__gnoworldSpace") as Spot | undefined;
-      const frame: Frame = { t, watched: {} };
+      const frame: Frame = { t, watched: {}, covered: covered() };
       if (space !== undefined) {
         camera(space, frame);
         earth(space, frame);
