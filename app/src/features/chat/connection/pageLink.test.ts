@@ -38,6 +38,20 @@ describe("the page's link", () => {
     await aTask();
   });
 
+  it("keeps another store's link that came in the same commit, once the last one lets go", async () => {
+    const before = store();
+    const after = store();
+    takeLink(before);
+    dropLink();
+    const taken = takeLink(after);
+    await aTask();
+    expect(takeLink(after)).toBe(taken);
+    expect(made.at(-1)?.stop).not.toHaveBeenCalled();
+    dropLink();
+    dropLink();
+    await aTask();
+  });
+
   it("stops the last page's link when another store takes one", async () => {
     takeLink(store());
     const before = made.at(-1);
