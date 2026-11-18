@@ -208,3 +208,75 @@ describe("a flight begun when the camera has all but stopped", () => {
     expect(turned(Infinity)).toBeGreaterThan(0.03);
   });
 });
+
+describe("a goal that moves on the way", () => {
+  // The home's goal changes from its system to the Earth close once its page lays the circle out: the end moves by tens of units in one
+  // frame. The flight goes over to the new end over a moment, never in one frame, and still lands exactly on it.
+  const fly = () => {
+    const from = at([0, 0, 1], [0, 1, 0]);
+    from.distance = 4;
+    const to = at([0, 0, 1], [0, 1, 0]);
+    Object.assign(to.look, { x: 400, y: 0, z: 0 });
+    to.distance = 4;
+    const flight = new Flight(from, goalOf(to));
+    const out = blankPose();
+    const steps: number[] = [];
+    const prev = { x: 0, y: 0, z: 0 };
+    let landed = false;
+    for (let frame = 0; frame < 400 && !landed; frame += 1) {
+      if (frame === 20) Object.assign(to.look, { x: 420, y: 15, z: -10 });
+      Object.assign(prev, out.look);
+      landed = flight.advance(MS, false, out);
+      steps.push(Math.hypot(out.look.x - prev.x, out.look.y - prev.y, out.look.z - prev.z));
+    }
+    return { steps, out, to };
+  };
+
+  it("takes the move over several frames", () => {
+    const { steps } = fly();
+    const before = Math.max(...steps.slice(1, 20));
+    expect(Math.max(...steps.slice(20, 30))).toBeLessThan(5 * Math.max(before, 0.5));
+  });
+
+  it("lands exactly on the end it moved to", () => {
+    const { out, to } = fly();
+    expect([out.look.x, out.look.y, out.look.z]).toEqual([to.look.x, to.look.y, to.look.z]);
+  });
+});
+
+describe("a goal whose way and distance move late on the way", () => {
+  // The page's circle comes late: the end's way turns by a radian and its distance doubles halfway. No frame turns the camera by a fifth of
+  // a radian (it popped by 0.85), and the flight lands on it, its way a unit.
+  it("turns and zooms over a moment, and lands exactly", () => {
+    const from = at([0, 0, 1], [0, 1, 0]);
+    from.distance = 4;
+    const to = at([1, 0, 0], [0, 1, 0]);
+    to.distance = 4;
+    const goal: Goal = {
+      pose: (out) => {
+        Object.assign(out.look, to.look);
+        Object.assign(out.way, to.way);
+        Object.assign(out.up, to.up);
+        out.distance = to.distance;
+        return true;
+      },
+    };
+    const flight = new Flight(from, goal);
+    const out = blankPose();
+    const last = { ...from.way };
+    let [turn, landed] = [0, false];
+    for (let frame = 0; frame < 600 && !landed; frame += 1) {
+      if (frame === 60) {
+        Object.assign(to.way, { x: Math.cos(1), y: 0, z: -Math.sin(1) });
+        to.distance = 8;
+      }
+      landed = flight.advance(MS, false, out);
+      if (frame >= 60) turn = Math.max(turn, angle(last, out.way));
+      Object.assign(last, out.way);
+    }
+    expect(turn).toBeLessThan(0.2);
+    expect([out.way.x, out.way.y, out.way.z]).toEqual([to.way.x, to.way.y, to.way.z]);
+    expect(Math.hypot(out.way.x, out.way.y, out.way.z)).toBeCloseTo(1, 12);
+    expect(out.distance).toBeCloseTo(8, 6);
+  });
+});

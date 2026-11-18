@@ -3,6 +3,7 @@
 // the field of view opens 5° mid-way (not on a turn). The goal is read each frame. Eased power2.inOut from rest, out when moving.
 import { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "@gnoworld/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
+import { approach, keepOf } from "./lag.ts";
 import { blankPose, copyPose, eyeOf, type Pose } from "./pose.ts";
 
 /** Where a flight goes: the pose asked, read each frame (false while it cannot be told yet), and what it says on its way. */
@@ -50,7 +51,7 @@ export class Flight {
   readonly goal: Goal;
   readonly #from = blankPose();
   readonly #to = blankPose();
-  // Where the flight's pose stands a moment in, read to weigh its start (`#startWeight`).
+  // The goal as read this frame: the end the flight flies to, `#to`, goes over to it (lag.ts).
   readonly #now = blankPose();
   readonly #apart = new Vector3();
   readonly #step: ZoomStep = { along: 0, width: 0 };
@@ -126,6 +127,7 @@ export class Flight {
     }
     const t = this.#share(still ? Infinity : this.#time + delta / 1000);
     this.along = (1 - this.#weight) * inOut(t) + this.#weight * outOnly(t);
+    if (this.goal.pose(this.#now)) approach(this.#to, this.#now, keepOf(delta / 1000, this.along));
     this.#pose(t, out);
     if (!this.#near && this.along >= NEAR) {
       this.#near = true;
@@ -173,7 +175,6 @@ export class Flight {
     const from = this.#from;
     const path = this.#path;
     if (path === undefined) return;
-    this.goal.pose(to);
     glideAt(path, this.along, this.#step);
     const left = 1 - this.#step.along;
     out.look.x = to.look.x + this.#apart.x * left;
