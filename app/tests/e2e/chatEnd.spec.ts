@@ -44,3 +44,29 @@ test("a room opens at its end and stays there as a late card comes in", async ({
   await expect(page.getByText("a later line")).toBeAttached();
   expect(await list.evaluate((box) => box.scrollTop)).toBe(0);
 });
+
+// WebKit anchors no scroll, and Chromium is asked not to here: a second card grows after the list moved to its end for the
+// first and before that move's scroll event, which then finds the list off its end (Safari showed a room mid-history).
+test("a room stays at its end when two cards grow a frame apart, with no scroll anchoring", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  const height = await list.evaluate(async (box) => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    const grow = (at: number) => {
+      const line = box.children[at];
+      if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "200px");
+    };
+    box.style.setProperty("overflow-anchor", "none");
+    grow(5);
+    await frame();
+    // After this frame's ResizeObserver, before the next frame's scroll event.
+    await new Promise((done) => setTimeout(done, 0));
+    grow(10);
+    await frame();
+    await frame();
+    return box.scrollHeight;
+  });
+  expect(height).toBeGreaterThan(400);
+  expect(await gap(list)).toBeLessThan(4);
+});

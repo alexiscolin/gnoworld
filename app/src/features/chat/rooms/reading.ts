@@ -97,6 +97,12 @@ const AT_END = 32;
 // Whether a list is scrolled to its end, or within AT_END of it.
 const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
 
+// Moves a list to its end, and notes where that is.
+const toEnd = (box: HTMLElement, top: { current: number }) => {
+  box.scrollTop = box.scrollHeight;
+  top.current = box.scrollTop;
+};
+
 // The lines held at their newest while the reader is there, as a line comes or a reaction grows one;
 // once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once,
 // and the reader is at the end only if that shows it.
@@ -108,6 +114,8 @@ function useNewestInView(
   const listRef = useRef<HTMLOListElement>(null);
   const atEndRef = useRef(true);
   const placedRef = useRef(false);
+  // Where this hook last moved the list.
+  const topRef = useRef(0);
   useLayoutEffect(() => {
     const box = listRef.current;
     if (box === null) return;
@@ -116,7 +124,8 @@ function useNewestInView(
       placedRef.current = true;
       box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
       atEndRef.current = atEnd(box);
-    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
+      topRef.current = box.scrollTop;
+    } else if (atEndRef.current) toEnd(box, topRef);
   }, [lines, fresh, reactions]);
   // The list shrinks as the composer grows (a six-line draft), and a line grows as its card, preview or image comes: no
   // scroll event comes for either, so a reader at the end is kept there by the new size, else the newest lines are lost
@@ -125,7 +134,7 @@ function useNewestInView(
     const box = listRef.current;
     if (box === null || typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(() => {
-      if (atEndRef.current) box.scrollTop = box.scrollHeight;
+      if (atEndRef.current) toEnd(box, topRef);
     });
     watch.observe(box);
     for (const line of box.children) watch.observe(line);
@@ -139,8 +148,13 @@ function useNewestInView(
       watch.disconnect();
     };
   }, []);
+  // A scroll is told a frame after its move, and a card may have grown the list since (WebKit anchors no scroll): off the
+  // end but where this hook put it, the list was moved by no reader.
   const onScroll = () => {
-    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
+    const box = listRef.current;
+    if (box === null) return;
+    if (atEnd(box)) atEndRef.current = true;
+    else if (box.scrollTop !== topRef.current) atEndRef.current = false;
   };
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
   const seesEnd = () => atEndRef.current && (listRef.current?.clientHeight ?? 0) > 0;
