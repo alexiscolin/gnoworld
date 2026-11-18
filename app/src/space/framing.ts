@@ -26,23 +26,32 @@ export function slideFor(space: Space, place: Place): void {
 /** Whether a flight runs that the page waits on: the framing's own tells it nothing, so a page asked meanwhile flies on its own (`go`). */
 export const waitedOn = ({ rig, keep }: Pick<Space, "rig" | "keep">): boolean => rig.flying && !keep.unheard;
 
-/** Holds the page's `circle`; where its framing turned at rest, flies to `again`, the place's goal, which tells the page nothing. */
+// A framing that turned: flown to where the scene is in sight (the flight tells the page nothing), else owed to the next hold in sight.
+function turn(
+  { place, universe, rig, plan, seen, keep }: Space,
+  again: (place: Place, universe: Universe) => Goal | undefined,
+): void {
+  if (place === undefined || universe === undefined || rig.flying || plan) return;
+  keep.owed = !seen;
+  const goal = seen ? again(place, universe) : undefined;
+  if (goal === undefined) return;
+  keep.unheard = true;
+  rig.fly(goal);
+}
+
+/** Holds the page's `circle`; where its framing turned at rest, flies to `again`, the place's goal, which tells the page nothing. Under a
+ * cover the camera stays where it was last drawn, the flight owed to the next hold in sight: it starts from what the reader saw. */
 export function holdCircle(
   space: Space,
   circle: Circle | undefined,
   again: (place: Place, universe: Universe) => Goal | undefined,
 ): void {
-  const turned = (circle?.close === true) !== (space.circle?.close === true);
+  const turned = (circle?.close === true) !== (space.circle?.close === true) || space.keep.owed;
   space.circle = circle;
-  const { place, rig, universe } = space;
-  if (place === undefined || universe === undefined) return;
-  const goal = turned && !rig.flying && !space.plan ? again(place, universe) : undefined;
-  if (goal !== undefined) {
-    space.keep.unheard = true;
-    rig[space.seen ? "fly" : "jump"](goal);
-  }
+  if (space.place === undefined || space.universe === undefined) return;
+  if (turned) turn(space, again);
   // A page's planet keeps to its circle as the page lays it out; during a flight the slide that rides it heads for the new one.
-  slideFor(space, place);
+  slideFor(space, space.place);
 }
 
 type At = Pick<Space, "arrival" | "universe" | "neared" | "kept">;

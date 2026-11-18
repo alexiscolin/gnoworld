@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { aloneOf, homeFrame, nearAlone } from "./framing.ts";
+import { aloneOf, holdCircle, homeFrame, nearAlone } from "./framing.ts";
+import type { Circle } from "./goals.ts";
 import { layoutOf } from "./layout.ts";
 import { Rig } from "./rig/rig.ts";
 
@@ -67,5 +68,54 @@ describe("the home's far worlds", () => {
     frame.uSolo.value = 0;
     homeFrame(space, undefined, 0.1);
     expect(frame.uSoloPx.value).toBe(0);
+  });
+});
+
+// The full chat covers the scene, and the camera is not moved under it: what it last drew is what stands when the chat leaves, and the
+// framing's flight starts from there, never from a pose that was never drawn (the first frame was a step and a turn).
+describe("a page's circle that turns the framing", () => {
+  const circle = (close: boolean): Circle => ({ x: 400, y: 300, radius: 120, width: 960, height: 560, close });
+  function stage(circleNow: Circle | undefined) {
+    const calls: string[] = [];
+    const rig = { flying: false, lens: () => undefined, fly: () => calls.push("fly"), jump: () => calls.push("jump") };
+    const space = {
+      circle: circleNow,
+      place: { kind: "world", id: "bubble" } as const,
+      universe,
+      rig,
+      seen: true,
+      plan: false,
+      keep: { unheard: false, owed: false },
+      see: { screen: { width: 960, height: 560 } },
+      options: { still: () => false },
+    };
+    const hold = (next: Circle | undefined) => {
+      holdCircle(space as never, next, () => ({ pose: () => true }));
+    };
+    return { calls, space, hold };
+  }
+
+  it("flies where the scene is in sight", () => {
+    const { calls, space, hold } = stage(circle(false));
+    hold(circle(true));
+    expect([calls, space.keep.unheard]).toEqual([["fly"], true]);
+  });
+
+  it("moves no camera where the scene is covered", () => {
+    const { calls, space, hold } = stage(circle(false));
+    space.seen = false;
+    hold(circle(true));
+    expect(calls).toEqual([]);
+  });
+
+  it("flies the turn a cover held back at the next hold in sight, though the circle has not turned again", () => {
+    const { calls, space, hold } = stage(circle(true));
+    space.seen = false;
+    hold(circle(false));
+    space.seen = true;
+    hold(circle(false));
+    expect(calls).toEqual(["fly"]);
+    hold(circle(false));
+    expect(calls, "once").toEqual(["fly"]);
   });
 });

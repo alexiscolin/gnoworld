@@ -124,7 +124,7 @@ export class Space {
     this.#asked = place;
     const universe = this.universe;
     if (universe === undefined || this.#there(place)) return waitedOn(this);
-    [this.place, this.neared, this.keep.unheard] = [place, false, false];
+    [this.place, this.neared, this.keep.unheard, this.keep.owed] = [place, false, false, false];
     this.stage.near?.warm.place({ place, universe, eye: this.rig.eye });
     this.stage.effects.scan.play(undefined);
     const goal = this.#goalOf(place, universe);
