@@ -103,7 +103,9 @@ test("hands the rail the places it links to", async () => {
     worlds: [
       expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
       expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
-      // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts): their pages stay routable.
+      // gnosh's colony is the one station shown (D13742); the others are no place while STATIONS_SHOWN is off (places.ts), their pages
+      // still routable.
+      expect.objectContaining({ slug: "gnosh-ai", path: "/w/gnosh-ai", kind: "station" }),
     ],
   });
 });

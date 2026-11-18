@@ -384,7 +384,8 @@ describe("a world's page and the chain's stream", () => {
         { slug: "earth", name: "Earth", href: "/earth" },
         { slug: "bubble", name: "Bubble", href: "/w/bubble" },
         { slug: "govdao", name: "GovDAO", href: "/w/govdao" },
-        // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts): the worlds beside it are Bubble and GovDAO.
+        // gnosh's colony is the one station shown (D13742); the others are no place while STATIONS_SHOWN is off (places.ts).
+        { slug: "gnosh-ai", name: "gnosh.ai", href: "/w/gnosh-ai" },
       ],
     });
   });
