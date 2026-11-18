@@ -146,7 +146,7 @@ test("a room opened on its New line stays there once it is quiet", async ({ page
         : Math.abs(Math.round(mark.getBoundingClientRect().top - box.getBoundingClientRect().top));
     });
   await expect.poll(fromTop).toBe(0);
-  // Past the net's wait (reading.ts, QUIET_MS).
+  // Past the net's wait (heldAtEnd.ts, QUIET_MS).
   await page.waitForTimeout(600);
   expect(await fromTop()).toBe(0);
   expect(await gap(list)).toBeGreaterThan(100);

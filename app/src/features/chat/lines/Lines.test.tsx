@@ -370,6 +370,54 @@ describe("the list held at its end", () => {
       expect(top).toBe(100);
     });
 
+    // The quiet wait may run out while the list is hidden: the arrival is still to come, when it is shown.
+    it("keeps its one move for the list shown again, when it is quiet while it has no height", () => {
+      draw({ paged: true });
+      client = 0;
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+      client = CLIENT;
+      strayed(0);
+      expect(top).toBe(600);
+    });
+
+    it("leaves a list shown again where it was, when it was not at its end as it lost its height", () => {
+      draw({ paged: true });
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+      top = 100;
+      scrolled();
+      client = 0;
+      grown(0);
+      client = CLIENT;
+      strayed(100);
+      expect(top).toBe(100);
+    });
+
+    it("holds the end it put the list at, when a card grows before that move's scroll event", () => {
+      draw({ paged: true });
+      strayed(0);
+      height += 300;
+      scrolled();
+      grown(0);
+      expect(top).toBe(900);
+    });
+
+    it("does nothing once the room is left: no move, no hand heard", () => {
+      draw({ paged: true });
+      const box = list();
+      top = 0;
+      scrolled();
+      grown(0);
+      act(() => {
+        root.unmount();
+      });
+      vi.advanceTimersByTime(QUIET);
+      box.dispatchEvent(new Event("wheel"));
+      expect(top).toBe(0);
+      root = createRoot(host);
+    });
+
     it("moves it again when the list is shown after it had no height", () => {
       draw({ paged: true });
       strayed(0);

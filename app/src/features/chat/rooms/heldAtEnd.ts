@@ -40,6 +40,7 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
     const latest = setTimeout(() => show(box), CARDS_WAIT_MS);
     return () => {
       clearTimeout(latest);
+      show(box);
     };
   }, [listRef]);
 }
@@ -101,7 +102,8 @@ export function useNewestInView({
     let quiet: ReturnType<typeof setTimeout> | undefined;
     const watch = new ResizeObserver(() => {
       if (atEndRef.current) toEnd(box, topRef);
-      if (box.clientHeight === 0) arrivingRef.current = true;
+      // No height: hidden. Shown again, it arrives again if it stood at its end, and is left where it was if not.
+      if (box.clientHeight === 0 && atEndRef.current) arrivingRef.current = true;
       clearTimeout(quiet);
       quiet = setTimeout(settle, QUIET_MS);
     });
@@ -126,7 +128,8 @@ export function useNewestInView({
   // end but where this hook put it, the list was moved by no reader.
   const onScroll = () => {
     const box = listRef.current;
-    if (box === null) return;
+    // A list with no height is moved by no reader: an engine may forget its place as it hides it.
+    if (box === null || box.clientHeight === 0) return;
     if (atEnd(box)) atEndRef.current = true;
     // A pixel or more: a phone may tell a place snapped to its own pixels.
     else if (Math.abs(box.scrollTop - topRef.current) >= 1) atEndRef.current = false;
