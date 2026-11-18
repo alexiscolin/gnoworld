@@ -97,7 +97,9 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   const [params] = useSearchParams();
   const session = useApp(({ login }) => login.session);
   const query = roomsQuery(world, session, attempt);
-  useEffect(() => {
+  // Taken in a layout effect, before useLinkAt's: rooms the page already holds come at the first draw, and the room in view is told the
+  // link then, once; taken in a later effect, the link never heard it and the room's history was never asked.
+  useLayoutEffect(() => {
     linkRef.current = takeLink(store);
     return dropLink;
   }, [store]);
