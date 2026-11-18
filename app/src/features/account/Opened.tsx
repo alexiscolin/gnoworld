@@ -15,14 +15,15 @@ const jarvisRow = (onJarvis: (() => void) | undefined, why: string | undefined):
 // A mouse or a trackpad, read as the menu opens: a computer's, whatever its window's width.
 const finePointer = (): boolean => typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches;
 
-// A guest's ways in where the header has no room for them: Adena where it is found, and a narrow computer's command line (PR #41's UX
-// review); a touch phone has no terminal.
+// A guest's ways in where the header has no room for them: Get started where no Adena is found, Adena where it is, and a narrow
+// computer's command line (PR #41's UX review); a touch phone has no terminal.
 function waysIn(
-  onConnect: (() => void) | undefined,
+  { onConnect, onGetStarted }: { onConnect: (() => void) | undefined; onGetStarted: (() => void) | undefined },
   narrow: boolean,
   to: (label: string, icon: IconName, view: DeviceView) => MenuItem,
 ) {
   return [
+    ...(onGetStarted === undefined ? [] : [{ label: "Get started", onSelect: onGetStarted }]),
     ...(onConnect === undefined ? [] : [{ label: "Connect Adena", onSelect: onConnect }]),
     ...(narrow && finePointer() ? [to("Log in with gnokey", "key", "key-login")] : []),
   ];
@@ -57,6 +58,7 @@ export function Opened({
   jarvisWhy,
   guestNote,
   onConnect,
+  onGetStarted,
   phone,
 }: {
   address: string | undefined;
@@ -72,6 +74,8 @@ export function Opened({
   guestNote?: string | undefined;
   /** A guest's way in, where Adena is found on a phone: its header has no room for the button, so it is the menu's first row. */
   onConnect?: (() => void) | undefined;
+  /** A guest's Get started, where a phone finds no Adena: its header has no Connect, so the steps are the menu's first row. */
+  onGetStarted?: (() => void) | undefined;
   /** A phone's header holds no network: its choices are rows of this menu. */
   phone?: boolean | undefined;
 }) {
@@ -87,7 +91,7 @@ export function Opened({
     },
   });
   const items: MenuItem[] = [
-    ...(address === undefined ? waysIn(onConnect, phone === true, to) : []),
+    ...(address === undefined ? waysIn({ onConnect, onGetStarted }, phone === true, to) : []),
     // A phone has no use for a greyed "Jarvis, soon": the row shows once it can act.
     ...(phone && onJarvis === undefined ? [] : [jarvisRow(onJarvis, jarvisWhy)]),
     to("Passport", "passport", "passport"),

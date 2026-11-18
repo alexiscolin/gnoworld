@@ -1,11 +1,19 @@
-// Asks across the page between parts that import nothing of each other, each answered by its one owner: the log in and a name to pick, by
-// the header's one account control (a second would watch the session and the wallet twice); who is here, by the chat's people (its info
+// Asks across the page between parts that import nothing of each other, each answered by its one owner: the log in, the steps (Get started)
+// and a name to pick, by the header's one account control (a second would watch the session and the wallet twice); who is here, by the chat's people (its info
 // panel); the rooms, by the chat header's name that opens them (the dock's "+N" chip). And what that control knows that the chat shows: whether the account has no name to be read by.
 import { useSyncExternalStore } from "react";
 import { Heard } from "./lib/heard.ts";
 
 type Ask =
-  "log-in" | "pick-name" | "who-is-here" | "jarvis" | "jarvis-catch-up" | "jarvis-ask" | "jarvis-said" | "rooms";
+  | "log-in"
+  | "get-started"
+  | "pick-name"
+  | "who-is-here"
+  | "jarvis"
+  | "jarvis-catch-up"
+  | "jarvis-ask"
+  | "jarvis-said"
+  | "rooms";
 const eventOf = (ask: Ask) => `gnoworld:${ask}`;
 
 /** Asks the page's owner of `ask` to act. */

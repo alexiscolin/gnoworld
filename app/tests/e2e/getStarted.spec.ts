@@ -31,3 +31,13 @@ for (const [name, size] of Object.entries(sizes)) {
     await expect(dialog).toBeHidden();
   });
 }
+
+// A phone's header has no Connect, and Adena has no phone app: the steps are a row of its menu.
+test("opens the steps from a phone's menu, where no Adena is found", async ({ page }) => {
+  await page.setViewportSize(sizes.phone);
+  await page.goto("/");
+  await hydrated(page);
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Get started" }).click();
+  await expect(page.getByRole("dialog", { name: "Get started" })).toBeVisible();
+});

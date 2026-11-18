@@ -253,8 +253,8 @@ it again would show an action no one can press until then.
 
 Enter and leave: everything that appears also leaves. It enters on `--ease-standard`
 with a 4–12 px travel from where it comes, and leaves on `--ease-in` in about 70% of the time, with a fade and a few
-pixels at most. One class writes it, `appears` (`packages/ui/src/appears.css`): the floating surfaces, the dialog, the bell's panel and
-the welcome card wear it, and set `--appear-time` (the enter's duration, `--motion-fast` by default), `--appear-grow` (the scale it comes
+pixels at most. One class writes it, `appears` (`packages/ui/src/appears.css`): the floating surfaces, the dialog and the bell's panel
+wear it, and set `--appear-time` (the enter's duration, `--motion-fast` by default), `--appear-grow` (the scale it comes
 from) and `--appear-from` (the offset it comes from) for what differs. It uses `@starting-style` and `transition-behavior:
 allow-discrete`, and shows when a popover is shown, a dialog is `open` or the element has `data-open`. The scene sets the pace; the page
 follows its phases.
@@ -441,9 +441,6 @@ The link and market cards, all in `app/src/features/`, none in `ui`:
 - **The trending card** (`chat/TrendingCard.tsx`, from `/trending`): a compact `Card`, the most called worlds of the last 7 days as an ordered
   list of plain `Row`s (the rank as the lead, the owner as the subtitle, the calls as the trail), a line saying what it is ranked by. Only the
   default universe is ranked, and the card says so in another.
-- **The welcome card** (`features/welcome/Welcome.tsx`): a compact `Card` over space on a first visit, a kicker, a title, a line, a solid
-  "Get started" (or "Connect Adena" where Adena is in the page) and an outline "Say hi"; any use or `Esc` closes it for good, and closed it stays
-  drawn, inert and faded, so that it leaves as it came.
 - **Get started** (`features/login/GetStarted.tsx`): a `Dialog` a Connect without Adena opens: four numbered steps, a `Disclosure` for what is
   only further reading, a solid Connect that appears once the page sees Adena (no reload) and a "Continue as a guest". Its links open in a new tab.
 - **The error system** (`features/errors/`): one `ErrorView` in three sizes. `page` and `place` (inside a plate) show a title, one line, a solid
