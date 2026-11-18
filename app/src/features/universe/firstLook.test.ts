@@ -16,6 +16,7 @@ const loader = (): void => {
   const box = document.createElement("div");
   box.setAttribute("role", "status");
   box.setAttribute("aria-label", "Loading space");
+  box.setAttribute("data-loader", "");
   document.body.append(box);
 };
 

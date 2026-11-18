@@ -11,7 +11,7 @@ const SHELL_FADE = 0.7;
 const SHARP_SLACK_MS = 500;
 
 /** Whether the loader still stands: what mounts under it rises with it. */
-export const loading = (): boolean => document.querySelector("[role='status'][aria-label='Loading space']") !== null;
+export const loading = (): boolean => document.querySelector("[data-loader]") !== null;
 
 // The bar's last stretch of fill, in ms, before the loader fades (SpaceLoader.module.css: the fade's delay, the fill's transition).
 const FILL_MS = 200;

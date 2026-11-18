@@ -302,7 +302,8 @@ Baseline "widely available", with four named exceptions: from 2024, the `popover
 colours then leave as drawn, the property doing nothing where forced colours do not exist; and
 `field-sizing` and `resize`, for the box of lines, which grows with its draft and drags by its
 height alone. The lint holds the line and lists the exceptions, the last two for the avatar's and
-the field's sheets alone. Popovers are positioned by a
+the field's sheets alone. The base styles alone also take `scrollbar-width`, `user-select` and
+`overscroll-behavior` (Safari from 16, a page too short to scroll from 16.4; ignored before). Popovers are positioned by a
 small function of ours until CSS anchor positioning (Baseline 2026) is widely available.
 
 ## Testing the CSS
@@ -512,6 +513,9 @@ fraction such as 899.5 included, falls on one side alone. The scripts' queries (
   a sheet with the info column's content and the planet, drawn when it opens, and "Its page"
   opens the place's own plate in a sheet. No 3D, no cosmos, no "View in space" until the phone's
   3D pass. Every control is a 44 px target (`--control-m`), set under the phone's range alone.
+  The screen stands still: the page takes no pull past its ends (`overscroll-behavior: none` on
+  the root) and the chat's lines hand no scroll on (`contain`), so the lines alone move (the
+  base styles).
 - 900 to 1279 px: the place's page with its chat a block, as before; the Earth keeps its chat a
   block of the page under the globe, up to the dock's 1280 px.
 - 1280 px: the dock opens by itself on a world.
