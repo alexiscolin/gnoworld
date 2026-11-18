@@ -162,7 +162,8 @@ function useNewestInView(
     const box = listRef.current;
     if (box === null) return;
     if (atEnd(box)) atEndRef.current = true;
-    else if (box.scrollTop !== topRef.current) atEndRef.current = false;
+    // A pixel or more: a phone may tell a place snapped to its own pixels.
+    else if (Math.abs(box.scrollTop - topRef.current) >= 1) atEndRef.current = false;
     hold(box, atEndRef.current);
   };
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.

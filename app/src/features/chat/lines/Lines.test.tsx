@@ -280,6 +280,30 @@ describe("the list held at its end", () => {
     expect(top).toBe(800);
   });
 
+  // A room opened on its New line near its end shows its end too: it is held there as any other.
+  it("stays at the end it opened on with its New line, when a card grows before that move's scroll event", () => {
+    height = 420;
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      return new DOMRect(0, this.matches("li[data-new]") ? 10 : 0, 0, 0);
+    });
+    draw({ paged: true, read: at(100) });
+    expect(top).toBe(10);
+    height += 300;
+    scrolled();
+    grown(0);
+    expect(top).toBe(320);
+  });
+
+  // A phone may tell a place snapped to its own pixels: a fraction off where the list was put is no reader's move.
+  it("takes a place told a fraction of a pixel off its own for its own", () => {
+    draw();
+    height += 300;
+    top += 0.4;
+    scrolled();
+    grown(0);
+    expect(top).toBe(900);
+  });
+
   it("leaves the reader who scrolled up where they are as a card grows, and holds the end again once back there", () => {
     draw();
     scrolled();
