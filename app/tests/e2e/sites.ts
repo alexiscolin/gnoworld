@@ -5,7 +5,9 @@ declare const process: { env: Record<string, string | undefined> };
 const port = Number(process.env["E2E_PORT"] ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65533)
   throw new Error(`E2E_PORT is no port base: ${String(process.env["E2E_PORT"])}`);
-const at = (offset: number) => `http://127.0.0.1:${String(port + offset)}`;
+// E2E_TLS=1: the hosts on https (serve.mjs), whose Secure cookies WebKit keeps; it drops them on plain http, even on 127.0.0.1.
+const scheme = process.env["E2E_TLS"] === "1" ? "https" : "http";
+const at = (offset: number) => `${scheme}://127.0.0.1:${String(port + offset)}`;
 
 /** The site as the demo's host serves it. */
 export const SITE = at(0);

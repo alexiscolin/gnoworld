@@ -7,7 +7,7 @@
 import { PHONE_QUERY, type Line, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
 import { EmptyState } from "@gnoworld/ui";
 import type { StreamEvent } from "@gnoworld/schemas";
-import { lazy, Suspense, use, type ReactNode } from "react";
+import { lazy, Suspense, use, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../../lib/ergo/ergo.ts";
 import type { RoomKeeping, RoomPins } from "../rooms/RoomKeeping.ts";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
@@ -16,6 +16,7 @@ import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "../Failing.tsx";
 import { NO_ROOM_YET } from "../loginWords.ts";
+import { SkeletonLines } from "../dock/SkeletonBits.tsx";
 import { useMedia } from "../dock/useMedia.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
@@ -45,15 +46,43 @@ const LINES = [styles["lines"], styles["fill"]].join(" ");
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
 
-// The room's lines: the list's place while it holds none (nor a call of the chain) or their code comes, then the lines view.
-function RoomLines(props: LinesProps) {
+/** How long a room waits for its history before it says it holds no line: Ergo may refuse the room, or answer nothing. */
+const HISTORY_WAIT_MS = 10_000;
+
+// The list's place until the room's history came: a few lines' shapes at its foot, where the newest lines will stand; past
+// HISTORY_WAIT_MS, the empty list and the room's word for it.
+function Arriving({ word }: { word: string }) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(setLate, HISTORY_WAIT_MS, true);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+  if (late)
+    return (
+      <>
+        {waiting(false)}
+        <Silence word={word} />
+      </>
+    );
+  return (
+    <div aria-busy="true" className={[styles["fill"], styles["arriving"]].join(" ")}>
+      <SkeletonLines />
+    </div>
+  );
+}
+
+// The room's lines: the list's place while it holds none (nor a call of the chain) or their code comes, then the lines view;
+// `arriving`, a skeleton in that place.
+function RoomLines({ arriving, ...props }: LinesProps & { arriving: string | undefined }) {
   // A room the chain told a call of holds one item at least, as a card of its thread among no message.
   const place = use(ChainPlaceContext);
   const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
   const asked = useJarvisItems(props.room, props.me).length > 0;
-  return props.lines.length === 0 && !told && !asked ? (
-    waiting(false)
-  ) : (
+  if (props.lines.length === 0 && !told && !asked)
+    return arriving === undefined ? waiting(false) : <Arriving word={arriving} />;
+  return (
     <Suspense fallback={waiting(true)}>
       <Lines {...props} />
     </Suspense>
@@ -94,6 +123,8 @@ export interface RoomViewProps {
         read?: string | undefined;
         /** This connection's history page came. */
         paged?: true | undefined;
+        /** The msgid of the found message the room is read around, the search's. */
+        jump?: string | undefined;
         /** Its reactions. */
         reactions?: readonly Reaction[] | undefined;
         /** Ergo refused one of the page's reactions here. */
@@ -155,19 +186,27 @@ function Silence({ word }: { word: string }) {
   );
 }
 
+// What a connected room with no line is: arriving while its history is on its way, empty once its page came.
+function noneOf(connected: boolean, lines: number, paged: true | undefined): "arriving" | "empty" | undefined {
+  if (!connected || lines > 0) return undefined;
+  return paged === true ? "empty" : "arriving";
+}
+
 export function RoomView(props: RoomViewProps) {
   const { room, state, chat, composer, me, onDelete, onDismiss, onRead } = props;
   const { onReact, onReply, onThread, onEdit, partner } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
-  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
+  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact, jump } = state ?? {};
   const connected = chat === "connected";
+  const none = noneOf(connected, lines.length, paged);
   return (
     <div className={styles["main"]} data-chat-state={chat}>
       <Lead status={connected ? null : NOTICES[chat]} />
       <PinsAbove key={`${String(room)} pins`} pins={pins} />
       <RoomLines
         key={room}
+        arriving={none === "arriving" ? empty : undefined}
         room={room}
         partner={partner}
         lines={lines}
@@ -179,6 +218,7 @@ export function RoomView(props: RoomViewProps) {
         onDismiss={onDismiss}
         read={read}
         paged={paged === true}
+        jumped={jump !== undefined}
         onRead={onRead}
         verdicts={verdicts}
         saving={saving}
@@ -190,7 +230,7 @@ export function RoomView(props: RoomViewProps) {
         onThread={onThread}
         onEdit={onEdit}
       />
-      {connected && lines.length === 0 ? <Silence word={empty} /> : null}
+      {none === "empty" ? <Silence word={empty} /> : null}
       {/* A room's, whose place is kept so the composer never moves; a direct message tells none. */}
       {room === undefined ? null : <TypistsHere key={`${room} typing`} typing={typing} />}
       {composer}

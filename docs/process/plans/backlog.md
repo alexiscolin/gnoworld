@@ -258,7 +258,7 @@ Before going live (the automatic deploy's part, D13172, another pull request: th
 | The planets' depth (D13993), the Earth's real hour (D13947), regions of the other worlds from their seed (D13996) | Built | none |
 | The calendar's dialog removed; Events and Media greyed "coming soon" (D13995, D13921) | Done | none |
 | The shared cards `/market`, `/trending` and `/proposals`: a line every reader of the room sees drawn as its card (D13018) | Built | none |
-| The welcome card on a first visit and the Get started dialog for a browser with no Adena (D13017); the passport in three tabs, Challenges, Stamps, Charted (D13027) | Built; "Take the tour" waits for a video (D13019) | none |
+| The Get started dialog for a browser with no Adena (D13017; the welcome card on a first visit, built then, is gone, D13808); the passport in three tabs, Challenges, Stamps, Charted (D13027) | Built | none |
 | One error system: every failure sorted into one kind, drawn by one view in three sizes (D13022) | Built | none |
 | The explorer's additions: the person card with balance and tokens, token worlds, a call's detail, search of realms by function name, the network line (D13023, D13028) | Built | [slice-13-explorer.md](slice-13-explorer.md) |
 | The chat's search by `from:` with no words, and the palette's "Following" chip (D13024, D13006); Ask Jarvis and `@jarvis` in the composer (D13025) | Built | [search.md](search.md) |

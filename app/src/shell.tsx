@@ -9,7 +9,6 @@ import { DockedChatHost, FullChatHost } from "./features/chat/index.ts";
 import { useSettingsApplied } from "./features/settings/applied.ts";
 import { holdsShell, revealShell } from "./features/universe/index.ts";
 import { UpdatePrompt } from "./features/update/index.ts";
-import { WelcomeSlot } from "./features/welcome/index.ts";
 import { queryClient } from "./lib/query/client.ts";
 import { site } from "./places.ts";
 import { AppLinks } from "./routerLink.tsx";
@@ -66,7 +65,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <main className={`${String(header["page"])} ${String(column["unmounted"])}`}>{children}</main>
         </Center>
         <UpdatePrompt />
-        <WelcomeSlot />
         <DeviceViews universe={universe.id} />
         <PillHost />
         <DockedChatHost />

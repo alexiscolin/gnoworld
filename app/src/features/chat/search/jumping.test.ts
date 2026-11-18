@@ -55,6 +55,8 @@ describe("a room opened at a found message", () => {
     jumping.latest("#bubble");
     expect(store.getState().chat.rooms["#bubble"]?.jump).toBeUndefined();
     expect(ids(store)).toEqual([]);
+    // Its newest lines are asked again: until their page comes the room has not arrived, and is not an empty one.
+    expect(store.getState().chat.rooms["#bubble"]?.paged).toBeUndefined();
     expect(sent.at(-1)).toMatch(/^CHATHISTORY LATEST #bubble \* \d+$/);
   });
 

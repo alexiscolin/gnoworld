@@ -19,8 +19,9 @@ declare global {
 }
 
 const ownBrowser = base.extend({
-  context: async ({ playwright, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {
-    const browser = await playwright.chromium.launch(launchOptions);
+  context: async ({ playwright, browserName, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {
+    // The project's own engine: Safari's fails at launch in the sandbox, never passes as Chromium in its clothes.
+    const browser = await playwright[browserName].launch(launchOptions);
     await use(
       await browser.newContext({ ...contextOptions, javaScriptEnabled, ...(baseURL === undefined ? {} : { baseURL }) }),
     );
@@ -177,14 +178,20 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         if (response.headers()["content-security-policy"] === undefined) policed.delete(frame.page());
         else policed.add(frame.page());
       });
+      // Where each came from (its file, line and column, and the first characters the browser quotes), for the failure's words.
+      const sources: string[] = [];
       context.on("console", (message) => {
-        const [mark, directive] = message.text().split(" ");
-        if (mark === MARK && directive !== undefined && directive !== "flush") seen.push(directive);
+        const [mark, directive, ...from] = message.text().split(" ");
+        if (mark !== MARK || directive === undefined || directive === "flush") return;
+        seen.push(directive);
+        sources.push(`${directive} at ${from.join(" ") || "the service worker"}`);
       });
       await context.addInitScript(
         ([mark, flush, told]) => {
           document.addEventListener("securitypolicyviolation", (event) => {
-            console.info(mark, event.blockedURI === flush ? "flush" : event.effectiveDirective);
+            // The flush's own words stay two (flush waits for them); a real one says where it came from.
+            const at = `${event.sourceFile || "the page"}:${String(event.lineNumber)}:${String(event.columnNumber)} ${JSON.stringify(event.sample)}`;
+            console.info(...(event.blockedURI === flush ? [mark, "flush"] : [mark, event.effectiveDirective, at]));
           });
           // What the service worker tells its pages of its own violations.
           navigator.serviceWorker.addEventListener("message", (event: MessageEvent<unknown>) => {
@@ -202,7 +209,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
       const [listening] = javaScriptEnabled ? open : [];
       if (listening !== undefined) for (const worker of context.serviceWorkers()) await flushWorker(listening, worker);
       for (const each of javaScriptEnabled ? open : []) await flush(each);
-      if (!planted) expect(seen, "a CSP violation no test planted").toEqual([]);
+      if (!planted) expect(seen, `a CSP violation no test planted: ${sources.join("; ")}`).toEqual([]);
     },
     { auto: true },
   ],
