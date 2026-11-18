@@ -496,6 +496,7 @@ test.describe("updates", () => {
     await page.evaluate(() => {
       scrollTo(0, document.documentElement.scrollHeight);
     });
+    expect(await page.evaluate(() => scrollY), "the page scrolled").toBeGreaterThan(0);
     await expect(notice).toBeInViewport();
   });
 
@@ -557,7 +558,6 @@ test.describe("updates", () => {
       await bump(page, request, { site });
       await expect(noticeOf(page)).toBeVisible();
     });
-    await step("done", () => Promise.resolve());
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
@@ -591,7 +591,10 @@ test.describe("updates", () => {
     await step("open, the worker's message lost once", async () => {
       await open(page);
       await page.evaluate(() => {
-        const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(ServiceWorker.prototype, "postMessage");
+        const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(
+          ServiceWorker.prototype,
+          "postMessage",
+        );
         let lost = true;
         Object.defineProperty(ServiceWorker.prototype, "postMessage", {
           value(this: ServiceWorker, message: unknown) {
@@ -622,7 +625,6 @@ test.describe("updates", () => {
       await expect(noticeOf(page)).toBeVisible();
     });
     await step("the click that reaches the worker, and the reload", () => clickedThrough(page));
-    await step("done", () => Promise.resolve());
   });
 
   // The worker running answers a tab opened after the deploy with its own version, so the click is real.
