@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Vector3 } from "three";
 import { Flight, type Goal } from "./flight.ts";
-import { blankPose, type Pose, type Spot } from "./pose.ts";
+import { blankPose, copyPose, eyeOf, spot, type Pose, type Spot } from "./pose.ts";
 
 const MS = 16;
 const at = (way: [number, number, number], up: [number, number, number]): Pose => {
@@ -136,5 +136,75 @@ describe("a landing on a place not ready", () => {
     const once = fly(() => (asked += 1) > 1);
     expect(asked).toBe(1);
     expect(once.seconds).toBeGreaterThan(fly().seconds + 0.5);
+  });
+});
+
+// The eye's speed over its distance, a second, of a pose that moved from `before` to `after` in `MS`.
+const speedOf = (before: Pose, after: Pose): number => {
+  const [from, to] = [eyeOf(before, spot()), eyeOf(after, spot())];
+  return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) / (MS / 1000) / after.distance;
+};
+
+describe("a flight begun while the camera moves", () => {
+  // The flight to a world asked while another still runs (its route came late): the camera starts it at the speed it has, never at the
+  // flight's own full speed, then changes it smoothly.
+  const speeds = (): { first: number; steps: number[]; before: number } => {
+    const first = at([0, 0, 1], [0, 1, 0]);
+    first.distance = 4;
+    const goalA = at([0, 0, 1], [0, 1, 0]);
+    Object.assign(goalA.look, { x: 400, y: 0, z: 0 });
+    goalA.distance = 4;
+    const flight = new Flight(first, goalOf(goalA));
+    const out = blankPose();
+    const prev = blankPose();
+    for (let frame = 0; frame < 118; frame += 1) {
+      copyPose(out, prev);
+      flight.advance(MS, false, out);
+    }
+    const before = speedOf(prev, out);
+    const goalB = at([0, 0, 1], [0, 1, 0]);
+    Object.assign(goalB.look, { x: 3000, y: 0, z: 0 });
+    goalB.distance = 4;
+    const next = new Flight(out, goalOf(goalB), { speed: before });
+    const steps: number[] = [];
+    for (let frame = 0; frame < 135; frame += 1) {
+      copyPose(out, prev);
+      next.advance(MS, false, out);
+      steps.push(speedOf(prev, out));
+    }
+    return { first: steps[0] ?? 0, steps, before };
+  };
+
+  it("starts at the speed it has, then changes it smoothly", () => {
+    const { first, steps, before } = speeds();
+    expect(before).toBeGreaterThan(0.1);
+    expect(Math.abs(first - before) / before).toBeLessThan(0.25);
+    const peak = Math.max(...steps);
+    steps.slice(1).forEach((step, frame) => {
+      expect(Math.abs(step - (steps[frame] ?? 0)), `frame ${String(frame + 1)}`).toBeLessThan(peak / 6);
+    });
+  });
+});
+
+describe("a flight begun when the camera has all but stopped", () => {
+  // The first screen's flight, nearly landed as the click comes: the next flight eases in from rest, with no step and no turn in its first
+  // frame (it began at full speed, as a flight does that is asked while the camera flies).
+  const turned = (speed: number): number => {
+    const first = at([0, 0, 1], [0, 1, 0]);
+    first.distance = 80;
+    const goal = at([1, 0, 0], [0, 1, 0]);
+    goal.distance = 20;
+    const flight = new Flight(first, goalOf(goal), { speed });
+    const out = blankPose();
+    flight.advance(50, false, out);
+    return angle(first.way, out.way);
+  };
+
+  it("turns the way by next to nothing in its first frame", () => {
+    expect(turned(0)).toBeLessThan(0.005);
+  });
+
+  it("turns it at its full rate where the camera flies as fast", () => {
+    expect(turned(Infinity)).toBeGreaterThan(0.03);
   });
 });

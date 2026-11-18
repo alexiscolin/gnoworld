@@ -85,11 +85,10 @@ export class Rig {
       this.jump(goal);
       return;
     }
-    const moving = this.#flight !== undefined || this.free.moving;
     this.free.stop();
     // A slide that rode the flight cut short goes on riding the new one, from the shift shown now: its share never jumps with the swap.
     const riding = this.#rideFrom >= 0;
-    this.#flight = new Flight(this.pose, goal, { moving });
+    this.#flight = new Flight(this.pose, goal, { speed: this.speed });
     if (riding) this.#slideTo(this.#to, this.#shareSeconds === SHIFT_IN_S, false);
   }
 
