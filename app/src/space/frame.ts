@@ -56,8 +56,8 @@ export function runFrames(space: Space, signal: AbortSignal): void {
       return nap;
     },
     lively: () => space.keep.redraw.live,
-    rouse: () => {
-      space.rig.free.rouse();
+    rouse: (taken) => {
+      space.rig.free.rouse(taken);
     },
     free: () => {
       if (space.disposed || space.renderer.getContext().isContextLost()) return;
