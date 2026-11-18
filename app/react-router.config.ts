@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Config } from "@react-router/dev/config";
+import { buildDirectoryOf } from "./src/buildDirectory.ts";
 import { outputs, pagePolicies } from "./src/csp.ts";
 import { connectOrigins, connectSrc } from "./src/cspOrigins.ts";
 import { loadData } from "./src/dataFiles.ts";
@@ -23,7 +24,7 @@ export default {
   ssr: false,
   // app/build, which the journeys build and serve. GitHub's build job builds into a folder of its own (GNOWORLD_BUILD, an absolute path):
   // a build empties its folder, and one into the journeys' would empty the site they are served from mid-run.
-  buildDirectory: process.env["GNOWORLD_BUILD"] ?? "build",
+  buildDirectory: buildDirectoryOf(process.env["GNOWORLD_BUILD"]),
   prerender: prerenderPaths(placesFrom(data)),
   // After the pages are written (React Router's buildEnd follows the prerender): a policy for each page, holding its own
   // scripts' hashes, for a host that reads _headers, for nginx, and for the test host.
