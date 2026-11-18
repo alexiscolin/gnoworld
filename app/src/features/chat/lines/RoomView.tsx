@@ -82,11 +82,13 @@ function RoomLines({ arriving, ...props }: LinesProps & { arriving: string | und
   const place = use(ChainPlaceContext);
   const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
   const asked = useJarvisItems(props.room, props.me).length > 0;
+  // The room opened on its skeleton: its lines then fade in over it.
+  const [after] = useState(arriving !== undefined);
   if (props.lines.length === 0 && !told && !asked)
     return arriving === undefined ? waiting(false) : <Arriving word={arriving} />;
   return (
     <Suspense fallback={waiting(true)}>
-      <Lines {...props} />
+      <Lines {...props} after={after} />
     </Suspense>
   );
 }

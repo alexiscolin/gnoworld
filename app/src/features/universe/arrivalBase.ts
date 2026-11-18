@@ -18,9 +18,9 @@ export const all = (root: ParentNode | null, selector: string): Element[] =>
 // through the move from the page before (`data-stood`, FullChatHost.tsx) keeps its own: it changes in place, never rising again.
 const LINES = "ol[aria-label='Messages']";
 const SEATED = "[data-chat-seat]:not([data-stood])";
-// The lines stand in a box that scrolls (a stage holds it: the box's own parent), and what follows them follows that stage.
+// The lines stand in a box that scrolls, in a stage: what follows them follows that stage (an empty room has no stage).
 const STAGE = `:has(> * > ${LINES})`;
-export const CHAT = ["header", `${LINES} > li:nth-last-child(-n + 10)`, `${STAGE} ~ *`]
+export const CHAT = ["header", `${LINES} > li:nth-last-child(-n + 10)`, `${LINES} ~ *`, `${STAGE} ~ *`]
   .map((part) => `${SEATED} ${part}`)
   .join(", ");
 

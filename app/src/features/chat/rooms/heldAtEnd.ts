@@ -21,20 +21,23 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
     const box = listRef.current;
     const unfilled = box?.querySelector(UNFILLED);
     if (box === null || unfilled === null || unfilled === undefined) return;
-    const show = () => {
-      box.removeAttribute("data-awaiting");
-    };
-    box.setAttribute("data-awaiting", "");
     const watch = new MutationObserver(() => {
       if (box.querySelector(UNFILLED) === null) show();
     });
-    watch.observe(box, { subtree: true, childList: true, attributes: true });
     const latest = setTimeout(show, CARDS_WAIT_MS);
-    return () => {
+    function show() {
       watch.disconnect();
       clearTimeout(latest);
-      show();
-    };
+      box?.removeAttribute("data-awaiting");
+    }
+    box.setAttribute("data-awaiting", "");
+    watch.observe(box, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-busy", "data-markets"],
+    });
+    return show;
   }, [listRef]);
 }
 

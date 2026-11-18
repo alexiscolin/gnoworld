@@ -28,10 +28,13 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    /* Fills the scrolling box when the room is short, as a list at the box's top did; never shrinks under its lines */
-    flex: 1 0 auto;
     /* No gap: each line holds its own padding, so the pointer crosses between lines and bar without leaving a row */
     gap: 0;
+  }
+
+  /* The room's list fills the scrolling box when the room is short, as a list at the box's top did; never shrinks under its lines. */
+  .fill > .lines {
+    flex: 1 0 auto;
   }
 
   /* The conversation's own list, with the skeleton that stands in for it: they take what the pins above and the composer
@@ -70,15 +73,20 @@
     font: var(--font-chat);
   }
 
-  /* The room's list and its skeleton cross-fade, opacity alone: the list in once its history and cards are in, the skeleton out.
-     While cards wait (`data-awaiting`, heldAtEnd.ts) the list is out and the skeleton in; the fade runs as the wait ends. */
+  /* The room's list and its skeleton cross-fade, opacity alone: while cards wait (`data-awaiting`, heldAtEnd.ts) the list is out and
+     the skeleton in; as the wait ends the list fades in and the skeleton out. A room that came from the skeleton (`data-after`) fades
+     the same way. A copy of the screen the chat leaves (inert) plays none of it again. */
   .fill {
-    animation: appear calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
+    transition: opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
   .fill[data-awaiting] {
-    animation: none;
     opacity: 0;
+    visibility: hidden;
+  }
+
+  .fill[data-after]:not([inert] *) {
+    animation: appear calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
   }
 
   /* The skeleton's place: the same box as the list, its shapes at the foot where the newest lines stand, drawn at once. */
@@ -90,16 +98,26 @@
     justify-content: flex-end;
     overflow: hidden;
     pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      visibility 0s calc(var(--motion-base) * var(--motion-scale));
     /* raw: its shapes stand at once, not after the skeleton's 300 ms wait */
     --motion-wait: 0s;
     --play: paused;
-    animation: vanish calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
   }
 
   .fill[data-awaiting] + .skeleton,
   .skeleton[data-shown] {
     --play: running;
-    animation: none;
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+
+  .fill[data-after]:not([inert] *) + .skeleton {
+    animation: vanish calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
   }
 
   @keyframes appear {

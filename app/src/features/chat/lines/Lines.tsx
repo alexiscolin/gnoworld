@@ -133,7 +133,7 @@ function List(props: ListProps) {
   return (
     <>
       <Told refused={refused} cannotReact={cannotReact} said={said} setSaid={setSaid} onDismiss={onDismiss} />
-      <Stage listRef={listRef} onScroll={onScroll}>
+      <Stage listRef={listRef} onScroll={onScroll} after={props.after === true}>
         <ol ref={olRef} {...on} {...ABOUT} className={styles["lines"]}>
           {props.entries.map((entry) =>
             !("line" in entry) ? (
@@ -172,15 +172,17 @@ function List(props: ListProps) {
 function Stage({
   listRef,
   onScroll,
+  after,
   children,
 }: {
   listRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
+  after: boolean;
   children: ReactNode;
 }) {
   return (
     <div className={styles["stage"]}>
-      <div ref={listRef} onScroll={onScroll} className={styles["fill"]}>
+      <div ref={listRef} onScroll={onScroll} data-after={after ? "" : undefined} className={styles["fill"]}>
         {children}
       </div>
       <div aria-hidden="true" className={styles["skeleton"]}>

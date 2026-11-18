@@ -294,6 +294,13 @@ describe("the list's reader kept in place", () => {
     expect(top).toBe(-500);
   });
 
+  it("marks a list that came after the skeleton, to fade in over it, and no other", () => {
+    draw({ after: true });
+    expect(scroller().hasAttribute("data-after")).toBe(true);
+    draw({ after: false });
+    expect(scroller().hasAttribute("data-after")).toBe(false);
+  });
+
   it("opens a room with news on its New line: its top at the list's", () => {
     newTop = BOX_TOP - 600;
     draw({ paged: true, read: at(99) });
