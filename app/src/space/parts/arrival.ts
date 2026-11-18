@@ -2,7 +2,7 @@ import { smoothstep } from "@gnoworld/core";
 
 // When a planet counts as ready to be seen as itself, and how it comes in: eased over a short fade, at once where motion is reduced.
 
-/** How long a planet takes to come in from its skeleton, in seconds. */
+/** How long a planet takes to come in over its stand-in, in seconds. */
 export const FADE_S = 0.6;
 
 interface Readiness {

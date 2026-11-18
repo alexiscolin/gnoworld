@@ -14,6 +14,7 @@
         "src/cspOrigins.ts!",
         "src/dataFiles.ts!",
         "src/dataPlaces.ts!",
+        "src/buildDirectory.ts!",
         "src/prerender.ts!",
         "src/sitemap.ts!",
         "src/stripGlsl.ts!"

@@ -1,9 +1,9 @@
 // The planets near enough to be seen as themselves: the few largest on screen, once a few pixels across, are drawn as the
-// generated planets they are (the Earth as the hand-made one), at the same place and size, lit by their sun; their quad is hidden
-// meanwhile. A planet stands only once its maps came, went to the GPU one a frame, and its shaders compiled, so it never waits on screen
-// and never stalls the frame it comes in.
+// generated planets they are (the Earth as the hand-made one), at the same place and size, lit by their sun, coming in over their quad,
+// the world's stand-in, which stays on screen till they are whole. A planet stands only once its maps came, went to the GPU one a frame,
+// and its shaders compiled, so it never waits on screen and never stalls the frame it comes in.
 import { Euler, Quaternion, Vector3, type Vector4 } from "three";
-import { EARTH } from "@gnoworld/core";
+import { EARTH, SHOWN_STATIONS } from "@gnoworld/core";
 import { scaleOf } from "../boosts.ts";
 import { placeOf, type Planet, type Universe, type Vec } from "../layout.ts";
 import type { Planet as Drawn } from "../planet/planet.ts";
@@ -12,7 +12,6 @@ import { dayOf } from "../earth/light.ts";
 import { drawnOf } from "./draw.ts";
 import { adopt, SPHERE } from "./adopt.ts";
 import { holdOf, hullIn, type Held } from "./held.ts";
-import { Bones } from "./bones.ts";
 import { upgradeStep } from "./upgrade.ts";
 import { warmFrame } from "./warmup.ts";
 import { Warm } from "./warm.ts";
@@ -24,7 +23,6 @@ const KEPT = 24;
 
 export class Near {
   readonly #device: NearDevice;
-  readonly #bones = new Bones();
   /** The maps asked ahead of their being seen as themselves (warmRealm.ts). */
   readonly warm: Warm;
   readonly #held = new Map<number, Held>();
@@ -36,11 +34,6 @@ export class Near {
   // The open system's planets too small yet, made ahead: each shows whole the frame it is wanted.
   readonly #ahead: Planet[] = [];
   #wantedIndex = new Set<number>();
-  // The planets whose quad is hidden for their skeleton: each gets it back once it is wanted no more and stands not as itself.
-  readonly #hidden = new Set<number>();
-  // The planets drawn as themselves once: none goes back to its skeleton in this page's life, whatever made it anew meanwhile (a planet
-  // forgotten, a page's alone), only to its quad.
-  readonly #drawnOnce = new Set<number>();
 
   // The frame's time, the page's planet and the one it frames close (-1 none), for the callbacks a frame runs.
   #seconds = 0;
@@ -55,7 +48,7 @@ export class Near {
   // The frame's delta, whether motion is reduced (a planet then comes in at once) and whether a flight runs (the Earth's maps wait).
   #fade: { delta: number; still: boolean; flying?: boolean } = { delta: 0, still: true };
 
-  /** Whether a planet is still coming in from its skeleton: the scene must go on drawing, or the fade stops where it stands. */
+  /** Whether a planet is still coming in over its stand-in: the scene must go on drawing, or the fade stops where it stands. */
   arriving = false;
 
   /** The worlds a lens lights, by their ids: the others stay quads, which dim; none, every one may be drawn as itself. */
@@ -65,7 +58,7 @@ export class Near {
   // Each world's lean toward the eye too, laid over its look's own lean and tilt.
   readonly #led = new Map<string, { ahead: number; leaned: Quaternion }>();
   // What a Near keeps for its planets, lent to the next (adopt.ts).
-  readonly #kept = { held: this.#held, hidden: this.#hidden, once: this.#drawnOnce, led: this.#led };
+  readonly #kept = { held: this.#held, led: this.#led };
   readonly #look = new Quaternion();
   readonly #euler = new Euler();
 
@@ -73,7 +66,6 @@ export class Near {
   constructor(device: NearDevice, from?: { near: Near; before: Universe; now: Universe }) {
     this.#device = device;
     this.warm = new Warm(device.maps);
-    device.stage.add(this.#bones.group);
     if (from !== undefined) adopt(from.near.#kept, this.#kept, { ...from, planets: device.planets });
   }
 
@@ -122,21 +114,13 @@ export class Near {
     for (const held of this.#held.values()) warmFrame(held, this.#device.camera);
     this.#held.forEach(this.#showOne);
     this.#held.forEach(this.#leaveOne);
-    this.#bones.begin();
     this.arriving = false;
     this.#wanted.forEach(this.#placeOne);
-    this.#bones.end();
-    for (const index of this.#hidden)
-      if (!this.#wantedIndex.has(index)) {
-        this.#hidden.delete(index);
-        this.#device.planets.show(index, this.#held.get(index)?.shown !== true);
-      }
   }
 
-  /** Makes every planet shown whole at once, its skeleton gone: a scene nobody sees stops its clock, and would go on half drawn once seen. */
+  /** Makes every planet shown whole at once: a scene nobody sees stops its clock, and would go on half drawn once seen. */
   settle(): void {
     for (const held of this.#held.values()) if (held.shown) [held.arrive, held.fresh] = [1, false];
-    this.#bones.clear();
   }
 
   /** Where the moons of `planet`, framed close, stand: their shadows cross it; the planet before is cleared. */
@@ -157,7 +141,8 @@ export class Near {
     if (shown === held.shown) return;
     held.shown = shown;
     handOver(held, this.#fade.still);
-    held.over = shown && !this.#hidden.has(index);
+    // gnosh's colony unfolds on its own (colony/gnoshColony.ts), never fading over a quad it would then leave in one frame.
+    held.over = shown && !SHOWN_STATIONS.includes(held.planet.id);
     this.#device.planets.show(index, !shown || held.over);
   };
 
@@ -168,37 +153,18 @@ export class Near {
     fall(held, this.#fade);
   };
 
-  // A wanted planet stands where its quad would, as itself once ready, coming in from its skeleton; until then its skeleton stands
-  // alone, never a degraded look.
+  // A wanted planet stands where its quad would, as itself once ready, coming in over its quad, the world's stand-in, which goes once it is
+  // whole; till it is ready the stand-in stays as it was (v0.1.7 hid it for a wireframe of bones, which Alexis saw in Firefox).
   readonly #placeOne = (planet: Planet): void => {
     const held = this.#held.get(planet.index);
-    if (held?.shown === true) {
-      this.#drawnOnce.add(planet.index);
-      this.#place(planet, held.drawn, this.#seconds);
-      if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device, this.#fade.flying === true);
-      const share = step(held, this.#fade);
-      held.drawn.setArrive(share);
-      this.#coming(planet, held, share);
-    } else if (this.#alone < 0 || this.#alone === planet.index) {
-      if (this.#drawnOnce.has(planet.index)) return;
-      this.#device.planets.show(planet.index, false);
-      this.#hidden.add(planet.index);
-      this.#skeleton(planet, 1);
-    }
-  };
-
-  // A planet coming in stands in its skeleton, or, if it comes over its quad, over that, which goes once it is whole.
-  #coming(planet: Planet, held: Held, share: number): void {
+    if (held?.shown !== true) return;
+    this.#place(planet, held.drawn, this.#seconds);
+    if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device, this.#fade.flying === true);
+    const share = step(held, this.#fade);
+    held.drawn.setArrive(share);
     this.arriving ||= held.over && share < 1;
     if (held.over && share >= 1) this.#device.planets.show(planet.index, (held.over = false));
-    else if (!held.over && share < 1) this.#skeleton(planet, 1 - share);
-  }
-
-  #skeleton(planet: Planet, opacity: number): void {
-    this.arriving ||= opacity < 1;
-    const at = placeOf(planet, this.#seconds, this.#at);
-    this.#bones.show(planet, { at, seconds: this.#seconds, opacity, ...this.#led.get(planet.id) });
-  }
+  };
 
   // One map a frame goes to the GPU, the planets wanted first: true once one went.
   readonly #uploadOne = (planet: Planet): boolean => {
@@ -259,7 +225,5 @@ export class Near {
 
   dispose(): void {
     for (const [index, held] of this.#held) this.#drop(index, held);
-    this.#device.stage.remove(this.#bones.group);
-    this.#bones.dispose();
   }
 }

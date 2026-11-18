@@ -13,8 +13,6 @@ interface Planets {
 
 export interface Kept {
   readonly held: Map<number, Held>;
-  readonly hidden: Set<number>;
-  readonly once: Set<number>;
   readonly led: Map<string, { ahead: number; leaned: unknown }>;
 }
 
@@ -31,8 +29,6 @@ export function adopt(
     held.planet = now.planets[at] ?? held.planet;
     to.held.set(at, held);
     planets.show(at, !held.shown || held.over);
-    if (from.hidden.has(index)) to.hidden.add(at);
-    if (from.once.has(index)) to.once.add(at);
     from.held.delete(index);
   }
   for (const [id, led] of from.led) to.led.set(id, led);
