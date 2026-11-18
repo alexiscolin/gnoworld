@@ -130,19 +130,19 @@ describe("the dialog Get started, opened and closed from the control", () => {
   const isOpen = (box: HTMLElement) => box.querySelector("dialog[open]") !== null;
 
   it("opens at the phone menu's ask, and stops hearing it once the control is gone", async () => {
+    const added = vi.spyOn(window, "addEventListener");
     const draw = drawer();
     draw(<LoginControl login={none} logIn={vi.fn()} />);
+    const heard = added.mock.calls.find(([type]) => type === "gnoworld:get-started")?.[2];
+    added.mockRestore();
     expect(isOpen(document.body)).toBe(false);
     act(() => {
       askFor("get-started");
     });
     await settled(() => isOpen(document.body));
     draw(null);
-    // Gone, the control is deaf: a later ask draws nothing.
-    act(() => {
-      askFor("get-started");
-    });
-    expect(isOpen(document.body)).toBe(false);
+    // Gone, the control hears no more: its ask's signal is aborted, the listener with it.
+    expect(typeof heard === "object" && heard.signal?.aborted).toBe(true);
   });
 
   it("closes on Connect, and logs in", async () => {
