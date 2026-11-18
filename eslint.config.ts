@@ -18,8 +18,9 @@ const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popo
 const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 // No scroll bar anywhere: the base styles hide them with scrollbar-width, everywhere a browser has it since 2024. No blue under a
-// drag: user-select, which a browser without it ignores.
-const BARS = { ...BASELINE_ALSO, allowProperties: ["scrollbar-width", "user-select"] };
+// drag: user-select, which a browser without it ignores. A phone's screen still under a pull past its ends: overscroll-behavior, which
+// Safari has from 16 (a page too short to scroll from 16.4) and a browser without it ignores.
+const BARS = { ...BASELINE_ALSO, allowProperties: ["scrollbar-width", "user-select", "overscroll-behavior"] };
 
 export default defineConfig(
   includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
