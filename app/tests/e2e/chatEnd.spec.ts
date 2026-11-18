@@ -44,3 +44,68 @@ test("a room opens at its end and stays there as a late card comes in", async ({
   await expect(page.getByText("a later line")).toBeAttached();
   expect(await list.evaluate((box) => box.scrollTop)).toBe(0);
 });
+
+// In the page: the lines at `first` grow by 200 px, then those at `then` (-1 is the newest) once the list has moved to its end for
+// the first and before that move's scroll event; the list's height once all is drawn.
+const grownApart = (list: Locator, first: readonly number[], then: readonly number[]) =>
+  list.evaluate(
+    async (box, [now, later]) => {
+      const frame = () => new Promise((done) => requestAnimationFrame(done));
+      const grow = (at: number) => {
+        const line = Array.from(box.children).at(at);
+        if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "200px");
+      };
+      now?.forEach(grow);
+      await frame();
+      // After this frame's ResizeObserver, before the next frame's scroll event.
+      await new Promise((done) => setTimeout(done, 0));
+      later?.forEach(grow);
+      await frame();
+      await frame();
+      await frame();
+      return box.scrollHeight;
+    },
+    [first, then],
+  );
+
+// WebKit anchors no scroll, and Chromium is asked not to here: a second card grows after the list moved to its end for the
+// first and before that move's scroll event, which then finds the list off its end (Safari showed a room mid-history).
+test("a room stays at its end when two cards grow a frame apart, with no scroll anchoring", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.evaluate((box) => {
+    box.style.setProperty("overflow-anchor", "none");
+  });
+  expect(await grownApart(list, [5], [10])).toBeGreaterThan(400);
+  expect(await gap(list)).toBeLessThan(4);
+});
+
+// Chromium and Firefox anchor the scroll: a line above the view grows with the newest one, after the list moved to its end and
+// before that move's scroll event. The anchoring moves the list by the first, and the second leaves it off its end.
+test("a room stays at its end when a line above and the newest one grow together, the scroll anchored", async ({
+  page,
+}) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await grownApart(list, [5], [6, -1]);
+  expect(await gap(list)).toBeLessThan(4);
+});
+
+// A reader who wheels up is let go, and keeps their place as the newest line grows.
+test("a reader who scrolls up by the wheel keeps their place as a card grows", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.hover();
+  await page.mouse.wheel(0, -150);
+  await expect.poll(() => gap(list)).toBeGreaterThan(100);
+  const before = await list.evaluate((box) => box.scrollTop);
+  await list.evaluate(async (box) => {
+    const line = box.children[box.children.length - 1];
+    if (line instanceof HTMLElement) line.style.setProperty("min-block-size", "300px");
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  expect(await list.evaluate((box) => box.scrollTop)).toBe(before);
+});
