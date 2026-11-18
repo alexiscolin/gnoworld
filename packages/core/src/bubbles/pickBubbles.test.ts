@@ -1060,11 +1060,12 @@ describe("for any input (property)", () => {
           const kept = (keptAt[k] ?? []).flatMap((at) => messages[at] ?? []);
           const out = pickBubbles(kept, now, who, RULES, shown);
           const held = new Map(kept.map((m) => [m.id, m]));
-          for (const b of out.bubbles) {
+          // Asked at every step, a step with no bubble included: a draw that shows none still asserts.
+          const strays = out.bubbles.filter((b) => {
             const source = held.get(b.id);
-            expect(source, "a bubble with no line").toBeDefined();
-            if (source !== undefined) expect(open(source)).toBe(true);
-          }
+            return source === undefined || !open(source);
+          });
+          expect(ids(strays), "a bubble with no line, or one the list no longer allows").toEqual([]);
           shown = out.shown;
         });
       }),
