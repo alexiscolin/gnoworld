@@ -4,9 +4,12 @@
 // on and off; /__down answers 503 for sw.js; /__deploy turns a release on and off, below), the third the same behind
 // the demo's password. /api goes to the real server, /ws to a real Ergo, /__drop?tag= ends the tagged pages'
 // WebSockets, /__wallet and /__sign answer for Adena's stand-in (api.mjs).
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { createServer } from "node:http";
+import { createReadStream, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { createServer as plainServer } from "node:http";
+import { createServer as tlsServer } from "node:https";
+import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inlineScripts, policy, sha256 } from "../../src/csp.ts";
@@ -225,8 +228,26 @@ function upgrade(request, socket, head) {
 const port = Number(process.env.E2E_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65533)
   throw new Error(`serve.mjs: E2E_PORT is no port base: ${process.env.E2E_PORT}`);
+// E2E_TLS=1 (sites.ts): the same hosts on https, under a key openssl makes at the start. Its folder goes as soon as the key
+// is read, before any host listens, so the run holds it in memory alone and none is kept in the repository: WebKit keeps the
+// server's Secure cookies (__Host-session, __Host-guest) on https alone.
+const tls = process.env.E2E_TLS === "1";
+function serving() {
+  if (!tls) return plainServer;
+  const dir = mkdtempSync(join(tmpdir(), "gnoworld-e2e-tls-"));
+  try {
+    const [key, cert] = [join(dir, "key.pem"), join(dir, "cert.pem")];
+    const args = ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=localhost"];
+    execFileSync("openssl", [...args, "-keyout", key, "-out", cert], { stdio: ["ignore", "ignore", "inherit"] });
+    const keys = { key: readFileSync(key), cert: readFileSync(cert) };
+    return (handler) => tlsServer(keys, handler);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const createServer = serving();
 // Ergo and the server first: a journey starts once the site answers, and the site's /api and /ws must answer by then.
-const origins = [port, port + 1, port + 2].map((each) => `http://127.0.0.1:${String(each)}`);
+const origins = [port, port + 1, port + 2].map((each) => `${tls ? "https" : "http"}://127.0.0.1:${String(each)}`);
 const backend = await startBackend(origins);
 createServer(host({})).on("upgrade", upgrade).listen(port, "127.0.0.1");
 createServer(host({ bumping: true }))

@@ -5,6 +5,7 @@
   "workspaces": {
     ".": { "entry": ["!evals/**"], "project": ["**/*.{js,mjs,cjs,ts,tsx}", "!evals/**"] },
     "app": {
+      "ignoreBinaries": ["openssl"],
       "entry": ["src/**/*.test.{ts,tsx}", "lab.config.ts", "tests/e2e/workshopBackend.mjs", "tests/tools/*.mjs"],
       "react-router": { "config": ["react-router.config.ts"] },
       "playwright": {
