@@ -42,12 +42,37 @@ interface Counters {
   listeners: number;
   geometries: number;
   textures: number;
+  planets: number;
+  kept: number;
 }
+
+// The planets drawn up close (near.ts) stay drawn, up to 24, so the way back never draws one again: one that comes into sight late in a
+// long visit stays, with its own geometries (its glow, its rings; the sphere is shared). Counted from the scene: each planet's group holds
+// the shared sphere.
+const KEPT = 24;
+const keptOf = (page: Page) =>
+  page.evaluate(() => {
+    interface Node {
+      type: string;
+      geometry?: { type: string };
+      children: Node[];
+    }
+    const space = Reflect.get(globalThis, "__gnoworldSpace") as { stage: { scene: Node } };
+    const planets = space.stage.scene.children.filter((group) =>
+      group.children.some(({ geometry }) => geometry?.type === "SphereGeometry"),
+    );
+    const own = new Set(
+      planets.flatMap(({ children }) =>
+        children.flatMap(({ geometry }) => (geometry && geometry.type !== "SphereGeometry" ? [geometry] : [])),
+      ),
+    );
+    return { planets: planets.length, kept: own.size };
+  });
 
 async function counters(page: Page, cdp: CDPSession): Promise<Counters> {
   const heap = await heapOf(cdp);
   const { documents, nodes, jsEventListeners } = await cdp.send("Memory.getDOMCounters");
-  return { heap, documents, nodes, listeners: jsEventListeners, ...(await gpuOf(page)) };
+  return { heap, documents, nodes, listeners: jsEventListeners, ...(await gpuOf(page)), ...(await keptOf(page)) };
 }
 
 /** No error page, no inline failure, no loader; the plate's words and the dock's chat drawn and shown when the page has them; no part of
@@ -178,6 +203,9 @@ test(`${String(ROUNDS)} rounds of a long visit leave no stuck screen and no leak
   expect(last.nodes, "the DOM's nodes").toBeLessThanOrEqual(base.nodes * MARGIN);
   expect(last.listeners, "the DOM's listeners").toBeLessThanOrEqual(base.listeners * MARGIN);
   expect(last.documents, "the documents").toBeLessThanOrEqual(base.documents);
-  expect(last.geometries, "the GPU's geometries").toBeLessThanOrEqual(base.geometries);
+  expect(last.planets, "the planets kept, near.ts's 24 at most").toBeLessThanOrEqual(KEPT);
+  expect(last.geometries - last.kept, "the GPU's geometries, the kept planets' apart").toBeLessThanOrEqual(
+    base.geometries - base.kept,
+  );
   expect(last.textures, "the GPU's textures").toBeLessThanOrEqual(base.textures);
 });
