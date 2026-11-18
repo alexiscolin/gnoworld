@@ -228,8 +228,8 @@ describe("the colony's signs on its hull as drawn", () => {
   });
 });
 
-// No skeleton stands in for the colony as it comes (parts/bones.ts): it comes in itself, unfolding from a little smaller, its signs with
-// it, and stands whole once come; nothing jumps.
+// The colony comes in itself, over its stand-in, unfolding from a little smaller, its signs with it, and stands whole once come;
+// nothing jumps.
 describe("the colony coming in", () => {
   it("is not shown before it starts coming, grows to its size as it comes, and tells its hull's share", async () => {
     const { ColonyBody } = await import("./gnoshColony.ts");
