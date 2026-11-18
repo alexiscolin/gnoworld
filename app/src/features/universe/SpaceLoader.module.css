@@ -80,7 +80,7 @@
   /* A computer's first HTML holds the loader inside the page's column, and the first paint holds that column at opacity 0 (shellHeader.module.css),
      which would hide the loader too: it holds nothing there, the loader covers the page from the first paint. A phone draws no loader (its page
      replaces it), so it keeps the hold. */
-  @media (prefers-reduced-motion: no-preference) and (width >= 900px) {
+  @media (width >= 900px) {
     :root[data-first]:has([data-loader]) :is(header, main) {
       opacity: 1;
       animation: none;
