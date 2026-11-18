@@ -96,7 +96,14 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
   await expect.poll(() => gap(list)).toBeLessThan(4);
   await list.hover();
   await page.mouse.wheel(0, -150);
-  await expect.poll(() => gap(list)).toBeGreaterThan(100);
+  // The wheel's scroll is animated in some engines: wait for it to stop before reading the place.
+  await expect
+    .poll(async () => {
+      const first = await gap(list);
+      await page.waitForTimeout(200);
+      return first > 100 && first === (await gap(list));
+    })
+    .toBe(true);
   const newest = list.locator(":scope > li").last();
   const at = () => newest.evaluate((line) => Math.round(line.getBoundingClientRect().top));
   const readerAt = () =>
@@ -153,9 +160,10 @@ test("a room opened on its New line stays there once it is quiet", async ({ page
         ? -1
         : Math.abs(Math.round(mark.getBoundingClientRect().top - view.getBoundingClientRect().top));
     });
-  await expect.poll(fromTop).toBe(0);
+  // Within a pixel: the page puts a scroll on its device pixels.
+  await expect.poll(fromTop).toBeLessThanOrEqual(1);
   await page.waitForTimeout(600);
-  expect(await fromTop()).toBe(0);
+  expect(await fromTop()).toBeLessThanOrEqual(1);
   expect(await gap(list)).toBeGreaterThan(100);
 });
 

@@ -41,9 +41,10 @@ function useCardsAwaited(listRef: RefObject<HTMLElement | null>) {
   }, [listRef]);
 }
 
-// How far a line's foot is above the list's foot.
-const awayOf = (box: HTMLElement, line: Element) =>
-  box.getBoundingClientRect().bottom - line.getBoundingClientRect().bottom;
+// How far a line's foot is above the list's foot: only what grows under the line changes it, not a scroll, so a scroll the
+// engine tells late (WebKit's wheel is animated) leaves the note true.
+const awayOf = (list: Element, line: Element) =>
+  list.getBoundingClientRect().bottom - line.getBoundingClientRect().bottom;
 
 interface Anchor {
   current: { line: Element; away: number } | undefined;
@@ -54,7 +55,7 @@ function note(box: HTMLElement, anchor: Anchor) {
   const top = box.getBoundingClientRect().top;
   for (const line of box.firstElementChild?.children ?? []) {
     if (line.getBoundingClientRect().bottom <= top) continue;
-    anchor.current = { line, away: awayOf(box, line) };
+    anchor.current = { line, away: awayOf(line.parentElement ?? line, line) };
     return;
   }
 }
@@ -87,7 +88,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
       const anchor = anchorRef.current;
       // At the end the foot holds the reader; above it, what grew under the lines they read moved them up by as much.
       if (anchor?.line.isConnected === true && !atEnd(box)) {
-        const moved = awayOf(box, anchor.line) - anchor.away;
+        const moved = awayOf(list, anchor.line) - anchor.away;
         if (Math.abs(moved) >= 1) box.scrollTop -= moved;
       }
       note(box, anchorRef);
