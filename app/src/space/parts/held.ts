@@ -23,6 +23,8 @@ export interface Held extends Warming {
   /** The full-size maps still to go to the GPU, and whether they were swapped in (the Earth's). */
   pending?: Texture[];
   upgraded: boolean;
+  /** How far they have come into focus over the half-size ones, 0 to 1, while they come (upgrade.ts). */
+  focus?: number;
   /** How far it has come in over its stand-in, 0 to 1. */
   arrive: number;
 }

@@ -52,7 +52,8 @@ export interface Planet {
   /** Where its moons stand, each as world x, y, z and its radius: their shadows cross it. At most four; the rest, none. */
   setMoons(shadows: readonly Vector4[]): void;
   /** Swaps the Earth's day, night and cloud maps for others of the same pictures at another size. */
-  setEarthMaps(maps: { day: Texture; night: Texture; clouds: Texture }): void;
+  /** The Earth's full-size maps in place of its own, which stay mixed in under them till `focus` (0 to 1, by default 1) is whole. */
+  setEarthMaps(maps: { day: Texture; night: Texture; clouds: Texture }, focus?: number): void;
   /** How far it has come in, 0 to 1: its surface, air and rings fade in together; below 1 its surface blends over what is behind. */
   setArrive(share: number): void;
   /** Whether the relief's shadows and cavities are drawn: off under the Low setting. */
@@ -153,14 +154,21 @@ class LivePlanet implements Planet {
     setUniform(uniforms, "heightOn", smoothstep(0, HEIGHT_MS, performance.now() - this.#heightAt));
   }
 
-  setEarthMaps({ day, night, clouds }: { day: Texture; night: Texture; clouds: Texture }): void {
+  setEarthMaps({ day, night, clouds }: { day: Texture; night: Texture; clouds: Texture }, focus = 1): void {
     const { uniforms } = this.surface;
-    for (const [name, map] of [
-      ["surface", day],
-      ["nightMap", night],
-      ["cloudMap", clouds],
-    ] as const)
-      if (uniforms[name] !== undefined) uniforms[name].value = map;
+    for (const [name, was, map] of [
+      ["surface", "surfaceWas", day],
+      ["nightMap", "nightWas", night],
+      ["cloudMap", "cloudWas", clouds],
+    ] as const) {
+      const [now, before] = [uniforms[name], uniforms[was]];
+      if (now === undefined) continue;
+      // The map replaced is kept till the focus is whole, then let go: freed, it must be bound nowhere.
+      if (before !== undefined && (focus >= 1 || now.value !== map))
+        before.value = focus >= 1 ? map : (now.value as Texture);
+      now.value = map;
+    }
+    setUniform(uniforms, "focus", focus);
   }
 
   setArrive(share: number): void {

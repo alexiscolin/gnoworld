@@ -133,6 +133,11 @@ export class Near {
 
   /** Whether planet `index` stands as itself (its maps on the GPU), not as its quad. */
   readonly shows = (index: number): boolean => this.#held.get(index)?.shown === true;
+  /** Whether planet `index` is made whole (compiled, drawn once, its maps on the GPU), shown or not: wanted only once it is a few pixels. */
+  readonly made = (index: number): boolean => {
+    const held = this.#held.get(index);
+    return held !== undefined && held.compiled && held.uploads.length === 0;
+  };
 
   // Planet `index` shown as itself or as its quad: made once, called on frames.
   readonly #showOne = (held: Held, index: number): void => {
@@ -159,7 +164,9 @@ export class Near {
     const held = this.#held.get(planet.index);
     if (held?.shown !== true) return;
     this.#place(planet, held.drawn, this.#seconds);
-    if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device, this.#fade.flying === true);
+    const { delta, still, flying } = this.#fade;
+    if (planet.id === EARTH && upgradeStep(held, this.#device, { delta, still, busy: this.#sent || flying === true }))
+      this.arriving = true;
     const share = step(held, this.#fade);
     held.drawn.setArrive(share);
     this.arriving ||= held.over && share < 1;

@@ -106,6 +106,11 @@ export const handMadeUniforms = (look: HandMade, maps: MapSet): Uniforms => ({
   cloudCover: { value: look.clouds },
   highClouds: { value: look.highClouds },
   nightLights: { value: maps.night === undefined ? 0 : 1 },
+  // The maps the Earth's full-size ones replace, mixed in while those come into focus (Planet.setEarthMaps): unread at 1.
+  surfaceWas: { value: maps.clouds },
+  cloudWas: { value: maps.clouds },
+  nightWas: { value: maps.clouds },
+  focus: { value: 1 },
 });
 
 /** Writes a number where a material holds its uniform. */

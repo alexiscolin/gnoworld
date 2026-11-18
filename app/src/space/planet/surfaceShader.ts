@@ -23,6 +23,20 @@ void main() {
 }
 `;
 
+// The Earth's full-size maps come into focus over the half-size ones they replace (parts/upgrade.ts): while `focus` is under 1 each read
+// of the day, the night or the clouds mixes in the map it replaced, read no more once it is 1 (the cities' spill, three levels blurred, is
+// the same in both).
+const FOCUS = /* glsl */ `
+uniform sampler2D surfaceWas;
+uniform sampler2D cloudWas;
+uniform sampler2D nightWas;
+uniform float focus;
+vec4 readIn(sampler2D map, sampler2D was, Lookup at) {
+  vec4 now = read(map, at);
+  return focus < 1.0 ? mix(read(was, at), now, focus) : now;
+}
+`;
+
 // The Earth's own clouds, its real cloud map by threshold, and its shadows. A slope read from the map beside each point, a pixel away and
 // no nearer than a texel, so the detail a pixel can carry is shaded and no finer, soft-clipped so a crater's rim never becomes a line.
 const RELIEF = /* glsl */ `
@@ -30,15 +44,15 @@ uniform float cloudCover;
 uniform float highClouds;
 uniform float nightLights;
 vec3 clouded(vec3 colour, vec3 high, float low, float shine, vec3 tint, out float cover) {
-  cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
-  float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
+  cover = smoothstep(low - 0.1, low + 0.72, readIn(cloudMap, cloudWas, lookupOf(high)).r);
+  float shadowed = smoothstep(low - 0.1, low + 0.72, readIn(cloudMap, cloudWas, lookupOf(normalize(high + spin * vSun * 0.016))).r);
   return cloudsOver(colour, cover, shadowed, shine, tint);
 }
 // A second, high layer: the same map read again, tilted and slower, thin and faint, with no shadow of its own, over the first.
 vec3 highClouded(vec3 colour, vec3 axis, float shine, vec3 tint) {
   vec3 tilted = vec3(axis.x, axis.y * 0.8 + axis.z * 0.6, axis.z * 0.8 - axis.y * 0.6);
   vec3 high = spin * normalize(turned(tilted, -cloudTime * 0.0022) + 0.14 * field(tilted * 2.3).yzx);
-  float cover = smoothstep(0.62, 1.02, read(cloudMap, lookupOf(high)).r);
+  float cover = smoothstep(0.62, 1.02, readIn(cloudMap, cloudWas, lookupOf(high)).r);
   return mix(colour, tint * shine + 0.0015, cover * highClouds);
 }
 const float TEXEL = 0.0032;
@@ -66,7 +80,7 @@ vec3 bumped(vec3 axis, float height, float angle, Lookup at, float ground, out f
   vec3 toNorth = spin * normalize(axis + north * reach);
   vec3 tilt = vec3(0.0);
   if (relief >= 0.004) {
-    vec3 slope = (east * (toneOf(read(surface, lookupOf(toEast)).rgb) - height) + north * (toneOf(read(surface, lookupOf(toNorth)).rgb) - height)) / reach;
+    vec3 slope = (east * (toneOf(readIn(surface, surfaceWas, lookupOf(toEast)).rgb) - height) + north * (toneOf(readIn(surface, surfaceWas, lookupOf(toNorth)).rgb) - height)) / reach;
     slope /= 1.0 + 0.35 * length(slope);
     tilt = relief * mix(1.0, 0.5, heightOn) * slope;
   }
@@ -87,6 +101,7 @@ export const SURFACE_FRAGMENT = /* glsl */ `
 ${COMMON}
 ${FIELD}
 ${LOOKUP}
+${FOCUS}
 ${PARTS}
 ${SHADE}
 ${RELIEF}
@@ -96,7 +111,7 @@ void main() {
   vec3 flow = field(axis);
   vec3 direction = spin * normalize(axis);
   Lookup place = lookupOf(direction);
-  vec3 base = read(surface, place).rgb;
+  vec3 base = readIn(surface, surfaceWas, place).rgb;
   float height = toneOf(base);
   float pixel = length(fwidth(axis));
     vec3 albedo = base;
@@ -134,7 +149,7 @@ void main() {
     if (highClouds > 0.0) colour = highClouded(colour, axis, shine, vec3(0.84, 0.86, 0.9));
   }
   if (nightLights > 0.0) {
-    vec3 cities = read(nightMap, place).rgb;
+    vec3 cities = readIn(nightMap, nightWas, place).rgb;
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
     float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
     colour += (cities * 2.6 + spill * 0.9) * CITY_LIGHT * dusk * (1.0 - 0.8 * overcast);
