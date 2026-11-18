@@ -83,6 +83,19 @@
     overflow: hidden;
   }
 
+  /* A phone's page takes no pull past its ends: no rubber band moves the header, a chat's frame or its composer (Safari from
+     16.4; before it a page too short to scroll still bounces, webkit.org/b/244232). A chat's lines hand no scroll on at
+     theirs: the list alone moves. */
+  @media (width < 900px) {
+    :root {
+      overscroll-behavior: none;
+    }
+
+    ol[aria-label="Messages"] {
+      overscroll-behavior: contain;
+    }
+  }
+
   /* One ring everywhere, fields included; nothing hides it. */
   :focus-visible {
     outline: var(--focus-width) solid var(--color-mine);
