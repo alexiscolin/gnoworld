@@ -398,6 +398,14 @@ test.describe("updates", () => {
   // run, 2.5 s at each load): what they try is the shell's, every page's.
   const PAGE = "/earth";
 
+  // Each step titled with its start, counted from the test's: one that runs out of time on a slow runner names, in its failure's first
+  // line, the step it was in and when that step began, read from the job's log alone.
+  function stepsOf() {
+    const start = performance.now();
+    return async <T>(title: string, body: () => Promise<T>): Promise<T> =>
+      test.step(`${title}, from ${String(Math.round(performance.now() - start))} ms`, body);
+  }
+
   async function open(page: Page): Promise<void> {
     await page.goto(`${site}${PAGE}`);
     await controlled(page);
@@ -530,18 +538,26 @@ test.describe("updates", () => {
   });
 
   test("Close puts the notice away and keeps its region; a newer version brings it back", async ({ page, request }) => {
-    await open(page);
-    await bump(page, request, { site });
-    await expect(noticeOf(page)).toBeVisible();
-    await promptOf(page).evaluate((region) => {
-      region.id = "kept";
+    const step = stepsOf();
+    await step("open", () => open(page));
+    await step("a first new version offered", async () => {
+      await bump(page, request, { site });
+      await expect(noticeOf(page)).toBeVisible();
     });
-    await promptOf(page).getByRole("button", { name: "Close" }).click();
-    await expect(promptOf(page)).toHaveCount(0);
-    await expect(page.locator("#kept[role='status']")).toHaveCount(1);
-    expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
-    await bump(page, request, { site });
-    await expect(noticeOf(page)).toBeVisible();
+    await step("Close", async () => {
+      await promptOf(page).evaluate((region) => {
+        region.id = "kept";
+      });
+      await promptOf(page).getByRole("button", { name: "Close" }).click();
+      await expect(promptOf(page)).toHaveCount(0);
+      await expect(page.locator("#kept[role='status']")).toHaveCount(1);
+      expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    });
+    await step("a newer version offered", async () => {
+      await bump(page, request, { site });
+      await expect(noticeOf(page)).toBeVisible();
+    });
+    await step("done", () => Promise.resolve());
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
@@ -571,32 +587,42 @@ test.describe("updates", () => {
 
   // A message to the worker may be lost; the page cannot tell, so the next click sends it again.
   test("a Reload click whose message was lost works at the next click", async ({ page, request }) => {
-    await open(page);
-    await page.evaluate(() => {
-      const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(ServiceWorker.prototype, "postMessage");
-      let lost = true;
-      Object.defineProperty(ServiceWorker.prototype, "postMessage", {
-        value(this: ServiceWorker, message: unknown) {
-          if (lost) {
-            lost = false;
-            document.documentElement.dataset["lost"] = "yes";
-            return;
-          }
-          post.call(this, message);
-        },
+    const step = stepsOf();
+    await step("open, the worker's message lost once", async () => {
+      await open(page);
+      await page.evaluate(() => {
+        const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(ServiceWorker.prototype, "postMessage");
+        let lost = true;
+        Object.defineProperty(ServiceWorker.prototype, "postMessage", {
+          value(this: ServiceWorker, message: unknown) {
+            if (lost) {
+              lost = false;
+              document.documentElement.dataset["lost"] = "yes";
+              return;
+            }
+            post.call(this, message);
+          },
+        });
       });
     });
-    await bump(page, request, { site });
-    await expect(noticeOf(page)).toBeVisible();
-    await promptOf(page).getByRole("button", { name: "Reload" }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-lost", "yes");
+    await step("a new version offered", async () => {
+      await bump(page, request, { site });
+      await expect(noticeOf(page)).toBeVisible();
+    });
     // The notice closes on its click and the page stays: the worker was told nothing.
-    await expect(promptOf(page)).toHaveCount(0);
-    expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    await step("the click whose message is lost", async () => {
+      await promptOf(page).getByRole("button", { name: "Reload" }).click();
+      await expect(page.locator("html")).toHaveAttribute("data-lost", "yes");
+      await expect(promptOf(page)).toHaveCount(0);
+      expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    });
     // Shown again, the page offers the update again, and that click reaches the worker.
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-    await expect(noticeOf(page)).toBeVisible();
-    await clickedThrough(page);
+    await step("offered again once shown", async () => {
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await expect(noticeOf(page)).toBeVisible();
+    });
+    await step("the click that reaches the worker, and the reload", () => clickedThrough(page));
+    await step("done", () => Promise.resolve());
   });
 
   // The worker running answers a tab opened after the deploy with its own version, so the click is real.
