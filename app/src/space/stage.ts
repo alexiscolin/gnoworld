@@ -17,6 +17,7 @@ import { Orbits, Plate, Round } from "./parts/marks.ts";
 import { Moons } from "./parts/moons.ts";
 import { Near } from "./parts/near.ts";
 import { Planets } from "./parts/planets.ts";
+import { keepPrograms } from "./parts/programs.ts";
 import { Sky } from "./parts/sky.ts";
 import { Effects } from "./rig/effects.ts";
 import { worldOf } from "./planet/generated.ts";
@@ -161,6 +162,8 @@ export class Stage {
       device,
       old === undefined || before === undefined ? undefined : { near: old, before, now: universe },
     );
+    // The new parts take the programs the last ones drew with before those go, or three frees them and the next frame links them anew.
+    if (last.length > 0) keepPrograms({ renderer, camera, stage: this.scene });
     for (const made of last) made.dispose();
     this.#made.push(planets, this.near, {
       dispose: () => {
