@@ -97,9 +97,16 @@ function useListReading(
   list: Pick<Parameters<typeof useReading>[0], "lines" | "paged" | "onRead" | "keeping"> & {
     fresh: string | undefined;
     reactions: readonly Reaction[] | undefined;
+    jumped: boolean;
   },
 ) {
-  const { listRef, seesEnd, onScroll } = useNewestInView(list.lines, list.fresh, list.reactions);
+  const { lines, fresh, reactions } = list;
+  const { listRef, seesEnd, onScroll } = useNewestInView({
+    lines,
+    fresh,
+    reactions,
+    arrived: list.paged && !list.jumped,
+  });
   const look = useReading({
     lines: list.lines,
     seesEnd,
@@ -128,10 +135,11 @@ export function useListRead(list: {
   reactions?: readonly Reaction[] | undefined;
   read?: string | undefined;
   paged?: boolean | undefined;
+  jumped?: boolean | undefined;
   onRead?: ((id: string) => void) | undefined;
   keeping?: Parameters<typeof useReading>[0]["keeping"];
 }) {
-  const { lines, me, reactions, read, paged = false, onRead, keeping } = list;
+  const { lines, me, reactions, read, paged = false, jumped = false, onRead, keeping } = list;
   const fresh = useNewMark(lines, placeOf(paged, read, keeping?.unread), me);
-  return { fresh, ...useListReading({ lines, fresh, reactions, paged, onRead, keeping }) };
+  return { fresh, ...useListReading({ lines, fresh, reactions, paged, jumped, onRead, keeping }) };
 }

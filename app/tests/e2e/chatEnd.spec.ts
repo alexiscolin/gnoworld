@@ -1,5 +1,7 @@
 import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
+import { word } from "./chat.ts";
+import { logIn } from "./irc.ts";
 import { live, room, T } from "./scriptedRoom.ts";
 import type { HistoryLine } from "./scripted.ts";
 
@@ -113,4 +115,44 @@ test("a reader who scrolls up by the wheel keeps their place as a card grows", a
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
   });
   expect(await list.evaluate((box) => box.scrollTop)).toBe(before);
+});
+
+// The safety net: a list shown again after it had no height (a phone's panel), its place lost meanwhile as an engine may lose
+// it, is put at its end once it is quiet; no reader moved it.
+test("a room shown again after its list had no height ends at its end, its place lost meanwhile", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.locator('ol[aria-label="Messages"]');
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await list.evaluate(async (box) => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    const region = box.closest("[data-chat-layout]");
+    if (!(region instanceof HTMLElement)) throw new Error("no chat layout");
+    region.style.setProperty("display", "none");
+    await frame();
+    await frame();
+    region.style.removeProperty("display");
+    await frame();
+    await frame();
+    box.scrollTop = 0;
+  });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+});
+
+// The net leaves the one exception alone: an account's room with unread lines opens on its New line and stays there.
+test("a room opened on its New line stays there once it is quiet", async ({ page }) => {
+  const address = await logIn(page, word("arrive"));
+  await room(page, { me: address, history: HISTORY.slice(0, 30), read: T(5) });
+  const list = page.getByRole("list", { name: "Messages" });
+  const fromTop = () =>
+    list.evaluate((box) => {
+      const mark = box.querySelector(":scope > li[data-new]");
+      return mark === null
+        ? -1
+        : Math.abs(Math.round(mark.getBoundingClientRect().top - box.getBoundingClientRect().top));
+    });
+  await expect.poll(fromTop).toBe(0);
+  // Past the net's wait (reading.ts, QUIET_MS).
+  await page.waitForTimeout(600);
+  expect(await fromTop()).toBe(0);
+  expect(await gap(list)).toBeGreaterThan(100);
 });

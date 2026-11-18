@@ -209,6 +209,7 @@ describe("the lines view, compiled", () => {
 describe("the list held at its end", () => {
   const CLIENT = 400;
   let height: number;
+  let client: number;
   let top: number;
   let resized: (() => void)[];
   const list = () => {
@@ -229,7 +230,8 @@ describe("the list held at its end", () => {
     height = 1000;
     top = 0;
     resized = [];
-    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(CLIENT);
+    client = CLIENT;
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(() => client);
     vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(() => height);
     vi.spyOn(Element.prototype, "scrollTop", "get").mockImplementation(() => top);
     vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation((to: number) => {
@@ -302,6 +304,82 @@ describe("the list held at its end", () => {
     scrolled();
     grown(0);
     expect(top).toBe(900);
+  });
+
+  // The safety net: whatever moved the list off its end, if it was not the reader, the room that has arrived ends at its end.
+  describe("once the room has arrived and its list is quiet", () => {
+    const QUIET = 250;
+    // The list moved off its end by no reader (an engine that forgets a hidden list's place), then a resize, then quiet.
+    const strayed = (to: number) => {
+      top = to;
+      scrolled();
+      grown(0);
+      vi.advanceTimersByTime(QUIET);
+    };
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("puts the list at its end again when the reader has not moved it", () => {
+      draw({ paged: true });
+      top = 0;
+      scrolled();
+      grown(0);
+      expect(top).toBe(0);
+      vi.advanceTimersByTime(QUIET);
+      expect(top).toBe(600);
+    });
+
+    it.each(["wheel", "touchmove", "keydown", "pointerdown"])(
+      "leaves the reader who moved the list by a %s",
+      (type) => {
+        draw({ paged: true });
+        list().dispatchEvent(new Event(type));
+        strayed(100);
+        expect(top).toBe(100);
+      },
+    );
+
+    it("leaves a room read around a found message where the search put it", () => {
+      draw({ paged: true, jumped: true });
+      strayed(300);
+      expect(top).toBe(300);
+    });
+
+    it("leaves a room opened on its New line there", () => {
+      draw({ paged: true, read: at(100) });
+      expect(host.querySelectorAll("ol > li[data-new]")).toHaveLength(1);
+      strayed(250);
+      expect(top).toBe(250);
+    });
+
+    // Once an arrival: what moves the list later with no hand on it (the browser's find in page) is left alone.
+    it("moves the list once, not again when it is moved later", () => {
+      draw({ paged: true });
+      strayed(0);
+      expect(top).toBe(600);
+      strayed(100);
+      expect(top).toBe(100);
+    });
+
+    it("moves it again when the list is shown after it had no height", () => {
+      draw({ paged: true });
+      strayed(0);
+      client = 0;
+      grown(0);
+      client = CLIENT;
+      strayed(0);
+      expect(top).toBe(600);
+    });
+
+    it("waits for the room's history", () => {
+      draw();
+      strayed(0);
+      expect(top).toBe(0);
+    });
   });
 
   it("leaves the reader who scrolled up where they are as a card grows, and holds the end again once back there", () => {

@@ -94,6 +94,8 @@ export interface RoomViewProps {
         read?: string | undefined;
         /** This connection's history page came. */
         paged?: true | undefined;
+        /** The msgid of the found message the room is read around, the search's. */
+        jump?: string | undefined;
         /** Its reactions. */
         reactions?: readonly Reaction[] | undefined;
         /** Ergo refused one of the page's reactions here. */
@@ -160,7 +162,7 @@ export function RoomView(props: RoomViewProps) {
   const { onReact, onReply, onThread, onEdit, partner } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
-  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
+  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact, jump } = state ?? {};
   const connected = chat === "connected";
   return (
     <div className={styles["main"]} data-chat-state={chat}>
@@ -179,6 +181,7 @@ export function RoomView(props: RoomViewProps) {
         onDismiss={onDismiss}
         read={read}
         paged={paged === true}
+        jumped={jump !== undefined}
         onRead={onRead}
         verdicts={verdicts}
         saving={saving}
