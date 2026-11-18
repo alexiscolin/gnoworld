@@ -154,12 +154,17 @@ test("hides the names through a flight, and gives them back once it lands", asyn
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
 });
 
-// The streaks are the speed pass's: its strength follows the rig's speed, which a flight raises and a view at rest does not.
+// The streaks are the speed pass's: drawn in a flight alone, their strength following the rig's speed from 0.8 (speed.ts). A view at rest
+// draws none: it does not fly, and its own idle turn, which starts 4 s after the last input (free.ts), stays far under 0.8.
 test("draws its streaks while it crosses, and none at rest", async ({ page }) => {
   await withWorlds(page);
   await home(page);
-  const speed = () => page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).rig.speed);
-  expect(await speed()).toBeCloseTo(0, 2);
+  const atRest = () =>
+    page.evaluate(() => {
+      const { rig } = Reflect.get(globalThis, "__gnoworldSpace") as Space;
+      return !rig.flying && rig.speed < 0.05;
+    });
+  expect(await atRest()).toBe(true);
   const crossed = page.evaluate(
     () =>
       new Promise<number>((resolve) => {
@@ -176,7 +181,7 @@ test("draws its streaks while it crosses, and none at rest", async ({ page }) =>
   await fly(page, systemPath(await otherSystem(page)));
   expect(await crossed).toBeGreaterThan(0);
   await flown(page);
-  await expect.poll(speed, SLOW).toBeCloseTo(0, 2);
+  await expect.poll(atRest, SLOW).toBe(true);
 });
 
 // Under reduced motion a flight lands in the frame it starts: no frame of travel, the rig never part of the way.
