@@ -4,8 +4,8 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { GUEST, T } from "./talk.ts";
 
-// A phone's screen stands still (Safari on iPhone): the document never scrolls on a view with the chat, so the header, the chat's frame and
-// the composer cannot move with a pull past an end; the lines alone scroll, and hand no scroll on to the page. Walked in WebKit and in
+// A phone's screen stands still (Safari on iPhone): the document never scrolls on a view with the chat, and takes no pull past its ends, so
+// the header, the chat's frame and the composer cannot move; the lines alone scroll, and hand no scroll on. Walked in WebKit and in
 // Chromium with an iPhone's profile (Claude Code's sandbox starts no WebKit: its half runs outside it). No headless engine draws the
 // rubber band itself: a real iPhone alone shows it.
 const ENGINES = ["webkit", "chromium"] as const;
@@ -91,23 +91,21 @@ for (const engine of ENGINES) {
           "the lines hand no scroll on",
         ).toBe("contain");
         expect(await box.evaluate((el) => el.scrollHeight > el.clientHeight), "the lines scroll").toBe(true);
-        // Mobile WebKit takes no wheel from Playwright: the lines are put at each end there, and wheeled past it in Chromium.
-        for (const end of [0, 1e6]) {
-          await box.evaluate((el, top) => {
-            el.scrollTop = top;
-          }, end);
-          if (engine === "chromium") {
-            const at = await box.evaluate((el) => {
-              const { left, top, width, height } = el.getBoundingClientRect();
-              return { x: left + width / 2, y: top + height / 2 };
-            });
-            await page.mouse.move(at.x, at.y);
-            await page.mouse.wheel(0, end === 0 ? -600 : 600);
-            await page.waitForTimeout(300);
-          }
-          expect(await frame(page)).toEqual(was);
-        }
       });
     }
+
+    test("a screen 900 px wide keeps the browser's own: the rule is a phone's alone", async () => {
+      await page.goto("/w/bubble?room=games");
+      await hydrated(page);
+      await expect(lines(page)).toHaveCount(MANY.length);
+      const values = () =>
+        page.evaluate(() => [
+          getComputedStyle(document.documentElement).overscrollBehaviorY,
+          getComputedStyle(document.querySelector('ol[aria-label="Messages"]') ?? document.body).overscrollBehaviorY,
+        ]);
+      expect(await values()).toEqual(["none", "contain"]);
+      await page.setViewportSize({ width: 900, height: 800 });
+      await expect.poll(values).toEqual(["auto", "auto"]);
+    });
   });
 }

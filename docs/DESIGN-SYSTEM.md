@@ -303,7 +303,7 @@ colours then leave as drawn, the property doing nothing where forced colours do 
 `field-sizing` and `resize`, for the box of lines, which grows with its draft and drags by its
 height alone. The lint holds the line and lists the exceptions, the last two for the avatar's and
 the field's sheets alone. The base styles alone also take `scrollbar-width`, `user-select` and
-`overscroll-behavior` (in every browser since 2022, Safari 16; ignored before). Popovers are positioned by a
+`overscroll-behavior` (Safari from 16, a page too short to scroll from 16.4; ignored before). Popovers are positioned by a
 small function of ours until CSS anchor positioning (Baseline 2026) is widely available.
 
 ## Testing the CSS
