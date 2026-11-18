@@ -41,7 +41,8 @@ function evaluated(url: URL, name: string | null) {
   const bytes = Uint8Array.from(hex.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16));
   const expression = new TextDecoder().decode(bytes);
   if (expression.endsWith(".IsDeleted()")) return queryEnvelope({ data: `(${String(name === null)} bool)` });
-  if (expression.endsWith(".Name()") && name !== null) return queryEnvelope({ data: `("${name}" string)` });
+  // The name is asked nil-guarded (core's evalNameOf): `func() string { d := ResolveAddress(…); if d == nil { return "" }; return d.Name() }()`.
+  if (expression.endsWith("return d.Name() }()") && name !== null) return queryEnvelope({ data: `("${name}" string)` });
   return rpcErrorEnvelope("unexpected");
 }
 

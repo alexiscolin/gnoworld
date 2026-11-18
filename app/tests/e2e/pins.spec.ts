@@ -4,6 +4,7 @@ import { lineOf, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { SITE } from "./sites.ts";
+import { ownContext } from "./deployed.ts";
 
 // Pins, through the real server and Ergo: the moderators (wallets moderator0 to 7, a worker's each, and moderator8
 // for the cap's test alone, so none passes 30 requests a minute) pin a line, every reader sees it. Workers share the
@@ -33,7 +34,7 @@ async function reader({ playwright, launchOptions }: Launcher, as?: string, room
   const { baseURL } = test.info().project.use;
   if (baseURL === undefined) throw new Error("no baseURL");
   const browser = await playwright.chromium.launch(launchOptions);
-  const context = await browser.newContext({ baseURL });
+  const context = await ownContext(browser, { baseURL });
   const second = await context.newPage();
   const address = as === undefined ? undefined : await logIn(second, as);
   await second.goto(`/w/bubble?room=${room}&chat=full`);

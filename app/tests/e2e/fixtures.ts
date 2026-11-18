@@ -3,7 +3,7 @@
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
 import { site } from "../../src/places.ts";
-import { serveJobs } from "./deployed.ts";
+import { refuseChains, serveJobs } from "./deployed.ts";
 import { pinFigures } from "./figures.ts";
 
 export { COUNTED } from "./deployed.ts";
@@ -147,6 +147,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         await context.route(pattern, (route) =>
           route.fulfill({ status: 404, headers: cors, body: JSON.stringify({ error: "not_ready" }) }),
         );
+      await refuseChains(context);
       if (counted) await serveJobs(context, cors);
       await use(undefined);
     },

@@ -4,8 +4,10 @@
 import { worldsDrawn } from "@gnoworld/core";
 import { WorldsCount } from "@gnoworld/schemas";
 import { NetworkAnswer, Worlds } from "@gnoworld/schemas/indexer";
-import type { BrowserContext } from "@playwright/test";
+import type { Browser, BrowserContext } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import universes from "../../data/universes.json" with { type: "json" };
+import { connectOrigins } from "../../src/cspOrigins.ts";
 
 export const RECORDED_FILE = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const RECORDED = Worlds.parse(JSON.parse(RECORDED_FILE));
@@ -41,4 +43,22 @@ export async function serveJobs(context: BrowserContext, headers: Record<string,
   ];
   for (const [pattern, body, answer] of served)
     await context.route(pattern, (route) => route.fulfill({ headers: answer, body }));
+}
+
+/** No real chain: every origin connect-src names (the universes' RPC and indexers) refused in the browser. GitHub's runner has a network
+ * and the sandbox none, so a node's answer, and its latency, would time a journey there alone; one that reads a chain routes its own on its
+ * page, which goes first. */
+export const refuseChains = (context: BrowserContext) =>
+  Promise.all(
+    connectOrigins(universes).map((origin) => context.route(`${origin}/**`, (route) => route.abort("blockedbyclient"))),
+  );
+
+/** A context of a browser a journey launches itself (a second account, a phone), as refused every chain as the test's own. */
+export async function ownContext(
+  browser: Browser,
+  options: Parameters<Browser["newContext"]>[0],
+): Promise<BrowserContext> {
+  const context = await browser.newContext(options);
+  await refuseChains(context);
+  return context;
 }

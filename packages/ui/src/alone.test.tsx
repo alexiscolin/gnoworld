@@ -519,8 +519,7 @@ describe("the move", () => {
   });
 });
 
-// The plate's cards rise in their stagger as the plate comes (Card/useRise.ts): its tests sit here, beside the room, as the Card folder's
-// tests are display-only and a default run skips them.
+// The plate's cards rise in their stagger as the plate comes (Card/useRise.ts): its tests sit here, beside the room.
 describe("a rising card's delay (--d)", () => {
   const watchers: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
   let now = 0;
