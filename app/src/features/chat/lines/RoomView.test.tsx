@@ -371,8 +371,20 @@ describe("RoomView", () => {
     expect(said(part(view({ state: { ...ROOM, lines } }), "Messages"))).toMatch(/first.*second/);
   });
 
-  it("says a room with no line has no message yet, once connected", () => {
-    expect(said(view({ state: { ...ROOM, lines: [] } }))).toContain("No messages yet.");
+  it("says a room with no line has no message yet, once its history came", () => {
+    expect(said(view({ state: { ...ROOM, lines: [], paged: true } }))).toContain("No messages yet.");
+  });
+
+  // The history comes a moment after the page connects: a room that holds lines must not say it holds none meanwhile.
+  it("shows a skeleton in the list's place, never the empty room's words, until the room's history came", () => {
+    const html = view({ state: { ...ROOM, lines: [] } });
+    expect(said(html)).not.toContain("No messages yet.");
+    expect(html).toMatch(/<div [^>]*aria-busy="true"[^>]*>.*data-shape="disc"/s);
+    expect(view({ state: { ...ROOM, lines: [], paged: true } })).not.toContain('data-shape="disc"');
+  });
+
+  it("shows no skeleton while the chat is not connected, which its status says", () => {
+    expect(view({ chat: "connecting", state: { ...ROOM, lines: [] } })).not.toContain('data-shape="disc"');
   });
 
   it("says who is here: how many, accounts shortened, guests named as guests", () => {
@@ -522,14 +534,15 @@ describe("RoomView", () => {
 
   // A conversation says why it is empty in words of its own.
   it("says the words it is given when it holds no line, once connected", () => {
-    const html = view({ state: { ...ROOM, lines: [] }, empty: "Nothing kept." });
+    const html = view({ state: { ...ROOM, lines: [], paged: true }, empty: "Nothing kept." });
     expect(said(html)).toContain("Nothing kept.");
     expect(said(html)).not.toContain("No messages yet.");
   });
 
-  it("shows a room it holds nothing of yet as empty, once connected", () => {
+  it("shows a room it holds nothing of yet as arriving, once connected, with nobody here", () => {
     const html = view({ state: undefined });
-    expect(said(html)).toContain("No messages yet.");
+    expect(said(html)).not.toContain("No messages yet.");
+    expect(html).toContain('data-shape="disc"');
     expect(said(part(html, "Who's here"))).toContain("0 here");
   });
 });

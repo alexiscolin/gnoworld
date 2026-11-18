@@ -1,9 +1,9 @@
 import type { Locator } from "@playwright/test";
-import { expect, test } from "./fixtures.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
 import { word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { live, room, T } from "./scriptedRoom.ts";
-import type { HistoryLine } from "./scripted.ts";
+import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 
 // A room opens at its newest line and stays there as that line's card comes late; a reader who scrolled up is left where they are.
 const MARKETS = {
@@ -155,4 +155,26 @@ test("a room opened on its New line stays there once it is quiet", async ({ page
   await page.waitForTimeout(600);
   expect(await fromTop()).toBe(0);
   expect(await gap(list)).toBeGreaterThan(100);
+});
+
+// Until its history came a room shows the chat's skeleton, never the empty room's words; then its lines, at their end.
+test("a room shows a skeleton until its history came, then its lines at their end", async ({ page }) => {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, "guest-zzzzzz", { history: HISTORY.slice(0, 30), historyAfter: held });
+  });
+  await page.goto("/w/bubble?room=games&chat=full");
+  await hydrated(page);
+  await expect(
+    page.locator('[data-chat-state="connected"] [aria-busy="true"] [data-shape="disc"]').first(),
+  ).toBeAttached();
+  await expect(page.getByText("No messages yet.")).toHaveCount(0);
+  release();
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect(list.locator(":scope > li").first()).toBeAttached();
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  await expect(page.locator('[aria-busy="true"] [data-shape="disc"]')).toHaveCount(0);
 });
