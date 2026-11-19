@@ -94,7 +94,7 @@ Semantic roles, all computed from them:
 | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
-| `--color-new`, `--color-new-line`, `--color-new-soft` | coral; coral at 60%; coral at 8% | What is new in a list: the "New" divider's word and its rule, the 60% holding 3:1 against the page (WCAG 1.4.11); the 8% tints a chat line not seen yet until it is read (it fades after 1 s over 0.6 s, none under reduced motion). Its own token, so what is new can change hue without touching danger |
+| `--color-new`, `--color-new-line`, `--color-new-soft` | coral; coral at 60%; coral at 12% (the rule of the `-soft` fills) | What is new in a list: the "New" divider's word and its rule, the 60% holding 3:1 against the page (WCAG 1.4.11); the soft fill tints a chat line not seen yet until it is read (it fades after 1 s over 0.6 s, none under reduced motion). Its own token, so what is new can change hue without touching danger |
 | `--world` | a world's own colour, set from its data, the dusk until it has one | The source of the three below; the Earth's page sets the sky |
 | `--world-light`, `--color-plate`, `--world-deep` | the world at 62% over the text; at 16% over the night; at 30% over space | The world's words and lines on the plate; the plate's fill, and the dock's beside a plate (alone over the scene the dock keeps the night); a `Network` dot's fill and a `Planet`'s far side |
 

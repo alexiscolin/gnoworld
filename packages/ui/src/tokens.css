@@ -44,7 +44,7 @@
     --color-danger-soft: color-mix(in oklab, var(--p-coral) 12%, transparent);
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
     --color-new-line: color-mix(in oklab, var(--p-coral) 60%, transparent);
-    --color-new-soft: color-mix(in oklab, var(--p-coral) 8%, transparent);
+    --color-new-soft: color-mix(in oklab, var(--p-coral) 12%, transparent);
     /* The world's own colour on its plate: a cool blue by default. At 16 % over the
        night it gives the frames' navy, #182033 sampled from the design (amber at 16 % read brown). */
     --world: var(--p-dusk);
