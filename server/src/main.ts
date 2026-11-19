@@ -27,6 +27,7 @@ import { mountOwners } from "./roles/wire.ts";
 import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { makeSearch } from "./search/index.ts";
+import { roomHistoryRoutes } from "./search/roomHistoryRoutes.ts";
 import { searchRoutes } from "./search/routes.ts";
 import { unreadBoot, unreadExpiry } from "./unread/boot.ts";
 import { callRoutes } from "./calls/routes.ts";
@@ -151,6 +152,19 @@ app.route(
     rooms: chat.roomsOf,
     session,
     origins: config.origins,
+    proxy: config.trustedProxy,
+    log,
+    now: Date.now,
+  }),
+);
+// A public room's last lines, for the page to draw before its link has joined: the guest's right, whoever asks.
+app.route(
+  "/api/history",
+  roomHistoryRoutes({
+    search,
+    roles,
+    archived: chat.rooms.archived,
+    rooms: chat.roomsOf,
     proxy: config.trustedProxy,
     log,
     now: Date.now,

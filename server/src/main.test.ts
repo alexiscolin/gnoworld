@@ -1444,7 +1444,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     return { dir, universes };
   };
 
-  it("serves a visitor each public route main mounts beside the chain: trending, network, tokens, people, calls, search, unread and translations", async () => {
+  it("serves a visitor each public route main mounts beside the chain: trending, network, tokens, people, calls, search, history, unread and translations", async () => {
     const origin = "https://gnoworld.test";
     const [rpc, indexer] = ["https://rpc.fake.example:443", "https://indexer.fake.example/graphql/query"];
     const { dir, universes } = universeFiles(rpc, indexer);
@@ -1495,6 +1495,8 @@ globalThis.fetch = (input, init) => {
       200,
       { hits: [], next: null, total: 0, capped: false, partial: false },
     ]);
+    const history = await at("/api/history?room=%23bubble");
+    expect([history.status, await history.json()]).toEqual([200, { room: "#bubble", lines: [] }]);
     expect((await at("/api/unread")).status).toBe(401);
     const foreign = await at("/api/unread", {
       method: "POST",
