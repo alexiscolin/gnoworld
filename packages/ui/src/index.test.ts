@@ -93,7 +93,8 @@ const parts: [
   Unstyled<ComponentProps<typeof ui.Panel.Body>>,
   Unstyled<ComponentProps<typeof ui.Panel.Footer>>,
   Unstyled<ComponentProps<typeof ui.Panel.Layout>>,
-] = [true, true, true, true, true, true, true];
+  Unstyled<ComponentProps<typeof ui.Breadcrumb.Step>>,
+] = [true, true, true, true, true, true, true, true];
 
 // What @gnoworld/ui gives the app and the admin console: a component left out of the entry
 // would pass its own tests and still be out of their reach.

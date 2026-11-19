@@ -227,20 +227,13 @@
     background: none;
   }
 
-  /* Between two levels, the design's chevron (the breadcrumb's, packages/ui), at 60%. */
-  .chevron::before {
-    content: "\203a";
-  }
-
+  /* Between two levels, the breadcrumb's chevron (packages/ui's TrailStep: its icon, its 60 % and its margins), in the levels' ink and size. */
   .chevron {
     /* raw: how far the chevron leans off the cream, the room a level's padding gives the other side */
     --_lean: 8px;
 
     flex: none;
     color: var(--color-text-muted);
-    /* raw: the breadcrumb's 60% */
-    opacity: 0.6;
-    margin-inline: var(--space-2xs);
     font: var(--font-ui);
     /* It leans as the cream slides, never moving a level. */
     transition: translate calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);

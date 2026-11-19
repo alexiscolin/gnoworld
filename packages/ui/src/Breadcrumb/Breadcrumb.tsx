@@ -11,6 +11,16 @@ export interface BreadcrumbProps {
   items: { label: string; href?: string; onSelect?: () => void }[];
 }
 
+/** The chevron between two steps of a trail, the design system's icon turned to point on: the breadcrumb's, and the header's between its
+ * views, never a text character. */
+function Step() {
+  return (
+    <span className={styles["step"]} aria-hidden="true">
+      <Icon name="chevron" size="s" />
+    </span>
+  );
+}
+
 /** Where the page sits in the site: a labelled trail of links ending on the current page, which is no link. It is drawn as the
  * design's kicker: the one label style, a dot in the world's colour, the steps apart by a chevron. */
 export function Breadcrumb({ label, items }: BreadcrumbProps) {
@@ -22,11 +32,7 @@ export function Breadcrumb({ label, items }: BreadcrumbProps) {
       <Cluster as="ol" space="2xs">
         {items.map((item, index) => (
           <li key={item.href ?? item.label}>
-            {index === 0 ? null : (
-              <span className={styles["step"]} aria-hidden="true">
-                <Icon name="chevron" size="s" />
-              </span>
-            )}
+            {index === 0 ? null : <Step />}
             {index !== last && item.onSelect !== undefined ? (
               <button type="button" className={styles["back"]} onClick={item.onSelect}>
                 <span className={styles["arrow"]} aria-hidden="true">
@@ -45,3 +51,5 @@ export function Breadcrumb({ label, items }: BreadcrumbProps) {
     </nav>
   );
 }
+
+Breadcrumb.Step = Step;

@@ -72,6 +72,17 @@ describe("the header", () => {
       ([, href, label]) => [href, text(label ?? "")] as const,
     );
   };
+  // Every icon is the design system's (D14003): the chevrons between the levels are its icon, no character a page's encoding could garble.
+  test("draws the chevrons between the levels as the design system's icon, never a character", async () => {
+    const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(await header("/w/bubble"))?.[1] ?? "";
+    const between = pill.split(/<a [^>]*>[\s\S]*?<\/a>/).slice(1, 3);
+    expect(between).toHaveLength(2);
+    for (const gap of between) {
+      expect(gap).toContain("<svg");
+      expect(text(gap).trim()).toBe("");
+    }
+  });
+
   test.each([
     ["/", "/earth", "Earth"],
     ["/earth", "/earth", "Earth"],
