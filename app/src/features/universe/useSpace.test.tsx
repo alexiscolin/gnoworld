@@ -103,6 +103,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// A flight asked as the page shows reads its goal at its first frame: the page's circle is held by then, not a frame after (the home's
+// goal turned from the system to the Earth close in the flight's first frame, a step of its own).
+describe("the page's circle", () => {
+  it("is held as the page's place is shown, before any frame", () => {
+    visit("earth");
+    expect(door.hold).toHaveBeenCalledTimes(1);
+    expect(door.hold.mock.invocationCallOrder[0]).toBeGreaterThan(door.show.mock.invocationCallOrder[0] ?? Infinity);
+  });
+});
+
 // What the Earth's page holds back until its first screen is done: the chat, which budgets.spec.ts leaves out of it.
 describe("the end of the first screen", () => {
   it("waits for space's first frame", () => {
