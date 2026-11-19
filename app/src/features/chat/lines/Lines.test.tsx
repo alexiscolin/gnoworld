@@ -599,6 +599,15 @@ describe("the lines view, compiled: threads' chips", () => {
     expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("199 replies");
   });
 
+  it("counts on the chip, in the coral of what is unseen, the thread's replies the reader has not seen", () => {
+    draw({ ...asked, paged: true, read: at(LINES - 3) });
+    const chip = () => [...host.querySelectorAll("button")].find((button) => /\d+ repl/.test(button.textContent));
+    expect(chip()?.querySelector('[data-tone="new"]')?.textContent).toBe("2");
+    expect(chip()?.getAttribute("aria-label")).toBe("199 replies, 2 unread, open the thread");
+    draw({ ...asked, paged: true, read: at(LINES - 1) });
+    expect(chip()?.querySelector('[data-tone="new"]')).toBeNull();
+  });
+
   it("reads the threads once for a line that comes, and draws no chip again for a line that answers none", () => {
     draw(asked);
     vi.clearAllMocks();

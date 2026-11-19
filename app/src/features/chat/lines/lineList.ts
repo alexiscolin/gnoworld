@@ -99,6 +99,16 @@ export const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
   pinned: keeping?.pinned.has(id) === true,
 });
 
+// The thread a line roots: its replies, and those the reader has not seen yet; none for a line that roots none.
+export const threadOf = (
+  repliesOf: ReadonlyMap<string, readonly { id: string }[]>,
+  unseen: ReadonlySet<string>,
+  id: string,
+) => {
+  const replies = repliesOf.get(id);
+  return { replies: replies?.length, unseenReplies: replies?.filter((reply) => unseen.has(reply.id)).length };
+};
+
 // The line a reply answers, when this room holds it: a reply naming its own msgid or another room's answers none here.
 export const answeredBy = (line: ShownLine, byId: ReadonlyMap<string, Line>, lineOf: (id: string) => string) =>
   line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""));

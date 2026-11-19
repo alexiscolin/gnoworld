@@ -16,6 +16,7 @@ import {
   NO_REACT,
   NO_REPLIES,
   NO_REPLY,
+  threadOf,
   verdictIn,
   type LinesProps,
   type ListProps,
@@ -158,7 +159,7 @@ function List(props: ListProps) {
                 {...marksOf(props, entry.line.id)}
                 react={me === undefined || (!shown.has(entry.line.id) && !votes.has(entry.line.id)) ? undefined : react}
                 answers={answeredBy(entry.line, byId, lineOf)}
-                replies={repliesOf.get(entry.line.id)?.length}
+                {...threadOf(repliesOf, unseen, entry.line.id)}
                 onThread={onThread}
               />
             ),

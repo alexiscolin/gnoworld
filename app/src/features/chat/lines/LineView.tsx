@@ -88,15 +88,16 @@ function rowOf({
 interface ChipOf {
   id: string;
   replies: number | undefined;
+  unseenReplies: number | undefined;
   stop: boolean;
   onThread: ((id: string) => void) | undefined;
 }
 
 // The chip of the thread a line roots, when the page opens threads and the line has replies; none for a line without.
-function chipOf({ id, replies, stop, onThread }: ChipOf) {
+function chipOf({ id, replies, unseenReplies, stop, onThread }: ChipOf) {
   return replies === undefined || onThread === undefined ? null : (
     <span className={styles["thread"]}>
-      <ThreadChip id={id} count={replies} stop={stop} onThread={onThread} />
+      <ThreadChip id={id} count={replies} unseen={unseenReplies} stop={stop} onThread={onThread} />
     </span>
   );
 }
@@ -141,6 +142,8 @@ export interface LineViewProps {
   answers: Line | undefined;
   /** The replies of the thread it roots, and how a chip opens it; none draws no chip. */
   replies?: number | undefined;
+  /** Those of its replies the reader has not seen yet, counted on its chip. */
+  unseenReplies?: number | undefined;
   onThread?: ((id: string) => void) | undefined;
   /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
   inThread?: true | undefined;
@@ -167,7 +170,7 @@ export const BARE_ROW = {
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread, votes, newHere, cardMsgid, cardKey, may, saving, room } = props;
+  const { replies, unseenReplies, onThread, inThread, votes, newHere, cardMsgid, cardKey, may, saving, room } = props;
   const row = rowOf({
     id: line.id,
     stop,
@@ -223,7 +226,7 @@ export function LineView(props: LineViewProps) {
       {/* The reactions at the line's start, the thread's chip at its end, on one row; none drawn, no row. */}
       <div className={styles["foot"]}>
         <Chips to={line.id} chips={chips} react={react} />
-        {chipOf({ id: line.id, replies, stop, onThread })}
+        {chipOf({ id: line.id, replies, unseenReplies, stop, onThread })}
       </div>
     </li>
   );
