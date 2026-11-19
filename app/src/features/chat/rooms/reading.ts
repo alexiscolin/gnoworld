@@ -3,6 +3,7 @@
 import { newMarkAfter, type Line, type NewMark } from "@gnoworld/core";
 import { useEffect, useEffectEvent, useState, type RefObject } from "react";
 import { useNewestInView } from "./heldAtEnd.ts";
+import { useAway, useUnseen } from "./unseen.ts";
 
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
  * while the room is open, as the place moves on and lines come; moved to the line a reader asks to go back to (the
@@ -110,6 +111,7 @@ function useListReading(
   return {
     listRef,
     awaiting,
+    seesEnd,
     onScroll: () => {
       onScroll();
       look();
@@ -121,7 +123,8 @@ function useListReading(
 const placeOf = (paged: boolean, read: string | undefined, unread: string | undefined) =>
   paged ? { read, unread } : { read: undefined, unread: undefined };
 
-/** What a list reads of its room: the line marked New, the list opened there or at its end, and the room read to it. */
+/** What a list reads of its room: the line marked New, the list opened there or at its end, the room read to it, and the
+ * lines not seen yet. */
 export function useListRead(list: {
   lines: readonly Line[];
   me: string | undefined;
@@ -132,5 +135,16 @@ export function useListRead(list: {
 }) {
   const { lines, me, read, paged = false, onRead, keeping } = list;
   const fresh = useNewMark(lines, placeOf(paged, read, keeping?.unread), me);
-  return { fresh, ...useListReading({ lines, fresh, paged, onRead, keeping }) };
+  const { seesEnd, onScroll, ...reading } = useListReading({ lines, fresh, paged, onRead, keeping });
+  const { away, look } = useAway(seesEnd);
+  const unseen = useUnseen(paged, { lines, read, me, away });
+  return {
+    fresh,
+    unseen,
+    ...reading,
+    onScroll: () => {
+      onScroll();
+      look();
+    },
+  };
 }

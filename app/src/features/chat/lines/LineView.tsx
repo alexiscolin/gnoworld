@@ -116,6 +116,8 @@ export interface LineViewProps {
   grouped?: boolean;
   /** Whether it is the first line past the reading place as the room opened. */
   fresh: boolean;
+  /** Whether the reader has not seen it yet: tinted, the tint fading once it is read (RoomView.module.css). */
+  unseen?: boolean;
   /** Its verdict from the server's stream, which a link's player waits on. */
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
@@ -190,6 +192,7 @@ export function LineView(props: LineViewProps) {
       className={KINDS[line.kind]}
       data-about-me={mentioned ? "" : undefined}
       data-new={fresh ? "" : undefined}
+      data-unseen={props.unseen === true ? "" : undefined}
       data-mine={mine ? "" : undefined}
       {...row.attrs}
     >
