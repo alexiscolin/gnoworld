@@ -72,7 +72,7 @@ describe("the routes ahead", () => {
     expect(routeModules(manifest)).toEqual(["/assets/world.js", "/assets/cosmos.js"]);
   });
 
-  it.each([[undefined], [null], [{}], [{ routes: 3 }], [{ routes: { a: null } }]])(
+  it.each([[undefined], [null], [{}], [{ routes: 3 }], [{ routes: { a: null } }], [{ routes: null }]])(
     "lists none for %j",
     async (junk) => {
       const { routeModules } = await import("./warmRealm.ts");

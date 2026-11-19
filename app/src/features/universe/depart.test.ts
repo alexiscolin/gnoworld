@@ -19,6 +19,7 @@ vi.mock("../../space/scene.ts", () => ({
     rig = { flying: false };
     stage = {};
     view = () => undefined;
+    // As the engine: a place it flies to already is waited on, not flown to again.
     go(place: Place) {
       log.calls.push("go");
       log.goes.push(place);
@@ -175,6 +176,38 @@ describe("the flight on the click", () => {
     show({ kind: "world", id: "earth" }, () => undefined);
     expect(arrival.enterPage).not.toHaveBeenCalled();
     expect(arrival.landTags).not.toHaveBeenCalled();
+  });
+
+  // The page asked again (its planet clicked in its arrival, a link to itself): no navigation follows to take the flight's events.
+  it("takes no wait for a click on the place the page shows already", async () => {
+    const { show } = await started();
+    show(WORLD, () => undefined);
+    log.goes.length = 0;
+    made.events?.["world"]?.("bubble");
+    expect(log.goes).toEqual([WORLD]);
+    made.events?.["near"]?.();
+    expect(arrival.enterPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves for the Earth's system by its address's id, whichever home namespace the label names", async () => {
+    await started();
+    made.events?.["system"]?.("gov");
+    expect(log.goes).toEqual([{ kind: "system", id: "gnoland" }]);
+  });
+
+  it("ends the wait when the page that comes asks no place, and gives its box back", async () => {
+    const { show } = await started();
+    const box = document.createElement("div");
+    box.dataset["globe"] = "";
+    document.body.append(box);
+    made.events?.["world"]?.("bubble");
+    expect(box.dataset["flown"]).toBe("flying");
+    made.events?.["landed"]?.();
+    show(undefined, () => undefined);
+    expect(box.dataset["flown"]).toBe("landed");
+    made.events?.["near"]?.();
+    expect(arrival.enterPage).toHaveBeenCalledTimes(1);
+    box.remove();
   });
 
   it("lets the engine's own near through once no flight is waiting for its page", async () => {

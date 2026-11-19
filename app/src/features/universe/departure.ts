@@ -13,8 +13,18 @@ let ahead: { readonly place: Place; near: boolean; landed: boolean } | undefined
 /** The flight to `place` leaves now, on the click that asks its page: the camera goes to the planet where the scene holds it, and to the page's
  * circle as the page lays it out. The leaving page's circle is no goal for the next planet: the flight goes for the middle's till then. False
  * (nothing left) under reduced motion, which jumps, and where space is not in sight or the camera stands there. */
-export function depart(space: Space | undefined, place: Place): boolean {
-  if (space === undefined || !space.seen || motionOf().matches || !space.go(place)) return false;
+export function depart(space: Space | undefined, asked: Place | undefined, to: Place): boolean {
+  // The Earth's system goes by one id in an address and by the layout's first home namespace in the engine's labels.
+  const place = to.kind === "system" && isHome(to.id) ? { kind: to.kind, id: HOME_SYSTEM } : to;
+  if (space === undefined || !space.seen || motionOf().matches) return false;
+  // The page on screen asked again (its planet clicked in its arrival, a link to itself): no navigation follows, so no page will come to take
+  // the flight's events: they reach it as any flight's, and a wait for another page is over.
+  if (asked !== undefined && sameAs(asked, place)) {
+    ahead = undefined;
+    if (space.go(place)) markFlown(true);
+    return false;
+  }
+  if (!space.go(place)) return false;
   ahead = { place, near: false, landed: false };
   space.hold(undefined);
   // The page the click leaves hides its plate as the flight begins, as the next would.
@@ -37,6 +47,7 @@ export function hold(said: "near" | "landed"): boolean {
 export function arrive(place: Place | undefined, near: () => void): void {
   const flight = ahead;
   ahead = undefined;
+  if (flight !== undefined && place === undefined) markFlown(false);
   if (flight === undefined || place === undefined || !sameAs(flight.place, place)) return;
   if (flight.landed) {
     markFlown(false);

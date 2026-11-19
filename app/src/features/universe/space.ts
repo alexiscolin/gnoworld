@@ -47,15 +47,15 @@ const events = {
   world: (id: string) => {
     const href = pages.get(id);
     if (href === undefined) return;
-    depart(space, { kind: "world", id });
+    depart(space, asked, { kind: "world", id });
     navigate(href);
   },
   system: (id: string) => {
-    depart(space, { kind: "system", id });
+    depart(space, asked, { kind: "system", id });
     navigate(systemPath(id));
   },
   universe: () => {
-    depart(space, { kind: "universe" });
+    depart(space, asked, { kind: "universe" });
     navigate("/universe");
   },
   near: () => {
@@ -85,7 +85,7 @@ const events = {
 // A click on a link the router took: the flight to the page's place leaves with it.
 function clicked(event: MouseEvent): void {
   const place = placeOfClick(event, worldsOf);
-  if (place !== undefined) depart(space, place);
+  if (place !== undefined) depart(space, asked, place);
 }
 
 function start(): void {
