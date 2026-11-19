@@ -117,18 +117,23 @@
     min-inline-size: 0;
   }
 
+  /* The name's column opens from nothing to the name's own width (0fr to 1fr), from rest to rest (ease-emphasized): the bar's width and the
+     links under the pill neither start with a kick nor stop short where the name ends, as a cap's transition did. */
   .named {
     display: grid;
-    transition: gap calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+    grid-template-columns: auto 1fr;
+    transition-property: gap, grid-template-columns;
+    transition-duration: calc(var(--motion-slow) * var(--motion-scale));
+    transition-timing-function: var(--ease-emphasized);
   }
 
   /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it. */
   .view[data-bare] .named {
+    grid-template-columns: auto 0fr;
     gap: 0;
   }
 
   .view[data-bare] .name {
-    max-inline-size: 0;
     padding-inline: 0;
     opacity: 0;
   }
@@ -150,9 +155,13 @@
     font: var(--font-label);
     letter-spacing: 0;
     text-transform: none;
-    transition-property: max-inline-size, padding, opacity;
+    /* The name's own column, the second, at every width: the word beside it may be hidden, never the column that folds. */
+    grid-column: 2;
+    /* raw: no width of its own below its column's, which folds it */
+    min-inline-size: 0;
+    transition-property: padding, opacity;
     transition-duration: calc(var(--motion-slow) * var(--motion-scale));
-    transition-timing-function: var(--ease-standard);
+    transition-timing-function: var(--ease-emphasized);
   }
 
   /* A system is a namespace, read as one: in mono, as an address or a path is; a world is a place, its name in the interface's own face. */
@@ -326,9 +335,9 @@
       display: none;
     }
 
-    /* The word hidden, the name alone in its level, giving way. */
+    /* The word hidden, the name alone in its level, giving way: its column (the second, as at every width) folds and opens as wide. */
     .named {
-      grid-template-columns: minmax(0, max-content);
+      gap: 0;
     }
 
     .name {

@@ -1,7 +1,9 @@
 // The views' pill's fill, one for the three views: it stands under the current view's link and glides to the next one as the page
-// changes. The links move while it goes (in the full chat their names fold and the pill's left edge runs), so the fill is the link's
-// own place as it stands each frame plus a gap that dies away without a turn: it never goes past its link and back, as a target read once
-// did when the names then folded. Places are the pill's own (a link's box less the pill's), so a move of the header as a whole is not one.
+// changes. The links move while it goes (in the full chat their names fold and the pill's left edge runs), so the fill heads for the place
+// the link will hold once they have (every running transition of the bar seen at its end, then set back, in one task: nothing is drawn
+// between) plus a gap that dies away: a link moving against the fill's way never turns it back, as its place read each frame did, nor
+// leaves it short, as a target read once did. Places are the pill's own (a link's box less the pill's), so a move of the header as a whole
+// is not one.
 import { motionWelcome } from "@gnoworld/ui";
 import { useLayoutEffect, type RefObject } from "react";
 import { useLocation } from "react-router";
@@ -19,6 +21,18 @@ interface Place {
 const placeOf = (nav: HTMLElement, link: HTMLElement): Place => {
   const { left, width } = link.getBoundingClientRect();
   return { x: left - nav.getBoundingClientRect().left, width };
+};
+
+// Where `link` will stand once the bar's transitions have run: each seen at its end, its place read, each set back where it was.
+const settledOf = (nav: HTMLElement, link: HTMLElement): Place => {
+  const running = typeof nav.getAnimations === "function" ? nav.getAnimations({ subtree: true }) : [];
+  const times = running.map((each) => each.currentTime);
+  for (const each of running) each.currentTime = Number(each.effect?.getComputedTiming().endTime ?? 0);
+  const place = placeOf(nav, link);
+  running.forEach((each, at) => {
+    each.currentTime = times[at] ?? null;
+  });
+  return place;
 };
 
 const write = (nav: HTMLElement, { x, width }: Place) => {
@@ -52,7 +66,7 @@ function follow(nav: HTMLElement): () => void {
       return;
     }
     delete nav.dataset["empty"];
-    const goal = placeOf(nav, link);
+    const goal = settledOf(nav, link);
     const still = !motionWelcome();
     // A new link to stand under (the mark moves to it a render after the page): the gap from where the fill is now.
     if (link !== linked) {
