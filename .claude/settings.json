@@ -17,6 +17,10 @@
       "Read(~/.npmrc)",
       "Read(~/.aws/**)",
       "Read(~/.local/share/gnomcp/**)",
+      "Read(~/.local/share/agent-github/**)",
+      "Edit(~/.local/share/agent-github/**)",
+      "Edit(~/.local/**)",
+      "Edit(~/.claude/hooks/**)",
       "Read(~/Library/Application Support/gno/**)",
       "Read(~/.claude.json)",
       "Bash(pnpm add *)",
@@ -130,6 +134,16 @@
             "onFailure": "block"
           }
         ]
+      },
+      {
+        "matcher": "Bash|Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$HOME/.claude/hooks/agent_pr_guard.py\" \"$HOME/.local/bin/agent-pr\"",
+            "onFailure": "block"
+          }
+        ]
       }
     ]
   },
@@ -149,7 +163,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
-    "excludedCommands": ["sh scripts/worktree.sh *"],
+    "excludedCommands": ["sh scripts/worktree.sh *", "~/.local/bin/agent-pr *"],
     "network": {
       "allowLocalBinding": true,
       "allowedDomains": ["registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "github.com"]
@@ -220,7 +234,8 @@
         "~/.aws",
         "~/.local/share/gnomcp",
         "~/Library/Application Support/gno",
-        "~/.claude.json"
+        "~/.claude.json",
+        "~/.local/share/agent-github"
       ]
     }
   }

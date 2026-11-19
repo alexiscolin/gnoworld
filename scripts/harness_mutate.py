@@ -1195,6 +1195,14 @@ def mutants():
     # agent-github's tools, which install_hooks.sh runs and which write every profile's denies, closed in the session's own tree (F13449).
     yield from each(".claude/settings.json", '      "Edit(/tools/agent-github/**)",\n', "", "hooks", "settings keep agent-github's tools out of the file tools (F13449)")
     yield from each(".claude/settings.json", '        "tools/agent-github",\n', "", "hooks", "the sandbox keeps commands out of agent-github's tools (F13449)")
+    # agent-pr's, the project's own (D14000 C, D14013): its exclusion, its token kept from commands and file tools, its folder and the
+    # hooks' kept from the file tools, its guard hook, which reads the tools that could reach it.
+    yield from each(".claude/settings.json", ', "~/.local/bin/agent-pr *"]', "]", "hooks", "agent-pr runs outside the sandbox from the project's settings (D14013)")
+    yield from each(".claude/settings.json", ',\n        "~/.local/share/agent-github"', "", "hooks", "the sandbox keeps commands out of agent-pr's token (D14013)")
+    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/hooks/**)"):
+        yield from each(".claude/settings.json", f'      "{rule}",\n', "", "hooks", f"settings keep {rule} from the file tools (D14013)")
+    yield from each(".claude/settings.json", '"matcher": "Bash|Read|Grep|Glob"', '"matcher": "Bash"', "hooks", "agent-pr's guard reads every tool that could reach it (D14013)")
+    yield from each(".claude/settings.json", '\\"$HOME/.local/bin/agent-pr\\"', '\\"/x/agent-pr\\"', "hooks", "agent-pr's guard knows the helper's path (D14013)")
     # The file tools write the session's folders alone; the instructions below a tree's root, and StrykerJS's copies left out of what
     # those close.
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
@@ -1376,7 +1384,7 @@ def mutants():
     yield from each(".claude/settings.json", '"Edit(/.claude/settings.json)"', '"Edit(/.claude/**)"', "hooks", "settings: no deny bans the gate's state")
     yield from each(".claude/settings.json", '"Bash(git push *)",\n', '"Bash(git push *)",\n      "Edit(/app/**)",\n', "hooks", "settings: no edit asks")
     yield from each(".claude/settings.json", '"repo": "gnoverse/gno-mcp"', '"repo": "nowhere/nothing"', "hooks", "settings: gnomcp's marketplace")
-    yield from each(".claude/settings.json", '"excludedCommands": ["sh scripts/worktree.sh *"]', '"excludedCommands": ["sh *"]', "hooks", "settings: worktree.sh alone leaves the sandbox (F5058)")
+    yield from each(".claude/settings.json", '"excludedCommands": ["sh scripts/worktree.sh *",', '"excludedCommands": ["sh *",', "hooks", "settings: worktree.sh alone leaves the sandbox (F5058)")
     yield from each(".claude/settings.json", '"Edit(/scripts/worktree.sh)"', '"Edit(/nothing)"', "hooks", "settings: an edit of worktree.sh, which leaves the sandbox, is refused (F5058)")
     for path in ("scripts/test_hooks.sh", ".githooks/pre-commit"):
         yield from each(path, "|| status=1; exit \"$status\"' EXIT", "exit \"$status\"' EXIT", "hooks", f"{path} keeps a failure through its EXIT trap")

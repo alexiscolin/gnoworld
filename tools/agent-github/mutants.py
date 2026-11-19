@@ -78,10 +78,10 @@ MUTANTS = [
     (G, [("            if not CALL.fullmatch(command):", "            if False:")], "the guard: one form of call"),
     (G, [("        if \".local/bin/agent-pr\" in command or helper in command:", "        if helper in command:")], "the guard: the helper under any spelling"),
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
-    (G, [("except Exception:  # what it cannot read", "except ZeroDivisionError:  # what it cannot read")], "the guard: what it cannot read is refused"),
-    (G, [("    if not isinstance(tool, str):\n", "    if False:\n")], "the guard: a tool it cannot name is refused"),
     (G, [('NAMED = rf"(?:{re.escape(helper)}|~/\\.local/bin/agent-pr)"', 'NAMED = rf"(?:{re.escape(helper)})"')], "the guard: the helper from the session's home"),
     (G, [('|~/\\.local/bin/agent-pr)"', '|~[^/ ]*/\\.local/bin/agent-pr)"')], "the guard: the session's own home alone, never ~user"),
+    (G, [("except Exception:  # what it cannot read", "except ZeroDivisionError:  # what it cannot read")], "the guard: what it cannot read is refused"),
+    (G, [("    if not isinstance(tool, str):\n", "    if False:\n")], "the guard: a tool it cannot name is refused"),
     (I, [("auth token --hostname github.com", "auth token")], "the installer: gh's token for github.com alone"),
     (I, [("grep -Eqx 'gh[po]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,255}'", "grep -Eqx '.+'")], "the installer: one GitHub token, as agent-pr reads it"),
     (I, [("is_token() { case $1 in *'\n'*) return 1 ;; esac && ", "is_token() { ")], "the installer: a token is one line"),
@@ -94,7 +94,7 @@ survived = []
 MUTANTS = [m for m in MUTANTS if all(w in m[2] for w in sys.argv[1:])]
 for name, pairs, label in MUTANTS:
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as d:
-        for f in (H, G, I, "SKILL.md", "test.sh"):
+        for f in (H, G, I, "test.sh"):
             shutil.copy(SOURCE.get(f, here / f), pathlib.Path(d) / f)
         target = pathlib.Path(d) / name
         text = target.read_text()

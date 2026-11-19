@@ -27,9 +27,14 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 
 ## Who does what
 
-- **The owner** approves each slice's plan, reviews blind first, runs what the
-  sandbox refuses (the push, through `land`; the merge into `main` on GitHub), and accepts or
-  refuses each rule the dream proposes.
+- **The owner** approves each slice's plan, reviews blind first, merges into `main` on GitHub, pushes a change of
+  `.github/workflows` himself, and accepts or refuses each rule the dream proposes. The agent publishes its own
+  `agent/**` branches and their pull requests in his name, through agent-pr (D14012, D14013): it runs outside the sandbox as
+  the project's one other excluded command, `~/.local/bin/agent-pr *`, with his `gh` login's token, which its installer takes
+  from `gh auth token` into `~/.local/share/agent-github/token`, kept from every command and file tool by the project's own
+  settings; its guard hook (`tools/agent-github/agent_pr_guard.py`) takes a call in one form, and the skill
+  (`.claude/skills/agent-github/SKILL.md`) says it. Nothing is written into a Claude profile (D14000 C). `land`, the owner's
+  command for a pull request, stays till 14a-2 removes it (D14014).
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its own range of finding numbers
   (so two branches side by side never take the same ones), makes its worktree and brief, opens its session through a script that opens a terminal pane,
@@ -538,7 +543,7 @@ costs context in every session.
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/stryker_lines.py` | the code GitHub's StrykerJS mutates: the changed tier-1 lines |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone, from a base whose harness is the tree's or main as GitHub serves it; a copy borrowing the installed packages, a workspace's `.bin` its own |
-| `scripts/land.py`, `scripts/agent_pr.py` | `land`, the owner's one command for a pull request (D13211, D13213), and the bundle reading and scans it reuses |
+| `scripts/land.py`, `scripts/agent_pr.py` | agent-pr, the agent's publishing in the owner's name (D14012, D14013), and `land`, the owner's command for a pull request till 14a-2 (D13211, D13213, D14014), which reuses its bundle reading and scans |
 | `.github/workflows/gate.yml` | the gate on GitHub: a pull request to main, a push to main or a run by hand, `gate-ok` its verdict |
 | `.github/workflows/nightly.yml` | the night on GitHub: 41 journeys, StrykerJS and the harness whole, the history's secrets; a red night opens one issue |
 | `.github/workflows/release.yml` | main's images: each push to main builds every image of `deploy/compose.yaml` and pushes it once to `ghcr.io/<owner>/<repository>/<image>:<12 hex of the commit>`; its one job writes packages alone, the token named in its push step alone, with no build cache, and the ci section holds the file to its every byte. A branch's own copy of the file runs on that branch's push, so a tag is trusted only as far as the repository's write access is |
