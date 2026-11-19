@@ -6,6 +6,7 @@ import { sameAs, type Place } from "../../space/place.ts";
 import type { Space } from "../../space/scene.ts";
 import { landTags } from "./arrival.ts";
 import { markFlown } from "./flown.ts";
+import { endArrival } from "./arrival.ts";
 import { ghost } from "./rise.ts";
 
 // The flight that left, and whether it neared or landed before its page was shown.
@@ -31,6 +32,7 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades on the leave clock, never cut out in a
   // frame, the chat dock's with it (it opens again with the destination's, as the arrival plays); not the cosmos's own parts, which stay
   // through a flight (arrival.ts RISING).
+  endArrival();
   ghost(() => false, "[data-exit]:not([data-clear], nav)", true);
   markFlown(true);
   return true;

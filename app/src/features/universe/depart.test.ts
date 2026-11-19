@@ -5,7 +5,7 @@ import type { Place } from "../../space/place.ts";
 // The flight leaves on the click (a label's or a link's), before the page it goes to is on screen; the page's arrival waits for that page.
 const log = vi.hoisted(() => ({ calls: [] as string[], goes: [] as Place[], flies: true, reduced: false }));
 const made = vi.hoisted(() => ({ events: undefined as undefined | Record<string, (id?: string) => void> }));
-const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), landTags: vi.fn(), waitTags: vi.fn() }));
+const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), landTags: vi.fn(), waitTags: vi.fn(), endArrival: vi.fn() }));
 vi.mock("./arrival.ts", () => arrival);
 const rise = vi.hoisted(() => ({ ghost: vi.fn() }));
 vi.mock("./rise.ts", () => rise);
@@ -163,6 +163,9 @@ describe("the flight on the click", () => {
     expect(stayed()).toBe(false);
     expect(among).toBe("[data-exit]:not([data-clear], nav)");
     expect(rise.ghost.mock.calls[0]?.[2]).toBe(true);
+    // The page's own arrival, if still playing, ends first: it would set the real dock visible through the flight.
+    expect(arrival.endArrival).toHaveBeenCalledTimes(1);
+    expect(arrival.endArrival.mock.invocationCallOrder[0]).toBeLessThan(rise.ghost.mock.invocationCallOrder[0] ?? 0);
     expect(box.dataset["flown"]).toBe("flying");
     box.remove();
   });

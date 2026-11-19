@@ -205,8 +205,7 @@ export function enterPage(kept = false, stays = false): void {
   // One arrival to a page: the flight's own calls (it nears, it lands) come after the page's and never play it again.
   if (arrived) return;
   arrived = true;
-  waiting?.();
-  running?.progress(1).kill();
+  endArrival();
   const reduced = motionOf().matches;
   // A page of the kind that left (`stays`: a world after a world) finds the plate, its frame and the dock standing: they stay as they are, and
   // only the words change (their own step below), never the box played again from nothing.
@@ -245,15 +244,17 @@ function wordsWhenBlocks(words: () => void, reduced: boolean): void {
   waitFor(blocksPresent, words, PLATE_WAIT_MS);
 }
 
+/** The page's own arrival, still playing, ends where it is (a click that leaves the page): it sets nothing on the real parts after it. */
+export function endArrival(): void {
+  waiting?.();
+  running?.progress(1).kill();
+}
+
 /** The page's copies in `layer` play the arrival back, 2.6 times as fast, and the layer goes with the end. */
 export function leavePage(layer: HTMLElement, page: number): void {
   // A page that has begun since (no flight between them: a phone, a weak GPU) owns the arrival now: the leaving one's copies play back alone.
   // Else its own arrival ends where it stands (never left half drawn on parts that persist, as the chat's seat does).
-  if (page === generation) {
-    waiting?.();
-    running?.progress(1).kill();
-    running = undefined;
-  }
+  if (page === generation) endArrival();
   const back = arrivalOf(layer, { ghost: true });
   back.progress(1).timeScale(BACK).reverse();
   back.eventCallback("onReverseComplete", () => {

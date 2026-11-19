@@ -81,10 +81,12 @@ export { loading } from "./firstLook.ts";
 export const RETURN_AFTER = 450;
 
 // What the page's place sets for a part holds out of its copy too: a plate whose fill space draws keeps it hidden (globe.module.css); beside a
-// plate the scene draws the dock's fill, which leaves with the page: its copy keeps the plate's.
+// plate the scene draws the dock's fill, which leaves with the page: its copy keeps the plate's. No animation runs in a copy.
 function carryFill(part: Element, copy: HTMLElement): void {
   const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
   if (fill !== "") copy.style.setProperty("--plate-fill", fill);
+  // A clone restarts its CSS animations (a card's rise holds it at opacity 0 till it runs out): none runs in a copy.
+  for (const inner of [copy, ...copy.querySelectorAll<HTMLElement>("*")]) inner.style.setProperty("animation", "none");
   if (part.hasAttribute("data-dock") && !part.hasAttribute("data-alone")) copy.style.background = "var(--color-plate)";
 }
 

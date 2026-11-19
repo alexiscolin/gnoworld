@@ -95,12 +95,17 @@ it("fades the departure's copy as one layer, no part animated alone, the dock's 
   };
   part(["data-exit"]);
   part(["data-exit", "data-dock"]);
+  const set = vi.spyOn(CSSStyleDeclaration.prototype, "setProperty");
   ghost(() => false, "[data-exit]", true);
   await Promise.resolve();
   const layer = [...document.body.children].find((child) => child.querySelector("[data-ghost]") !== null);
   if (layer === undefined) throw new Error("no copy was shown");
   expect(gsap.getTweensOf(layer)).toHaveLength(1);
   for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
+  // A clone restarts its CSS animations (a card's rise, opacity 0 till it ends): none runs in a copy.
+  // (jsdom keeps no `animation` property: the calls are read.)
+  expect(set.mock.calls.filter(([name, value]) => name === "animation" && value === "none")).toHaveLength(6);
+  set.mockRestore();
   expect(layer.querySelector<HTMLElement>("[data-dock]")?.style.background).toBe("var(--color-plate)");
   finish();
   expect(document.querySelector("[data-ghost]")).toBeNull();
