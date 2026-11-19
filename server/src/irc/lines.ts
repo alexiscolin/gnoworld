@@ -97,7 +97,7 @@ export function joins(rooms: readonly string[]): string[] {
 
 // Ergo's time, in server-time's form alone, so a mark is always a time Ergo can read back; and the id an
 // edit names (+gnoworld/edit), 128 characters at most, or the line is no edit.
-function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; country?: string } {
+export function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; country?: string } {
   const [time = "", edits = "", country = ""] = [
     tags.get("time"),
     tags.get("+gnoworld/edit"),

@@ -113,7 +113,8 @@ export function makeSay(deps: SayDeps): (guest: Guest, room: string, text: strin
     if (sent === false) return refused(503, "not_ready", "relay");
     const at = now();
     counted(room, guest.name, at);
-    if (sent.msgid !== "") passed({ room, account: nick, msgid: sent.msgid, text });
+    if (sent.msgid !== "")
+      passed({ room, account: nick, msgid: sent.msgid, text, ...(sent.time === undefined ? {} : { time: sent.time }) });
     return { status: 200 };
   };
 }

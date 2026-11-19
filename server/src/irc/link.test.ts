@@ -2014,6 +2014,26 @@ describe("the link's relays (D430)", () => {
     expect(link.relaying()).toBe(0);
   });
 
+  it("resolves a relay with the time Ergo stamped on its line, when the line has one", async () => {
+    const { link, peer } = await up({ relayMs: 2000 });
+    const taken = link.relay("#bubble", NICK, "hello");
+    const sent = await peer.next(/RELAYMSG/);
+    const label = /^@label=(\S+) RELAYMSG/.exec(sent)?.[1];
+    peer.say(`@label=${label ?? ""};msgid=m1;time=2026-11-13T12:00:00.000Z :${NICK}!~u@h PRIVMSG #bubble :hello`);
+    await expect(taken).resolves.toEqual({ msgid: "m1", time: "2026-11-13T12:00:00.000Z" });
+  });
+
+  it("leaves out a time Ergo's form does not allow: a bad or a date-only one is no time", async () => {
+    const { link, peer } = await up({ relayMs: 2000 });
+    for (const bad of ["garbage", "2026-11-13"]) {
+      const taken = link.relay("#bubble", NICK, "hello");
+      const sent = await peer.next(/RELAYMSG/);
+      const label = /^@label=(\S+) RELAYMSG/.exec(sent)?.[1];
+      peer.say(`@label=${label ?? ""};msgid=m1;time=${bad} :${NICK}!~u@h PRIVMSG #bubble :hello`);
+      await expect(taken).resolves.toEqual({ msgid: "m1" });
+    }
+  });
+
   it("resolves each relay by its own label, in any order: a FAIL or an error number refuses its caller alone", async () => {
     const { link, peer } = await up({ relayMs: 2000 });
     const results = [

@@ -74,6 +74,18 @@ describe("unread's store of places", () => {
     expect(t.unread.counts(ALICE)).toEqual({});
   });
 
+  it("counts a line no more once the place is its own time, and counts one indexed with no time at the clock after it", () => {
+    const t = setup();
+    t.line("#bubble", BOB, T0 - MINUTE);
+    t.unread.place(ALICE, "#bubble", T0 - MINUTE);
+    expect(t.unread.counts(ALICE)).toEqual({});
+    // No time on the line: the index takes its clock, which is past the time Ergo stamped, so a place at that time leaves it.
+    t.clock.now = T0 + 1_000;
+    t.search.add({ room: "#bubble", account: BOB, msgid: "untimed", text: "word" });
+    t.unread.place(ALICE, "#bubble", T0);
+    expect(t.unread.counts(ALICE)).toEqual({ bubble: 1 });
+  });
+
   it("refuses a place more than 5 minutes past now and takes one exactly 5 minutes past", () => {
     const t = setup();
     expect(t.unread.place(ALICE, "#bubble", T0 + 5 * MINUTE + 1)).toBe(false);
