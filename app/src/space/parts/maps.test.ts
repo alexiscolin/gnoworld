@@ -1,5 +1,5 @@
 import type { Texture } from "three";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const loads = vi.hoisted(() => ({ asked: [] as string[], answer: new Map<string, (t: Texture) => void>() }));
 
@@ -65,7 +65,17 @@ describe("Maps priority", () => {
   });
 });
 
+// What the screen is: its short side in page pixels, its pixel ratio, and whether its pointer is a finger.
+const screenIs = (side: number, ratio = 1, coarse = false) => {
+  vi.stubGlobal("screen", { width: side, height: side + 400 });
+  vi.stubGlobal("devicePixelRatio", ratio);
+  vi.stubGlobal("matchMedia", () => ({ matches: coarse }));
+};
+
 describe("the Earth's full-size maps", () => {
+  beforeEach(() => {
+    screenIs(1440);
+  });
   const asks = async (connection: object) => {
     vi.stubGlobal("navigator", { connection });
     earth.full = 0;
@@ -153,5 +163,21 @@ describe("the Earth's full-size maps", () => {
         maps.earth(false);
       }),
     ).toEqual([0, 0]);
+  });
+
+  // A 2048 map gives one texel per pixel up to a disc 2048 / pi (652) pixels wide: no screen that cannot show a bigger one needs 4096.
+  it.each([
+    { name: "a phone at ratio 1 (430 px)", side: 430, ratio: 1, coarse: true, asks: [0, 1] },
+    { name: "the edge, 651 drawn pixels", side: 651, ratio: 1, coarse: true, asks: [0, 1] },
+    { name: "one pixel past it, 653", side: 653, ratio: 1, coarse: true, asks: [1, 1] },
+    { name: "an iPad (768 px)", side: 768, ratio: 2, coarse: true, asks: [1, 1] },
+    { name: "a desktop window screen (1440 px)", side: 1440, ratio: 2, coarse: false, asks: [1, 1] },
+  ])("$name: the full set and the relief are asked as $asks", async ({ side, ratio, coarse, asks }) => {
+    screenIs(side, ratio, coarse);
+    expect(
+      await asked((maps) => {
+        maps.earthAhead();
+      }),
+    ).toEqual(asks);
   });
 });
