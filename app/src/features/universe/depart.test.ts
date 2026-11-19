@@ -162,6 +162,7 @@ describe("the flight on the click", () => {
     const [stayed, among] = rise.ghost.mock.calls[0] as [() => boolean, string];
     expect(stayed()).toBe(false);
     expect(among).toBe("[data-exit]:not([data-clear], nav)");
+    expect(rise.ghost.mock.calls[0]?.[2]).toBe(true);
     expect(box.dataset["flown"]).toBe("flying");
     box.remove();
   });

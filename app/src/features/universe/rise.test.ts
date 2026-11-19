@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { gsap } from "gsap";
 import { afterEach, expect, it, vi } from "vitest";
-import { holdChrome, riseChrome } from "./rise.ts";
+import { ghost, holdChrome, riseChrome } from "./rise.ts";
 
 const still = vi.hoisted(() => ({ on: false }));
 vi.mock("../../space/motion.ts", () => ({
@@ -82,4 +82,26 @@ it("moves nothing at all under reduced motion", () => {
   still.on = true;
   riseChrome(0);
   expect(gsap.globalTimeline.getChildren()).toHaveLength(0);
+});
+
+// A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole, none of its parts on a clock of its own
+// (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the plate's fill.
+it("fades the departure's copy as one layer, no part animated alone, the dock's copy over the plate's fill", async () => {
+  const part = (attributes: string[]) => {
+    const box = document.body.appendChild(document.createElement("div"));
+    for (const name of attributes) box.setAttribute(name, "");
+    box.append(document.createElement("h1"), document.createElement("p"));
+    return box;
+  };
+  part(["data-exit"]);
+  part(["data-exit", "data-dock"]);
+  ghost(() => false, "[data-exit]", true);
+  await Promise.resolve();
+  const layer = [...document.body.children].find((child) => child.querySelector("[data-ghost]") !== null);
+  if (layer === undefined) throw new Error("no copy was shown");
+  expect(gsap.getTweensOf(layer)).toHaveLength(1);
+  for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
+  expect(layer.querySelector<HTMLElement>("[data-dock]")?.style.background).toBe("var(--color-plate)");
+  finish();
+  expect(document.querySelector("[data-ghost]")).toBeNull();
 });

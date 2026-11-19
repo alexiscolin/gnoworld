@@ -80,9 +80,17 @@ export { loading } from "./firstLook.ts";
 // The cosmos comes back under a flight: the hero and the worlds rise as it lands.
 export const RETURN_AFTER = 450;
 
-/** A fading ghost of each `[data-exit]` part in sight (or each of `among`), as its page goes, so the page coming in is not cut in on them. Copied now, shown
+// What the page's place sets for a part holds out of its copy too: a plate whose fill space draws keeps it hidden (globe.module.css); beside a
+// plate the scene draws the dock's fill, which leaves with the page: its copy keeps the plate's.
+function carryFill(part: Element, copy: HTMLElement): void {
+  const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
+  if (fill !== "") copy.style.setProperty("--plate-fill", fill);
+  if (part.hasAttribute("data-dock") && !part.hasAttribute("data-alone")) copy.style.background = "var(--color-plate)";
+}
+
+/** A fading ghost of each `[data-exit]` part in sight (or each of `among`; `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun), as its page goes, so the page coming in is not cut in on them. Copied now, shown
  * once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
-export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
+export function ghost(stayed: () => boolean, among = "[data-exit]", asBlock = false): void {
   // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
   const leaving = pageNow();
   const parts = [...document.querySelectorAll(among)].filter((part) => getComputedStyle(part).visibility !== "hidden");
@@ -99,9 +107,7 @@ export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
     if (copy === undefined) continue;
     copy.removeAttribute("data-exit");
     copy.setAttribute("data-ghost", "");
-    // What the page's place sets for it holds out of it too: a plate whose fill space draws keeps it hidden (globe.module.css).
-    const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
-    if (fill !== "") copy.style.setProperty("--plate-fill", fill);
+    carryFill(part, copy);
     if (getComputedStyle(part).position === "fixed") layer.append(copy);
     else {
       const { left, top, width, height } = part.getBoundingClientRect();
@@ -120,6 +126,15 @@ export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
       gsap.to(layer, {
         autoAlpha: 0,
         ...FULL_MOVE,
+        onComplete: () => {
+          layer.remove();
+        },
+      });
+    else if (asBlock)
+      gsap.to(layer, {
+        autoAlpha: 0,
+        duration: 0.5,
+        ease: "power2.out",
         onComplete: () => {
           layer.remove();
         },
