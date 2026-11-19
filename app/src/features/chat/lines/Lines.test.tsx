@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { noMedia } from "../../../../tests/mount.tsx";
 import type { ChainHeard } from "../../../store/chain.ts";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
+import { QUIET_MS } from "../rooms/fling.ts";
 import { Lines, type LinesProps } from "./Lines.tsx";
 import { Reactions } from "./Reactions.tsx";
 import type * as reactionsModule from "./Reactions.tsx";
@@ -222,6 +223,8 @@ describe("the list's reader kept in place", () => {
   const BOX_TOP = 100;
   const BOX = 400;
   let top: number;
+  // How many times the page wrote the list's scroll.
+  let writes: number;
   let resized: (() => void)[];
   // Each line's top, by its place in the list; every line is 20 px high.
   let tops: number[];
@@ -236,6 +239,16 @@ describe("the list's reader kept in place", () => {
     tops = tops.map((at) => at - by);
     for (const tell of resized) tell();
   };
+  // The list drawn, and watched by the resize observer, which notes the line the reader sees: what a growth is measured against.
+  const opened = (props?: Parameters<typeof draw>[0]) => {
+    draw(props);
+    for (const tell of resized) tell();
+  };
+  // The reader's scroll moves to `to`, the lines with it as a browser moves them, and the browser tells it.
+  const flung = (to: number) => {
+    tops = tops.map((at) => at + top - to);
+    scrolledTo(to);
+  };
   // The reader scrolls up to `to`, and the browser tells it.
   const scrolledTo = (to: number) => {
     top = to;
@@ -243,13 +256,27 @@ describe("the list's reader kept in place", () => {
       scroller().dispatchEvent(new Event("scroll"));
     });
   };
+  // The reader's scroll is over: no scroll event for as long as the page waits for one.
+  const quiet = () => {
+    act(() => {
+      vi.advanceTimersByTime(QUIET_MS);
+    });
+  };
+  const touch = (type: "touchstart" | "touchend") => {
+    act(() => {
+      scroller().dispatchEvent(new Event(type));
+    });
+  };
   beforeEach(() => {
+    vi.useFakeTimers();
     top = 0;
+    writes = 0;
     resized = [];
     tops = Array.from({ length: LINES + 20 }, (_, n) => BOX_TOP + n * 20 - 3000);
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(BOX);
     vi.spyOn(Element.prototype, "scrollTop", "get").mockImplementation(() => top);
     vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation((to: number) => {
+      writes += 1;
       top = Math.min(0, to);
     });
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
@@ -271,6 +298,7 @@ describe("the list's reader kept in place", () => {
   let newTop = BOX_TOP;
   afterEach(() => {
     newTop = BOX_TOP;
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -281,26 +309,81 @@ describe("the list's reader kept in place", () => {
   });
 
   it("keeps the lines a reader scrolled up reads still as something grows under them", () => {
-    draw();
+    opened();
     scrolledTo(-500);
+    quiet();
     pushed(300);
     expect(top).toBe(-800);
   });
 
-  // The scroll event comes before the frame's resize: the growth the frame holds is undone, the reader's own scroll kept.
-  it("undoes what grew in the frame of a scroll, and keeps the scroll", () => {
-    draw();
+  // A write to the scroll stops the momentum of a flung list on iOS: while the reader's scroll goes on the page writes none, and what
+  // a growth asks of it is written once, as the scroll is over, the lines the reader sees put back where they were.
+  it("writes nothing to the scroll while it goes on, whatever the layout says of a scroll event", () => {
+    opened();
+    flung(-500);
+    // The compositor scrolls ahead of the layout: the lines are 3 px behind the scroll the event tells.
+    tops = tops.map((at) => at + 400 - 3);
+    scrolledTo(-900);
+    flung(-700);
+    expect(writes).toBe(0);
+  });
+
+  it("reads no layout and writes nothing for a scroll event: it only says the scroll goes on", () => {
+    opened();
+    const read = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    read.mockClear();
     scrolledTo(-500);
+    scrolledTo(-700);
+    expect(read).not.toHaveBeenCalled();
+    expect(writes).toBe(0);
+  });
+
+  it("owes a growth during the fling to the scroll's end, and writes it once then", () => {
+    opened();
+    flung(-500);
+    pushed(300);
+    flung(-600);
+    pushed(100);
+    expect(writes).toBe(0);
+    expect(top).toBe(-600);
+    quiet();
+    expect(writes).toBe(1);
+    expect(top).toBe(-1000);
+    quiet();
+    expect(writes).toBe(1);
+  });
+
+  // The scroll event comes before the frame's resize: the growth the frame holds is owed, the reader's own scroll kept.
+  it("owes what grew in the frame of a scroll, and keeps the scroll", () => {
+    opened();
+    flung(-500);
     tops = tops.map((at) => at + 100 - 300);
     scrolledTo(-600);
-    expect(top).toBe(-900);
     for (const tell of resized) tell();
+    expect(top).toBe(-600);
+    quiet();
     expect(top).toBe(-900);
+  });
+
+  it("writes nothing while a finger is on the list, though it holds still, and its growth once the finger is up and the list quiet", () => {
+    opened();
+    flung(-500);
+    touch("touchstart");
+    pushed(300);
+    act(() => {
+      vi.advanceTimersByTime(QUIET_MS * 10);
+    });
+    expect(writes).toBe(0);
+    touch("touchend");
+    expect(writes).toBe(0);
+    quiet();
+    expect(writes).toBe(1);
+    expect(top).toBe(-800);
   });
 
   // The box grows (the composer shrinks) near the oldest end: the browser clamps the scroll, the lines do not move by script.
   it("leaves a reader the browser moved by clamping the scroll", () => {
-    draw();
+    opened();
     scrolledTo(-500);
     tops = tops.map((at) => at - 20);
     top = -480;
@@ -309,7 +392,7 @@ describe("the list's reader kept in place", () => {
   });
 
   it("leaves a reader alone when something grows above what they read", () => {
-    draw();
+    opened();
     scrolledTo(-500);
     for (const tell of resized) tell();
     expect(top).toBe(-500);

@@ -45,7 +45,8 @@ test("a room opens at its end and stays there as a late card comes in", async ({
   // Scrolled up, a line that comes moves nothing the reader sees.
   await scrolling(list).evaluate(async (box) => {
     box.scrollTop = -box.scrollHeight;
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    // The reader has stopped: the page writes to the scroll once the list was quiet 150 ms (rooms/fling.ts).
+    await new Promise((done) => setTimeout(done, 250));
   });
   const first = await firstAt(list);
   ergo().send(live("later", T(40), { text: "a later line" }));
@@ -158,7 +159,7 @@ async function readerUp(page: Page) {
   await expect.poll(() => gap(list)).toBeLessThan(4);
   await scrolling(list).evaluate(async (box) => {
     box.scrollTop = -300;
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    await new Promise((done) => setTimeout(done, 250));
   });
   return list;
 }
@@ -174,9 +175,7 @@ for (const [name, card] of [
   });
 }
 
-test("a reader scrolling as a card grows keeps their place: the scroll is told in the frame of the growth", async ({
-  page,
-}) => {
+test("a reader scrolling as a card grows keeps their place once the scroll is over", async ({ page }) => {
   const list = await readerUp(page);
   const moved = await scrolling(list).evaluate(async (box) => {
     const frame = () => new Promise((done) => requestAnimationFrame(done));
@@ -189,6 +188,8 @@ test("a reader scrolling as a card grows keeps their place: the scroll is told i
     await frame();
     await frame();
     await frame();
+    // The growth is written once the scroll is over, the reader's lines put back.
+    await new Promise((done) => setTimeout(done, 250));
     // The scroll alone moves the line down by 100.
     return Math.round((reader?.getBoundingClientRect().top ?? 0) - was);
   });
@@ -307,4 +308,27 @@ test("a room whose history never comes says it holds no message after 10 s", asy
   await page.clock.fastForward(1_500);
   await expect(page.getByText("No messages yet.")).toBeVisible();
   await expect(skeleton).toHaveCount(0);
+});
+
+// A scroll that goes on by itself (a finger's fling on a phone, here a smooth scroll) is never stopped by the page: a card that grows under
+// the reader's lines meanwhile is written to the scroll once it is over (a write to the scroll ends the momentum on iOS).
+test("a card that grows during a scroll leaves the scroll running to its end", async ({ page }) => {
+  await room(page, { history: HISTORY.slice(0, 30) });
+  const list = page.getByRole("list", { name: "Messages" });
+  await expect.poll(() => gap(list)).toBeLessThan(4);
+  const reached = await scrolling(list).evaluate(async (box) => {
+    // The list's far end, as it stands before the growth.
+    const target = box.clientHeight - box.scrollHeight;
+    box.scrollTo({ top: target, behavior: "smooth" });
+    await new Promise((done) => setTimeout(done, 80));
+    const last = box.querySelector("ol")?.lastElementChild;
+    if (last instanceof HTMLElement) last.style.setProperty("min-block-size", "300px");
+    let farthest = box.scrollTop;
+    for (let waited = 0; waited < 1500 && farthest > target + 5; waited += 50) {
+      await new Promise((done) => setTimeout(done, 50));
+      farthest = Math.min(farthest, box.scrollTop);
+    }
+    return farthest - target;
+  });
+  expect(reached, "px short of the list's far end").toBeLessThanOrEqual(5);
 });

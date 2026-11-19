@@ -2,6 +2,7 @@
 // column-reverse), so what grows above never moves the end. What is left here is a reader's own place: a reader scrolled up keeps
 // their lines still as something below them grows (the browser's scroll anchoring is off there: WebKit has none).
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { Fling } from "./fling.ts";
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -57,9 +58,9 @@ function note(box: HTMLElement, anchor: Anchor) {
   if (line) anchor.current = { line, top: line.getBoundingClientRect().top - top, scroll: box.scrollTop };
 }
 
-// A reader scrolled up keeps the line they see where it was: what the scroll explains is theirs (it moved the line by as much as
-// it moved), the rest (a card grown under the line, a box shrunk, a composer grown) is undone. At the end the foot holds them.
-function keep(box: HTMLElement, anchor: Anchor) {
+// A reader scrolled up keeps the line they see where it was: what the scroll explains is theirs, the rest (a card grown under the line, a
+// box shrunk) is undone. While their scroll goes on nothing is written to it (iOS stops its momentum): the rest is owed to the fling.
+function keep(box: HTMLElement, anchor: Anchor, fling: Fling) {
   const noted = anchor.current;
   if (noted?.line.isConnected === true && !atEnd(box)) {
     const moved =
@@ -68,7 +69,8 @@ function keep(box: HTMLElement, anchor: Anchor) {
       noted.top +
       box.scrollTop -
       noted.scroll;
-    if (Math.abs(moved) >= 1) box.scrollTop += moved;
+    if (fling.moving) fling.owe(moved);
+    else if (Math.abs(moved) >= 1) box.scrollTop += moved;
   }
   note(box, anchor);
 }
@@ -81,6 +83,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const placedRef = useRef(false);
   const anchorRef: Anchor = useRef(undefined);
   const awaiting = useCardsAwaited(listRef);
+  const flingRef = useRef<Fling>(undefined);
   // The browser's own anchoring would move the reader's place a second time (a property CSS lints as not baseline).
   useLayoutEffect(() => {
     listRef.current?.style.setProperty("overflow-anchor", "none");
@@ -97,13 +100,40 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const box = listRef.current;
     const list = box?.firstElementChild;
     if (box === null || list === null || list === undefined || typeof ResizeObserver === "undefined") return;
+    const fling = new Fling((owed) => {
+      if (Math.abs(owed) >= 1) box.scrollTop += owed;
+      note(box, anchorRef);
+    });
+    flingRef.current = fling;
     const watch = new ResizeObserver(() => {
-      keep(box, anchorRef);
+      keep(box, anchorRef, fling);
     });
     watch.observe(list);
     watch.observe(box);
+    const signal = new AbortController();
+    box.addEventListener(
+      "scrollend",
+      () => {
+        fling.ended();
+      },
+      { signal: signal.signal },
+    );
+    for (const [type, down] of [
+      ["touchstart", true],
+      ["touchend", false],
+      ["touchcancel", false],
+    ] as const)
+      box.addEventListener(
+        type,
+        () => {
+          fling.touching(down);
+        },
+        { passive: true, signal: signal.signal },
+      );
     return () => {
       watch.disconnect();
+      signal.abort();
+      fling.stop();
     };
   }, []);
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
@@ -111,9 +141,10 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const box = listRef.current;
     return box !== null && box.clientHeight > 0 && atEnd(box);
   };
-  // A scroll is told before the frame's resize: the growth the frame holds is undone then, the reader's own scroll kept.
+  // A scroll only says that the reader's goes on: nothing is measured or written in its listener, a growth is measured by the resize
+  // observer, once a frame, and owed to the fling until it ends.
   const onScroll = () => {
-    if (listRef.current !== null) keep(listRef.current, anchorRef);
+    flingRef.current?.scrolled();
   };
   return { listRef, seesEnd, onScroll, awaiting };
 }
