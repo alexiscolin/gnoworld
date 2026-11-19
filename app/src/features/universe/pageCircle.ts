@@ -28,15 +28,11 @@ export function circleOf(globe: HTMLElement | null): Circle | undefined {
   };
 }
 
-/** The page's plate, in the page's pixels, and where its words end: the content's right edge less its end padding (--plate-inset-end), where the
- * fill starts to fade; its box alone reaches the plate's edge. None where the page has no plate. */
-export function plateOf(): { readonly box: DOMRect; readonly words: number } | undefined {
-  const box = document.querySelector("[data-look='plate']")?.getBoundingClientRect();
-  if (box === undefined) return undefined;
-  const content = document.querySelector<HTMLElement>("[data-look='plate'] [data-content]");
-  const end =
-    content === null
-      ? box.right
-      : content.getBoundingClientRect().right - parseFloat(getComputedStyle(content).paddingInlineEnd);
-  return { box, words: end };
+/** The page's plate, in the page's pixels, and where its fill starts to fade: --plate-fade short of its right edge, as its own fill
+ * (Panel.module.css), past its content's air. None where the page has no plate. */
+export function plateOf(): { readonly box: DOMRect; readonly fade: number } | undefined {
+  const plate = document.querySelector("[data-look='plate']");
+  if (plate === null) return undefined;
+  const box = plate.getBoundingClientRect();
+  return { box, fade: box.right - (parseFloat(getComputedStyle(plate).getPropertyValue("--plate-fade")) || 0) };
 }

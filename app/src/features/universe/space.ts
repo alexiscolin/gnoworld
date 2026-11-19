@@ -235,7 +235,7 @@ export function hold(): void {
   if (space === undefined || waiting()) return;
   space.hold(circleOf(globe()));
   const plate = plateOf();
-  if (plate !== undefined) space.plate(plate.box, plate.words);
+  if (plate !== undefined) space.plate(plate.box, plate.fade);
 }
 
 /** Whether a flight brings the page's planet now. */

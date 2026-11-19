@@ -253,10 +253,12 @@ describe("the tokens", () => {
     expect(value(name)).toBe(px);
   });
 
-  // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/process/decisions.md, the floor chosen).
-  it("set the plate to 808 px at the video's width, narrowing with the window to a floor", () => {
+  // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/process/decisions.md, the floor chosen), then
+  // its air, a step of fill right of its content (D14002).
+  it("set the plate to 808 px at the video's width, narrowing with the window to a floor, plus its air", () => {
     const [, floor = "", share = "", cap = ""] =
-      /^clamp\((\d+)px, ([\d.]+)vi, (\d+)px\)$/.exec(value("--plate-w") ?? "") ?? [];
+      /^calc\(clamp\((\d+)px, ([\d.]+)vi, (\d+)px\) \+ var\(--plate-air\)\)$/.exec(value("--plate-w") ?? "") ?? [];
+    expect(value("--plate-air")).toBe("var(--space-m)");
     const at = (width: number) => Math.min(Number(cap), Math.max(Number(floor), (Number(share) * width) / 100));
     expect(Number(cap)).toBe(808);
     expect(Math.round(at(1728))).toBe(808);
