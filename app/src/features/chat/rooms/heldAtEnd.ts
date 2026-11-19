@@ -61,18 +61,19 @@ function note(box: HTMLElement, anchor: Anchor) {
 // A reader scrolled up keeps the line they see where it was: what the scroll explains is theirs, the rest (a card grown under the line, a
 // box shrunk) is undone. While their scroll goes on nothing is written to it (iOS stops its momentum): the rest is owed to the fling.
 function keep(box: HTMLElement, anchor: Anchor, fling: Fling) {
-  const noted = anchor.current;
-  if (noted?.line.isConnected === true && !atEnd(box)) {
-    const moved =
-      noted.line.getBoundingClientRect().top -
-      box.getBoundingClientRect().top -
-      noted.top +
-      box.scrollTop -
-      noted.scroll;
-    if (fling.moving) fling.owe(moved);
-    else if (Math.abs(moved) >= 1) box.scrollTop += moved;
-  }
+  const moved = movedLine(box, anchor);
+  if (fling.moving) fling.owe(moved);
+  else if (Math.abs(moved) >= 1) box.scrollTop += moved;
   note(box, anchor);
+}
+
+// How far the line the reader sees was moved by what the scroll does not explain (0 for a reader at the end, whom the foot holds).
+function movedLine(box: HTMLElement, anchor: Anchor): number {
+  const noted = anchor.current;
+  if (noted?.line.isConnected !== true || atEnd(box)) return 0;
+  return (
+    noted.line.getBoundingClientRect().top - box.getBoundingClientRect().top - noted.top + box.scrollTop - noted.scroll
+  );
 }
 
 /** The list of a room: it opens on its New line when there is one (`fresh`), else at its end (CSS). A reader scrolled up keeps
@@ -84,6 +85,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
   const anchorRef: Anchor = useRef(undefined);
   const awaiting = useCardsAwaited(listRef);
   const flingRef = useRef<Fling>(undefined);
+  const frameRef = useRef<number>(undefined);
   // The browser's own anchoring would move the reader's place a second time (a property CSS lints as not baseline).
   useLayoutEffect(() => {
     listRef.current?.style.setProperty("overflow-anchor", "none");
@@ -101,7 +103,9 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const list = box?.firstElementChild;
     if (box === null || list === null || list === undefined || typeof ResizeObserver === "undefined") return;
     const fling = new Fling((owed) => {
-      if (Math.abs(owed) >= 1) box.scrollTop += owed;
+      // What grew since the last frame's note is owed too; a reader who flicked back to the end is held by the foot: nothing is owed.
+      const total = atEnd(box) ? 0 : owed + movedLine(box, anchorRef);
+      if (Math.abs(total) >= 1) box.scrollTop += total;
       note(box, anchorRef);
     });
     flingRef.current = fling;
@@ -118,15 +122,12 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
       },
       { signal: signal.signal },
     );
-    for (const [type, down] of [
-      ["touchstart", true],
-      ["touchend", false],
-      ["touchcancel", false],
-    ] as const)
+    // A finger is down while any touch is: one of two lifted leaves the list touched.
+    for (const type of ["touchstart", "touchend", "touchcancel"] as const)
       box.addEventListener(
         type,
-        () => {
-          fling.touching(down);
+        (event) => {
+          fling.touching(event.touches.length > 0);
         },
         { passive: true, signal: signal.signal },
       );
@@ -134,6 +135,7 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
       watch.disconnect();
       signal.abort();
       fling.stop();
+      if (frameRef.current !== undefined) cancelAnimationFrame(frameRef.current);
     };
   }, []);
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
@@ -141,10 +143,17 @@ export function useNewestInView({ fresh }: { fresh: string | undefined }) {
     const box = listRef.current;
     return box !== null && box.clientHeight > 0 && atEnd(box);
   };
-  // A scroll only says that the reader's goes on: nothing is measured or written in its listener, a growth is measured by the resize
-  // observer, once a frame, and owed to the fling until it ends.
+  // A scroll writes nothing and reads nothing in its listener: it says the reader's goes on, and the line they see is noted again once a
+  // frame (a growth above the view moves nothing, so the line kept must be near it); what a growth asks of the scroll is owed to the fling.
   const onScroll = () => {
-    flingRef.current?.scrolled();
+    const fling = flingRef.current;
+    if (fling === undefined) return;
+    fling.scrolled();
+    if (frameRef.current !== undefined) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = undefined;
+      if (listRef.current !== null) keep(listRef.current, anchorRef, fling);
+    });
   };
   return { listRef, seesEnd, onScroll, awaiting };
 }
