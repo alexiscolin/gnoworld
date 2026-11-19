@@ -461,79 +461,124 @@ guard '{"tool_name": "Read", "tool_input": {"file_path": "tools/agent-github/age
 guard '{"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content": "the state is ~/.local/share/agent-github"}}' ||
 	fail "the guard refused a write that only names the folder"
 
-# 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: each profile
-# gets the denies of every profile, the sandbox on, the exclusion and the hook; a profile that turns hooks off is refused.
+# 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: it installs the
+# helper with the tools it found, the guard and the state, takes the owner's own gh login token (D14012), and writes nothing into a
+# profile, neither settings nor a skill (D14000 C, D14013): the exclusion, the denies, the hook and the skill are the project's own,
+# committed. It still reads every profile, and refuses one that turns hooks off or grants what the helper keeps.
 fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts"
-cp "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/" && cp "$helper" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts/agent_pr.py"
+cp "$here/agent_pr_guard.py" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/" && cp "$helper" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts/agent_pr.py"
 echo '{"permissions": {"deny": ["Edit(~/.zshrc)"]}, "sandbox": {"excludedCommands": ["x *"]}}' >"$fh/.claude/settings.json"
 echo '{"theme": "dark"}' >"$fh/.claude-work/settings.json"
+cp -R "$fh" "$t/fakehome.before"
+# The token comes from the gh found, run as the owner's own: here from an empty config folder, so that only what GH_TOKEN or
+# GH_ENTERPRISE_TOKEN says reaches it, never this machine's login.
+mkdir -p "$t/ghcfg"
 sed -e "s|^raw=.*|raw=file://$t/raw|" -e "s|^api=.*|api=file://$t/api|" -e "s|--proto '=https'|--proto '=https,file'|" "$here/install.sh" >"$t/install.sh"
 mkdir -p "$t/api/repos/a/b/compare" && echo '{"status": "behind"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
 echo '{"status": "identical"}' >"$t/api/repos/a/b/compare/main...0123456"
-inst() { HOME="$fh" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
+inst() { HOME="$fh" GH_CONFIG_DIR="$t/ghcfg" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
 # What the installer must have found on the PATH it ran with (D13412): the helper holds that python3, then the folders of that
-# git, gh and gitleaks and the system's own PATH; each profile denies exactly the folder above each one's folder outside the
-# system's, as found and as real, the outermost alone, and runs the guard hook with that python3.
-protected() { # protected <home> <the PATH the installer ran with>
+# git, gh and gitleaks and the system's own PATH.
+written() { # written <home> <the PATH the installer ran with>
 	python3 -I - "$1" "$2" <<'PY'
-import json, os, shutil, sys
+import os, shutil, sys
 home, path = sys.argv[1:]
 system = os.confstr("CS_PATH").split(":")
 found = {n: os.path.join(os.path.realpath(os.path.dirname(w)), os.path.basename(w)) for n, w in ((n, shutil.which(n, path=path)) for n in ("python3", "git", "gh", "gitleaks"))}
-up = lambda d: os.path.dirname(d) if os.path.dirname(d) != "/" else d
-pre = {up(d) for p in found.values() for d in (os.path.dirname(p), os.path.dirname(os.path.realpath(p))) if d not in system}
-pre = {a for a in pre if not any(a.startswith(b + "/") for b in pre)}
 lines = open(f"{home}/.local/bin/agent-pr").read().split("\n")
 assert lines[0] == f"#!/usr/bin/env -S -i LC_ALL=C {found['python3']} -I", lines[0]
 tools = ":".join(list(dict.fromkeys(os.path.dirname(found[n]) for n in ("git", "gh", "gitleaks"))) + system)
 assert f'TOOLS = "{tools}"' in lines, [l for l in lines if l.startswith("TOOLS")]
-for profile in (".claude", ".claude-work"):
-    s = json.load(open(f"{home}/{profile}/settings.json"))
-    assert {r for r in s["permissions"]["deny"] if r.startswith("Edit(//")} == {f"Edit(/{a}/**)" for a in pre}, (profile, pre)
-    assert f"{found['python3']} -I {home}/.claude/hooks/agent_pr_guard.py {home}/.local/bin/agent-pr" in [h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]], profile
 PY
 }
-protected "$fh" "$PATH" || fail "the installer did not write in the tools found on its PATH, or deny their folders"
+written "$fh" "$PATH" || fail "the installer did not write in the tools found on its PATH"
+untouched() { # untouched <home> <its copy before>: every profile's settings as they were, and no skill written into one
+	diff -r -x hooks "$2/.claude" "$1/.claude" >/dev/null && diff -r "$2/.claude-work" "$1/.claude-work" >/dev/null
+}
+untouched "$fh" "$t/fakehome.before" || fail "the installer wrote into a profile (D14000 C): $(diff -r -x .local -x hooks "$t/fakehome.before" "$fh")"
 # A PATH folder that is a link in a folder a session writes, to the tools' own: the real folder is written in, never the link,
 # which the session could point at its own programs once the install is done.
 fh4="$t/fh4" && mkdir -p "$fh4/.claude" "$fh4/.claude-work" && echo '{}' >"$fh4/.claude/settings.json" && echo '{}' >"$fh4/.claude-work/settings.json" && ln -s "${GH%/*}" "$t/hb"
-(HOME="$fh4" PATH="$t/hb:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with a linked folder first: $(cat "$t/inst.out")"
-protected "$fh4" "$t/hb:$PATH" && ! grep -qF "$t/hb" "$fh4/.local/bin/agent-pr" "$fh4/.claude/settings.json" || fail "the installer wrote in a linked folder, not the one it leads to"
-# --stamp, which install_hooks.sh runs for land, writes the tools in once every profile denies their folders, and refuses before.
-cp "$helper" "$t/stamped" && HOME="$fh" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1 && head -1 "$t/stamped" | grep -qxF "#!/usr/bin/env -S -i LC_ALL=C $PY -I" ||
-	fail "--stamp did not write in the tools with every profile denying their folders: $(cat "$t/inst.out")"
+(HOME="$fh4" GH_CONFIG_DIR="$t/ghcfg" PATH="$t/hb:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with a linked folder first: $(cat "$t/inst.out")"
+written "$fh4" "$t/hb:$PATH" && ! grep -qF "$t/hb" "$fh4/.local/bin/agent-pr" || fail "the installer wrote in a linked folder, not the one it leads to"
+[ "$(cat "$fh4/.claude/settings.json")" = '{}' ] && [ "$(cat "$fh4/.claude-work/settings.json")" = '{}' ] && [ ! -e "$fh4/.claude/skills" ] && [ ! -e "$fh4/.claude-work/skills" ] ||
+	fail "the installer wrote into a profile of a second home"
+# --stamp, which install_hooks.sh runs for land till 14a-2 removes it, writes the tools in once every profile denies exactly the folder
+# above each tool's folder outside the system's, as found and as real, the outermost alone (what an earlier install wrote), and
+# refuses while one is missing; with the system's own python3 and git found first, their folders need no deny.
+stamp_denies() { # stamp_denies <home> <PATH> [drop]: the denies an earlier install wrote for that PATH, or all but the first
+	python3 -I - "$1" "$2" "${3:-}" <<'PY'
+import json, os, shutil, sys
+home, path, drop = sys.argv[1:]
+system = os.confstr("CS_PATH").split(":")
+found = [os.path.join(os.path.realpath(os.path.dirname(w)), os.path.basename(w)) for w in (shutil.which(n, path=path) for n in ("python3", "git", "gh", "gitleaks"))]
+up = lambda d: os.path.dirname(d) if os.path.dirname(d) != "/" else d
+pre = {up(d) for p in found for d in (os.path.dirname(p), os.path.dirname(os.path.realpath(p))) if d not in system}
+pre = sorted(a for a in pre if not any(a.startswith(b + "/") for b in pre))
+rules = [f"Edit(/{a}/**)" for a in pre][1 if drop else 0:]
+for profile in (".claude", ".claude-work"):
+    json.dump({"permissions": {"deny": rules}}, open(f"{home}/{profile}/settings.json", "w"))
+PY
+}
+stamped_with() { # stamped_with <PATH>: --stamp, run with that PATH, wrote in the python3 it found, through its folder's real path
+	spy=$(PATH=$1 && command -v python3) && spy=$(cd "${spy%/*}" && pwd -P)/python3 &&
+		cp "$helper" "$t/stamped" && HOME="$fh" PATH="$1" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1 &&
+		head -1 "$t/stamped" | grep -qxF "#!/usr/bin/env -S -i LC_ALL=C $spy -I"
+}
+for P in "$PATH" "/usr/bin:$PATH"; do
+	stamp_denies "$fh" "$P" || fail "the test could not give the profiles the tools' denies"
+	stamped_with "$P" || fail "--stamp did not write in the tools with every profile denying their folders (PATH=$P): $(cat "$t/inst.out")"
+	stamp_denies "$fh" "$P" drop || fail "the test could not give the profiles the tools' denies"
+	stamped_with "$P" && fail "--stamp wrote in the tools with a profile missing one of their folders' denies (PATH=$P)"
+done
+cp "$t/fakehome.before/.claude/settings.json" "$fh/.claude/settings.json" && cp "$t/fakehome.before/.claude-work/settings.json" "$fh/.claude-work/settings.json"
 if [ -x /usr/bin/python3 ] && [ "$PY" != /usr/bin/python3 ]; then # another python3 and git, the system's own
 	fh3="$t/fh3" && mkdir -p "$fh3/.claude" "$fh3/.claude-work" && echo '{}' >"$fh3/.claude/settings.json" && echo '{}' >"$fh3/.claude-work/settings.json"
-	(HOME="$fh3" PATH="/usr/bin:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with the system's python3 first: $(cat "$t/inst.out")"
-	protected "$fh3" "/usr/bin:$PATH" || fail "the installer did not write in the system's python3 and git it found first, or denied the wrong folders"
+	(HOME="$fh3" GH_CONFIG_DIR="$t/ghcfg" PATH="/usr/bin:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with the system's python3 first: $(cat "$t/inst.out")"
+	written "$fh3" "/usr/bin:$PATH" || fail "the installer did not write in the system's python3 and git it found first"
 fi
-python3 -I - "$fh" <<'PY' || fail "the installer left a profile without its protections"
-import json, sys
-home = sys.argv[1]
-for profile in (".claude", ".claude-work"):
-    s = json.load(open(f"{home}/{profile}/settings.json"))
-    deny, sb = s["permissions"]["deny"], s["sandbox"]
-    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/settings.json)",
-                 "Edit(~/.claude-work/settings.json)", "Edit(~/.claude-work/skills/**)", "Edit(~/.claude/hooks/**)"):
-        assert rule in deny, (profile, rule)
-    assert sb["enabled"] is True and sb["allowUnsandboxedCommands"] is False, profile
-    assert f"{home}/.local/bin/agent-pr *" in sb["excludedCommands"] and "~/.local/share/agent-github" in sb["filesystem"]["denyRead"], profile
-    assert any("agent_pr_guard.py" in h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]), profile
-assert "Edit(~/.zshrc)" in json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"]
-PY
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/proj\nalexis/other agent')" ] || fail "the allow list is not the repositories given"
-# Line 1 and TOOLS aside, the helper installed is the commit's.
+# Line 1 and TOOLS aside, the helper installed is the commit's; the guard installed is the commit's.
 sed -e 1d -e '/^TOOLS = /d' "$helper" >"$t/shipped.rest" && sed -e 1d -e '/^TOOLS = /d' "$fh/.local/bin/agent-pr" >"$t/installed.rest"
 cmp -s "$t/shipped.rest" "$t/installed.rest" || fail "the helper installed is not the commit's"
-grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
-[ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
+cmp -s "$here/agent_pr_guard.py" "$fh/.claude/hooks/agent_pr_guard.py" || fail "the guard installed is not the commit's"
+tokfile="$fh/.local/share/agent-github/token"
+[ ! -e "$tokfile" ] || fail "a token was written with gh giving none and no terminal to ask it"
+mode() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"; }
+# The owner's gh login token, as gh gives it for github.com (D14012): written, owner-only, nowhere else, never printed. What is no
+# single token line is refused, unprinted, and another GitHub's token is never taken for github.com.
+GHO=gho_$(printf '%036d' 3)
+for bad in not-a-token gho_short "${GHO}x" "$(printf '%s\n%s' "$GHO" "$GHO")"; do
+	(export GH_TOKEN="$bad" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj)
+	[ ! -e "$tokfile" ] || fail "the installer wrote what gh gave though it is no single token line: $bad"
+	case $(cat "$t/inst.out") in *"$bad"*) fail "the installer printed what gh gave: $bad" ;; esac
+done
+(export GH_HOST=ghe.example GH_ENTERPRISE_TOKEN="$GHO" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj)
+[ ! -e "$tokfile" ] || fail "the installer took another GitHub's token for github.com"
+(export GH_TOKEN="$GHO" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj) || fail "the install with gh's token failed: $(cat "$t/inst.out")"
+[ "$(cat "$tokfile" 2>/dev/null)" = "$GHO" ] || fail "the installer did not write the owner's gh login token"
+[ "$(mode "$tokfile")" = 600 ] && [ "$(mode "$fh/.local/share/agent-github")" = 700 ] || fail "the gh login token or its folder is not the owner's alone"
+[ "$(grep -rl "$GHO" "$fh")" = "$tokfile" ] || fail "the token was written elsewhere too: $(grep -rl "$GHO" "$fh")"
+[ -z "$(ls -A "$fh/.local/share/agent-github" | grep -v -e '^token$' -e '^repos.allow$')" ] || fail "the installer left a file beside the token"
+grep -q "$GHO" "$t/inst.out" && fail "the installer printed the token"
+for good in "ghp_$(printf '%036d' 4)" "github_pat_$(printf '%030d' 5)"; do
+	(export GH_TOKEN="$good" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj)
+	[ "$(cat "$tokfile" 2>/dev/null)" = "$good" ] || fail "the installer refused a token agent-pr takes: ${good%%_*}_..."
+done
+# Installed again: gh giving none keeps the token written before; gh giving another replaces it.
+(export GH_TOKEN="$GHO" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj)
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj
+[ "$(cat "$tokfile" 2>/dev/null)" = "$GHO" ] || fail "an install with gh giving no token lost the one written before"
+G2=gho_$(printf '%036d' 6)
+(export GH_TOKEN="$G2" && inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj)
+[ "$(cat "$tokfile" 2>/dev/null)" = "$G2" ] || fail "a new gh login token did not replace the old one"
+rm -f "$tokfile"
+untouched "$fh" "$t/fakehome.before" || fail "a later install wrote into a profile"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
-[ "$(grep -c agent_pr_guard "$fh/.claude/settings.json")" = 1 ] || fail "a second install added the hook twice"
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/other agent\nalexis/proj')" ] || fail "a second install did not keep one line per repository"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/other
 grep -qx "alexis/other agent" "$fh/.local/share/agent-github/repos.allow" && fail "a repository named again kept its earlier token"
-grep -q "Edit(~/.zshrc)" "$fh/.claude-work/settings.json" || fail "the work profile did not get the default profile's own denies"
 grep -q "warning: .*runs 'x \*' outside the sandbox" "$t/inst.out" || fail "the installer did not warn of an exclusion found through PATH"
 echo '{"status": "diverged"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a commit that is not on the branch named"
