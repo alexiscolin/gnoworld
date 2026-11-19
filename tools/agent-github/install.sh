@@ -3,8 +3,8 @@
 # which sessions can write): agent-pr, its guard hook, its state folder and allow list. It writes nothing into a Claude profile
 # (D14000 C): the exclusion, the denies, the hook and the skill are the project's own settings and skill, committed (D14013).
 # agent-pr holds the python3, git, gh and gitleaks your PATH finds, each refused where a session could have put it first (D13412).
-# Then it takes your own gh login's token for github.com (D14012), or asks for one where gh gives none and a terminal is there;
-# nothing shows it. Run it in your own Terminal, never from Claude Code:
+# It keeps no copy of your own token: agent-pr asks your gh login for it at each call (D14012, D14013); an agent account's token,
+# where a repository names one, it asks where a terminal is, and nothing shows it. Run it in your own Terminal, never from Claude Code:
 #   sh <(curl -fsSL https://raw.githubusercontent.com/<src>/<commit>/tools/agent-github/install.sh) <src> <branch> <commit> <owner/repo>...
 #   (<src>: the repository holding the tool; <commit>: its full id, on <branch> (checked); a repository written owner/repo uses your token, and
 #   owner/repo:agent the agent account's. A token alone again: ... install.sh --token [agent]. The tools found written into a
@@ -23,24 +23,10 @@ write_token() { # write_token <file> <token>: owner-only, in one rename
 	install -d -m 700 "$state"
 	(umask 077 && printf '%s\n' "$2" >"$state/$1.new" && mv "$state/$1.new" "$state/$1")
 }
-gh_token() { "$gh" auth token --hostname github.com 2>/dev/null; } # the owner's own gh login, for github.com alone (D14012)
-# Your own gh login's token, when gh gives one line that is a token; it replaces the one written before. Nothing shown.
-from_gh() {
-	given=$(gh_token) || return 1
-	is_token "$given" || { echo "gh gave no GitHub token for github.com: none taken from it"; return 1; }
-	write_token token "$given"
-	echo "your gh login's token written ($state/token, mode 600)"
-}
-
-ask_token() { # ask_token [name]: your token (the default), or the one named, the agent account's for one
-	file=token${1:+.$1}
-	[ -t 0 ] || { echo "no terminal on stdin: no token asked (later: install.sh --token${1:+ $1})"; return 0; }
-	if [ -z "${1:-}" ]; then
-		printf 'Paste YOUR fine-grained token (only the repositories you name; Contents and Pull requests read and write; no\n'
-		printf 'Administration, no Workflows); nothing shows; Enter alone to skip: '
-	else
-		printf 'Paste the %s token (the agent account: classic, scope repo only, never workflow); nothing shows; Enter alone to skip: ' "$1"
-	fi
+ask_token() { # ask_token <name>: the token named, an agent account's; your own is your gh login's, never kept (D14013)
+	file=token.$1
+	[ -t 0 ] || { echo "no terminal on stdin: no token asked (later: install.sh --token $1)"; return 0; }
+	printf 'Paste the %s token (the agent account: classic, scope repo only, never workflow); nothing shows; Enter alone to skip: ' "$1"
 	trap 'stty echo' EXIT INT TERM
 	stty -echo
 	IFS= read -r token || token=
@@ -60,7 +46,7 @@ ask_token() { # ask_token [name]: your token (the default), or the one named, th
 # link to it a session could point elsewhere later. Each is refused when its real file or its folder lies under the home folder or
 # a temporary one, where a session could have put it first, or when a copy could not carry its path as written (a shebang, a
 # Python string). Sets py, tools (their folders, then the system's own PATH) and prefixes (the folder above each one's folder
-# outside the system's, the real file's too: what a deny keeps from every session).
+# outside the system's, the real file's too: what --stamp asks every profile to deny, for land till 14a-2 removes it).
 found() {
 	[ -d "${HOME:-}" ] || { echo "no home folder: ${HOME:-}" >&2; exit 1; }
 	system=$(command -p getconf PATH) py= tools= prefixes=
@@ -78,7 +64,6 @@ found() {
 			w=$(command -p realpath "$w" 2>/dev/null) || continue
 			case "$r/ $d/" in "${w%/}"/* | *" ${w%/}"/*) echo "$name: $at is under $w, which a session can write: install it elsewhere" >&2 && exit 1 ;; esac
 		done
-		[ "$name" = gh ] && gh=$p
 		[ "$name" = python3 ] && py=$p || case :$tools: in *":${p%/*}:"*) ;; *) tools=$tools${p%/*}: ;; esac
 	done
 	tools=$tools$system
@@ -93,8 +78,8 @@ stamp() { # stamp <file>...: py and tools written into each copy, which runs now
 }
 
 if [ "${1:-}" = --token ]; then
-	case ${2:-} in '' | [a-z0-9]*) ;; *) echo "a token's name is lower case letters, digits and -" >&2; exit 2 ;; esac
-	if [ -z "${2:-}" ]; then found && { from_gh || ask_token; }; else ask_token "$2"; fi
+	case ${2:-} in [a-z0-9]*) ;; *) echo "--token <name>: an agent account's token, its name lower case letters, digits and -; yours is your gh login's (D14013)" >&2; exit 2 ;; esac
+	ask_token "$2"
 	exit 0
 fi
 found
@@ -102,13 +87,14 @@ profiles=
 for p in "$HOME/.claude" "$HOME"/.claude-*; do [ -f "$p/settings.json" ] && profiles="$profiles $p"; done
 if [ "${1:-}" = --stamp ]; then
 	shift
-	# land runs these tools too: every profile's sessions must be kept from their folders already, by this installer's run.
+	# land runs these tools too: every profile's sessions must be kept from their folders, by denies the owner writes (no install
+	# writes a profile since D14000 C).
 	"$py" -I - "$prefixes" $profiles <<'PY' || exit 1
 import json, os, sys
 want = [f"Edit(/{x}/**)" for x in sys.argv[1].split()]
 missing = [f"{p}: {w}" for p in sys.argv[2:] for w in want if w not in json.load(open(os.path.join(p, "settings.json"))).get("permissions", {}).get("deny", [])]
 if missing:
-    sys.exit("these profiles' sessions may write the tools found; run agent-github's installer first:\n  " + "\n  ".join(missing))
+    sys.exit("these profiles' sessions may write the tools found; add these denies to each by hand (no install writes a profile, D14000 C):\n  " + "\n  ".join(missing))
 PY
 	stamp "$@"
 	exit 0
@@ -151,8 +137,8 @@ for profile in sys.argv[2:]:
         if any(k in str(g) for k in ("agent-github", ".local", ".claude/hooks", *prefixes)):
             bad.append(f"{profile}: grants {g}")
     for e in sandbox.get("excludedCommands", []):
-        if not str(e).startswith("/"):
-            print(f"warning: {profile} runs '{e}' outside the sandbox, found through PATH or ~: write it with its absolute path", file=sys.stderr)
+        if not str(e).startswith(("/", "~/")):
+            print(f"warning: {profile} runs '{e}' outside the sandbox, found through PATH: write it from / or ~/", file=sys.stderr)
 if bad:
     print("refused, remove these first:\n  " + "\n  ".join(bad), file=sys.stderr)
     sys.exit(1)
@@ -175,6 +161,6 @@ echo "Before adding a repository to $state/repos.allow, read its workflows: one 
 echo "a pull request can reach, runs the agent's code with them."
 rm -rf "$fetched"
 trap - EXIT
-# Your own gh login's token; where gh gives none, the token written before stays, or one is asked.
-from_gh || [ -e "$state/token" ] || ask_token
+# No copy of your own token is kept (D14013): agent-pr asks your gh login at each call. One an earlier install wrote goes.
+[ ! -e "$state/token" ] || { rm -f "$state/token" && echo "removed $state/token: agent-pr asks your gh login for your token at each call"; }
 case " $* " in *":agent "*) ask_token agent ;; esac

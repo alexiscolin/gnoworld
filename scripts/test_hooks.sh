@@ -269,7 +269,7 @@ assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktr
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
-assert "tools/agent-github" in listed, "agent-github's installer, which writes every profile's denies and which install_hooks.sh runs, is outside the harness list (F13449)"
+assert "tools/agent-github" in listed, "agent-github's tools, which install_hooks.sh runs, are outside the harness list (F13449)"
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json", "CLAUDE.md"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs, or the instructions every session reads (a nested one no commit may hold: check_docs refuses it)"
 # Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
 # tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
@@ -3115,7 +3115,7 @@ done
 case :$(command -p getconf PATH): in *":$(dirname "$(command -v gitleaks)"):"*) ;; *)
 	mkdir -p "$i/home5/.claude" && echo '{}' >"$i/home5/.claude/settings.json"
 	(cd "$i" && HOME="$i/home5" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's profile, its hooks with it: $(cat "$t/out")"
-	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
+	grep -qF "add these denies to each by hand" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
 	;;
 esac
 # This machine's twins of the committed rules go into every Claude profile's user settings (D13413): this repository's checkout is

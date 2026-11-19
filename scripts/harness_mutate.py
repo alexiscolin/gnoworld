@@ -1192,7 +1192,7 @@ def mutants():
         yield from each(".claude/settings.json", f'        "{path}",\n', "", "hooks", f"the sandbox keeps commands out of {path} (7z, S4)")
     for rule, why in (("Edit(//tmp/CLAUDE.md)", "above every worktree, by /tmp"), ("Edit(~/.claude/rules/**)", "of the home folder")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep the instructions {why} out of the file tools (7z, S4)")
-    # agent-github's tools, which install_hooks.sh runs and which write every profile's denies, closed in the session's own tree (F13449).
+    # agent-github's tools, which install_hooks.sh runs (land's --stamp, till 14a-2), closed in the session's own tree (F13449).
     yield from each(".claude/settings.json", '      "Edit(/tools/agent-github/**)",\n', "", "hooks", "settings keep agent-github's tools out of the file tools (F13449)")
     yield from each(".claude/settings.json", '        "tools/agent-github",\n', "", "hooks", "the sandbox keeps commands out of agent-github's tools (F13449)")
     # agent-pr's, the project's own (D14000 C, D14013): its exclusion, its token kept from commands and file tools, its folder and the
