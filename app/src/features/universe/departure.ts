@@ -17,6 +17,13 @@ let taken: HTMLElement | undefined;
 // The flight that left, and whether it neared or landed before its page was shown.
 let ahead: { readonly place: Place; near: boolean; landed: boolean } | undefined;
 
+// What the live page still animates (a card's rise) stops where it is drawn, as the copy took it: until the copy shows, nothing arrives.
+function pauseLeaving(): void {
+  for (const part of document.querySelectorAll(LEAVING))
+    if (typeof part.getAnimations === "function")
+      for (const each of part.getAnimations({ subtree: true })) each.pause();
+}
+
 /** The flight to `place` leaves now, on the click that asks its page: the camera goes to the planet where the scene holds it, and to the page's
  * circle as the page lays it out. The leaving page's circle is no goal for the next planet: the flight goes for the middle's till then. False
  * (nothing left) under reduced motion, which jumps, and where space is not in sight or the camera stands there. */
@@ -41,6 +48,7 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   taken = undefined;
   // The copy is taken (what is on screen, parts still hidden left out); only then the page's own arrival ends: it would reveal them.
   endArrival();
+  pauseLeaving();
   markFlown(true);
   return true;
 }

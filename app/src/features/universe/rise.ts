@@ -93,8 +93,11 @@ function carryFill(part: Element, copy: HTMLElement): void {
   ];
   if (live.length === cloned.length)
     live.forEach((each, at) => {
-      if (typeof each.getAnimations !== "function" || each.getAnimations().length === 0) return;
       const drawn = getComputedStyle(each);
+      // A fill a part takes from a token its page sets (a card's, a dock's) is not set at the body, where the copy stands: it is carried as drawn.
+      if (drawn.backgroundColor !== "rgba(0, 0, 0, 0)")
+        cloned[at]?.style.setProperty("background-color", drawn.backgroundColor);
+      if (typeof each.getAnimations !== "function" || each.getAnimations().length === 0) return;
       cloned[at]?.style.setProperty("opacity", drawn.opacity);
       cloned[at]?.style.setProperty("transform", drawn.transform);
     });

@@ -204,6 +204,29 @@ describe("the flight on the click", () => {
     expect(rise.ghost.mock.calls[0]?.[1]).toMatchObject({ taken: undefined });
   });
 
+  // Until the copy shows, nothing of the leaving page goes on arriving under it: its CSS animations stop where they are drawn.
+  it("pauses what the leaving page still animates, its own parts alone", async () => {
+    await started();
+    const pause = vi.fn();
+    const other = vi.fn();
+    const part = document.createElement("div");
+    part.setAttribute("data-exit", "");
+    const outside = document.createElement("div");
+    document.body.append(part, outside);
+    Object.defineProperty(Element.prototype, "getAnimations", {
+      configurable: true,
+      value(this: Element) {
+        return [{ pause: this === part ? pause : other }];
+      },
+    });
+    made.events?.["world"]?.("bubble");
+    Reflect.deleteProperty(Element.prototype, "getAnimations");
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+    part.remove();
+    outside.remove();
+  });
+
   it("holds the plate's arrival and the tags' landing for the page, and gives them as the page is shown", async () => {
     const { show } = await started();
     made.events?.["world"]?.("bubble");

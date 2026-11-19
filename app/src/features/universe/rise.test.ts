@@ -134,6 +134,8 @@ it("copies a part mid-animation with the opacity and transform it is drawn with"
   card.style.opacity = "0.2";
   card.style.transform = "translateY(12px)";
   card.dataset["rising"] = "";
+  const token = document.head.appendChild(document.createElement("style"));
+  token.textContent = "section { background-color: rgb(1, 2, 3); }";
   // (jsdom has no getAnimations.)
   Object.defineProperty(Element.prototype, "getAnimations", {
     configurable: true,
@@ -143,7 +145,9 @@ it("copies a part mid-animation with the opacity and transform it is drawn with"
   });
   const copy = copyOf("[data-exit]")?.querySelector("section");
   expect(copy?.style.opacity).toBe("0.2");
+  expect(copy?.style.backgroundColor).toBe("rgb(1, 2, 3)");
   expect(copy?.style.transform).toBe("translateY(12px)");
   expect(rested.style.opacity).toBe("");
   Reflect.deleteProperty(Element.prototype, "getAnimations");
+  token.remove();
 });
