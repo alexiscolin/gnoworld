@@ -33,9 +33,10 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
   the project's one other excluded command, `~/.local/bin/agent-pr *`, and asks his `gh` login for his token at each call
   (`gh auth token --hostname github.com`, as him, from his home); no copy is kept, and its installer removes one an earlier
   install wrote. gh keeps that token in the Keychain by default, which the sandbox reaches (D13159): the owner keeps it in
-  `~/.config/gh` instead (`gh auth login --insecure-storage`), which the sandbox denies. Its guard hook
-  (`tools/agent-github/agent_pr_guard.py`) takes a call in one form, and lets every call through on a machine where agent-pr is
-  not installed, since nothing can leave the sandbox through it there; the skill (`.claude/skills/agent-github/SKILL.md`) says
+  `~/.config/gh` instead (`gh auth login --insecure-storage`), which the sandbox denies, and removes the github.com item an
+  earlier login left in the Keychain, if any. Its guard hook
+  (`tools/agent-github/agent_pr_guard.py`) takes a call in one form; on a machine where agent-pr is not installed it refuses a
+  call that names it and lets every other through, since nothing else can leave the sandbox through it there; the skill (`.claude/skills/agent-github/SKILL.md`) says
   how to call it. Nothing is written into a Claude profile (D14000 C). `land`, the owner's command for a pull request, stays till
   14a-2 removes it (D14014).
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
