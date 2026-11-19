@@ -41,6 +41,87 @@ describe("Free", () => {
   });
 });
 
+// The view's turn round its up in one 16 ms frame, signed, in radians.
+const yawOf = (free: Free, pose: Pose): number => {
+  const before = Math.atan2(pose.way.x, pose.way.z);
+  free.advance(16, false, { pose, reach: REACH });
+  return Math.atan2(pose.way.x, pose.way.z) - before;
+};
+
+describe("Free's drag", () => {
+  // A hand's moves land in some frames only (a slow machine, a screen's own rate): the view still turns each frame, the one way, evenly.
+  it("turns the view every frame, one way and evenly, though the hand's moves land every other frame", () => {
+    const free = new Free();
+    free.wander = WANDER.galaxy;
+    const pose = poseAt([0, 0, 0], 100);
+    idleFor(free, pose, 5);
+    const steps: number[] = [];
+    for (let frame = 0; frame < 40; frame += 1) {
+      if (frame % 2 === 0) free.drag({ dx: 8, dy: 0, height: 560, seconds: 1 / 30 });
+      steps.push(yawOf(free, pose));
+    }
+    const held = steps.slice(8).map(Math.abs);
+    expect(Math.min(...steps.slice(8).map(Math.sign)), "one way").toBe(Math.max(...steps.slice(8).map(Math.sign)));
+    expect(Math.min(...held) / Math.max(...held), "even").toBeGreaterThan(0.6);
+  });
+
+  it("never turns the view back in a frame between moves the hand leaves apart, the slow turn on", () => {
+    const free = new Free();
+    free.wander = WANDER.galaxy;
+    const pose = poseAt([0, 0, 0], 100);
+    idleFor(free, pose, 5);
+    const steps: number[] = [];
+    for (let frame = 0; frame < 45; frame += 1) {
+      if (frame % 3 === 0) free.drag({ dx: 8, dy: 0, height: 560, seconds: 1 / 60 });
+      steps.push(yawOf(free, pose));
+    }
+    expect(Math.max(...steps)).toBeLessThanOrEqual(1e-12);
+  });
+
+  it("starts a drag's turn over a few frames, never all of it in the first", () => {
+    const free = new Free();
+    const pose = poseAt([0, 0, 0], 100);
+    free.drag({ dx: 40, dy: 0, height: 560, seconds: 1 / 30 });
+    const [first, second] = [Math.abs(yawOf(free, pose)), Math.abs(yawOf(free, pose))];
+    expect(first).toBeLessThan(0.6 * ((2 * Math.PI * 40) / 560));
+    expect(second).toBeGreaterThan(0.5 * first);
+  });
+
+  // A steady hand, a move a frame: the view trails it by about two moves (D409: the hand holds what the view looks at), no more.
+  it("trails a steady hand by two moves at most", () => {
+    const [free, pose] = [new Free(), poseAt([0, 0, 0], 100)];
+    for (let frame = 0; frame < 20; frame += 1) {
+      free.drag({ dx: 9.6, dy: 0, height: 900, seconds: 0.016 });
+      free.advance(16, false, { pose, reach: REACH });
+    }
+    const hand = (2 * Math.PI * 9.6 * 20) / 900;
+    expect(hand + Math.atan2(pose.way.x, pose.way.z)).toBeLessThan((2 * Math.PI * 9.6 * 2) / 900);
+  });
+
+  it("is done moving once let go and made: the loop may sleep", () => {
+    const [free, pose] = [new Free(), poseAt([0, 0, 0], 100)];
+    free.drag({ dx: 0, dy: 30, height: 560, seconds: 1 / 30 });
+    expect(free.moving, "a pitch alone is a move").toBe(true);
+    free.release(true);
+    for (let t = 0; t < 1; t += 0.016) free.advance(16, false, { pose, reach: REACH });
+    expect(free.moving).toBe(false);
+  });
+
+  it("makes the whole turn the hand asked, at any frame rate, once let go and still", () => {
+    const [a, b] = [poseAt([0, 0, 0], 100), poseAt([0, 0, 0], 100)];
+    for (const [pose, ms] of [
+      [a, 16],
+      [b, 66],
+    ] as const) {
+      const free = new Free();
+      free.drag({ dx: 40, dy: 0, height: 560, seconds: 1 / 30 });
+      free.release(true);
+      for (let t = 0; t < 2; t += ms / 1000) free.advance(ms, false, { pose, reach: REACH });
+      expect(Math.atan2(pose.way.x, pose.way.z)).toBeCloseTo(-(2 * Math.PI * 40) / 560, 3);
+    }
+  });
+});
+
 // How far the view turns in one 16 ms frame, in radians, the galaxy's slow turn on.
 const stepOf = (free: Free, pose: Pose): number => {
   const before = { ...pose.way };

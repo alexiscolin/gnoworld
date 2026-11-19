@@ -3,7 +3,8 @@
 // the field of view opens 5° mid-way (not on a turn). The goal is read each frame. Eased power2.inOut from rest, out when moving.
 import { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "@gnoworld/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
-import { blankPose, copyPose, type Pose } from "./pose.ts";
+import { approach, keepOf } from "./lag.ts";
+import { blankPose, copyPose, eyeOf, type Pose } from "./pose.ts";
 
 /** Where a flight goes: the pose asked, read each frame (false while it cannot be told yet), and what it says on its way. */
 export interface Goal {
@@ -18,6 +19,8 @@ export interface Goal {
 }
 
 const NEAR = 0.68;
+// A moment, in seconds, over which the flight's own speed at its start is read.
+const MOMENT_S = 1e-3;
 const FOV_BUMP = 5;
 // The longest a goal is waited for before the flight lands where it is.
 const WAIT_S = 2;
@@ -48,6 +51,8 @@ export class Flight {
   readonly goal: Goal;
   readonly #from = blankPose();
   readonly #to = blankPose();
+  // The goal as read this frame: the end the flight flies to, `#to`, goes over to it (lag.ts).
+  readonly #now = blankPose();
   readonly #apart = new Vector3();
   readonly #step: ZoomStep = { along: 0, width: 0 };
   readonly #a = new Vector3();
@@ -59,8 +64,10 @@ export class Flight {
   readonly #turn = new Quaternion();
   readonly #part = new Quaternion();
   readonly #none = new Quaternion();
-  readonly #moving: boolean;
+  readonly #speed: number;
   readonly #rho: number;
+  // The share of a full-speed start the flight takes: 1 where the camera flies as fast as the flight, 0 where it is at rest.
+  #weight = 0;
   #path: ZoomPath | undefined;
   #seconds = 1;
   #time = 0;
@@ -71,11 +78,11 @@ export class Flight {
   /** How far along, eased, 0 to 1. */
   along = 0;
 
-  /** From `from`, already `moving` or not, to `goal`. */
-  constructor(from: Pose, goal: Goal, { moving = false, rho = ZOOM_RHO } = {}) {
+  /** From `from`, the camera flying at `speed` (the eye's over its distance, a second), to `goal`. */
+  constructor(from: Pose, goal: Goal, { rho = ZOOM_RHO, speed = 0 }: { rho?: number; speed?: number } = {}) {
     this.goal = goal;
     copyPose(from, this.#from);
-    this.#moving = moving;
+    this.#speed = speed;
     this.#rho = rho;
   }
 
@@ -88,6 +95,7 @@ export class Flight {
     this.#path = zoomPath(this.#apart.length(), { from: this.#from.distance, to: this.#to.distance }, this.#rho);
     this.#turnOf();
     this.#seconds = Math.max(zoomSeconds(this.#path.length), (EASE_PEAK * this.#turn.angleTo(this.#none)) / TURN_RATE);
+    this.#weight = this.#speed > 0 ? this.#startWeight() : 0;
     return true;
   }
 
@@ -118,13 +126,29 @@ export class Flight {
       return this.#waited > WAIT_S;
     }
     const t = this.#share(still ? Infinity : this.#time + delta / 1000);
-    this.along = this.#moving ? outOnly(t) : inOut(t);
+    this.along = (1 - this.#weight) * inOut(t) + this.#weight * outOnly(t);
+    if (this.goal.pose(this.#now)) approach(this.#to, this.#now, keepOf(delta / 1000, this.along));
     this.#pose(t, out);
     if (!this.#near && this.along >= NEAR) {
       this.#near = true;
       this.goal.near?.();
     }
     return t >= 1;
+  }
+
+  // A camera flying slower than the flight's own full-speed start (one all but landed: its next flight began at full speed, a step and a turn
+  // in its first frame) starts it in proportion: the speed of both read over a moment of the flight, the eye's over its distance.
+  #startWeight(): number {
+    const along = this.along;
+    const moment = MOMENT_S / this.#seconds;
+    this.along = outOnly(moment);
+    this.#pose(moment, this.#now);
+    this.along = along;
+    const at = eyeOf(this.#from, this.#a);
+    const then = eyeOf(this.#now, this.#b);
+    const own =
+      Math.hypot(then.x - at.x, then.y - at.y, then.z - at.z) / MOMENT_S / Math.max(this.#from.distance, 1e-6);
+    return Math.min(1, this.#speed / Math.max(own, 1e-9));
   }
 
   // Decided once, as the flight starts slowing: its rest drawn out by up to SLACK_S where the place is not ready, else kept.
@@ -151,7 +175,6 @@ export class Flight {
     const from = this.#from;
     const path = this.#path;
     if (path === undefined) return;
-    this.goal.pose(to);
     glideAt(path, this.along, this.#step);
     const left = 1 - this.#step.along;
     out.look.x = to.look.x + this.#apart.x * left;

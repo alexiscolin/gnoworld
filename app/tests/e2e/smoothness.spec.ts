@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { adena } from "./adena.ts";
 import { callWallet, connect, REALM, writeChain } from "./callCard.ts";
 import { open } from "./chatScreenOpen.ts";
+import { word } from "./chat.ts";
 import { onEarth, spaceReady as sceneOn } from "./earthStage.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { logIn } from "./irc.ts";
 import { analyse, continuity, odd } from "./smoothAnalysis.ts";
 import { record, stop, type Raw } from "./smoothness.ts";
 
@@ -55,6 +57,54 @@ test("the measure sees a planted jump, a bounce and a stall, and none in an ease
       { floor: 0.01 },
     ).bounces.length,
   ).toBeGreaterThan(0);
+  // A step over a stall is not judged: the stall drew none of it; the same step in a frame of its own is a jump.
+  const stalled = times.map((t, i) => (i > 20 ? t + 300 : t));
+  const stepped = eased.map((v, i) => (i > 20 ? v + 0.5 : v));
+  expect(continuity(stalled, stepped, { floor: 0.01, unseen: 32 }).jumps).toEqual([]);
+  expect(continuity(times, stepped, { floor: 0.01, unseen: 32 }).jumps.length).toBeGreaterThan(0);
+  // The Earth's facing comes in degrees: 30 degrees turned slowly is no bounce and no whole turn.
+  const turning: Raw = {
+    frames: times.map((t, i) => ({ t, lat: 10, lon: i * 0.75, earthShown: true, watched: {} })),
+    long: [],
+    shifts: [],
+  };
+  expect(analyse(turning).lon).toEqual({ jumps: [], bounces: [] });
+  expect(analyse(turning).turns).toBeLessThan(0.1);
+  // A camera that jumps under the opaque full chat is not seen; the same jump uncovered is one.
+  const posed = (covered: boolean): Raw => ({
+    frames: times.map((t, i) => ({
+      t,
+      eye: [i < 20 ? i : i + 1000, 0, 0],
+      covered: covered && i >= 19 && i <= 21,
+      watched: {},
+    })),
+    long: [],
+    shifts: [],
+  });
+  expect(analyse(posed(true)).eye?.jumps).toEqual([]);
+  expect(analyse(posed(false)).eye?.jumps.length).toBeGreaterThan(0);
+  // What is seen is judged: an element at 1 under a hidden parent shows nothing; a swap for another element in sight is judged.
+  const part = (seen: number, left: number, id: number) => ({
+    opacity: 1,
+    seen,
+    scale: 1,
+    x: 0,
+    y: 0,
+    left,
+    width: 10,
+    id,
+  });
+  const watched = (at: (i: number) => ReturnType<typeof part>): Raw => ({
+    frames: times.map((t, i) => ({ t, watched: { "#p": at(i) } })),
+    long: [],
+    shifts: [],
+  });
+  expect(
+    analyse(watched((i) => part(i < 20 ? 0 : Math.min(1, (i - 19) / 10), 0, 1))).watched["#p"]?.opacity.jumps,
+  ).toEqual([]);
+  expect(
+    analyse(watched((i) => part(1, i < 20 ? 100 : 300, i < 20 ? 1 : 2))).watched["#p"]?.left.jumps.length,
+  ).toBeGreaterThan(0);
   const raw: Raw = { frames: times.map((t, i) => ({ t: i > 20 ? t + 100 : t, watched: {} })), long: [], shifts: [] };
   expect(analyse(raw).stalls.count).toBe(1);
 });
@@ -95,7 +145,11 @@ test("3 the galaxy, dragged", async ({ page }) => {
     await wait(page, 2000);
     await page.mouse.move(480, 280);
     await page.mouse.down();
-    await page.mouse.move(640, 320, { steps: 20 });
+    // A hand's drag, a step a frame: twenty moves sent at once land in one frame after the press's, and the scene follows the hand there.
+    for (let step = 1; step <= 20; step += 1) {
+      await page.mouse.move(480 + 8 * step, 280 + 2 * step);
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+    }
     await page.mouse.up();
     await wait(page, 4000);
   });
@@ -121,6 +175,38 @@ test("4 a world's page: the chat full and back, the pill gliding", async ({ page
     },
   );
 });
+
+// The views' bar and its pill with no scene: the page at the browser's own 60 frames a second, where a transition is read whole (on the
+// software GPU the scene's frames draw it in a few).
+const BAR = "nav[aria-label='Views']";
+async function barAndPill(page: Page, name: string) {
+  await flow(page, [`${name}-to-chat`, PILL, BAR], async () => {
+    await views(page).locator("a[href*='chat=full']").click();
+    await wait(page, 2000);
+  });
+  // In the full chat each level's name is folded whole, at every width (under 1340 px the word beside it is hidden).
+  const widths = await views(page)
+    .locator("a .truncate")
+    .evaluateAll((names) => names.map((each) => each.getBoundingClientRect().width));
+  expect(
+    widths.filter((width) => width > 0.5),
+    `${name}: the names folded in the full chat`,
+  ).toEqual([]);
+  // The world's link by its address: under 1340 px its word is hidden, and its folded name says nothing yet.
+  await flow(page, [`${name}-to-page`, PILL, BAR], async () => {
+    await views(page).locator("a[href='/w/bubble']").click();
+    await wait(page, 2000);
+  });
+}
+
+for (const width of [1366, 1280])
+  test(`4b a world's page with no scene at ${String(width)} px: the chat full and back, the bar and the pill gliding`, async ({
+    page,
+  }) => {
+    await open(page, { width, as: ACCOUNT, height: 768, full: false });
+    await wait(page, 1500);
+    await barAndPill(page, `4b-world-${String(width)}`);
+  });
 
 test("5 the plate: a card alone, closed; Try it's tabs", async ({ page }) => {
   await adena(page);
@@ -169,12 +255,17 @@ test("6b the bubble on the Earth", async ({ page }) => {
   });
 });
 
-test("7 a dialog, open and closed (poll)", async ({ page }) => {
-  await open(page, { width: 1366, as: ACCOUNT, height: 768, full: false, query: "&test-gpu" });
-  await sceneOn(page);
+// The + is an account's: the page logs in for real (a scripted Ergo alone leaves it a guest), then opens the docked chat and its poll
+// dialog; 7 with the scene, its twin 7b with none, at 60 frames a second, where the dialog's opening and closing are judged.
+async function pollDialog(page: Page, name: string, scene: boolean) {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await logIn(page, word("poll"));
+  await page.goto(`/w/bubble?room=games${scene ? "&test-gpu" : ""}`);
+  await hydrated(page);
+  if (scene) await sceneOn(page);
   await wait(page, 2000);
-  await flow(page, ["7-dialog", "[role='dialog']"], async () => {
-    await page.getByRole("button", { name: /^add/i }).first().click();
+  await flow(page, [name, "[role='dialog']"], async () => {
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByRole("menuitem", { name: "Poll" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await wait(page, 1500);
@@ -182,10 +273,14 @@ test("7 a dialog, open and closed (poll)", async ({ page }) => {
     await expect(page.getByRole("dialog")).toBeHidden();
     await wait(page, 1000);
   });
-});
+}
+
+test("7 a dialog, open and closed (poll)", ({ page }) => pollDialog(page, "7-dialog", true));
+
+test("7b a dialog with no scene, open and closed (poll)", ({ page }) => pollDialog(page, "7b-dialog", false));
 
 test("8 the dive into the Earth's page and out, lines from far countries during and after", async ({ page }) => {
-  const { socket } = await onEarth(page, {
+  const { socket, sent } = await onEarth(page, {
     me: ACCOUNT,
     motion: true,
     ticking: true,
@@ -202,6 +297,8 @@ test("8 the dive into the Earth's page and out, lines from far countries during 
   };
   await flow(page, ["8-earth-dive"], async () => {
     await page.locator("a[href='/earth']").first().dispatchEvent("click");
+    // The home opens no chat: the Earth's page joins #earth as the dive comes, and its first line is said once it has.
+    await expect.poll(() => sent.some((line) => line.startsWith("JOIN #earth")), SLOW).toBe(true);
     say("d1", "from Japan, in the dive", "JP");
     await wait(page, 3000);
     say("d2", "from Brazil, in the dive", "BR");
