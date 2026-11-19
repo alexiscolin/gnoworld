@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { gsap } from "gsap";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Place } from "../../space/place.ts";
 
 // The flight leaves on the click (a label's or a link's), before the page it goes to is on screen; the page's arrival waits for that page.
 const log = vi.hoisted(() => ({ calls: [] as string[], goes: [] as Place[], flies: true, reduced: false }));
 const made = vi.hoisted(() => ({ events: undefined as undefined | Record<string, (id?: string) => void> }));
 const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), landTags: vi.fn(), waitTags: vi.fn(), endArrival: vi.fn() }));
-vi.mock("./arrival.ts", () => arrival);
+// The rest of each module real: rise.ts asks arrival.ts for the page that leaves.
+vi.mock("./arrival.ts", async (actual) => ({ ...(await actual<object>()), ...arrival }));
 const rise = vi.hoisted(() => ({ ghost: vi.fn(), copyOf: vi.fn(), fadeAway: vi.fn() }));
-vi.mock("./rise.ts", () => rise);
+vi.mock("./rise.ts", async (actual) => ({ ...(await actual<object>()), ...rise }));
 vi.mock("./moonRooms.ts", () => ({ feedMoons: () => undefined, stopMoons: () => undefined }));
 vi.mock("../../space/scene.ts", () => ({
   Space: class {
@@ -78,14 +80,20 @@ async function started() {
 }
 
 // What the router does with a click on a link: it takes it (prevents the default) and navigates.
-function click(href: string, { taken = true, ctrl = false } = {}): void {
+interface Click {
+  readonly init?: MouseEventInit;
+  readonly attributes?: Record<string, string>;
+  readonly taken?: boolean;
+}
+function click(href: string, { init = {}, attributes = {}, taken = true }: Click = {}) {
   const link = Object.assign(document.createElement("a"), { href });
+  for (const [name, value] of Object.entries(attributes)) link.setAttribute(name, value);
   if (taken)
     link.addEventListener("click", (event) => {
       event.preventDefault();
     });
   document.body.append(link);
-  link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ctrlKey: ctrl }));
+  link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ...init }));
   link.remove();
 }
 
@@ -121,7 +129,7 @@ describe("the flight on the click", () => {
   it("does not leave for a click the router did not take, a link out or a page that is no place", async () => {
     await started();
     click("/w/bubble", { taken: false });
-    click("/w/bubble", { ctrl: true, taken: false });
+    click("/w/bubble", { init: { ctrlKey: true }, taken: false });
     click("https://example.org/w/bubble");
     click("/list");
     expect(log.goes).toEqual([]);
@@ -279,5 +287,99 @@ describe("the flight on the click", () => {
     await started();
     made.events?.["near"]?.();
     expect(arrival.enterPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The click's copy and the tags with arrival.ts, rise.ts, flown.ts and tags.ts real: what a click the router does not take, or a link to a page that
+// is no place, does to the page it leaves.
+const part = (attributes: string[], parent: Element = document.body, tag = "div") => {
+  const element = parent.appendChild(document.createElement(tag));
+  for (const name of attributes) element.setAttribute(name, "");
+  return element;
+};
+const page = () => {
+  document.body.replaceChildren();
+  const box = part(["data-globe"]);
+  const layout = part([]);
+  part(["data-frame"], layout);
+  part(["data-exit", "data-look"], layout).append(document.createElement("h1"));
+  part(["data-dock", "data-exit"], layout);
+  return { box, tag: part(["data-tag"], document.body, "span") };
+};
+
+const untouched = (box: HTMLElement, tag: HTMLElement) => {
+  expect(box.dataset["flown"]).toBeUndefined();
+  expect(document.querySelector("[data-ghost]")).toBeNull();
+  expect(gsap.getTweensOf(tag)).toHaveLength(0);
+  expect(tag.style.opacity).toBe("");
+};
+
+describe("with the page's arrival and its copy real", () => {
+  beforeEach(async () => {
+    // (jsdom has no Web Animations: the fade is one that never ends.)
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      value: () => ({ finished: new Promise(() => undefined) }),
+    });
+    const real = await vi.importActual<typeof import("./arrival.ts")>("./arrival.ts");
+    const copies = await vi.importActual<typeof import("./rise.ts")>("./rise.ts");
+    arrival.enterPage.mockImplementation(real.enterPage);
+    arrival.landTags.mockImplementation(real.landTags);
+    arrival.waitTags.mockImplementation(real.waitTags);
+    arrival.endArrival.mockImplementation(real.endArrival);
+    rise.ghost.mockImplementation(copies.ghost);
+    rise.copyOf.mockImplementation(copies.copyOf);
+    rise.fadeAway.mockImplementation(copies.fadeAway);
+  });
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  describe("a click that sends no flight leaves its page as it was", () => {
+    it.each([
+      ["a modifier's", "/w/bubble", { init: { ctrlKey: true } }],
+      ["a shift's", "/w/bubble", { init: { shiftKey: true } }],
+      ["a middle button's", "/w/bubble", { init: { button: 1 } }],
+      ["a new tab's", "/w/bubble", { attributes: { target: "_blank" } }],
+      ["a download's", "/w/bubble", { attributes: { download: "" } }],
+      ["a link out", "https://example.org/w/bubble", {}],
+    ])("%s click", async (_name, href, how) => {
+      await started();
+      const { box, tag } = page();
+      click(href, how);
+      untouched(box, tag);
+      expect(log.goes).toEqual([]);
+    });
+
+    it("a click on a link to a page that is no place: its plate and dock stay for the route's own leaving copy", async () => {
+      await started();
+      const { box, tag } = page();
+      click("/list");
+      untouched(box, tag);
+      // The route's page leaving makes its own copy of the parts, which are still seen.
+      const { ghost } = await import("./rise.ts");
+      ghost(() => false);
+      await Promise.resolve();
+      expect(document.querySelector("[data-ghost]")).not.toBeNull();
+    });
+  });
+
+  describe("a click that sends a flight", () => {
+    it("hides the aiming tags with the flight, not at the capture", async () => {
+      await started();
+      const { box, tag } = page();
+      let seen = -1;
+      const link = Object.assign(document.createElement("a"), { href: "/w/bubble" });
+      link.addEventListener("click", (event) => {
+        seen = gsap.getTweensOf(tag).length;
+        event.preventDefault();
+      });
+      document.body.append(link);
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+      expect(seen).toBe(0);
+      expect(gsap.getTweensOf(tag).length).toBeGreaterThan(0);
+      expect(box.dataset["flown"]).toBe("flying");
+      expect(document.querySelector("[data-ghost]")).not.toBeNull();
+    });
   });
 });
