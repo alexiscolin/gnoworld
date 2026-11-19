@@ -24,8 +24,10 @@
   }
 
   @media (width >= 900px) {
+    /* The pill's end space is the block's own, whatever ends it: the network's name, or its testnet's chip. */
     .inPill {
       display: inline-flex;
+      padding-inline-end: var(--space-s);
     }
 
     /* The thin divider the pill's control and the network share. */
@@ -44,9 +46,5 @@
   .caution {
     margin-inline-start: var(--space-2xs);
     color: var(--color-warm);
-  }
-
-  .inPill .caution {
-    margin-inline-end: var(--space-s);
   }
 }

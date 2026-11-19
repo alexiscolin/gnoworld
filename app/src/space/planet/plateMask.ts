@@ -10,7 +10,7 @@ export interface PlateMask {
   readonly uRound: IUniform<number>;
 }
 
-/** A stage's plate uniforms: the box, where its words end, how much it shows, the buffer's height, all in the buffer's pixels. */
+/** A stage's plate uniforms: the box, where its fill starts fading, how much it shows, the buffer's height, all in the buffer's pixels. */
 export const newPlateMask = (): PlateMask => ({
   uBox: { value: new Vector4() },
   uFade: { value: 0 },

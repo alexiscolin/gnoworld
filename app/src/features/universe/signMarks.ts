@@ -3,6 +3,7 @@
 import { useEffect, type RefObject } from "react";
 import type { GroundMark } from "../../space/earth/ground.ts";
 import { calmed } from "../../earthSignsCalm.ts";
+import { LEAST_ROOM } from "./pageCircle.ts";
 
 /** The sheet's own width, the design's. */
 const BUBBLE_WIDTH = 258;
@@ -127,9 +128,6 @@ interface Fit {
   /** A world's: the plate's right edge and the header's foot, which its bubbles keep clear of; none on the Earth, whose do not. */
   readonly from?: { readonly x: number; readonly y: number } | undefined;
 }
-
-// A plate that stands beside the dock leaves the room between them; one stacked over the planet, as on a narrow page, leaves none to keep.
-const LEAST_ROOM = 240;
 
 // Where the frames keep a country brought into view, as shares of the free area: across from the plate's edge, down from the header.
 const AIM_ACROSS = 0.4;

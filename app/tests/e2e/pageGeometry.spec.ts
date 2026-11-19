@@ -10,14 +10,14 @@ import { axeOf } from "./axe.ts";
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/process/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
 // held to 2 px of the frame's, for anti-aliasing and compression; the pictures' own numbers are read off the frames' pixels.
 
-// A plate as frames 20, 37 and 90 draw it: 24 px from the left, 98 from the top, 808 wide with its fade, and the box it stands in.
+// A plate as frames 20, 37 and 90 draw it: 24 px from the left, 98 from the top, 808 wide with its fade, 832 with its air (D14002), and the box it stands in.
 const plateAt = async (page: Page, path: string) => {
   await page.goto(path);
   await hydrated(page);
   const plate = await box(page, "[data-look='plate']");
   near(plate.x, 24, "the plate's left");
   near(plate.y, 98, "the plate's top");
-  near(plate.width, 808, "the plate's width");
+  near(plate.width, 832, "the plate's width");
   return plate;
 };
 

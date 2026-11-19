@@ -65,6 +65,26 @@
     --_dot: var(--world);
   }
 
+  /* The chevron between two steps of a trail, the breadcrumb's and the header's between its views: the design system's icon turned to
+     point on, at 60 %, never a text character (D14003). */
+  .trail-step {
+    display: inline-flex;
+    justify-content: center;
+    /* raw: the advance of the "›" it replaced, measured at 5.14 px of the label's 12 px with its tracking: each step keeps its place */
+    inline-size: 0.4284em;
+    margin-inline: var(--space-2xs);
+    opacity: 0.6;
+    rotate: calc(-90deg * var(--dir));
+  }
+
+  /* The chevron at three quarters of the text's size, wider than its box and centred on it. */
+  .trail-step svg {
+    /* raw: three quarters of the text's size, as tall as its caps */
+    inline-size: 0.75em;
+    /* raw: square, as the icon is drawn */
+    block-size: 0.75em;
+  }
+
   /* A bar of controls over the page and the scene: a pill with a line round it, four pixels in, the night at 45% behind it (the prototype's
      #hnav .links): the header's views, and space's two views apart from them on a phone. No blur until the scene has a sky. */
   .control-bar {
