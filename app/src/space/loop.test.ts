@@ -247,6 +247,28 @@ describe("loop", () => {
     expect(again.log.freed).toBe(0);
   });
 
+  // A hidden tab's frames stop, so no frame is there to arm the timer: hiding arms it.
+  it("frees what it holds 10 s after the page hides, though no frame comes, and not if it shows again before", () => {
+    const l = make();
+    l.frame(1000);
+    l.state.unseen = true;
+    l.page.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(9000);
+    expect(l.log.freed).toBe(0);
+    vi.advanceTimersByTime(1500);
+    expect(l.log.freed).toBe(1);
+    const again = make();
+    again.frame(1000);
+    again.state.unseen = true;
+    again.page.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(5000);
+    again.state.unseen = false;
+    again.page.dispatchEvent(new Event("visibilitychange"));
+    again.frame(6000);
+    vi.advanceTimersByTime(20_000);
+    expect(again.log.freed).toBe(0);
+  });
+
   it("holds ambient frames to their gap, and takes a full one at once", () => {
     const l = make();
     l.state.need = "ambient";
