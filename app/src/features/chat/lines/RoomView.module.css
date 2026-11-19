@@ -189,9 +189,9 @@
     }
   }
 
-  /* A line not seen yet (`data-unseen`, rooms/unseen.ts): a faint tint over its fill and under its words, an inset shadow, which no
-     line moves for. Read, it loses the mark and the tint waits 1 s, then fades over 0.6 s; nothing runs at rest, and under reduced
-     motion (--motion-scale 0) it goes at once. */
+  /* A line not seen yet (`data-unseen`, rooms/unseen.ts): the resting fill (--color-fill) behind its words, an inset shadow, which no
+     line moves for; the New divider alone carries the colour. Read, it loses the mark and the fill waits 1 s, then fades over 0.6 s;
+     nothing runs at rest, and under reduced motion (--motion-scale 0) it goes at once. */
   .lines > li {
     /* raw: the owner's 1 s wait and 0.6 s fade (2026-11-19) */
     transition: box-shadow calc(0.6s * var(--motion-scale)) var(--ease-standard) calc(1s * var(--motion-scale));
@@ -199,7 +199,7 @@
 
   .lines > li[data-unseen] {
     /* raw: a spread past any line's box, so the shadow fills it */
-    box-shadow: inset 0 0 0 100vmax var(--color-new-soft);
+    box-shadow: inset 0 0 0 100vmax var(--color-fill);
     transition: none;
   }
 
