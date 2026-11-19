@@ -140,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -e \"$HOME/.local/bin/agent-pr\" ] || exit 0; python3 -I \"$HOME/.claude/hooks/agent_pr_guard.py\" \"$HOME/.local/bin/agent-pr\"",
+            "command": "[ -e \"$HOME/.local/bin/agent-pr\" ] || { ! grep -q '\\.local/bin/agent-pr' || { echo 'agent-pr guard: agent-pr is not installed' >&2; exit 2; }; exit 0; }; python3 -I \"$HOME/.claude/hooks/agent_pr_guard.py\" \"$HOME/.local/bin/agent-pr\"",
             "onFailure": "block"
           }
         ]

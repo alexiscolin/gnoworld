@@ -1201,7 +1201,8 @@ def mutants():
     yield from each(".claude/settings.json", ',\n        "~/.local/share/agent-github"', "", "hooks", "the sandbox keeps commands out of agent-pr's token (D14013)")
     for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/hooks/**)"):
         yield from each(".claude/settings.json", f'      "{rule}",\n', "", "hooks", f"settings keep {rule} from the file tools (D14013)")
-    yield from each(".claude/settings.json", '[ -e \\"$HOME/.local/bin/agent-pr\\" ] || exit 0; ', "", "hooks", "agent-pr's guard blocks no session before agent-pr is installed (14a-1)")
+    yield from each(".claude/settings.json", '[ -e \\"$HOME/.local/bin/agent-pr\\" ] || { ', '{ ', "hooks", "agent-pr's guard blocks no session before agent-pr is installed (14a-1)")
+    yield from each(".claude/settings.json", "! grep -q '\\\\.local/bin/agent-pr' || { echo", "true || { echo", "hooks", "agent-pr's hook refuses a call naming it before it is installed (14a-1)")
     yield from each(".claude/settings.json", '"matcher": "Bash|Read|Grep|Glob"', '"matcher": "Bash"', "hooks", "agent-pr's guard reads every tool that could reach it (D14013)")
     yield from each(".claude/settings.json", '\\"$HOME/.local/bin/agent-pr\\"', '\\"/x/agent-pr\\"', "hooks", "agent-pr's guard knows the helper's path (D14013)")
     # The file tools write the session's folders alone; the instructions below a tree's root, and StrykerJS's copies left out of what
