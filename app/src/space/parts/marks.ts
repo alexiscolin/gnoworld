@@ -191,7 +191,7 @@ export class Plate {
     this.mesh.renderOrder = 0.5;
   }
 
-  /** The plate's box on the page, its text's right edge where the fill starts fading, in the page's pixels; `ratio` the buffer's. */
+  /** The plate's box on the page, where its fill starts fading (past its text's air), in the page's pixels; `ratio` the buffer's. */
   place(
     box: { left: number; top: number; right: number; bottom: number },
     fade: number,
