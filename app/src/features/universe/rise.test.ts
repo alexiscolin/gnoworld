@@ -86,7 +86,6 @@ it("moves nothing at all under reduced motion", () => {
 
 // A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole, none of its parts on a clock of its own
 // (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the plate's fill.
-const frames: (() => void)[] = [];
 it("fades the departure's copy as one layer, no part animated alone, the dock's copy over the plate's fill", async () => {
   const part = (attributes: string[]) => {
     const box = document.body.appendChild(document.createElement("div"));
@@ -102,23 +101,49 @@ it("fades the departure's copy as one layer, no part animated alone, the dock's 
   if (taken === undefined) throw new Error("no copy taken");
   document.body.querySelector("h1")?.remove();
   expect(taken.parentElement).toBeNull();
-  vi.stubGlobal("requestAnimationFrame", (run: () => void) => {
-    frames.push(run);
-    return 0;
-  });
+  // The fade runs on the compositor (Web Animations), none on a tween of the main thread's, which a busy page stalls.
+  let end: () => void = () => undefined;
+  const animate = vi.fn(() => ({ finished: new Promise<void>((done) => (end = done)) }));
+  taken.animate = animate as unknown as typeof taken.animate;
   ghost(() => false, { asBlock: true, taken });
   await Promise.resolve();
-  // Its clock starts on the first frame after it is shown, never during the click's stall.
+  expect(animate).toHaveBeenCalledTimes(1);
+  expect(animate.mock.calls[0]).toMatchObject([[{ opacity: 1 }, { opacity: 0 }], { duration: 500 }]);
   expect(gsap.getTweensOf(taken)).toHaveLength(0);
-  for (const run of frames.splice(0)) run();
   const layer = taken;
-  expect(gsap.getTweensOf(layer)).toHaveLength(1);
   for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
   // A clone restarts its CSS animations (a card's rise, opacity 0 till it ends): none runs in a copy.
   // (jsdom keeps no `animation` property: the calls are read.)
   expect(set.mock.calls.filter(([name, value]) => name === "animation" && value === "none")).toHaveLength(6);
   set.mockRestore();
   expect(layer.querySelector<HTMLElement>("[data-dock]")?.style.background).toBe("var(--color-plate)");
-  finish();
+  expect(document.querySelector("[data-ghost]")).not.toBeNull();
+  end();
+  await Promise.resolve();
+  await Promise.resolve();
   expect(document.querySelector("[data-ghost]")).toBeNull();
+  vi.unstubAllGlobals();
+});
+
+// A card mid its CSS rise (opacity 0 through its delay) stands in the copy as it is drawn at the click, never landed at its end state.
+it("copies a part mid-animation with the opacity and transform it is drawn with", () => {
+  const box = document.body.appendChild(document.createElement("div"));
+  box.setAttribute("data-exit", "");
+  const card = box.appendChild(document.createElement("section"));
+  const rested = box.appendChild(document.createElement("p"));
+  card.style.opacity = "0.2";
+  card.style.transform = "translateY(12px)";
+  card.dataset["rising"] = "";
+  // (jsdom has no getAnimations.)
+  Object.defineProperty(Element.prototype, "getAnimations", {
+    configurable: true,
+    value(this: Element) {
+      return this instanceof HTMLElement && this.dataset["rising"] !== undefined ? [{}] : [];
+    },
+  });
+  const copy = copyOf("[data-exit]")?.querySelector("section");
+  expect(copy?.style.opacity).toBe("0.2");
+  expect(copy?.style.transform).toBe("translateY(12px)");
+  expect(rested.style.opacity).toBe("");
+  Reflect.deleteProperty(Element.prototype, "getAnimations");
 });

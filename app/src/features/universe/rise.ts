@@ -85,7 +85,19 @@ export const RETURN_AFTER = 450;
 function carryFill(part: Element, copy: HTMLElement): void {
   const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
   if (fill !== "") copy.style.setProperty("--plate-fill", fill);
-  // A clone restarts its CSS animations (a card's rise holds it at opacity 0 till it runs out): none runs in a copy.
+  // A clone restarts its CSS animations (a card's rise holds it at opacity 0 till it runs out): none runs in a copy, each part standing as the
+  // live one is drawn now (one mid-rise, still at its delay, stays unseen, not landed at its end).
+  const [live, cloned] = [
+    [part, ...part.querySelectorAll("*")],
+    [copy, ...copy.querySelectorAll<HTMLElement>("*")],
+  ];
+  if (live.length === cloned.length)
+    live.forEach((each, at) => {
+      if (typeof each.getAnimations !== "function" || each.getAnimations().length === 0) return;
+      const drawn = getComputedStyle(each);
+      cloned[at]?.style.setProperty("opacity", drawn.opacity);
+      cloned[at]?.style.setProperty("transform", drawn.transform);
+    });
   for (const inner of [copy, ...copy.querySelectorAll<HTMLElement>("*")]) inner.style.setProperty("animation", "none");
   if (part.hasAttribute("data-dock") && !part.hasAttribute("data-alone")) copy.style.background = "var(--color-plate)";
 }
@@ -121,8 +133,7 @@ export function copyOf(among = "[data-exit]"): HTMLElement | undefined {
 }
 
 /** A fading ghost of each `[data-exit]` part in sight (or each of `among`, or the `taken` copy of them, made earlier: as the page stood then;
- * `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun, its clock starting on the first frame it is
- * shown), as its page goes, so the page coming in is not cut in on them. Copied now, shown once the commit is done unless the page `stayed`
+ * `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun, it fades on the compositor), as its page goes, so the page coming in is not cut in on them. Copied now, shown once the commit is done unless the page `stayed`
  * (React's strict second run, in development). Reduced motion: none. */
 export function ghost(
   stayed: () => boolean,
@@ -150,16 +161,15 @@ export function ghost(
         },
       });
     else if (asBlock)
-      requestAnimationFrame(() => {
-        gsap.to(layer, {
-          autoAlpha: 0,
-          duration: 0.5,
-          ease: "power2.out",
-          onComplete: () => {
-            layer.remove();
-          },
+      // On the compositor: it goes on while the main thread is busy with the next page, where a tween on it stalled and cut the fade.
+      layer
+        .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: "ease-out", fill: "forwards" })
+        .finished.then(() => {
+          layer.remove();
+        })
+        .catch(() => {
+          layer.remove();
         });
-      });
     else leavePage(layer, leaving);
   });
 }
