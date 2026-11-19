@@ -2,7 +2,8 @@
 // for the whole cosmos their paths, imports and calls where the file has them.
 import { callersIn } from "@gnoworld/core";
 
-export { COLONY_PHASE, fixedSizeOf, HUB_WORLDS, STATION_WORLDS } from "./stationWorlds.ts";
+export { COLONY_PHASE, fixedSizeOf, STATION_WORLDS } from "./stationWorlds.ts";
+export { HUB_WORLDS } from "./hubWorlds.ts";
 /** A world of the file: what the scene reads of it, its realms' paths, imports and calls for the whole cosmos where the file has them. */
 export interface CosmosWorld {
   readonly id: string;

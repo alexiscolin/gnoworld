@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { layoutOf, type Planet, type Universe } from "./layout.ts";
 import { readFileSync } from "node:fs";
 import { Hubs } from "@gnoworld/schemas";
-import { HUB_WORLDS, STATION_WORLDS } from "./stationWorlds.ts";
+import { inputsOf, worldIds } from "../../tests/tools/pictureInputs.ts";
+import { HUB_WORLDS } from "./hubWorlds.ts";
+import { STATION_WORLDS } from "./stationWorlds.ts";
 
 // A planet of `universe` by its id, which must stand in it; and how far its body reaches from its sun, and starts.
 const planetOf = (universe: Universe, id: string): Planet => {
@@ -80,5 +82,14 @@ describe("the hubs that list no realm", () => {
   it("stand in the universe as a planet, so a page asking for one adds nothing", () => {
     const universe = layoutOf([], [...STATION_WORLDS, ...HUB_WORLDS]);
     for (const { id } of HUB_WORLDS) expect(universe.byId.get(id)?.id).toBe(id);
+  });
+});
+
+// A world's picture is retaken when a file its look is made from changes (the colony's code reads stationWorlds.ts): listing a hub is no
+// change of any look, so the list lives in a file no world's look reads.
+describe("listing a hub", () => {
+  it("is in no file a world's picture is made from", () => {
+    for (const id of worldIds())
+      for (const file of inputsOf(id)) expect(readFileSync(file, "utf8"), `${id}: ${file}`).not.toContain("HUB_WORLDS");
   });
 });
