@@ -255,7 +255,7 @@ describe("the tokens", () => {
 
   // The plate narrows with the window: the video's 808 px at its 1728 px, a floor below (docs/process/decisions.md, the floor chosen), then
   // its air, a step of fill right of its content (D14002).
-  it("set the plate to 808 px at the video's width, narrowing with the window to a floor, plus its air", () => {
+  it("set the plate to 808 px at the video's width, narrowing with the window to a floor", () => {
     const [, floor = "", share = "", cap = ""] =
       /^calc\(clamp\((\d+)px, ([\d.]+)vi, (\d+)px\) \+ var\(--plate-air\)\)$/.exec(value("--plate-w") ?? "") ?? [];
     expect(value("--plate-air")).toBe("var(--space-m)");
