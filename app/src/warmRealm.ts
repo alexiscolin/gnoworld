@@ -42,10 +42,9 @@ export function routeModules(manifest: unknown): string[] {
   return [...new Set(modules)];
 }
 
-// The routes' modules fetched and run, one at a time, in the idle time: the first visit of a route found its code to fetch and run after the click,
-// up to 11 s on a software GPU, where the click's flight draws meanwhile (a link's `modulepreload` alone left the running to the click: 1.5 s
-// there). A module script of the manifest's own URL is the one the router asks: the browser's module map runs it once. (Not `import()`: its
-// module is no plain name, which the lint's walls read, D123.)
+// The routes' modules fetched and run one at a time in idle time: a route's first visit ran its code after the click (up to 11 s on a software
+// GPU; a link's `modulepreload` still left the running to the click, 1.5 s). A module script of the manifest's own URL is the one the router
+// asks, run once by the module map; not `import()`, whose module is no plain name the lint's walls read (D123).
 let routed = false;
 function warmRoutes(): void {
   if (routed || matchMedia(PHONE_QUERY).matches) return;
