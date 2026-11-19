@@ -78,6 +78,7 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
   };
   const freeSoon = () => {
     sleeper ??= setTimeout(() => {
+      sleeper = undefined;
       beat.free();
     }, FREE_MS);
   };

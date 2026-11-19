@@ -269,6 +269,17 @@ describe("loop", () => {
     expect(again.log.freed).toBe(0);
   });
 
+  it("arms the timer again when the page hides again after it freed", () => {
+    const l = make();
+    l.frame(1000);
+    l.state.unseen = true;
+    l.page.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(10_500);
+    l.page.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(10_500);
+    expect(l.log.freed).toBe(2);
+  });
+
   it("holds ambient frames to their gap, and takes a full one at once", () => {
     const l = make();
     l.state.need = "ambient";
@@ -288,6 +299,8 @@ describe("loop", () => {
     l.state.nap = 2000;
     l.frame(1000);
     l.state.unseen = true;
+    l.page.dispatchEvent(new Event("visibilitychange"));
+    expect(vi.getTimerCount()).toBe(2); // the nap and the free
     l.leaving.abort();
     expect([l.page.live, l.window.live, l.canvas.live]).toEqual([0, 0, 0]);
     expect(vi.getTimerCount()).toBe(0);

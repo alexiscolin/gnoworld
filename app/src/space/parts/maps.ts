@@ -55,6 +55,8 @@ export class Maps {
   readonly #full: Late<FullEarth> = { asked: false };
   readonly #relief: Late<ReliefMaps> = { asked: false };
   #earth: EarthMaps | undefined;
+  // Whether the screen is a small one, read once: a frame asks for the full set each time it is held.
+  #small: boolean | undefined;
   #earthAsked = false;
   #ahead = false;
   // The page's own maps still on their way: the other worlds' wait for them, so they never share the link with them.
@@ -117,7 +119,7 @@ export class Maps {
   /** The Earth's full-size maps, once they came. */
   fullEarth(): FullEarth | undefined {
     // What sharpens the Earth is asked on any link but a data saver's: a browser calling Wi-Fi "3g" must not keep it at half size.
-    return this.#late(this.#full, loadFullEarth, () => savesData() || smallScreen());
+    return this.#late(this.#full, loadFullEarth, () => savesData() || (this.#small ??= smallScreen()));
   }
 
   /** The Earth's and the Moon's height, once it came. */

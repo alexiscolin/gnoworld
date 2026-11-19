@@ -65,16 +65,27 @@ describe("Maps priority", () => {
   });
 });
 
-// What the screen is: its short side in page pixels, its pixel ratio, and whether its pointer is a finger.
-const screenIs = (side: number, ratio = 1, coarse = false) => {
-  vi.stubGlobal("screen", { width: side, height: side + 400 });
+// What the screen is: its width and height in page pixels (the short side by default a phone's 400 less), its pixel ratio, and whether
+// its pointer is a finger.
+const screenIs = ({
+  width,
+  height = width + 400,
+  ratio = 1,
+  coarse = false,
+}: {
+  width: number;
+  height?: number | undefined;
+  ratio?: number;
+  coarse?: boolean;
+}) => {
+  vi.stubGlobal("screen", { width, height });
   vi.stubGlobal("devicePixelRatio", ratio);
   vi.stubGlobal("matchMedia", () => ({ matches: coarse }));
 };
 
 describe("the Earth's full-size maps", () => {
   beforeEach(() => {
-    screenIs(1440);
+    screenIs({ width: 1440 });
   });
   const asks = async (connection: object) => {
     vi.stubGlobal("navigator", { connection });
@@ -171,13 +182,29 @@ describe("the Earth's full-size maps", () => {
     { name: "the edge, 651 drawn pixels", side: 651, ratio: 1, coarse: true, asks: [0, 1] },
     { name: "one pixel past it, 653", side: 653, ratio: 1, coarse: true, asks: [1, 1] },
     { name: "an iPad (768 px)", side: 768, ratio: 2, coarse: true, asks: [1, 1] },
+    { name: "a phone at ratio 3: the touch cap holds it at 1", side: 430, ratio: 3, coarse: true, asks: [0, 1] },
+    { name: "the same screen with a mouse: 860 drawn pixels", side: 430, ratio: 3, coarse: false, asks: [1, 1] },
+    { name: "a phone on its side (932 x 430)", side: 932, height: 430, ratio: 1, coarse: true, asks: [0, 1] },
     { name: "a desktop window screen (1440 px)", side: 1440, ratio: 2, coarse: false, asks: [1, 1] },
-  ])("$name: the full set and the relief are asked as $asks", async ({ side, ratio, coarse, asks }) => {
-    screenIs(side, ratio, coarse);
+  ])("$name: the full set and the relief are asked as $asks", async ({ side, height, ratio, coarse, asks }) => {
+    screenIs({ width: side, height, ratio, coarse });
     expect(
       await asked((maps) => {
         maps.earthAhead();
       }),
     ).toEqual(asks);
+  });
+
+  it("reads the screen once, not at each frame that asks for the full set", async () => {
+    const reads = vi.fn(() => ({ matches: true }));
+    screenIs({ width: 430, coarse: true });
+    vi.stubGlobal("matchMedia", reads);
+    vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
+    const maps = new Maps("/");
+    maps.earth();
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    for (let frame = 0; frame < 5; frame += 1) maps.fullEarth();
+    expect(reads).toHaveBeenCalledTimes(1);
   });
 });
