@@ -30,11 +30,14 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 - **The owner** approves each slice's plan, reviews blind first, merges into `main` on GitHub, pushes a change of
   `.github/workflows` himself, and accepts or refuses each rule the dream proposes. The agent publishes its own
   `agent/**` branches and their pull requests in his name, through agent-pr (D14012, D14013): it runs outside the sandbox as
-  the project's one other excluded command, `~/.local/bin/agent-pr *`, with his `gh` login's token, which its installer takes
-  from `gh auth token` into `~/.local/share/agent-github/token`, kept from every command and file tool by the project's own
-  settings; its guard hook (`tools/agent-github/agent_pr_guard.py`) takes a call in one form, and the skill
-  (`.claude/skills/agent-github/SKILL.md`) says it. Nothing is written into a Claude profile (D14000 C). `land`, the owner's
-  command for a pull request, stays till 14a-2 removes it (D14014).
+  the project's one other excluded command, `~/.local/bin/agent-pr *`, and asks his `gh` login for his token at each call
+  (`gh auth token --hostname github.com`, as him, from his home); no copy is kept, and its installer removes one an earlier
+  install wrote. gh keeps that token in the Keychain by default, which the sandbox reaches (D13159): the owner keeps it in
+  `~/.config/gh` instead (`gh auth login --insecure-storage`), which the sandbox denies. Its guard hook
+  (`tools/agent-github/agent_pr_guard.py`) takes a call in one form, and lets every call through on a machine where agent-pr is
+  not installed, since nothing can leave the sandbox through it there; the skill (`.claude/skills/agent-github/SKILL.md`) says
+  how to call it. Nothing is written into a Claude profile (D14000 C). `land`, the owner's command for a pull request, stays till
+  14a-2 removes it (D14014).
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its own range of finding numbers
   (so two branches side by side never take the same ones), makes its worktree and brief, opens its session through a script that opens a terminal pane,
@@ -152,7 +155,7 @@ PATH, as any version manager puts it there; check.sh and the evals take nvm's de
 elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed. So a
 series built in a scratch clone under the temp folder, whose `.git/hooks` the sandbox writes, gets no verdict there (D13407, F13415): its
 product commits are committed in the worktree with the clone's dates (the same hashes) and check.sh runs on that committed tree; a
-harness series, which only `land` puts on GitHub, runs check.sh's lanes by hand in the clone before its land: the paths
+harness series, which agent-pr or, till 14a-2, `land` puts on GitHub, runs check.sh's lanes by hand in the clone before its land: the paths
 `scripts/related.py` gives for its changed files through Vitest's `related` command, the lint job's steps, its sections.
 It records nothing: no hook reads a record (D13173). No commit's gate walks a journey: a session
 that writes or changes one runs that spec itself before committing (`node app/node_modules/@playwright/test/cli.js test -c

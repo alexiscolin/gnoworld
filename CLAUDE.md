@@ -9,9 +9,9 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 ## Hard rules
 
 - Never add `Co-Authored-By`, "Generated with" or any other attribution line to commits or pull requests (`commit-msg` refuses them).
-- Never push to main, push a tag, force a push, publish or deploy to a public network unless asked in the current conversation. The
-  agent publishes its own `agent/**` branches and their pull requests in Alexis's name, through agent-pr alone
-  (`.claude/skills/agent-github`, D14012, D14013); a change of `.github/workflows` stays his to push. Never `--no-verify`.
+- Never push, publish or deploy to a public network unless asked in the current conversation, but the agent's own `agent/**`
+  branches and their pull requests, which it publishes in Alexis's name through agent-pr alone (`.claude/skills/agent-github`,
+  D14012, D14013): never main, a tag, a forced push or a change of `.github/workflows`, which stays his. Never `--no-verify`.
 - Code, comments, commits and docs are in English, whatever the conversation's language; how to talk to each person is in their
   `CLAUDE.local.md`, never committed.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
