@@ -7,7 +7,7 @@ const log = vi.hoisted(() => ({ calls: [] as string[], goes: [] as Place[], flie
 const made = vi.hoisted(() => ({ events: undefined as undefined | Record<string, (id?: string) => void> }));
 const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), landTags: vi.fn(), waitTags: vi.fn(), endArrival: vi.fn() }));
 vi.mock("./arrival.ts", () => arrival);
-const rise = vi.hoisted(() => ({ ghost: vi.fn(), copyOf: vi.fn() }));
+const rise = vi.hoisted(() => ({ ghost: vi.fn(), copyOf: vi.fn(), fadeAway: vi.fn() }));
 vi.mock("./rise.ts", () => rise);
 vi.mock("./moonRooms.ts", () => ({ feedMoons: () => undefined, stopMoons: () => undefined }));
 vi.mock("../../space/scene.ts", () => ({
@@ -148,83 +148,67 @@ describe("the flight on the click", () => {
     expect(log.calls).toEqual(["hold none"]);
   });
 
-  // The leaving plate fades on the leave clock (a copy, rise.ts), before the page's box is hidden: never cut out in one frame, the dock with it.
-  it("fades the leaving page's plate and dock, never the cosmos's own parts, before hiding them", async () => {
-    await started();
+  const globe = () => {
     const box = document.createElement("div");
     box.dataset["globe"] = "";
     document.body.append(box);
-    rise.ghost.mockImplementationOnce(() => {
-      expect(box.dataset["flown"]).toBeUndefined();
-    });
+    return box;
+  };
+
+  // The leaving plate (and dock) is a copy that fades as one block, never cut out in a frame; a label's click, which no capture listener saw,
+  // makes it at the flight; the real parts are hidden by the box's flying mark.
+  it("shows the page's copy at a label's click and fades it away, then ends the page's arrival", async () => {
+    await started();
+    const box = globe();
+    const copy = document.createElement("div");
+    rise.copyOf.mockReturnValueOnce(copy);
     made.events?.["world"]?.("bubble");
-    expect(rise.ghost).toHaveBeenCalledTimes(1);
-    const [stayed, how] = rise.ghost.mock.calls[0] as [() => boolean, { among: string; asBlock: boolean }];
-    expect(stayed()).toBe(false);
-    expect(how.among).toBe("[data-exit]:not([data-clear], nav)");
-    expect(how.asBlock).toBe(true);
-    // The copy is taken as the page stands on screen; then its own arrival ends (it would reveal the parts still hidden into the copy, and
-    // set the real dock visible through the flight).
-    expect(arrival.endArrival).toHaveBeenCalledTimes(1);
-    expect(arrival.endArrival.mock.invocationCallOrder[0]).toBeGreaterThan(
-      rise.ghost.mock.invocationCallOrder[0] ?? Infinity,
-    );
+    expect(rise.copyOf).toHaveBeenCalledWith("[data-exit]:not([data-clear], nav)");
+    expect(document.body.contains(copy)).toBe(true);
     expect(box.dataset["flown"]).toBe("flying");
+    expect(rise.fadeAway).toHaveBeenCalledWith(copy);
+    expect(arrival.endArrival).toHaveBeenCalledTimes(1);
     box.remove();
+    copy.remove();
   });
 
-  // A cold load's first second: the router's own listener swaps the prerendered content on the click, so the copy is taken before it.
-  it("takes the page's copy in the capture phase of a link's click, before the router's, and shows it", async () => {
+  // A cold load's first second: the router's own listener swaps the prerendered content on the click, and the live page keeps arriving until
+  // the copy shows: the copy is shown, and the live parts hidden, in the click's capture phase, in its task.
+  it("shows the copy and hides the live parts in the capture phase of a link's click, before the router's", async () => {
     await started();
+    const box = globe();
     const copy = document.createElement("div");
     const order: string[] = [];
     rise.copyOf.mockImplementationOnce(() => {
       order.push("copy");
       return copy;
     });
-    const router = (event: Event) => {
-      order.push("router");
-      event.preventDefault();
-    };
     const link = Object.assign(document.createElement("a"), { href: "/w/bubble" });
-    link.addEventListener("click", router);
+    link.addEventListener("click", (event) => {
+      order.push(`router, copy shown ${String(document.body.contains(copy))}, ${String(box.dataset["flown"])}`);
+      event.preventDefault();
+    });
     document.body.append(link);
     link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    expect(order).toEqual(["copy", "router, copy shown true, flying"]);
+    expect(rise.fadeAway).toHaveBeenCalledTimes(1);
+    expect(rise.fadeAway).toHaveBeenCalledWith(copy);
     link.remove();
-    expect(order).toEqual(["copy", "router"]);
-    expect(rise.ghost.mock.calls[0]?.[1]).toMatchObject({ taken: copy });
+    box.remove();
+    copy.remove();
   });
 
-  it("drops the copy of a click the router did not take, and of any other: a later flight takes its own", async () => {
+  it("drops the copy of a click the router did not take, and the live parts come back as they were", async () => {
     await started();
-    rise.copyOf.mockReturnValueOnce(document.createElement("div"));
+    const box = globe();
+    box.dataset["flown"] = "landed";
+    const copy = document.createElement("div");
+    rise.copyOf.mockReturnValueOnce(copy);
     click("/w/bubble", { taken: false });
-    expect(rise.copyOf).toHaveBeenCalledTimes(1);
-    made.events?.["world"]?.("bubble");
-    expect(rise.ghost.mock.calls[0]?.[1]).toMatchObject({ taken: undefined });
-  });
-
-  // Until the copy shows, nothing of the leaving page goes on arriving under it: its CSS animations stop where they are drawn.
-  it("pauses what the leaving page still animates, its own parts alone", async () => {
-    await started();
-    const pause = vi.fn();
-    const other = vi.fn();
-    const part = document.createElement("div");
-    part.setAttribute("data-exit", "");
-    const outside = document.createElement("div");
-    document.body.append(part, outside);
-    Object.defineProperty(Element.prototype, "getAnimations", {
-      configurable: true,
-      value(this: Element) {
-        return [{ pause: this === part ? pause : other }];
-      },
-    });
-    made.events?.["world"]?.("bubble");
-    Reflect.deleteProperty(Element.prototype, "getAnimations");
-    expect(pause).toHaveBeenCalledTimes(1);
-    expect(other).not.toHaveBeenCalled();
-    part.remove();
-    outside.remove();
+    expect(rise.fadeAway).not.toHaveBeenCalled();
+    expect(document.body.contains(copy)).toBe(false);
+    expect(box.dataset["flown"]).toBe("landed");
+    box.remove();
   });
 
   it("holds the plate's arrival and the tags' landing for the page, and gives them as the page is shown", async () => {

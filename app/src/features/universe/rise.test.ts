@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { gsap } from "gsap";
 import { afterEach, expect, it, vi } from "vitest";
-import { copyOf, ghost, holdChrome, riseChrome } from "./rise.ts";
+import { copyOf, fadeAway, holdChrome, riseChrome } from "./rise.ts";
 
 const still = vi.hoisted(() => ({ on: false }));
 vi.mock("../../space/motion.ts", () => ({
@@ -84,9 +84,10 @@ it("moves nothing at all under reduced motion", () => {
   expect(gsap.globalTimeline.getChildren()).toHaveLength(0);
 });
 
-// A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole, none of its parts on a clock of its own
-// (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the plate's fill.
-it("fades the departure's copy as one layer, no part animated alone, the dock's copy over the plate's fill", async () => {
+// A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole on the compositor, none of its parts on a
+// clock of its own (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the
+// plate's fill, and no CSS animation runs in a copy.
+it("fades a copy as one layer on the compositor, no part animated alone, the dock's copy over the plate's fill", async () => {
   const part = (attributes: string[]) => {
     const box = document.body.appendChild(document.createElement("div"));
     for (const name of attributes) box.setAttribute(name, "");
@@ -96,23 +97,20 @@ it("fades the departure's copy as one layer, no part animated alone, the dock's 
   part(["data-exit"]);
   part(["data-exit", "data-dock"]);
   const set = vi.spyOn(CSSStyleDeclaration.prototype, "setProperty");
-  // The copy is taken as the page stands at the click; the page changes after it; the copy shown is the one taken.
-  const taken = copyOf("[data-exit]");
-  if (taken === undefined) throw new Error("no copy taken");
+  const layer = copyOf("[data-exit]");
+  if (layer === undefined) throw new Error("no copy taken");
+  // The copy is taken as the page stands; the page changes after it; the copy is the one taken.
   document.body.querySelector("h1")?.remove();
-  expect(taken.parentElement).toBeNull();
-  // The fade runs on the compositor (Web Animations), none on a tween of the main thread's, which a busy page stalls.
+  expect(layer.parentElement).toBeNull();
   let end: () => void = () => undefined;
   const animate = vi.fn(() => ({ finished: new Promise<void>((done) => (end = done)) }));
-  taken.animate = animate as unknown as typeof taken.animate;
-  ghost(() => false, { asBlock: true, taken });
-  await Promise.resolve();
+  layer.animate = animate as unknown as typeof layer.animate;
+  document.body.append(layer);
+  fadeAway(layer);
   expect(animate).toHaveBeenCalledTimes(1);
   expect(animate.mock.calls[0]).toMatchObject([[{ opacity: 1 }, { opacity: 0 }], { duration: 500 }]);
-  expect(gsap.getTweensOf(taken)).toHaveLength(0);
-  const layer = taken;
+  expect(gsap.getTweensOf(layer)).toHaveLength(0);
   for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
-  // A clone restarts its CSS animations (a card's rise, opacity 0 till it ends): none runs in a copy.
   // (jsdom keeps no `animation` property: the calls are read.)
   expect(set.mock.calls.filter(([name, value]) => name === "animation" && value === "none")).toHaveLength(6);
   set.mockRestore();
@@ -122,7 +120,6 @@ it("fades the departure's copy as one layer, no part animated alone, the dock's 
   await Promise.resolve();
   await Promise.resolve();
   expect(document.querySelector("[data-ghost]")).toBeNull();
-  vi.unstubAllGlobals();
 });
 
 // A card mid its CSS rise (opacity 0 through its delay) stands in the copy as it is drawn at the click, never landed at its end state.

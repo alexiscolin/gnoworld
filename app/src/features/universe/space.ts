@@ -91,9 +91,7 @@ function start(): void {
   // leaves first, as it starts.
   const unlisten = listenClicks(
     () => worldsOf,
-    (place) => {
-      depart(space, asked, place);
-    },
+    (place) => depart(space, asked, place),
   );
   const leave = () => {
     unlisten();

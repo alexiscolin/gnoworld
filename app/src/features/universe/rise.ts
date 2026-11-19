@@ -135,20 +135,25 @@ export function copyOf(among = "[data-exit]"): HTMLElement | undefined {
   return layer;
 }
 
-/** A fading ghost of each `[data-exit]` part in sight (or each of `among`, or the `taken` copy of them, made earlier: as the page stood then;
- * `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun, it fades on the compositor), as its page goes, so the page coming in is not cut in on them. Copied now, shown once the commit is done unless the page `stayed`
- * (React's strict second run, in development). Reduced motion: none. */
-export function ghost(
-  stayed: () => boolean,
-  {
-    among = "[data-exit]",
-    asBlock = false,
-    taken,
-  }: { among?: string; asBlock?: boolean; taken?: HTMLElement | undefined } = {},
-): void {
+/** The copy `layer`, shown, fades away as one block, on the compositor: it goes on while the main thread is busy with the next page, where a
+ * tween on it stalled and cut the fade. */
+export function fadeAway(layer: HTMLElement): void {
+  layer
+    .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: "ease-out", fill: "forwards" })
+    .finished.then(() => {
+      layer.remove();
+    })
+    .catch(() => {
+      layer.remove();
+    });
+}
+
+/** A fading ghost of each `[data-exit]` part in sight (or each of `among`), as its page goes, so the page coming in is not cut in on them.
+ * Copied now, shown once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
+export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
   // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
   const leaving = pageNow();
-  const layer = taken ?? copyOf(among);
+  const layer = copyOf(among);
   if (layer === undefined) return;
   queueMicrotask(() => {
     if (stayed()) return;
@@ -163,16 +168,6 @@ export function ghost(
           layer.remove();
         },
       });
-    else if (asBlock)
-      // On the compositor: it goes on while the main thread is busy with the next page, where a tween on it stalled and cut the fade.
-      layer
-        .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: "ease-out", fill: "forwards" })
-        .finished.then(() => {
-          layer.remove();
-        })
-        .catch(() => {
-          layer.remove();
-        });
     else leavePage(layer, leaving);
   });
 }

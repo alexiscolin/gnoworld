@@ -7,21 +7,40 @@ import type { Space } from "../../space/scene.ts";
 import { landTags } from "./arrival.ts";
 import { markFlown } from "./flown.ts";
 import { endArrival } from "./arrival.ts";
-import { copyOf, ghost } from "./rise.ts";
+import { copyOf, fadeAway } from "./rise.ts";
 
 const LEAVING = "[data-exit]:not([data-clear], nav)";
-// The page as it stood at a click on a link, taken before React's own listener fills in what that click renders (a cold load's first second
-// swaps the prerendered content then): the copy is what the reader saw. Kept for the click's bubbling listener to use, or drop.
-let taken: HTMLElement | undefined;
+// The page's copy as it stood at a click on a link, taken, shown and the live parts hidden in that click's own task, before React's listener fills
+// in what the click renders and before any paint: nothing of the live page shows or arrives between the click and the copy's fade. Kept for the
+// click's bubbling listener to fade, or to drop where the router did not take the link; `flown` is the box's state it hid from.
+let taken: { readonly layer: HTMLElement; readonly flown: string | undefined } | undefined;
 
 // The flight that left, and whether it neared or landed before its page was shown.
 let ahead: { readonly place: Place; near: boolean; landed: boolean } | undefined;
 
-// What the live page still animates (a card's rise) stops where it is drawn, as the copy took it: until the copy shows, nothing arrives.
-function pauseLeaving(): void {
-  for (const part of document.querySelectorAll(LEAVING))
-    if (typeof part.getAnimations === "function")
-      for (const each of part.getAnimations({ subtree: true })) each.pause();
+// The copy, shown over the live parts, which it hides (the flight's mark, globe.module.css); none under reduced motion or with no part in sight.
+function show(): typeof taken {
+  const layer = copyOf(LEAVING);
+  if (layer === undefined) return undefined;
+  const flown = document.querySelector<HTMLElement>("[data-globe]")?.dataset["flown"];
+  document.body.append(layer);
+  markFlown(true);
+  return { layer, flown };
+}
+
+// The copy fades away as the flight begins; one not taken at the click (a label's) is made now.
+function fadeOut(): void {
+  const copy = taken ?? show();
+  taken = undefined;
+  if (copy !== undefined) fadeAway(copy.layer);
+}
+
+// A click the router did not take, or a flight that did not leave: the copy goes and the live parts come back as they were.
+function drop(): void {
+  if (taken === undefined) return;
+  taken.layer.remove();
+  markFlown(taken.flown === "flying");
+  taken = undefined;
 }
 
 /** The flight to `place` leaves now, on the click that asks its page: the camera goes to the planet where the scene holds it, and to the page's
@@ -35,20 +54,19 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   // the flight's events: they reach it as any flight's, and a wait for another page is over.
   if (asked !== undefined && sameAs(asked, place)) {
     ahead = undefined;
-    if (space.go(place)) markFlown(true);
-    return false;
+    if (!space.go(place)) return false;
+    fadeOut();
+    markFlown(true);
+    return true;
   }
   if (!space.go(place)) return false;
   ahead = { place, near: false, landed: false };
   space.hold(undefined);
-  // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades on the leave clock, never cut out in a
-  // frame, the chat dock's with it (it opens again with the destination's, as the arrival plays); not the cosmos's own parts, which stay
-  // through a flight (arrival.ts RISING).
-  ghost(() => false, { among: LEAVING, asBlock: true, taken });
-  taken = undefined;
-  // The copy is taken (what is on screen, parts still hidden left out); only then the page's own arrival ends: it would reveal them.
+  // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades, never cut out in a frame, the chat
+  // dock's with it (it opens again with the destination's, as the arrival plays); not the cosmos's own parts, which stay through a flight
+  // (arrival.ts RISING). Then the page's own arrival ends, which would reveal what is still hidden.
+  fadeOut();
   endArrival();
-  pauseLeaving();
   markFlown(true);
   return true;
 }
@@ -95,16 +113,17 @@ function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, string>): P
   return world === undefined ? undefined : { kind: "world", id: world };
 }
 
-/** Listens to the document's clicks: in the capture phase, before the router's, the page's copy is taken at a click that may be a link's; in the
- * bubbling phase, once the router has taken it, `leave` is given the place it goes to, or the copy is dropped. What it returns stops both. */
-export function listenClicks(worlds: () => ReadonlyMap<string, string>, leave: (place: Place) => void): () => void {
+/** Listens to the document's clicks: in the capture phase, before the router's, the page's copy is taken and shown at a click that may be a link's;
+ * in the bubbling phase, once the router has taken it, `leave` is given the place it goes to and says whether a flight left, else the copy is
+ * dropped. What it returns stops both. */
+export function listenClicks(worlds: () => ReadonlyMap<string, string>, leave: (place: Place) => boolean): () => void {
   const before = (event: MouseEvent): void => {
-    taken = event.target instanceof Element && event.target.closest("a[href]") !== null ? copyOf(LEAVING) : undefined;
+    drop();
+    if (event.target instanceof Element && event.target.closest("a[href]") !== null) taken = show();
   };
   const after = (event: MouseEvent): void => {
     const place = placeOfClick(event, worlds());
-    if (place !== undefined) leave(place);
-    taken = undefined;
+    if (place === undefined || !leave(place)) drop();
   };
   document.addEventListener("click", before, true);
   document.addEventListener("click", after);
