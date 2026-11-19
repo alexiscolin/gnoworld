@@ -1,14 +1,15 @@
 // What a line is to its reader: a notice, which the page tells the account of and counts unseen, or
 // none. An account's alone, in a room it follows or in a direct message; never its own line, a NOTICE (a bot's or a
 // server's) or an edit, a line already counted when it came. One notice a line, in this order: a mention of the account,
-// a reply to one of its lines, a mention of the whole room where that counts.
+// a reply in a thread it started or answered in, a mention of the whole room where that counts.
 import { fold } from "./fold.ts";
 import type { NoticeMode } from "./noticeModes.ts";
 import { markdown } from "../markdown/markdown.ts";
 import { mentions, mentionsRoom } from "../markdown/mentions.ts";
 import type { Line } from "./room.ts";
+import { threadsOf } from "./threads.ts";
 
-/** What a line is to its reader: a mention of them, a mention of the whole room, a reply to them, a direct message. */
+/** What a line is to its reader: a mention of them, a mention of the whole room, a reply in their thread, a direct message. */
 type NoticeKind = "mention" | "group" | "reply" | "dm";
 
 export interface Notice {
@@ -48,8 +49,14 @@ const made = (line: Line, kind: NoticeKind, where: string): Notice => ({
 const quiet = (line: Line, mode: NoticeMode, me: string): boolean =>
   mode === "none" || line.kind === "notice" || line.edits !== undefined || line.account === me;
 
-const repliesTo = (line: Line, held: readonly Line[], me: string): boolean =>
-  line.reply !== undefined && held.some((each) => each.id === line.reply && each.account === me);
+// A reply in a thread the reader is in: the line it answers, or the root and every reply of that line's thread (threads.ts), holds
+// one of theirs. Read only for a line that replies, against the room's lines held.
+function repliesTo(line: Line, held: readonly Line[], me: string): boolean {
+  if (line.reply === undefined) return false;
+  const { rootOf } = threadsOf(held);
+  const root = rootOf.get(line.reply) ?? line.reply;
+  return held.some((each) => each.account === me && (each.id === root || rootOf.get(each.id) === root));
+}
 
 /** Whether a text may mention anyone: most lines hold no @, and need no parsing. */
 export const hasAt = (text: string): boolean => text.includes("@") || fold(text).includes("@");

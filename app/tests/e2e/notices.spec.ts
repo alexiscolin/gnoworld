@@ -143,7 +143,7 @@ test.describe("notifications", () => {
       .ergo()
       .send(`@msgid=r1;time=${T(31)};account=${MEMBER};+reply=a1 :${MEMBER}!u@h PRIVMSG #bubble/games :agreed`);
     await expect(rowOf(page, "games")).toContainText("1 unread");
-    await expect(roomsNav(page).getByRole("link", { name: `${SHORT} replied to you #games` })).toBeVisible();
+    await expect(roomsNav(page).getByRole("link", { name: `${SHORT} replied in your thread #games` })).toBeVisible();
     await tab(page, "show");
     await expect(page).toHaveTitle(BASE);
   });

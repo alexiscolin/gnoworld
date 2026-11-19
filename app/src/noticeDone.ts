@@ -5,7 +5,7 @@ import type { Notice } from "@gnoworld/core";
 const WORDS = {
   mention: "mentioned you",
   group: "mentioned the room",
-  reply: "replied to you",
+  reply: "replied in your thread",
   dm: "wrote to you",
 } as const;
 
