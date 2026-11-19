@@ -16,6 +16,8 @@ export class Upkeep {
   plated: Plated | undefined;
   /** Whether the flight that runs, if one does, is the framing's own, which no page waits on. */
   unheard = false;
+  /** Whether a framing turned under a cover, and its flight is owed to the next hold in sight. */
+  owed = false;
   /** Asks the loop for a frame where it sleeps; a no-op while it is awake. Set once the loop runs, and never touches back. */
   wake: () => void = () => undefined;
 

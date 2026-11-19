@@ -1,7 +1,9 @@
 // The reader's hand on a generated world: a drag turns the planet about its middle, round the screen's up and right, the camera and the
 // sun staying. The turn is a layer on top of the planet's own spin, which never stops: it is kept, never eased back. It follows the pointer
-// one to one (a surface's point moves as far as the pointer), and carries on after the release with the view's inertia (rig/free.ts).
+// to the pointer (a surface's point moves as far as the pointer, with the camera's lag, rig/free.ts), and carries on after the release with the view's inertia (rig/free.ts).
+import { damp } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
+import { handTau } from "../rig/free.ts";
 
 // Seconds a turn's speed takes to fall by its e-th: as the camera's turn (rig/free.ts).
 const TAU = 0.32;
@@ -20,12 +22,14 @@ export class Grab {
   readonly #axis = new Vector3();
   readonly #step = new Quaternion();
   #held = false;
+  #lag = 0;
 
-  /** A drag of `dx`, `dy` pixels on a planet `radius` pixels across its half, `seconds` since the last move: it turns at once. */
+  /** A drag of `dx`, `dy` pixels on a planet `radius` pixels across its half, `seconds` since the last move: it turns with the hand's lag. */
   drag({ dx, dy, radius, seconds }: { dx: number; dy: number; radius: number; seconds: number }): void {
     const [x, y] = [dx / radius, dy / radius];
     const over = Math.max(seconds, SHORTEST_S);
     this.#held = true;
+    this.#lag = handTau(seconds);
     this.#asked.x += x;
     this.#asked.y += y;
     this.#speed.x = x / over;
@@ -57,9 +61,12 @@ export class Grab {
   /** `step` seconds on, the view turned as `view`; `still` (reduced motion) has no inertia. */
   advance(seconds: number, view: Quaternion, still: boolean): void {
     const step = Math.min(seconds, LONGEST_S);
-    let x = this.#asked.x;
-    let y = this.#asked.y;
-    this.#asked.x = this.#asked.y = 0;
+    const share = damp(step, this.#lag);
+    let x = this.#asked.x * share;
+    let y = this.#asked.y * share;
+    this.#asked.x -= x;
+    this.#asked.y -= y;
+    if (Math.abs(this.#asked.x) + Math.abs(this.#asked.y) < DONE) this.#asked.x = this.#asked.y = 0;
     if (!this.#held) {
       if (still) this.#speed.x = this.#speed.y = 0;
       const decay = Math.exp(-step / TAU);
