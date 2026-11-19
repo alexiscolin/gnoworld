@@ -1,5 +1,6 @@
 // The generated worlds' maps, shared by every world that names them and kept once loaded (a world's look names a few of a small
 // library), and the Earth's own. A map that fails is asked again after two seconds.
+import { pixelRatioFor } from "@gnoworld/core";
 import type { Texture, WebGLRenderer } from "three";
 import { afterLoad, onLoad } from "../../afterLoad.ts";
 import { fastLink, savesData } from "../../lib/saveData.ts";
@@ -21,6 +22,12 @@ const noop = (): undefined => undefined;
 const WIDTH = 2048;
 const ANISOTROPY = 8;
 const AGAIN_MS = 2000;
+
+/** Whether no disc the screen can show is wider than a 2048 map's sharp one (a texel a pixel up to 2048 / pi = 652): 4096 adds nothing. */
+const smallScreen = (): boolean =>
+  Math.min(screen.width, screen.height) *
+    pixelRatioFor(devicePixelRatio, matchMedia("(pointer: coarse)").matches, "high") <=
+  WIDTH / Math.PI;
 
 /** What is asked late: once the Earth's first maps are in, in the browser's idle time, and never under Low or Save-Data. */
 interface Late<T> {
@@ -48,6 +55,8 @@ export class Maps {
   readonly #full: Late<FullEarth> = { asked: false };
   readonly #relief: Late<ReliefMaps> = { asked: false };
   #earth: EarthMaps | undefined;
+  // Whether the screen is a small one, read once: a frame asks for the full set each time it is held.
+  #small: boolean | undefined;
   #earthAsked = false;
   #ahead = false;
   // The page's own maps still on their way: the other worlds' wait for them, so they never share the link with them.
@@ -110,7 +119,7 @@ export class Maps {
   /** The Earth's full-size maps, once they came. */
   fullEarth(): FullEarth | undefined {
     // What sharpens the Earth is asked on any link but a data saver's: a browser calling Wi-Fi "3g" must not keep it at half size.
-    return this.#late(this.#full, loadFullEarth, savesData);
+    return this.#late(this.#full, loadFullEarth, () => savesData() || (this.#small ??= smallScreen()));
   }
 
   /** The Earth's and the Moon's height, once it came. */

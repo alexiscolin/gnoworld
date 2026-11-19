@@ -76,13 +76,17 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     if (need === "full") changed = now;
     return need;
   };
+  const freeSoon = () => {
+    sleeper ??= setTimeout(() => {
+      sleeper = undefined;
+      beat.free();
+    }, FREE_MS);
+  };
   const run = (now: number): boolean => {
     if (beat.gone()) return false;
     if (beat.unseen()) {
       last = now;
-      sleeper ??= setTimeout(() => {
-        beat.free();
-      }, FREE_MS);
+      freeSoon();
       return false;
     }
     clearTimeout(sleeper);
@@ -116,6 +120,8 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     else keep.wake();
   };
   const change = () => {
+    // A hidden tab runs no frame, which is where the timer is armed otherwise.
+    if (beat.unseen()) freeSoon();
     keep.touch();
   };
   wakeOn(on, { input, change }, signal);
