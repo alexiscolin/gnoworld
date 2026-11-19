@@ -12,7 +12,7 @@ import { feedMoons, stopMoons } from "./moonRooms.ts";
 import { enterPage, landTags } from "./arrival.ts";
 export { drawnYet, onDrawn } from "./drawn.ts";
 import { drew } from "./drawn.ts";
-import { arrive, depart, hold as holdEvent, placeOfClick, waiting } from "./departure.ts";
+import { arrive, depart, hold as holdEvent, listenClicks, waiting } from "./departure.ts";
 import { markDrawn, markFlown, syncFlown } from "./flown.ts";
 
 export { syncFlown };
@@ -82,12 +82,6 @@ const events = {
   },
 };
 
-// A click on a link the router took: the flight to the page's place leaves with it.
-function clicked(event: MouseEvent): void {
-  const place = placeOfClick(event, worldsOf);
-  if (place !== undefined) depart(space, asked, place);
-}
-
 function start(): void {
   if (starting) return;
   starting = true;
@@ -95,9 +89,14 @@ function start(): void {
   // In development a module swapped in takes its canvas and its engine with it: no second universe draws under the new one. A hot reload
   // of an engine file brings this module back without its old instance's dispose (Vite runs the accepting module's alone): that one
   // leaves first, as it starts.
-  document.addEventListener("click", clicked);
+  const unlisten = listenClicks(
+    () => worldsOf,
+    (place) => {
+      depart(space, asked, place);
+    },
+  );
   const leave = () => {
-    document.removeEventListener("click", clicked);
+    unlisten();
     space?.dispose();
     canvas.remove();
     labels.remove();

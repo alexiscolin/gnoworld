@@ -7,7 +7,12 @@ import type { Space } from "../../space/scene.ts";
 import { landTags } from "./arrival.ts";
 import { markFlown } from "./flown.ts";
 import { endArrival } from "./arrival.ts";
-import { ghost } from "./rise.ts";
+import { copyOf, ghost } from "./rise.ts";
+
+const LEAVING = "[data-exit]:not([data-clear], nav)";
+// The page as it stood at a click on a link, taken before React's own listener fills in what that click renders (a cold load's first second
+// swaps the prerendered content then): the copy is what the reader saw. Kept for the click's bubbling listener to use, or drop.
+let taken: HTMLElement | undefined;
 
 // The flight that left, and whether it neared or landed before its page was shown.
 let ahead: { readonly place: Place; near: boolean; landed: boolean } | undefined;
@@ -32,7 +37,8 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades on the leave clock, never cut out in a
   // frame, the chat dock's with it (it opens again with the destination's, as the arrival plays); not the cosmos's own parts, which stay
   // through a flight (arrival.ts RISING).
-  ghost(() => false, "[data-exit]:not([data-clear], nav)", true);
+  ghost(() => false, { among: LEAVING, asBlock: true, taken });
+  taken = undefined;
   // The copy is taken (what is on screen, parts still hidden left out); only then the page's own arrival ends: it would reveal them.
   endArrival();
   markFlown(true);
@@ -70,7 +76,7 @@ const linkOf = (event: MouseEvent): HTMLAnchorElement | undefined => {
 
 /** The place a click on a link the router took (it prevents the default) goes to: the cosmos's own views by their address, a world by its page's
  * path (`worlds`, each page's world); none for a click the router left to the browser, a link out or a page that shows no place. */
-export function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, string>): Place | undefined {
+function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, string>): Place | undefined {
   const path = linkOf(event)?.pathname;
   if (path === undefined) return undefined;
   const at = cosmosAt(path);
@@ -79,4 +85,23 @@ export function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, stri
     return { kind: "system", id: isHome(at.system) ? HOME_SYSTEM : (at.system ?? HOME_SYSTEM) };
   const world = worlds.get(trimmed(path));
   return world === undefined ? undefined : { kind: "world", id: world };
+}
+
+/** Listens to the document's clicks: in the capture phase, before the router's, the page's copy is taken at a click that may be a link's; in the
+ * bubbling phase, once the router has taken it, `leave` is given the place it goes to, or the copy is dropped. What it returns stops both. */
+export function listenClicks(worlds: () => ReadonlyMap<string, string>, leave: (place: Place) => void): () => void {
+  const before = (event: MouseEvent): void => {
+    taken = event.target instanceof Element && event.target.closest("a[href]") !== null ? copyOf(LEAVING) : undefined;
+  };
+  const after = (event: MouseEvent): void => {
+    const place = placeOfClick(event, worlds());
+    if (place !== undefined) leave(place);
+    taken = undefined;
+  };
+  document.addEventListener("click", before, true);
+  document.addEventListener("click", after);
+  return () => {
+    document.removeEventListener("click", before, true);
+    document.removeEventListener("click", after);
+  };
 }

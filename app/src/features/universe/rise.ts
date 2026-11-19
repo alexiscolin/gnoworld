@@ -90,14 +90,12 @@ function carryFill(part: Element, copy: HTMLElement): void {
   if (part.hasAttribute("data-dock") && !part.hasAttribute("data-alone")) copy.style.background = "var(--color-plate)";
 }
 
-/** A fading ghost of each `[data-exit]` part in sight (or each of `among`; `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun), as its page goes, so the page coming in is not cut in on them. Copied now, shown
- * once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
-export function ghost(stayed: () => boolean, among = "[data-exit]", asBlock = false): void {
-  // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
-  const leaving = pageNow();
+/** A copy of each `[data-exit]` part in sight (or each of `among`), in a layer not yet shown: the page as it stands now. None under reduced
+ * motion, or with no part in sight. */
+export function copyOf(among = "[data-exit]"): HTMLElement | undefined {
   const parts = [...document.querySelectorAll(among)].filter((part) => getComputedStyle(part).visibility !== "hidden");
+  if (parts.length === 0 || motionOf().matches) return undefined;
   const layer = document.createElement("div");
-  if (parts.length === 0 || motionOf().matches) return;
   layer.setAttribute("aria-hidden", "true");
   // A ghost is the part's look and nothing else: it takes no pointer, and stands over the scene and the page, under the full chat
   // (ChatScreen.module.css, 3), which grows over it, and the loader.
@@ -119,6 +117,25 @@ export function ghost(stayed: () => boolean, among = "[data-exit]", asBlock = fa
       layer.append(stand);
     }
   }
+  return layer;
+}
+
+/** A fading ghost of each `[data-exit]` part in sight (or each of `among`, or the `taken` copy of them, made earlier: as the page stood then;
+ * `asBlock`: the copy fades as one layer, as a page left by a click whose flight has begun, its clock starting on the first frame it is
+ * shown), as its page goes, so the page coming in is not cut in on them. Copied now, shown once the commit is done unless the page `stayed`
+ * (React's strict second run, in development). Reduced motion: none. */
+export function ghost(
+  stayed: () => boolean,
+  {
+    among = "[data-exit]",
+    asBlock = false,
+    taken,
+  }: { among?: string; asBlock?: boolean; taken?: HTMLElement | undefined } = {},
+): void {
+  // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
+  const leaving = pageNow();
+  const layer = taken ?? copyOf(among);
+  if (layer === undefined) return;
   queueMicrotask(() => {
     if (stayed()) return;
     document.body.append(layer);
@@ -133,13 +150,15 @@ export function ghost(stayed: () => boolean, among = "[data-exit]", asBlock = fa
         },
       });
     else if (asBlock)
-      gsap.to(layer, {
-        autoAlpha: 0,
-        duration: 0.5,
-        ease: "power2.out",
-        onComplete: () => {
-          layer.remove();
-        },
+      requestAnimationFrame(() => {
+        gsap.to(layer, {
+          autoAlpha: 0,
+          duration: 0.5,
+          ease: "power2.out",
+          onComplete: () => {
+            layer.remove();
+          },
+        });
       });
     else leavePage(layer, leaving);
   });

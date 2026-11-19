@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { gsap } from "gsap";
 import { afterEach, expect, it, vi } from "vitest";
-import { ghost, holdChrome, riseChrome } from "./rise.ts";
+import { copyOf, ghost, holdChrome, riseChrome } from "./rise.ts";
 
 const still = vi.hoisted(() => ({ on: false }));
 vi.mock("../../space/motion.ts", () => ({
@@ -86,6 +86,7 @@ it("moves nothing at all under reduced motion", () => {
 
 // A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole, none of its parts on a clock of its own
 // (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the plate's fill.
+const frames: (() => void)[] = [];
 it("fades the departure's copy as one layer, no part animated alone, the dock's copy over the plate's fill", async () => {
   const part = (attributes: string[]) => {
     const box = document.body.appendChild(document.createElement("div"));
@@ -96,10 +97,21 @@ it("fades the departure's copy as one layer, no part animated alone, the dock's 
   part(["data-exit"]);
   part(["data-exit", "data-dock"]);
   const set = vi.spyOn(CSSStyleDeclaration.prototype, "setProperty");
-  ghost(() => false, "[data-exit]", true);
+  // The copy is taken as the page stands at the click; the page changes after it; the copy shown is the one taken.
+  const taken = copyOf("[data-exit]");
+  if (taken === undefined) throw new Error("no copy taken");
+  document.body.querySelector("h1")?.remove();
+  expect(taken.parentElement).toBeNull();
+  vi.stubGlobal("requestAnimationFrame", (run: () => void) => {
+    frames.push(run);
+    return 0;
+  });
+  ghost(() => false, { asBlock: true, taken });
   await Promise.resolve();
-  const layer = [...document.body.children].find((child) => child.querySelector("[data-ghost]") !== null);
-  if (layer === undefined) throw new Error("no copy was shown");
+  // Its clock starts on the first frame after it is shown, never during the click's stall.
+  expect(gsap.getTweensOf(taken)).toHaveLength(0);
+  for (const run of frames.splice(0)) run();
+  const layer = taken;
   expect(gsap.getTweensOf(layer)).toHaveLength(1);
   for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
   // A clone restarts its CSS animations (a card's rise, opacity 0 till it ends): none runs in a copy.
