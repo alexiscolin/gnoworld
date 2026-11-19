@@ -3,7 +3,7 @@
 // the bell and the account's menu, which holds the passport. Drawn once the page wakes: a not-found path is served
 // the page written at /, which must hydrate as the path's own. The bars stay over the full chat, which they open and close.
 import { PHONE_QUERY } from "@gnoworld/core";
-import { Breadcrumb, Chip, Cluster, Logo } from "@gnoworld/ui";
+import { Chip, Cluster, Icon, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { useWoken } from "./features/home/clock.ts";
@@ -123,8 +123,8 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             // patches no attribute (react-dom 19.3.1), and a new link takes the path's own.
             <Fragment key={`${level.view}:${String(woken)}`}>
               {index === 0 ? null : (
-                <span className={styles["chevron"]} aria-hidden="true">
-                  <Breadcrumb.Step />
+                <span className={`trail-step ${styles["chevron"] ?? ""}`} aria-hidden="true">
+                  <Icon name="chevron" size="s" />
                 </span>
               )}
               <LevelLink level={level} current={current} beyond={at !== -1 && index > at} bare={full} />

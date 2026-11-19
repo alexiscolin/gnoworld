@@ -12,10 +12,10 @@ export interface BreadcrumbProps {
 }
 
 /** The chevron between two steps of a trail, the design system's icon turned to point on: the breadcrumb's, and the header's between its
- * views, never a text character. */
+ * views (the `trail-step` utility), never a text character. */
 function Step() {
   return (
-    <span className={styles["step"]} aria-hidden="true">
+    <span className="trail-step" aria-hidden="true">
       <Icon name="chevron" size="s" />
     </span>
   );
@@ -51,5 +51,3 @@ export function Breadcrumb({ label, items }: BreadcrumbProps) {
     </nav>
   );
 }
-
-Breadcrumb.Step = Step;
