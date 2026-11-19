@@ -85,6 +85,8 @@ MUTANTS = [
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
     (G, [("except Exception:  # what it cannot read", "except ZeroDivisionError:  # what it cannot read")], "the guard: what it cannot read is refused"),
     (G, [("    if not isinstance(tool, str):\n", "    if False:\n")], "the guard: a tool it cannot name is refused"),
+    (G, [('NAMED = rf"(?:{re.escape(helper)}|~/\\.local/bin/agent-pr)"', 'NAMED = rf"(?:{re.escape(helper)})"')], "the guard: the helper from the session's home"),
+    (G, [('|~/\\.local/bin/agent-pr)"', '|~[^/ ]*/\\.local/bin/agent-pr)"')], "the guard: the session's own home alone, never ~user"),
 ]
 survived = []
 # python3 -I mutants.py [<words of a label>...]: those mutants alone.

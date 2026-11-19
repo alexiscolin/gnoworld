@@ -418,7 +418,9 @@ refuses() { guard "$1"; [ $? = 2 ]; }
 nl='
 ' # a trailing newline, which a command substitution would strip
 bash_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
-for P in "$H"; do
+# The helper is written with its absolute path, or from the session's own home, as the project's settings name it (D14000 C): both
+# forms take the same calls, and refuse the same ones.
+for P in "$H" "~/.local/bin/agent-pr"; do
 	for ok in "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$P push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
 		"$P open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md"; do
 		guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
@@ -434,8 +436,13 @@ for P in "$H"; do
 		refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
 	done
 done
-for bad in "cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'" \
-	"~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\$HOME/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle"; do
+# Only the session's own home: never another user's, the shell's own folders, a quoted or escaped tilde, a variable, or a folder below.
+for bad in "~root/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "~+/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"~-/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "./~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"'~/.local/bin/agent-pr' push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\"~/.local/bin/agent-pr\" push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"\\~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\$HOME/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"\${HOME}/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "~/x/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'"; do
 	refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
 done
 for ok in "git status" "ls tools/agent-github"; do
