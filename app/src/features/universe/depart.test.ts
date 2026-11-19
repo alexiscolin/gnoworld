@@ -148,8 +148,8 @@ describe("the flight on the click", () => {
     expect(log.calls).toEqual(["hold none"]);
   });
 
-  // The leaving plate fades on the leave clock (a copy, rise.ts), before the page's box is hidden: never cut out in one frame; the dock stays.
-  it("fades the leaving page's plate, never its dock or the cosmos's own parts, before hiding it", async () => {
+  // The leaving plate fades on the leave clock (a copy, rise.ts), before the page's box is hidden: never cut out in one frame, the dock with it.
+  it("fades the leaving page's plate and dock, never the cosmos's own parts, before hiding them", async () => {
     await started();
     const box = document.createElement("div");
     box.dataset["globe"] = "";
@@ -161,7 +161,7 @@ describe("the flight on the click", () => {
     expect(rise.ghost).toHaveBeenCalledTimes(1);
     const [stayed, among] = rise.ghost.mock.calls[0] as [() => boolean, string];
     expect(stayed()).toBe(false);
-    expect(among).toBe("[data-exit]:not([data-dock], [data-clear], nav)");
+    expect(among).toBe("[data-exit]:not([data-clear], nav)");
     expect(box.dataset["flown"]).toBe("flying");
     box.remove();
   });

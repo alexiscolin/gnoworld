@@ -29,8 +29,9 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   ahead = { place, near: false, landed: false };
   space.hold(undefined);
   // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades on the leave clock, never cut out in a
-  // frame. The dock stays (the next page's takes over), and the cosmos's own parts, which stay through a flight (arrival.ts RISING).
-  ghost(() => false, "[data-exit]:not([data-dock], [data-clear], nav)");
+  // frame, the chat dock's with it (it opens again with the destination's, as the arrival plays); not the cosmos's own parts, which stay
+  // through a flight (arrival.ts RISING).
+  ghost(() => false, "[data-exit]:not([data-clear], nav)");
   markFlown(true);
   return true;
 }
