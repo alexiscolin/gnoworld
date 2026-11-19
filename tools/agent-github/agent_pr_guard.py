@@ -34,9 +34,10 @@ def check(call):
         refuse("no tool reads or names the agent's state folder (~/.local/share/agent-github): its token lives there")
     if tool == "Bash":
         command = given.get("command", "")
-        if not isinstance(command, str):  # a list compares whole items, and would pass the test below
-            refuse("a call it cannot read")
-        if ".local/bin/agent-pr" in command or helper in command:
+        # Claude Code strips the shell's quotes and escapes from a command's first word before it matches the exclusion
+        # (2.1.328): the helper is looked for in the command so read, and only its one plain form taken.
+        plain = re.sub(r"[\\'\"$`]", "", command)
+        if ".local/bin/agent-pr" in plain or helper in plain:
             if not CALL.fullmatch(command):
                 refuse(f"agent-pr is called alone, in one form: {helper} (or ~/.local/bin/agent-pr) push <owner/repo> <bundle> | open "
                        f"<owner/repo> <agent/branch> <pr file>, the files under /tmp/claude-{uid}/agent-pr/ written plainly: no variable, "

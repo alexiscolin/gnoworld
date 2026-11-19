@@ -211,6 +211,10 @@ apr_call "git status" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || 
 # But a call that names the helper is refused there, whatever its form: the exclusion stands, and no guard reads it.
 apr_rc=0 && { apr_call "~/.local/bin/agent-pr x > /tmp/claude-$apr_u/o" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
 [ "$apr_rc" = 2 ] || fail "agent-pr's hook let a call naming the helper through before agent-pr is installed"
+for apr_spelt in "~/.local/bin/agent''-pr x > /tmp/claude-$apr_u/o" "~/.local/bin/agent\\-pr x" '~/.local/bin/agent""-pr x' "~/.local/bin/agent\$'-'pr x"; do
+	apr_rc=0 && { apr_call "$apr_spelt" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
+	[ "$apr_rc" = 2 ] || fail "agent-pr's hook let the helper through before its install, spelt: $apr_spelt"
+done
 # pnpm runs no pnpmfile, and no script at a person's install: one pointed git at the
 # repository's hooks, which a branch can change.
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"

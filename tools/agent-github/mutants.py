@@ -76,7 +76,7 @@ MUTANTS = [
     (I, [("\tawk -v n=\"$name\" '$1 != n' \"$state/repos.allow\" >\"$state/repos.allow.new\"\n", "\tcp \"$state/repos.allow\" \"$state/repos.allow.new\"\n")], "the installer: one line per repository"),
     (G, [("if tool in READERS and", "if False and")], "the guard: no reader names the state folder"),
     (G, [("            if not CALL.fullmatch(command):", "            if False:")], "the guard: one form of call"),
-    (G, [("        if \".local/bin/agent-pr\" in command or helper in command:", "        if helper in command:")], "the guard: the helper under any spelling"),
+    (G, [("        if \".local/bin/agent-pr\" in plain or helper in plain:", "        if helper in plain:")], "the guard: the helper under any spelling"),
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
     (G, [('NAMED = rf"(?:{re.escape(helper)}|~/\\.local/bin/agent-pr)"', 'NAMED = rf"(?:{re.escape(helper)})"')], "the guard: the helper from the session's home"),
     (G, [('|~/\\.local/bin/agent-pr)"', '|~[^/ ]*/\\.local/bin/agent-pr)"')], "the guard: the session's own home alone, never ~user"),
@@ -87,7 +87,7 @@ MUTANTS = [
     (H, [("    if not TOKEN.fullmatch(token):\n        raise Failed(\"gh gave", "    if not token:\n        raise Failed(\"gh gave")], "the owner's token: one token line from gh"),
     (H, [('    if which == "token":\n        return from_gh()\n', "")], "the owner's token: gh's, never a copy"),
     (I, [('{ rm -f "$state/token" && echo', '{ true && echo')], "the installer: an earlier copy of the owner's token goes"),
-    (G, [("        if not isinstance(command, str):", "        if False:")], "the guard: a command that is no string is refused"),
+    (G, [('        plain = re.sub(r"[\\\\\'\\"$`]", "", command)\n', "        plain = command\n")], "the guard: the helper read as the shell would, quotes stripped"),
 ]
 survived = []
 # python3 -I mutants.py [<words of a label>...]: those mutants alone.

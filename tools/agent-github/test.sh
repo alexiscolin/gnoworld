@@ -467,6 +467,13 @@ for P in "$H" "~/.local/bin/agent-pr"; do
 		refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
 	done
 done
+# The helper spelt with the shell's quotes or escapes, which Claude Code strips from a command's first word before it matches the
+# exclusion (2.1.328's code, read by the security review of 14a-1): refused under both forms, never let through unread.
+for bad in "~/.local/bin/agent''-pr x > /tmp/claude-$U/o" "~/.local/bin/agent\\-pr x" '~/.local/bin/agent""-pr x' "~/.local/bin/agent\$'-'pr x" \
+	'~/.local/b""in/agent-pr x' '~/.local/bin/agent``-pr x' "$(printf '%s' "$H" | sed "s/-pr\$/''-pr/") x > /tmp/claude-$U/o" \
+	"$(printf '%s' "$H" | sed 's/-pr$/""-pr/') x"; do
+	refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2) the helper spelt: $bad"
+done
 # Only the session's own home: never another user's, the shell's own folders, a quoted or escaped tilde, a variable, or a folder below.
 for bad in "~root/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "~+/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
 	"~-/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "./~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
