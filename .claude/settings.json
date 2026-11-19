@@ -140,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$HOME/.claude/hooks/agent_pr_guard.py\" \"$HOME/.local/bin/agent-pr\"",
+            "command": "[ -e \"$HOME/.local/bin/agent-pr\" ] || exit 0; python3 -I \"$HOME/.claude/hooks/agent_pr_guard.py\" \"$HOME/.local/bin/agent-pr\"",
             "onFailure": "block"
           }
         ]

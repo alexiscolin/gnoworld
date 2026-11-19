@@ -190,9 +190,11 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
-# agent-pr's hook command as the settings write it, run by sh as Claude Code runs it, from a home holding the guard: $HOME expands
-# there, its one form passes, a chained call is refused (exit 2), and with its guard gone it still blocks (python3 exits 2).
-agh="$t/agent-home" && mkdir -p "$agh/.claude/hooks" && cp "$here/../tools/agent-github/agent_pr_guard.py" "$agh/.claude/hooks/"
+# agent-pr's hook command as the settings write it, run by sh as Claude Code runs it, from a home holding the helper and its guard:
+# $HOME expands there, its one form passes, a chained call is refused (exit 2); with its guard gone it still blocks (python3 exits 2);
+# with no helper installed nothing can leave the sandbox through it, and a session runs (exit 0).
+agh="$t/agent-home" && mkdir -p "$agh/.claude/hooks" "$agh/.local/bin" && cp "$here/../tools/agent-github/agent_pr_guard.py" "$agh/.claude/hooks/"
+: >"$agh/.local/bin/agent-pr"
 apr_cmd=$(python3 -I -c 'import json, sys; s = json.load(open(sys.argv[1])); print(next(h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "agent_pr_guard.py" in h["command"]))' "$here/../.claude/settings.json")
 apr_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
 apr_u=$(id -u)
@@ -204,6 +206,8 @@ apr_rc=0 && { apr_call "~/.local/bin/agent-pr push o/r /tmp/claude-$apr_u/agent-
 rm "$agh/.claude/hooks/agent_pr_guard.py"
 apr_rc=0 && { apr_call "git status" | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
 [ "$apr_rc" = 2 ] || fail "agent-pr's hook with its guard missing did not block"
+rm "$agh/.local/bin/agent-pr"
+apr_call "git status" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || fail "agent-pr's hook blocked a session before agent-pr is installed"
 # pnpm runs no pnpmfile, and no script at a person's install: one pointed git at the
 # repository's hooks, which a branch can change.
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
