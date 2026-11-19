@@ -29,7 +29,7 @@ done
 # Each visitor's address is one of 250 x 250 (setup.ts, load.js), a stream's four to one.
 [ "$ACCOUNTS" -le 62500 ] && [ "$CROWD" -le 62500 ] && [ "$STREAMS" -le 250000 ] ||
 	missing "ACCOUNTS and CROWD 62,500 at most, STREAMS 250,000: the visitors' addresses"
-# Without OpenAI's key every line is unchecked and the breaker stops calling: the messages measure nothing.
+# Without OpenAI's key moderation is off: the messages would measure no check.
 key=${OPENAI_API_KEY_FILE:-}
 [ "$only" != messages ] || [ -n "$key" ] || missing "messages: set OPENAI_API_KEY_FILE, OpenAI's key, which checks each line"
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
@@ -55,6 +55,8 @@ for secret in ergo_oper_password log_pepper openai_api_key; do openssl rand -hex
 [ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key"
 export DEMO_HTPASSWD_FILE="$tmp/htpasswd" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
 export LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
+# Moderation on with the operator's key alone: the made-up one in its place must never reach OpenAI.
+if [ -n "$key" ]; then export MODERATION=on; else export MODERATION=off; fi
 export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test INSIDE_SUBNET=172.30.91.0/24 WEB_ADDRESS=172.30.91.10
 # The load comes from one address of the internal network, which the server and Ergo believe in web's place:
 # each virtual user is a visitor of its own (X-Real-IP, X-Forwarded-For).

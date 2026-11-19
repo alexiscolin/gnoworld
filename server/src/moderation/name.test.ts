@@ -47,10 +47,15 @@ describe("a room's name checked", () => {
     expect(await check("earth", "bad-name")).toBe("hide");
   });
 
-  it("leaves a name unchecked when the provider fails, answers unchecked or is not set", async () => {
+  it("leaves a name unchecked when the provider fails or answers unchecked", async () => {
     expect(await setup(() => Promise.resolve("unchecked")).check("earth", "fine")).toBe("unchecked");
     expect(await setup(() => Promise.reject(new Error("down"))).check("earth", "fine")).toBe("unchecked");
-    expect(await setup(undefined).check("earth", "fine")).toBe("unchecked");
+  });
+
+  // No provider is moderation off (MODERATION=off): the world's rules alone judge the name.
+  it("passes a name by its world's rules alone with no provider, moderation off", async () => {
+    expect(await setup(undefined).check("earth", "fine")).toBe("pass");
+    expect(await setup(undefined).check("earth", "buy-spam-now")).toBe("hide");
   });
 
   it("hides a name of a world the file does not name, with no provider call", async () => {

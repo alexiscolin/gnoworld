@@ -1,6 +1,5 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
-import { jsonOf } from "@gnoworld/core";
 import { ChainId, Key } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
@@ -8,12 +7,13 @@ import { z } from "zod";
 import { cardSettings, cardsConfigOf, cardsNeedReader, type CardsConfig } from "./cards/settings.ts";
 import { adminOf, apartFromPublic, doorOf, doorSettings, type AdminConfig, type DoorConfig } from "./door/settings.ts";
 import type { Thresholds } from "./moderation/decide.ts";
-import { CATEGORIES } from "./moderation/provider.ts";
+import { moderationSettings } from "./moderation/settings.ts";
 import {
   absolute,
   databasePath,
   host,
   isOrigin,
+  keyFile,
   list,
   parseSettings,
   port,
@@ -136,28 +136,7 @@ const settingsSchema = () =>
       EXPLAIN_SEED_FILE: absolute.optional(),
       EXPLAIN_PER_DAY: whole(1000, 30),
       HUBS_FILE: absolute.optional(),
-      OPENAI_API_KEY_FILE: z.string().min(1).optional(),
-      // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
-      MODERATION_THRESHOLDS: z
-        .string()
-        .transform((text, ctx) => {
-          const value = jsonOf(text);
-          if (value !== undefined) return value;
-          ctx.addIssue({ code: "custom", message: "json" });
-          return z.NEVER;
-        })
-        .pipe(
-          z.strictObject(
-            Object.fromEntries(CATEGORIES.map((category) => [category, z.number().gt(0).max(1).optional()])),
-          ),
-        )
-        .default({}),
-      NEW_ACCOUNT_HOURS: whole(720, 24),
-      MUTE_STRIKES: whole(99, 3),
-      MUTE_WINDOW_MINUTES: whole(1440, 10),
-      MUTE_MINUTES: whole(10_080, 5),
-      // Ergo's ban list holds 100 a room: the mutes leave the moderators their share of it.
-      MUTE_MAX: whole(100, 50),
+      ...moderationSettings(),
       ...cardSettings(),
       ...doorSettings(),
     })
@@ -197,10 +176,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     universes: settings.UNIVERSES_FILE,
     hubs: hubsOf(env, settings.HUBS_FILE),
     moderation: {
-      openaiKey:
-        OPENAI_API_KEY_FILE === undefined
-          ? undefined
-          : new Secret(readWord("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
+      // Opt-in: only MODERATION=on reads OpenAI's key, and then the server stops without it.
+      openaiKey: settings.MODERATION === "on" ? keyFile("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE, true) : undefined,
       thresholds: MODERATION_THRESHOLDS,
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },

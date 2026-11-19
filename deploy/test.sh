@@ -358,6 +358,14 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
+	mutant "the guard is not told the host's own addresses" "the guard refuses the host's own address 192.0.2.7" \
+		compose 'services: { guard: { environment: { HOST_PUBLIC_ADDRESSES: "" } } }'
+	mutant "the guard forgets the host's own addresses" "the guard refuses the host's own address 192.0.2.9" \
+		guard sed '/for own in /,/^\tdone$/ s#-j REJECT#-j ACCEPT#'
+	mutant "the guard takes any word for an address" "the guard does not start on a host address that is not one: example.com" \
+		guard sed '/is not an IPv4 address/,/exit 1/ s#exit 1#:#'
+	mutant "the guard reads its addresses as patterns" "the guard does not start on a host address that is not one: *" \
+		guard sed '/^set -f$/d'
 	mutant "the way out's port answers what it did not accept" "the guard lets nothing else out" \
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
@@ -556,6 +564,7 @@ else
 	cat >"$tmp/fake/docker" <<'FAKE'
 #!/bin/sh
 printf '%s\n' "$*" >>"$FAKE_LOG"
+[ "$1" != compose ] || printf 'env MODERATION=%s\n' "${MODERATION:-}" >>"$FAKE_LOG"
 case "$*" in
 "ps -aq --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
 "compose "*" ps -q "*) echo c0ntainer ;;
@@ -610,6 +619,14 @@ FAKE
 	(load "" all) >"$tmp/load.log" 2>&1 || true
 	expect "and skipped among the rest, no line sent" \
 		"$(grep -c 'messages: skipped' "$tmp/load.log" || true) $(grep -c 'SCENARIO=messages' "$tmp/fake.log" || true)" "1 0"
+	expect "and the load's stack checks nothing: its own made-up key never reaches OpenAI" \
+		"$(grep '^env MODERATION=' "$tmp/fake.log" | sort -u | tr '\n' ' ')" "env MODERATION=off "
+	printf 'sk-%s\n' "$(openssl rand -hex 20)" >"$tmp/k6_key"
+	: >"$tmp/fake.log"
+	(exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO= OPENAI_API_KEY_FILE="$tmp/k6_key" sh "$here/k6/run.sh" logins) \
+		>"$tmp/load.log" 2>&1 || true
+	expect "with the operator's key, the load's stack checks each line" \
+		"$(grep '^env MODERATION=' "$tmp/fake.log" | sort -u | tr '\n' ' ')" "env MODERATION=on "
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
@@ -624,6 +641,11 @@ FAKE
 	export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key" # a made-up key: no key at all, jarvis reads it only when on, and no proof here asks the model
 	export JARVIS_DOOR_KEY_FILE="$tmp/jarvis_door_key" # the door's key, made up too: the server's and jarvis's, which prove each other
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
+	# The host's own public addresses, where a public front listens: two of TEST-NET-1 (RFC 5737), outside every range the
+	# guard refuses anyway and apart from the visitors' two, so only HOST_PUBLIC_ADDRESSES refuses them.
+	export HOST_PUBLIC_ADDRESSES="${TEST_HOST_PUBLIC_ADDRESSES:-192.0.2.7 192.0.2.9}"
+	# The stack checks each line with OpenAI (opt-in, off by default): the proofs of the check and the previews need it on.
+	export MODERATION=on
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
 	# jarvis's network and the admin API's, apart from the defaults (172.30.91 and 172.30.92) as the internal one is.
 	export JARVIS_SUBNET="${TEST_JARVIS_SUBNET:-172.30.93.0/24}" JARVIS_ADDRESS="${TEST_JARVIS_ADDRESS:-172.30.93.10}"
@@ -697,6 +719,27 @@ FAKE
 	for range in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 \
 		192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4; do
 		expect "the guard refuses $range, every protocol" "$(printf '%s\n' "$v4" | grep -c -- "^-A OUTPUT -d $range -j REJECT" || true)" 1
+	done
+	for address in $HOST_PUBLIC_ADDRESSES; do
+		expect "the guard refuses the host's own address $address, every protocol" \
+			"$(printf '%s\n' "$v4" | grep -c -- "^-A OUTPUT -d $address/32 -j REJECT" || true)" 1
+	done
+	# guard.sh checks HOST_PUBLIC_ADDRESSES before anything else, so its own image runs it alone: the script the guard
+	# mounts (a mutant's copy too), its last line and its exit code. A list it takes goes on to look for web, which is not there.
+	guard_alone() {
+		docker run --rm -e HOST_PUBLIC_ADDRESSES="$1" --entrypoint sh \
+			-v "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/guard"}}{{.Source}}{{end}}{{end}}' "$guard"):/guard:ro" \
+			"$(docker inspect --format '{{.Config.Image}}' "$guard")" -c 'said=$(sh /guard/guard.sh 2>&1 >/dev/null); code=$?; printf "%s\n" "$said" | tail -1; exit $code'
+	}
+	for list in '' '192.0.2.7 192.0.2.9'; do
+		expect "the guard takes the host addresses [$list] and goes on" "$(guard_alone "$list" 2>&1 || echo "exit $?")" \
+			"guard: cannot find web's network
+exit 1"
+	done
+	for word in 192.0.2.256 example.com 2001:db8::1 192.0.2.7/32 1.2.3 01.2.3.4 '*'; do
+		expect "the guard does not start on a host address that is not one: $word" \
+			"$(guard_alone "192.0.2.7 $word" 2>&1 || echo "exit $?")" "guard: HOST_PUBLIC_ADDRESSES: $word is not an IPv4 address
+exit 1"
 	done
 	last_refusal=$(printf '%s\n' "$v4" | grep -n -- '-j REJECT' | tail -1 | cut -d: -f1)
 	first_way_out=$(printf '%s\n' "$v4" | grep -n -e '--dports 80,443 -j ACCEPT' -e '^-A OUTPUT -p udp -j ACCEPT' | head -1 | cut -d: -f1)
@@ -904,6 +947,10 @@ PY
 	# jarvis answers nothing, so its door answers off, or not_ready when on.
 	# Read once, Compose's refusal of the project a fail: a count of 0 must not stand for a file that does not load.
 	services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"
+	# Moderation is chosen, never defaulted: a stack whose deploy/.env says neither on nor off does not start.
+	expect "Compose refuses a stack that does not choose MODERATION" \
+		"$(env -u MODERATION docker compose --env-file /dev/null -p "$project" $files config server 2>&1 >/dev/null |
+			grep -c 'set MODERATION=on or off' || true)" 1
 	expect "the default services hold no jarvis, nor its reader, nor their ways out" \
 		"$(printf '%s\n' "$services" | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
 	expect "the default services are web, Ergo, the server, the guard and the server's way out" \

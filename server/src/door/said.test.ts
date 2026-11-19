@@ -189,11 +189,18 @@ describe("a refused answer", () => {
     expect(flagged.relays).toEqual([]);
     const failing = setup({ provider: () => Promise.resolve("unchecked") });
     expect(await failing.said.offer(offered("fine"))).toBe("private");
-    const none = setup({ provider: undefined });
-    expect(await none.said.offer(offered("fine"))).toBe("private");
-    expect([failing.relays, none.relays]).toEqual([[], []]);
+    expect(failing.relays).toEqual([]);
     const control = setup();
     expect(await control.said.offer(offered("fine"))).toBe("public");
+  });
+
+  // No provider is moderation off (MODERATION=off): the answer goes public as any line does, unchecked.
+  it("is public with no provider, moderation off", async () => {
+    const none = setup({ provider: undefined });
+    expect(await none.said.offer(offered("fine"))).toBe("public");
+    // The world's rules still judge it.
+    expect(await none.said.offer(offered("a perfect scam"))).toBe("private");
+    expect(none.relays).toHaveLength(1);
   });
 
   it("stays private when the relay is refused or unsure, and keeps nothing", async () => {

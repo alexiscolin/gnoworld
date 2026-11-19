@@ -118,6 +118,10 @@ services:
       ERGO_HOST: ergo
       ERGO_PORT: "6667"
       ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
+      # OpenAI's moderation, chosen in deploy/.env, never defaulted: on, every line and preview page is checked
+      # with the key below; off, the key is never read, every line and room name is judged by its world's rules
+      # alone, and there are no previews nor link cards.
+      MODERATION: ${MODERATION:?set MODERATION=on or off in deploy/.env}
       OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
       # Ergo's volume, read-only, measured against its cap at each retention tick.
       ERGO_DATA: /ergo
@@ -347,6 +351,9 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       XTABLES_LOCKFILE: /tmp/xtables.lock
+      # The host's own public addresses, refused like the private ranges: where a public front on this host
+      # listens, which 80 and 443 would otherwise reach. None by default.
+      HOST_PUBLIC_ADDRESSES: ${HOST_PUBLIC_ADDRESSES:-}
       # Its own address on jarvis's way out's network, by which guard.sh finds that network.
       JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
       # And its address on the reader's way out's network.

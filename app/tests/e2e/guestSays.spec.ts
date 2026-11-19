@@ -1,8 +1,8 @@
 import type { Page, Route } from "@playwright/test";
 import { expect, hydrated, test } from "./fixtures.ts";
 
-// A guest's first line from the Earth's chat to the server, /api/guest and /api/guest/say stubbed (the real ones need a moderation
-// provider): the name asked as the box takes the focus, the line sent as typed, and what a refusal says in the field's own words.
+// A guest's first line from the Earth's chat to the server, /api/guest and /api/guest/say stubbed (the real ones need the
+// server): the name asked as the box takes the focus, the line sent as typed, and what a refusal says in the field's own words.
 const json =
   (body: unknown, status = 200) =>
   (route: Route) =>

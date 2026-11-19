@@ -98,12 +98,13 @@ and `link_reader` as 65530, users of their own.
    `apache2-utils` or `httpd-tools` on Linux), then `chmod 644 deploy/secrets/demo_htpasswd`:
    nginx reads it as its own user, and it holds a hash, not the password.
 3. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own https origin, the address visitors will
-   type (required: Ergo refuses a WebSocket from any other site, and the server any POST); the internal
-   network's addresses may change there.
+   type (required: Ergo refuses a WebSocket from any other site, and the server any POST), and `MODERATION`, `on` or
+   `off` (required: on checks every public line with OpenAI's key, step 4; off skips that check, and the world's rules
+   alone judge each line); the internal network's addresses may change there.
 4. The chat's and the moderation's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
    (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
    deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
-   `deploy/secrets/openai_api_key`.
+   `deploy/secrets/openai_api_key` (with `MODERATION=off`, any line: Compose wants the file, the server never reads it).
    Jarvis's: Anthropic's key, one line, in `deploy/secrets/anthropic_api_key`, a key of a workspace with its own
    spend limit (ADR-0002 §5); with Jarvis off, any line (Compose wants the file, jarvis reads it only when on).
    The door's key, which the server and jarvis alone hold: `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`,
@@ -190,9 +191,8 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 
 - **A host whose own public address serves something.** The guard refuses private addresses,
   then lets out TCP 80 and 443 to the rest: on a host with a public address on an
-  interface (a rented server), the proxies' network would reach that address's services.
-  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office, until the
-  deploy part (D13172) builds a VM that refuses its own public address, proven on it.
+  interface (a rented server), list it in `HOST_PUBLIC_ADDRESSES`, or the proxies' network reaches that address's
+  services. `sh deploy/test.sh` there needs it in `TEST_HOST_PUBLIC_ADDRESSES` too, beside the two test addresses.
 - **A restart of the whole host, or of Docker.** Docker restarts the containers itself,
   without Compose's order: for a moment, a proxy may run before the guard's rules are in, and
   if `web` is not up yet the guard stops, leaving the proxies on a network with nothing in it.
@@ -276,8 +276,10 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 
 ### The moderation check
 
-- **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
-  unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
+- **Its settings.** `MODERATION`, `on` or `off`, chosen in `deploy/.env` (compose refuses a stack with neither): on reads
+  OpenAI's key from `OPENAI_API_KEY_FILE` (one word, 32 characters at least); off, nothing leaves the server: every
+  line, guests' included, every room's name and Jarvis's answers are judged by the world's rules alone, there are no
+  previews, and the alert says so at the start.
   The thresholds that replace OpenAI's own flag and the hours an account counts as new are the server's defaults: compose does not
   forward `MODERATION_THRESHOLDS` or `NEW_ACCOUNT_HOURS`, so `deploy/.env` cannot set them
   ([CONFIGURATION.md](CONFIGURATION.md), section 3).
@@ -449,8 +451,8 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   first pass, asks for a realm with a deployer, functions and counts, and prints the job's log lines. The indexer's queries are those
   onyx-1's answers (`server/src/worlds/onyxIndexer.json`); its per-realm filter is refused there (422), so the counts come from the paged read
   of every call. A first pass of onyx-1's 767 realms, measured outside Docker: 1,634 calls (7 of them the indexer's) in 7.0 minutes, every realm counted.
-- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`): with `UNIVERSES_FILE` and
-  `OPENAI_API_KEY_FILE` (the server refuses to start with the file named and either missing), at start and then every six hours from
+- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`): with `UNIVERSES_FILE` (the server
+  refuses to start without it) and moderation on (`MODERATION=on`; off, there is no previews job), at start and then every six hours from
   the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
   `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
   time a quarter-second apart, each within 10 s and 64 KiB. It keeps a page's first 4,096 bytes, cut at a line's end, has OpenAI's
@@ -490,7 +492,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   where ops' log backend sets them.
 - **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
   `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
-  `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
+  `moderation_off` (`MODERATION` not on: every line judged by the world's rules alone), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_category` (a category beyond the 13, ignored: its name in the log's reason field, once a process, to add to the list), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),

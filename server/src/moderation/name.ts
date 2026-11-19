@@ -1,5 +1,6 @@
 // A room's name checked as a message of its world is: the world's rules read it as words (hyphens as spaces), then the
 // provider; a name the provider could not read is left unchecked, which the route answers by refusing, never by making the room.
+// No provider is moderation off (MODERATION=off): the rules alone judge.
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
 import type { Answer } from "./provider.ts";
@@ -7,7 +8,7 @@ import { ruleVerdict } from "./rules.ts";
 
 interface Options {
   rulesOf: (world: string) => Rules | undefined;
-  // None without a key: every name is then unchecked.
+  // None with moderation off: the rules alone judge a name.
   provider: ((text: string) => Promise<Answer | "unchecked">) | undefined;
   thresholds: Thresholds;
 }
@@ -21,7 +22,7 @@ export function makeNameChecker({ rulesOf, provider, thresholds }: Options) {
     if (rules === undefined) return "hide";
     const words = name.replaceAll("-", " ");
     if (ruleVerdict(words, rules, { newAccount: false }) !== undefined) return "hide";
-    if (provider === undefined) return "unchecked";
+    if (provider === undefined) return "pass";
     const answer = await provider(words);
     if (answer === "unchecked") return "unchecked";
     return decide(answer, thresholds).action === "hide" ? "hide" : "pass";

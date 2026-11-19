@@ -6,10 +6,22 @@
 # network and the outside bridge are not walled, INPUT's policy being ACCEPT, so any other port the guard held a listener
 # on would be open to them (none is). Out, from each proxy's port: replies to connections it opened, nothing else. The DNS servers
 # Docker forwards to from this network; then
-# every private, local, carrier and reserved address refused, so the host, its LAN and any VPN stay out of reach; then
+# every private, local, carrier and reserved address refused, so the host, its LAN and any VPN stay out of reach, and the
+# host's own public addresses (HOST_PUBLIC_ADDRESSES), where a public front on it listens; then
 # public TCP 80 and 443, and nothing else: no UDP, no other port. Nothing in this network starts a connection to web
 # or to any container of the stack. IPv6 is closed. deploy/test.sh proves each line.
 set -eu
+
+# HOST_PUBLIC_ADDRESSES: IPv4 addresses, spaces between, none by default. Read as words, never as patterns, and each
+# one checked before anything else, so a typo stops the guard instead of becoming a rule.
+set -f
+addresses=${HOST_PUBLIC_ADDRESSES:-}
+for address in $addresses; do
+	if ! printf '%s\n' "$address" | grep -Eqx '((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'; then
+		echo "guard: HOST_PUBLIC_ADDRESSES: $address is not an IPv4 address" >&2
+		exit 1
+	fi
+done
 
 # The internal network is the one web is on: its interface is the route to web's address.
 web=$(getent hosts web | awk '{ print $1 }')
@@ -74,6 +86,9 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 	for range in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 \
 		192.0.0.0/24 192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4; do
 		echo "-A OUTPUT -d $range -j REJECT"
+	done
+	for own in $addresses; do
+		echo "-A OUTPUT -d $own/32 -j REJECT"
 	done
 	echo '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
 	echo 'COMMIT'

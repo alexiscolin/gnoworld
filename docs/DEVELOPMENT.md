@@ -137,7 +137,7 @@ when the streams close. Inside Claude Code's sandbox Chromium runs one process p
 or `room|reply|line`, `room|thread|line`, `room|react|👍`, `room|vote|<answer>`, `room|edit|line`, in the Earth, an Earth room
 `earth/<name>` (writer 0 makes it, its name checked by the moderation), a hub's world or a realm's page `/r/<path>`; `\n` breaks a line,
 `@{prev}` mentions the room's last speaker; writer n sits in the script's room n modulo their number), each by the next writer of its
-room able to (a reply, a thread, a reaction, a card or a mention needs a key), the `--bare` writers before the guests declaring no country, the last `--guests` writers as guests with no key (they need the moderation's key, `WORKSHOP_OPENAI_KEY_FILE`), one every
+room able to (a reply, a thread, a reaction, a card or a mention needs a key), the `--bare` writers before the guests declaring no country, the last `--guests` writers as guests with no key (their lines checked by OpenAI with the moderation's key, `WORKSHOP_OPENAI_KEY_FILE`, by the world's rules alone without it), one every
 `--every` to 1.5 times `--every` seconds, from the start again till `--minutes` are over (once without), then they
 stay silent till Ctrl-C; the "(sim)" mark stays, and each writer declares a country of its own. To empty the chat first, stop the workshop
 and remove `.claude/tmp/workshop-data/backend` (history, accounts, sessions; the worlds and prices stay); the workshop's server takes 50 new

@@ -334,6 +334,7 @@ describe("the chat, as the server starts it", () => {
       const config = loadConfig({
         DATABASE: join(dir, "server.db"),
         LOG_PEPPER_FILE: files.pepper,
+        MODERATION: "on",
         OPENAI_API_KEY_FILE: files.key,
       });
       const calls: { url: string; init: RequestInit }[] = [];
@@ -353,6 +354,29 @@ describe("the chat, as the server starts it", () => {
       expect(calls.map(({ url }) => url)).toEqual(["https://api.openai.com/v1/moderations"]);
       expect(new Headers(calls[0]?.init.headers).get("authorization")).toBe(`Bearer ${key}`);
       expect(calls[0]?.init.body).toBe(JSON.stringify({ model: "omni-moderation-latest", input: "hello" }));
+    });
+
+    it("sends nothing to OpenAI with a key file named and MODERATION unset, as the server loads it", async () => {
+      const files = { key: join(dir, "key-off"), pepper: join(dir, "pepper-off") };
+      writeFileSync(files.key, `sk-${"k".repeat(40)}\n`);
+      writeFileSync(files.pepper, `${PEPPER}\n`);
+      const config = loadConfig({
+        DATABASE: join(dir, "server-off.db"),
+        LOG_PEPPER_FILE: files.pepper,
+        OPENAI_API_KEY_FILE: files.key,
+      });
+      const calls: string[] = [];
+      vi.stubGlobal("fetch", (url: string) => {
+        calls.push(url);
+        return Promise.reject(new Error("no network here"));
+      });
+      const mark = logged.length;
+      const { peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: config.moderation });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "unchecked", reason: "no_key" }]);
+      vi.unstubAllGlobals();
+      expect(calls).toEqual([]);
+      expect(logged.slice(mark).filter((line) => line.includes('"moderation_off"'))).toHaveLength(1);
     });
 
     it("holds an account 59 minutes old to a new account's links under a one-hour setting", async () => {
@@ -1866,6 +1890,29 @@ describe("the chat, as the server starts it", () => {
       });
       peer.say(":mod!u@h REDACT #bubble b1 :off topic");
       await expect.poll(() => chat.said?.get("#bubble", "b1")).toBeUndefined();
+    });
+
+    // No provider is moderation off, where an answer goes public unchecked: the chat must hand the door the provider its
+    // lines have, or a host with moderation on would publish Jarvis's answers unchecked.
+    it("checks Jarvis's public answers with the chat's own provider: a flagged answer stays private", async () => {
+      const asked: string[] = [];
+      const flagging = {
+        provider: (text: string) => {
+          asked.push(text);
+          return Promise.resolve(answer({ hate: true }, { hate: 0.9 }));
+        },
+      };
+      const door = { heard: { said: () => undefined }, changed: () => undefined, said: { hosts: ["gno.land"] } };
+      const { chat } = await linked({ worlds: worlds("bubble"), moderation: OFF }, flagging, { door });
+      const offered = {
+        room: "#bubble",
+        who: Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
+        started: T0,
+        question: "what did they decide?",
+        answer: { status: "answered" as const, markdown: "Something hateful.", buttons: [] },
+      };
+      expect(await chat.said?.offer(offered)).toBe("private");
+      expect(asked.some((text) => text.includes("Something hateful."))).toBe(true);
     });
 
     it("drops a line its author deletes, and one its author edits, at once", async () => {

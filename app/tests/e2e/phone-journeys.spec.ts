@@ -34,7 +34,7 @@ const band = (page: Page, place: string) => page.getByRole("button", { name: `${
 const bubbleBox = (page: Page) => page.getByRole("textbox", { name: "Message #bubble" });
 const worldsList = (page: Page) => page.getByRole("navigation", { name: "Worlds" });
 
-// A guest's name and say, stubbed as guestSays.spec.ts does (the real ones need a moderation provider); the bodies said come back.
+// A guest's name and say, stubbed as guestSays.spec.ts does (the real ones need the server); the bodies said come back.
 async function guestSays(page: Page): Promise<unknown[]> {
   const said: unknown[] = [];
   await page.route("**/api/guest", (route) => route.fulfill({ json: { name: "brave-otter-abcd" } }));
