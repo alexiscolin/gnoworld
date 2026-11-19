@@ -481,6 +481,17 @@ describe("the list's reader kept in place", () => {
     expect(top).toBe(-600);
   });
 
+  it("tints the lines past the place as the room opens, and lets them go once the place passes them", () => {
+    draw({ paged: true, read: at(LINES - 3) });
+    expect(
+      [...host.querySelectorAll("ol > li[data-unseen]")].map((li) =>
+        li.textContent.includes(`number ${String(LINES - 1)}`),
+      ),
+    ).toEqual([false, true]);
+    draw({ paged: true, read: at(LINES - 1) });
+    expect(host.querySelectorAll("ol > li[data-unseen]")).toHaveLength(0);
+  });
+
   describe("a room whose lines hold a card", () => {
     const CARD = "💹 Market prices";
     const CAP = 400;

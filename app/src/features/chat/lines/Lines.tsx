@@ -97,7 +97,7 @@ function List(props: ListProps) {
   const { room, partner, known, me, refused, connected, cannotReact, lines, shown, lineOf, newest } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { verdicts, saving = false, keeping, byId, votes, repliesOf, onThread, onEdit } = props;
-  const { fresh, listRef, onScroll, awaiting } = useListRead(props);
+  const { fresh, unseen, listRef, onScroll, awaiting } = useListRead(props);
   const olRef = useRef<HTMLOListElement>(null);
   const { stop, mounted, on, leave, asked } = useLineFocus(lines, olRef, fresh);
   const { said, setSaid, copy } = useCopy();
@@ -150,6 +150,7 @@ function List(props: ListProps) {
                   (room !== undefined || partner !== undefined) && mounted(entry.line.id) ? actionsOf(entry.line) : null
                 }
                 fresh={entry.line.id === fresh}
+                unseen={unseen.has(entry.line.id)}
                 grouped={props.grouped.has(entry.line.id)}
                 verdict={verdictIn(verdicts, newest, entry.line.id)}
                 players={room !== undefined && !saving}
