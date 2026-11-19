@@ -88,6 +88,7 @@ MUTANTS = [
     (I, [("(umask 077 && printf", "(printf")], "the installer: the token owner-only"),
     (I, [('from_gh || [ -e "$state/token" ] || ask_token', 'rm -f "$state/token"; from_gh || ask_token')], "the installer: no gh token keeps the one written"),
     (I, [('\twrite_token token "$given"\n', "\ttrue\n")], "the installer: gh's token written"),
+    (G, [("        if not isinstance(command, str):", "        if False:")], "the guard: a command that is no string is refused"),
 ]
 survived = []
 # python3 -I mutants.py [<words of a label>...]: those mutants alone.

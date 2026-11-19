@@ -449,7 +449,8 @@ for ok in "git status" "ls tools/agent-github"; do
 	guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
 done
 # What it cannot read is refused, never a crash Claude Code would let through.
-for bad in 'garbage' '[]' '{"tool_name": "Bash", "tool_input": null}' '{"tool_name": "Bash", "tool_input": {"command": 7}}' '{"tool_name": 7}'; do
+for bad in 'garbage' '[]' '{"tool_name": "Bash", "tool_input": null}' '{"tool_name": "Bash", "tool_input": {"command": 7}}' '{"tool_name": 7}' \
+	'{"tool_name": "Bash", "tool_input": {"command": ["x"]}}'; do
 	refuses "$bad" || fail "the guard did not refuse (exit 2) a call it cannot read: $bad"
 done
 for reader in '{"tool_name": "Read", "tool_input": {"file_path": "/opt/agent/.local/share/agent-github/token"}}' \
