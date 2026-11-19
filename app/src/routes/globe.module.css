@@ -16,10 +16,10 @@
     display: block;
   }
 
-  /* A flight brings the page's body: the frame, the plate and the dock wait out of sight, out of reach of a pointer, a key or a reader, and
-     come in together on the arrival's one clock (arrival.ts) as the flight ends. The page leaves `flown` "flying" from the click that asks
+  /* A flight brings the page's body: the frame and the plate wait out of sight, out of reach of a pointer, a key or a reader, and
+     come in together on the arrival's one clock (arrival.ts) as the flight ends; the dock, the layout's third child after the frame and the plate, stays through it (D461). The page leaves `flown` "flying" from the click that asks
      the flight (host.ts). */
-  .globe[data-flown="flying"] + * > * {
+  .globe[data-flown="flying"] + * > :nth-child(-n + 2) {
     opacity: 0;
     visibility: hidden;
   }

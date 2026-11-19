@@ -7,6 +7,8 @@ const log = vi.hoisted(() => ({ calls: [] as string[], goes: [] as Place[], flie
 const made = vi.hoisted(() => ({ events: undefined as undefined | Record<string, (id?: string) => void> }));
 const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), landTags: vi.fn(), waitTags: vi.fn() }));
 vi.mock("./arrival.ts", () => arrival);
+const rise = vi.hoisted(() => ({ ghost: vi.fn() }));
+vi.mock("./rise.ts", () => rise);
 vi.mock("./moonRooms.ts", () => ({ feedMoons: () => undefined, stopMoons: () => undefined }));
 vi.mock("../../space/scene.ts", () => ({
   Space: class {
@@ -144,6 +146,24 @@ describe("the flight on the click", () => {
     log.calls.length = 0;
     hold();
     expect(log.calls).toEqual(["hold none"]);
+  });
+
+  // The leaving plate fades on the leave clock (a copy, rise.ts), before the page's box is hidden: never cut out in one frame; the dock stays.
+  it("fades the leaving page's plate, never its dock or the cosmos's own parts, before hiding it", async () => {
+    await started();
+    const box = document.createElement("div");
+    box.dataset["globe"] = "";
+    document.body.append(box);
+    rise.ghost.mockImplementationOnce(() => {
+      expect(box.dataset["flown"]).toBeUndefined();
+    });
+    made.events?.["world"]?.("bubble");
+    expect(rise.ghost).toHaveBeenCalledTimes(1);
+    const [stayed, among] = rise.ghost.mock.calls[0] as [() => boolean, string];
+    expect(stayed()).toBe(false);
+    expect(among).toBe("[data-exit]:not([data-dock], [data-clear], nav)");
+    expect(box.dataset["flown"]).toBe("flying");
+    box.remove();
   });
 
   it("holds the plate's arrival and the tags' landing for the page, and gives them as the page is shown", async () => {

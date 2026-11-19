@@ -6,6 +6,7 @@ import { sameAs, type Place } from "../../space/place.ts";
 import type { Space } from "../../space/scene.ts";
 import { landTags } from "./arrival.ts";
 import { markFlown } from "./flown.ts";
+import { ghost } from "./rise.ts";
 
 // The flight that left, and whether it neared or landed before its page was shown.
 let ahead: { readonly place: Place; near: boolean; landed: boolean } | undefined;
@@ -27,7 +28,9 @@ export function depart(space: Space | undefined, asked: Place | undefined, to: P
   if (!space.go(place)) return false;
   ahead = { place, near: false, landed: false };
   space.hold(undefined);
-  // The page the click leaves hides its plate as the flight begins, as the next would.
+  // The page the click leaves hides its plate as the flight begins, as the next would: its copy fades on the leave clock, never cut out in a
+  // frame. The dock stays (the next page's takes over), and the cosmos's own parts, which stay through a flight (arrival.ts RISING).
+  ghost(() => false, "[data-exit]:not([data-dock], [data-clear], nav)");
   markFlown(true);
   return true;
 }

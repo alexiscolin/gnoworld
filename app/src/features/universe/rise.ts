@@ -80,14 +80,12 @@ export { loading } from "./firstLook.ts";
 // The cosmos comes back under a flight: the hero and the worlds rise as it lands.
 export const RETURN_AFTER = 450;
 
-/** A fading ghost of each `[data-exit]` part in sight, as its page goes, so the page coming in is not cut in on them. Copied now, shown
+/** A fading ghost of each `[data-exit]` part in sight (or each of `among`), as its page goes, so the page coming in is not cut in on them. Copied now, shown
  * once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
-export function ghost(stayed: () => boolean): void {
+export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
   // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
   const leaving = pageNow();
-  const parts = [...document.querySelectorAll("[data-exit]")].filter(
-    (part) => getComputedStyle(part).visibility !== "hidden",
-  );
+  const parts = [...document.querySelectorAll(among)].filter((part) => getComputedStyle(part).visibility !== "hidden");
   const layer = document.createElement("div");
   if (parts.length === 0 || motionOf().matches) return;
   layer.setAttribute("aria-hidden", "true");
