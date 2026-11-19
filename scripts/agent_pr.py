@@ -28,7 +28,8 @@ SPACE = f"/private/tmp/claude-{os.getuid()}/agent-pr/"
 OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}")
 NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}")
 PART = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}")
-TOKEN = re.compile(r"ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,255}")
+# A classic or fine-grained token, or the owner's own gh login's, as `gh auth token` gives it (D14012).
+TOKEN = re.compile(r"gh[po]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,255}")
 # An allow-list line: a repository, then the name of the token it uses when not the default one (token.<name>).
 LINE = re.compile(r"(\S+)(?: ([a-z0-9][a-z0-9-]{0,31}))?")
 SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")

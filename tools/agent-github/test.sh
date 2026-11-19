@@ -238,6 +238,15 @@ cp "$tok.bak" "$tok" && chmod 400 "$tok"
 run push alexis/proj "$t/space/tok.bundle" || fail "a token file of mode 400 was refused: $(cat "$t/out")"
 [ "$(remote agent/tok)" != none ] || fail "the control push after the token tests did not land"
 chmod 600 "$tok"
+# The owner's own gh login's token, as `gh auth token` gives it (D14012, D14013): gho_ and 36 letters or digits, taken as any other.
+g -C "$t/s" checkout -q -b agent/gho main && echo gho >"$t/s/o.txt" && g -C "$t/s" add o.txt && g -C "$t/s" commit -qm gho
+g -C "$t/s" bundle create -q "$t/space/gho.bundle" agent/gho
+GHO=gho_$(printf '%036d' 5)
+printf '%s\n' "$GHO" >"$tok" && chmod 600 "$tok"
+run push alexis/proj "$t/space/gho.bundle" || fail "the owner's gh login token was refused: $(cat "$t/out")"
+[ "$(remote agent/gho)" != none ] || fail "the push with the owner's gh login token did not land"
+grep -qx "AGENT_TOKEN=$GHO" "$t/git.log" || fail "git did not get the owner's gh login token"
+cp "$tok.bak" "$tok" && chmod 600 "$tok"
 
 # 8. A secret in any pushed commit stops the push: in a file, added then removed, hidden from diffs, allowed by the
 # repository's own gitleaks files, by an allow comment, or brought in by a merge; and again with a clean commit on top.
