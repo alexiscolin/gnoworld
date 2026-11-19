@@ -104,3 +104,13 @@ export function makeQuery(db: DatabaseSync) {
     };
   };
 }
+
+const Latest = z.array(z.object({ msgid: z.string(), account: z.string(), at: z.number(), text: z.string() }));
+
+/** A room's newest `limit` lines, oldest first, from `lines_by_room`: no words, no filter. */
+export function makeLatest(db: DatabaseSync) {
+  const newest = db.prepare(
+    "SELECT msgid, account, at, text FROM lines WHERE room = ? ORDER BY at DESC, rowid DESC LIMIT ?",
+  );
+  return (room: string, limit: number) => Latest.parse(newest.all(room, limit)).toReversed();
+}
