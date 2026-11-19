@@ -85,7 +85,7 @@ interface Setup {
 }
 
 type ProviderFn = (text: string) => Promise<Answer | "unchecked">;
-type Relayed = { msgid: string } | false | "unsure";
+type Relayed = { msgid: string; time?: string } | false | "unsure";
 type RelayFn = (room: string, nick: string, text: string) => Promise<Relayed>;
 const ACCESS: Record<string, "write" | "read"> = {
   "#earth": "write",
@@ -814,6 +814,17 @@ describe("POST /api/guest/say: the relay's word (the link bounds it itself, 5 s)
     await say(app, guest, " hello there ");
     expect(passed).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ room: "#earth", account: `anon/${guest.name}`, msgid: "m77", text: "hello there" }),
+    );
+  });
+
+  it("hands the line on with the time Ergo stamped it, never the server's clock: a reader's place is Ergo's time, so a later one would stay unread", async () => {
+    const { app, passed } = setup({
+      relay: () => Promise.resolve({ msgid: "m78", time: "2026-11-13T12:00:00.000Z" }),
+    });
+    const guest = await arrive(app);
+    await say(app, guest, "hello there");
+    expect(passed).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ msgid: "m78", time: "2026-11-13T12:00:00.000Z" }),
     );
   });
 });

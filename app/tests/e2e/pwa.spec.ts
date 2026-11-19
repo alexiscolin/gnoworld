@@ -447,8 +447,16 @@ test.describe("updates", () => {
   }
 
   // Two tabs on the version running, the second made first so that the test's own page opens last.
-  async function twoTabs(page: Page): Promise<Page> {
+  async function twoTabs(page: Page, { aheadInOther = true } = {}): Promise<Page> {
     const other = await page.context().newPage();
+    // A tab on a slow link asks no page's code ahead of a click (warmRealm.ts, saveData.ts's fastLink): what its click fetches is read.
+    if (!aheadInOther)
+      await other.addInitScript(() => {
+        Object.defineProperty(navigator, "connection", {
+          configurable: true,
+          value: { effectiveType: "3g", saveData: false },
+        });
+      });
     await open(page);
     await open(other);
     return other;
@@ -663,7 +671,8 @@ test.describe("updates", () => {
     page,
     request,
   }) => {
-    const other = await twoTabs(page);
+    // Its click must fetch the world's code: a tab that had asked it ahead, before the deploy, would fetch none.
+    const other = await twoTabs(page, { aheadInOther: false });
     try {
       await deploy(page, request);
       await firstTabClicks(page, other);

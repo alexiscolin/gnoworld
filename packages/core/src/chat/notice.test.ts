@@ -146,6 +146,27 @@ describe("roomNotice: a reply to a line of the account's", () => {
   });
 });
 
+// A thread is a chain of replies (threads.ts): a reply anywhere in one the account started or answered in is theirs to hear.
+describe("roomNotice: a reply in a thread the account is in", () => {
+  const theirs = line("their question", { id: "s1", time: T(1), account: BOB, from: BOB });
+
+  test("is a reply when it answers another's line in a thread the account started", () => {
+    const mine = line("my question", { id: "r1", time: T(1), account: ME, from: ME });
+    const bobs = line("an answer", { id: "r2", time: T(2), account: BOB, from: BOB, reply: "r1" });
+    expect(kindOf("and another", { reply: "r2" }, { held: [mine, bobs] })).toBe("reply");
+  });
+
+  test("is a reply when it answers in a thread the account answered in", () => {
+    const answer = line("my answer", { id: "s2", time: T(2), account: ME, from: ME, reply: "s1" });
+    expect(kindOf("me too", { reply: "s1" }, { held: [theirs, answer] })).toBe("reply");
+  });
+
+  test("is none in a thread the account is not in", () => {
+    const alices = line("an answer", { id: "s2", time: T(2), account: ALICE, from: ALICE, reply: "s1" });
+    expect(kindOf("me too", { reply: "s2" }, { held: [theirs, alices] })).toBeUndefined();
+  });
+});
+
 describe("roomNotice: a mention of the whole room", () => {
   test.each([
     ["alone", "@room"],

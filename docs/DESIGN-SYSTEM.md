@@ -83,7 +83,7 @@ Semantic roles, all computed from them:
 
 | Role | Made of | Use |
 |---|---|---|
-| `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
+| `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards, and of a chat line not seen yet until it is read (it fades after 1 s over 0.6 s, none under reduced motion); hover |
 | `--color-text-faint` | muted at 80% | A field's placeholder alone, dimmer than the prefix as frame 10's: 5.1:1 on a field over night, 5.4:1 over space, 4.6:1 inside a card (WCAG AA) |
 | `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show |
 | `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover; a field's resting edge is the strong one (frame 10) |

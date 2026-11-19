@@ -228,7 +228,7 @@ describe("RoomsView: notifications", () => {
     });
 
     it.each([
-      ["reply", "replied to you"],
+      ["reply", "replied in your thread"],
       ["dm", "wrote to you"],
     ] as const)("says a %s as %s", (kind, words) => {
       const where = kind === "dm" ? ALICE : "#bubble";
@@ -252,7 +252,7 @@ describe("RoomsView: notifications", () => {
         notices: notices({ list: [note("mention", "#bubble"), note("reply", "#bubble/games")] }),
       });
       expect(headings(html).toSorted()).toEqual(["Notifications", "Rooms", "Talk"]);
-      expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
+      expect(said(html).indexOf("replied in your thread")).toBeLessThan(said(html).indexOf("mentioned you"));
     });
 
     // A first notice comes in after the rooms, so it pushes no row down.
@@ -310,7 +310,7 @@ describe("noticeSaid", () => {
   it.each([
     ["mention", "mentioned you in #games"],
     ["group", "mentioned the room in #games"],
-    ["reply", "replied to you in #games"],
+    ["reply", "replied in your thread in #games"],
   ] as const)("says who and what, then where, of a %s", (kind, said) => {
     expect(noticeSaid(at(kind, ALICE, "#bubble/games"))).toBe(`g10gh7…3y5tv ${said}`);
   });

@@ -481,6 +481,17 @@ describe("the list's reader kept in place", () => {
     expect(top).toBe(-600);
   });
 
+  it("tints the lines past the place as the room opens, and lets them go once the place passes them", () => {
+    draw({ paged: true, read: at(LINES - 3) });
+    expect(
+      [...host.querySelectorAll("ol > li[data-unseen]")].map((li) =>
+        li.textContent.includes(`number ${String(LINES - 1)}`),
+      ),
+    ).toEqual([false, true]);
+    draw({ paged: true, read: at(LINES - 1) });
+    expect(host.querySelectorAll("ol > li[data-unseen]")).toHaveLength(0);
+  });
+
   describe("a room whose lines hold a card", () => {
     const CARD = "💹 Market prices";
     const CAP = 400;
@@ -586,6 +597,15 @@ describe("the lines view, compiled: threads' chips", () => {
     const chips = [...host.querySelectorAll("button")].filter((button) => /\d+ repl/.test(button.textContent));
     expect(chips).toHaveLength(1);
     expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("199 replies");
+  });
+
+  it("counts on the chip, in the coral of what is unseen, the thread's replies the reader has not seen", () => {
+    draw({ ...asked, paged: true, read: at(LINES - 3) });
+    const chip = () => [...host.querySelectorAll("button")].find((button) => /\d+ repl/.test(button.textContent));
+    expect(chip()?.querySelector('[data-tone="new"]')?.textContent).toBe("2");
+    expect(chip()?.getAttribute("aria-label")).toBe("199 replies, 2 unread, open the thread");
+    draw({ ...asked, paged: true, read: at(LINES - 1) });
+    expect(chip()?.querySelector('[data-tone="new"]')).toBeNull();
   });
 
   it("reads the threads once for a line that comes, and draws no chip again for a line that answers none", () => {

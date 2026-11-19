@@ -1785,8 +1785,13 @@ describe("RELAYMSG: the bot says a guest's line (D430)", () => {
       await ready(e);
       const reader = await guest(e, "gus", TAGS);
       await join(reader, "#bubble");
-      expect(msgidOf(await link.relay("#bubble", NICK, "through the link"))).toMatch(/^\w+$/);
+      const relayed = await link.relay("#bubble", NICK, "through the link");
+      expect(msgidOf(relayed)).toMatch(/^\w+$/);
       const line = await reader.expect(/PRIVMSG #bubble :through the link$/);
+      // The time on the bot's answer is the one every reader sees on the line: the unread count is made against it.
+      const seen = /(?:^|;)time=([^; ]+)/.exec(line)?.[1];
+      expect(seen).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+      expect(typeof relayed === "object" ? relayed.time : undefined).toBe(seen);
       expect(line).toContain(`:${NICK}!`);
       expect(line).toContain("draft/relaymsg=gnoworld");
     });

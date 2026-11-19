@@ -6,8 +6,9 @@ import type { State } from "./session.ts";
 // The relays waiting for Ergo at once, at most: a guest's line past it is not taken, so a silent Ergo grows nothing.
 const RELAYS_MAX = 500;
 
-/** What a relay comes to: the id Ergo gave the line (empty when it sent none), a refusal, or no word in time (the line may still come). */
-export type Relayed = { msgid: string } | false | "unsure";
+/** What a relay comes to: the id Ergo gave the line (empty when it sent none) and the time it stamped on it when it sent one, a
+ * refusal, or no word in time (the line may still come). */
+export type Relayed = { msgid: string; time?: string } | false | "unsure";
 
 /** How long Ergo has to answer a relayed line. */
 export const RELAY_MS = 5000;

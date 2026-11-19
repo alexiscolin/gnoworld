@@ -1,6 +1,7 @@
 // What the server's IRC link remembers of one connection to Ergo, and the lines it reads to keep it.
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
+import { marks } from "./lines.ts";
 import type { Relayed } from "./relay.ts";
 import { makeRedacts, type Redacts } from "./redacts.ts";
 import { freshHistory, type HistoryState } from "./history.ts";
@@ -69,10 +70,13 @@ export function sentOn(state: State, command: string, params: readonly string[])
 /** The answer to a relay carries its label: a FAIL or an error number refuses it, the line itself or an ACK takes it. */
 function relayAnswered(state: State, { tags, command }: IrcMessage): void {
   const label = tags.get("label");
-  if (label !== undefined)
-    state.relays.get(label)?.(
-      command === "FAIL" || /^[45]\d\d$/.test(command) ? false : { msgid: tags.get("msgid") ?? "" },
-    );
+  if (label === undefined) return;
+  const { time } = marks(tags);
+  state.relays.get(label)?.(
+    command === "FAIL" || /^[45]\d\d$/.test(command)
+      ? false
+      : { msgid: tags.get("msgid") ?? "", ...(time === undefined ? {} : { time }) },
+  );
 }
 
 /** A reader that first settles the relay an answer's label names, then reads the line as it does. */
