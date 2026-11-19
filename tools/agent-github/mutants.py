@@ -80,9 +80,11 @@ MUTANTS = [
     (I, [('            print(f"warning: {profile} runs', '            (lambda *a, **k: None)(f"warning: {profile} runs')], "the installer: a PATH exclusion is said"),
     (I, [("\tawk -v n=\"$name\" '$1 != n' \"$state/repos.allow\" >\"$state/repos.allow.new\"\n", "\tcp \"$state/repos.allow\" \"$state/repos.allow.new\"\n")], "the installer: one line per repository"),
     (G, [("if tool in READERS and", "if False and")], "the guard: no reader names the state folder"),
-    (G, [("        if not CALL.fullmatch(command):", "        if False:")], "the guard: one form of call"),
-    (G, [("    if \".local/bin/agent-pr\" in command or helper in command:", "    if helper in command:")], "the guard: the helper under any spelling"),
+    (G, [("            if not CALL.fullmatch(command):", "            if False:")], "the guard: one form of call"),
+    (G, [("        if \".local/bin/agent-pr\" in command or helper in command:", "        if helper in command:")], "the guard: the helper under any spelling"),
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
+    (G, [("except Exception:  # what it cannot read", "except ZeroDivisionError:  # what it cannot read")], "the guard: what it cannot read is refused"),
+    (G, [("    if not isinstance(tool, str):\n", "    if False:\n")], "the guard: a tool it cannot name is refused"),
 ]
 survived = []
 # python3 -I mutants.py [<words of a label>...]: those mutants alone.

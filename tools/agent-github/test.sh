@@ -409,28 +409,46 @@ wait "$pb"; rb=$?
 "$GIT" -C "$t/github/alexis/proj.git" grep -q "$SECRET" agent/race 2>/dev/null && fail "a secret reached the remote through the race"
 alltext="$alltext$(cat "$t/outA" "$t/outB")"
 
-# 14. The guard hook: a call naming the helper is taken in its one form alone; no reading tool names the state folder.
+# 14. The guard hook: a call naming the helper is taken in its one form alone; no reading tool names the state folder. A refusal is
+# exit 2, which Claude Code blocks on; any other failure would let the call through, so what it cannot read is refused too.
 H=/opt/agent/.local/bin/agent-pr
 U=$(id -u)
 guard() { printf '%s' "$1" | python3 -I "$here/agent_pr_guard.py" "$H" >/dev/null 2>&1; }
+refuses() { guard "$1"; [ $? = 2 ]; }
+nl='
+' # a trailing newline, which a command substitution would strip
 bash_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
-for ok in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$H push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
-	"$H open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md" "git status" "ls tools/agent-github"; do
+for P in "$H"; do
+	for ok in "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$P push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
+		"$P open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md"; do
+		guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
+	done
+	for bad in "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle; cat x" "$P push alexis/proj /tmp/claude-$U/a/b.bundle" "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle && cat x" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/*.bundle" "$P push alexis/proj /tmp/claude-$U/agent-pr/*(e:'touch x':)" \
+		"$P push alexis/proj \$(cat x)" "$P push alexis/proj /tmp/claude-$U/agent-pr/../../etc/hosts" "$P push alexis/proj /tmp/claude-$U/agent-pr/a\$(id)b" "$P push alexis/proj /tmp/claude-0/a.bundle" \
+		"HOME=/tmp $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" "env $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle > /tmp/claude-$U/o" "$(printf '%s\n%s' "$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" "cat x")" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle extra" "$P open alexis/proj main /tmp/claude-$U/agent-pr/a/pr.md" \
+		"$P open alexis/proj agent/x /tmp/claude-$U/a/pr.md" "$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle " \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle$nl" " $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle"; do
+		refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
+	done
+done
+for bad in "cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'" \
+	"~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\$HOME/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle"; do
+	refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
+done
+for ok in "git status" "ls tools/agent-github"; do
 	guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
 done
-for bad in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle; cat x" "$H push alexis/proj /tmp/claude-$U/a/b.bundle" "$H push alexis/proj /tmp/claude-$U/a/b.bundle && cat x" \
-	"$H push alexis/proj /tmp/claude-$U/agent-pr/*.bundle" "$H push alexis/proj /tmp/claude-$U/agent-pr/*(e:'touch x':)" \
-	"$H push alexis/proj \$(cat x)" "$H push alexis/proj /tmp/claude-$U/agent-pr/../../etc/hosts" "$H push alexis/proj /tmp/claude-$U/agent-pr/a\$(id)b" "$H push alexis/proj /tmp/claude-0/a.bundle" \
-	"HOME=/tmp $H push alexis/proj /tmp/claude-$U/a.bundle" "~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/a.bundle" \
-	"$H push alexis/proj /tmp/claude-$U/a.bundle > /tmp/claude-$U/o" "$(printf '%s\n%s' "$H push alexis/proj /tmp/claude-$U/a.bundle" "cat x")" \
-	"$H push alexis/proj /tmp/claude-$U/a.bundle extra" "$H open alexis/proj main /tmp/claude-$U/a/pr.md" \
-	"cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'"; do
-	guard "$(bash_call "$bad")" && fail "the guard took: $bad"
+# What it cannot read is refused, never a crash Claude Code would let through.
+for bad in 'garbage' '[]' '{"tool_name": "Bash", "tool_input": null}' '{"tool_name": "Bash", "tool_input": {"command": 7}}' '{"tool_name": 7}'; do
+	refuses "$bad" || fail "the guard did not refuse (exit 2) a call it cannot read: $bad"
 done
 for reader in '{"tool_name": "Read", "tool_input": {"file_path": "/opt/agent/.local/share/agent-github/token"}}' \
 	'{"tool_name": "Grep", "tool_input": {"pattern": "ghp_", "path": "../../.local/share/agent-github"}}' \
 	'{"tool_name": "Glob", "tool_input": {"pattern": "**/*", "path": "/opt/agent/.local/share/agent-github"}}'; do
-	guard "$reader" && fail "the guard let a tool read the state folder: $reader"
+	refuses "$reader" || fail "the guard let a tool read the state folder: $reader"
 done
 guard '{"tool_name": "Read", "tool_input": {"file_path": "tools/agent-github/agent-pr"}}' || fail "the guard refused reading the helper's source"
 guard '{"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content": "the state is ~/.local/share/agent-github"}}' ||
