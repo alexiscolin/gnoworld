@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { layoutOf, type Planet, type Universe } from "./layout.ts";
+import { readFileSync } from "node:fs";
+import { Hubs } from "@gnoworld/schemas";
+import { inputsOf, worldIds } from "../../tests/tools/pictureInputs.ts";
+import { HUB_WORLDS } from "./hubWorlds.ts";
 import { STATION_WORLDS } from "./stationWorlds.ts";
 
 // A planet of `universe` by its id, which must stand in it; and how far its body reaches from its sun, and starts.
@@ -59,5 +63,33 @@ describe("gnosh's colony in the universe", () => {
       expect(planet.orbit, id).toBe(planetOf(without, id).orbit);
       expect(inner(colony), id).toBeGreaterThan(outer(planet));
     }
+  });
+});
+
+// A hub that lists no realm is in no worlds file (the server's worlds job reads realms), so a flight to its page would lay the universe
+// again in its first frame (75 to 109 ms): the scene lays each such hub out from the start.
+describe("the hubs that list no realm", () => {
+  it("are all laid out from the start, each a system of its own, and no other", () => {
+    const hubs = Hubs.parse(JSON.parse(readFileSync("app/data/hubs.json", "utf8")));
+    // A station is no planet: it stands round the Earth, or is the colony above.
+    const bare = hubs
+      .filter(({ kind, realms }) => kind !== "station" && (realms ?? []).length === 0)
+      .map(({ slug }) => slug);
+    expect(HUB_WORLDS.map(({ id }) => id)).toEqual(bare);
+    for (const world of HUB_WORLDS) expect(world).toEqual({ id: world.id, namespace: world.id, realms: [] });
+  });
+
+  it("stand in the universe as a planet, so a page asking for one adds nothing", () => {
+    const universe = layoutOf([], [...STATION_WORLDS, ...HUB_WORLDS]);
+    for (const { id } of HUB_WORLDS) expect(universe.byId.get(id)?.id).toBe(id);
+  });
+});
+
+// A world's picture is retaken when a file its look is made from changes (the colony's code reads stationWorlds.ts): listing a hub is no
+// change of any look, so the list lives in a file no world's look reads.
+describe("listing a hub", () => {
+  it("is in no file a world's picture is made from", () => {
+    for (const id of worldIds())
+      for (const file of inputsOf(id)) expect(readFileSync(file, "utf8"), `${id}: ${file}`).not.toContain("HUB_WORLDS");
   });
 });

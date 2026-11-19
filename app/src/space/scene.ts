@@ -2,7 +2,7 @@
 // (stopped while hidden or covered), one rig that alone moves the camera; a page asks a place and hands its circle, and hears when
 // the flight nears and lands; a click or a wheel asks a place back, which the page's address then asks of it.
 import { PerspectiveCamera, Vector3, type WebGLRenderer } from "three";
-import { STATION_WORLDS, usesOf, type CosmosWorld } from "./cosmosWorld.ts";
+import { HUB_WORLDS, STATION_WORLDS, usesOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { runFrames } from "./frame.ts";
 import { arrivalOf, firstArrival, holdCircle, scans, slideFor, waitedOn } from "./framing.ts";
 import { homeGoal, middleOf, planetGoal, screenOf, systemGoal, universeGoal, type Circle } from "./goals.ts";
@@ -43,7 +43,7 @@ export class Space {
   #asked: Place | undefined;
   #file: readonly CosmosWorld[] = [];
   // The worlds pages asked that the file lacks, the shown stations from the first (stationWorlds.ts).
-  readonly #added: CosmosWorld[] = [...STATION_WORLDS];
+  readonly #added: CosmosWorld[] = [...STATION_WORLDS, ...HUB_WORLDS];
   readonly #trip = { dived: false, from: new Vector3() };
   /** Whether the flight to the page's planet passed its 68 %. */
   neared = false;
