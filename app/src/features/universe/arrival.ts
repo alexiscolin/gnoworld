@@ -248,6 +248,7 @@ function wordsWhenBlocks(words: () => void, reduced: boolean): void {
 export function endArrival(): void {
   waiting?.();
   running?.progress(1).kill();
+  running = undefined;
 }
 
 /** The page's copies in `layer` play the arrival back, 2.6 times as fast, and the layer goes with the end. */

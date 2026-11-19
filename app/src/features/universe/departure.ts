@@ -4,9 +4,8 @@ import { cosmosAt, HOME_SYSTEM, isHome, trimmed } from "../../cosmosAt.ts";
 import { motionOf } from "../../space/motion.ts";
 import { sameAs, type Place } from "../../space/place.ts";
 import type { Space } from "../../space/scene.ts";
-import { landTags } from "./arrival.ts";
+import { endArrival, landTags } from "./arrival.ts";
 import { markFlown } from "./flown.ts";
-import { endArrival } from "./arrival.ts";
 import { copyOf, fadeAway } from "./rise.ts";
 
 const LEAVING = "[data-exit]:not([data-clear], nav)";
@@ -24,7 +23,7 @@ function show(): typeof taken {
   if (layer === undefined) return undefined;
   const flown = document.querySelector<HTMLElement>("[data-globe]")?.dataset["flown"];
   document.body.append(layer);
-  markFlown(true);
+  markFlown(true, false);
   return { layer, flown };
 }
 
@@ -39,7 +38,7 @@ function fadeOut(): void {
 function drop(): void {
   if (taken === undefined) return;
   taken.layer.remove();
-  markFlown(taken.flown === "flying");
+  markFlown(taken.flown === "flying", false);
   taken = undefined;
 }
 
@@ -94,17 +93,20 @@ export function arrive(place: Place | undefined, near: () => void): void {
   } else if (flight.near) near();
 }
 
-const linkOf = (event: MouseEvent): HTMLAnchorElement | undefined => {
-  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
-  const taken = event.defaultPrevented && event.button === 0;
-  return taken && link instanceof HTMLAnchorElement && link.origin === location.origin ? link : undefined;
-};
+// Whether a click is a plain one: the left button, no modifier.
+const plain = (event: MouseEvent): boolean =>
+  event.button === 0 && !(event.ctrlKey || event.metaKey || event.shiftKey || event.altKey);
 
-/** The place a click on a link the router took (it prevents the default) goes to: the cosmos's own views by their address, a world by its page's
- * path (`worlds`, each page's world); none for a click the router left to the browser, a link out or a page that shows no place. */
-function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, string>): Place | undefined {
-  const path = linkOf(event)?.pathname;
-  if (path === undefined) return undefined;
+// The link a click may send a flight by: a plain click on a link of the site's own, with no other target and no download.
+function flyable(event: MouseEvent): HTMLAnchorElement | undefined {
+  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+  if (!plain(event) || !(link instanceof HTMLAnchorElement) || link.origin !== location.origin) return undefined;
+  return link.hasAttribute("download") || (link.target !== "" && link.target !== "_self") ? undefined : link;
+}
+
+/** The place a page's path asks: the cosmos's own views by their address, a world by its page's path (`worlds`, each page's world); none for a
+ * page that shows no place. */
+function placeAt(path: string, worlds: ReadonlyMap<string, string>): Place | undefined {
   const at = cosmosAt(path);
   if (at?.view === "universe") return { kind: "universe" };
   if (at?.view === "system")
@@ -117,12 +119,16 @@ function placeOfClick(event: MouseEvent, worlds: ReadonlyMap<string, string>): P
  * in the bubbling phase, once the router has taken it, `leave` is given the place it goes to and says whether a flight left, else the copy is
  * dropped. What it returns stops both. */
 export function listenClicks(worlds: () => ReadonlyMap<string, string>, leave: (place: Place) => boolean): () => void {
+  // Only a click that can be a flight's, a link to a place, takes the copy: any other (a modifier's, a new tab's, a page that shows no place)
+  // is left as it is, its own page leaving as it does.
   const before = (event: MouseEvent): void => {
     drop();
-    if (event.target instanceof Element && event.target.closest("a[href]") !== null) taken = show();
+    const link = flyable(event);
+    if (link !== undefined && placeAt(link.pathname, worlds()) !== undefined) taken = show();
   };
   const after = (event: MouseEvent): void => {
-    const place = placeOfClick(event, worlds());
+    const link = flyable(event);
+    const place = event.defaultPrevented && link !== undefined ? placeAt(link.pathname, worlds()) : undefined;
     if (place === undefined || !leave(place)) drop();
   };
   document.addEventListener("click", before, true);

@@ -107,7 +107,7 @@ function carryFill(part: Element, copy: HTMLElement): void {
 
 /** A copy of each `[data-exit]` part in sight (or each of `among`), in a layer not yet shown: the page as it stands now. None under reduced
  * motion, or with no part in sight. */
-export function copyOf(among = "[data-exit]"): HTMLElement | undefined {
+export function copyOf(among: string): HTMLElement | undefined {
   const parts = [...document.querySelectorAll(among)].filter((part) => getComputedStyle(part).visibility !== "hidden");
   if (parts.length === 0 || motionOf().matches) return undefined;
   const layer = document.createElement("div");
@@ -148,12 +148,12 @@ export function fadeAway(layer: HTMLElement): void {
     });
 }
 
-/** A fading ghost of each `[data-exit]` part in sight (or each of `among`), as its page goes, so the page coming in is not cut in on them.
+/** A fading ghost of each `[data-exit]` part in sight as its page goes, so the page coming in is not cut in on them.
  * Copied now, shown once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
-export function ghost(stayed: () => boolean, among = "[data-exit]"): void {
+export function ghost(stayed: () => boolean): void {
   // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
   const leaving = pageNow();
-  const layer = copyOf(among);
+  const layer = copyOf("[data-exit]");
   if (layer === undefined) return;
   queueMicrotask(() => {
     if (stayed()) return;

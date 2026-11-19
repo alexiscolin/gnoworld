@@ -148,3 +148,14 @@ it("copies a part mid-animation with the opacity and transform it is drawn with"
   Reflect.deleteProperty(Element.prototype, "getAnimations");
   token.remove();
 });
+
+// A fade that is cancelled (the layer's animation rejects its `finished`) still removes the copy.
+it("removes the copy when its fade is cancelled", async () => {
+  const layer = document.body.appendChild(document.createElement("div"));
+  layer.animate = (() => ({ finished: Promise.reject(new Error("cancelled")) })) as unknown as typeof layer.animate;
+  fadeAway(layer);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(layer.isConnected).toBe(false);
+});
