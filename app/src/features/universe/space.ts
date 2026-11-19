@@ -3,20 +3,25 @@
 // the universe) becomes the router's navigation, and its flight's end the page's arrival.
 import type { Space } from "../../space/scene.ts";
 import type { Place } from "../../space/place.ts";
-import { systemPath } from "../../cosmosAt.ts";
-import { Heard } from "../../lib/heard.ts";
+import { systemPath, trimmed } from "../../cosmosAt.ts";
 import { pagesOf } from "../../lib/hubWorld.ts";
 import { labelWords } from "./worldFact.ts";
 import { site } from "../../places.ts";
 import { motionOf } from "../../space/motion.ts";
 import { feedMoons, stopMoons } from "./moonRooms.ts";
 import { enterPage, landTags } from "./arrival.ts";
+export { drawnYet, onDrawn } from "./drawn.ts";
+import { drew } from "./drawn.ts";
+import { arrive, depart, hold as holdEvent, listenClicks, waiting } from "./departure.ts";
 import { markDrawn, markFlown, syncFlown } from "./flown.ts";
 
 export { syncFlown };
 import { holdsDive, layers, releaseDive } from "./firstLook.ts";
 import { attach } from "../../earthGround.ts";
-import { circleOf } from "./pageCircle.ts";
+import { circleOf, plateOf } from "./pageCircle.ts";
+import { offer, tellOffer } from "./offer.ts";
+
+export { offer };
 import { offerOf } from "./gpu.ts";
 import { lightSpace } from "../../lenses.ts";
 import { isMap, onMap } from "../../mapView.ts";
@@ -31,38 +36,43 @@ let space: Space | undefined;
 let [starting, reading, releasing] = [false, false, false];
 let asked: Place | undefined;
 let navigate: (href: string) => void = () => undefined;
-const drawn = { done: false, heard: new Set<() => void>() };
 
 // Each world's page as the rail's links say it (lib/hubWorld.ts): its hub's, else its first realm's view; the Earth's own.
 let pages: ReadonlyMap<string, string> = new Map();
-
+// The world each of those pages is of, by its path.
+let worldsOf: ReadonlyMap<string, string> = new Map();
 const globe = () => document.querySelector<HTMLElement>("[data-globe]");
 
 const events = {
   world: (id: string) => {
     const href = pages.get(id);
-    if (href !== undefined) navigate(href);
+    if (href === undefined) return;
+    depart(space, asked, { kind: "world", id });
+    navigate(href);
   },
   system: (id: string) => {
+    depart(space, asked, { kind: "system", id });
     navigate(systemPath(id));
   },
   universe: () => {
+    depart(space, asked, { kind: "universe" });
     navigate("/universe");
   },
   near: () => {
+    if (holdEvent("near")) return;
     markFlown(false);
     enterPage();
   },
   // A flight that never neared (it stood where it was) still lets the page's text in.
   landed: () => {
+    if (holdEvent("landed")) return;
     const flying = globe()?.dataset["flown"] === "flying";
     if (flying) markFlown(false);
     if (flying) enterPage();
     landTags();
   },
   drawn: () => {
-    drawn.done = true;
-    for (const heard of drawn.heard) heard();
+    drew();
     const dive = releaseDive();
     const place = asked;
     if (dive !== undefined && place !== undefined)
@@ -79,7 +89,12 @@ function start(): void {
   // In development a module swapped in takes its canvas and its engine with it: no second universe draws under the new one. A hot reload
   // of an engine file brings this module back without its old instance's dispose (Vite runs the accepting module's alone): that one
   // leaves first, as it starts.
+  const unlisten = listenClicks(
+    () => worldsOf,
+    (place) => depart(space, asked, place),
+  );
   const leave = () => {
+    unlisten();
     space?.dispose();
     canvas.remove();
     labels.remove();
@@ -135,6 +150,7 @@ function readWorlds(): void {
       const worlds = file?.worlds ?? [];
       const home = site.universeAt("/");
       pages = pagesOf(worlds, { earth: home.earth.path, worlds: home.worlds });
+      worldsOf = new Map([...pages].map(([id, href]) => [trimmed(href), id]));
       space?.worlds(worlds);
       // The first visit's dive to the home starts here, the file come: its Earth's tag waits for it to near.
       if (asked?.kind === "home" && flying()) markFlown(true);
@@ -155,6 +171,7 @@ function go(place: Place): void {
   // A flight to a page's planet hides the page till it nears; a jump there tells it at once, as an unchanged place lets it be.
   const went = space.go(place);
   if (went && (place.kind === "world" || place.kind === "home")) markFlown(true);
+  arrive(place, events.near);
   tell(place);
 }
 
@@ -175,6 +192,7 @@ export function release(): void {
   queueMicrotask(() => {
     if (!releasing || space === undefined) return;
     releasing = false;
+    arrive(undefined, events.near);
     // Covered first: the circle's going turns the framing, and a framing that turns in sight flies, to a flight no page waits on.
     space.covered = true;
     space.hold(undefined);
@@ -189,6 +207,7 @@ export function show(place: Place | undefined, to: (href: string) => void): void
   asked = place;
   releasing = false;
   if (place === undefined) {
+    arrive(undefined, events.near);
     if (space !== undefined) space.covered = true;
     // Nothing looks at the moons while space is covered; the next place asked for feeds them again.
     stopMoons();
@@ -211,39 +230,12 @@ export function press(): void {
   if (asked !== undefined) go(asked);
 }
 
-/** Where the offer of space stands: not decided yet, taken (space runs or loads), waiting for the reader's ask, never (a weak GPU), or
- * failed (its chunk or WebGL refused). */
-export const offer = {
-  state: "undecided" as "undecided" | "taken" | "ask" | "none" | "failed",
-  heard: new Heard(),
-};
-function tellOffer(state: typeof offer.state): void {
-  offer.state = state;
-  offer.heard.tell();
-}
-
 /** The page's planet's circle and its plate, measured as the page lays them out. */
 export function hold(): void {
-  if (space === undefined) return;
+  if (space === undefined || waiting()) return;
   space.hold(circleOf(globe()));
-  const plate = document.querySelector("[data-look='plate']")?.getBoundingClientRect();
-  const content = document.querySelector<HTMLElement>("[data-look='plate'] [data-content]");
-  // Where the words end: the content's right edge less its end padding (--plate-inset-end), where the fill starts to fade; its box alone reaches the plate's edge.
-  const words =
-    content === null
-      ? undefined
-      : content.getBoundingClientRect().right - parseFloat(getComputedStyle(content).paddingInlineEnd);
-  if (plate !== undefined) space.plate(plate, words ?? plate.right);
-}
-
-/** Whether space has drawn its first frame. */
-export const drawnYet = (): boolean => drawn.done;
-
-/** Calls `heard` once the first frame is drawn (at once if it was). */
-export function onDrawn(heard: () => void): () => void {
-  if (drawn.done) heard();
-  drawn.heard.add(heard);
-  return () => drawn.heard.delete(heard);
+  const plate = plateOf();
+  if (plate !== undefined) space.plate(plate.box, plate.words);
 }
 
 /** Whether a flight brings the page's planet now. */

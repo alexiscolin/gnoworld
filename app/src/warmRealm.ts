@@ -29,6 +29,38 @@ const warmChunks = (): void => {
   });
 };
 
+/** The code of each route a click may land on, once each (the root's and the not-found's left out), from the build's manifest as React Router puts
+ * it on the page; none where the page holds none (development). */
+export function routeModules(manifest: unknown): string[] {
+  const routes: unknown =
+    typeof manifest === "object" && manifest !== null ? Reflect.get(manifest, "routes") : undefined;
+  if (typeof routes !== "object" || routes === null) return [];
+  const modules = Object.entries(routes).flatMap(([id, route]) => {
+    const module: unknown = typeof route === "object" && route !== null ? Reflect.get(route, "module") : undefined;
+    return id === "root" || id.endsWith("notFound") || typeof module !== "string" ? [] : [module];
+  });
+  return [...new Set(modules)];
+}
+
+// The routes' modules fetched and run one at a time in idle time: a route's first visit ran its code after the click (up to 11 s on a software
+// GPU; a link's `modulepreload` still left the running to the click, 1.5 s). A module script of the manifest's own URL is the one the router
+// asks, run once by the module map; not `import()`, whose module is no plain name the lint's walls read (D123).
+let routed = false;
+function warmRoutes(): void {
+  if (routed || matchMedia(PHONE_QUERY).matches) return;
+  routed = true;
+  const queue = routeModules(Reflect.get(globalThis, "__reactRouterManifest"));
+  const next = (): void => {
+    const src = queue.shift();
+    if (src === undefined) return;
+    const done = (): void => void setTimeout(next);
+    document.head.append(
+      Object.assign(document.createElement("script"), { type: "module", src, onload: done, onerror: done }),
+    );
+  };
+  next();
+}
+
 const AHEAD_MOST = 8;
 const AT_ONCE = 2;
 
@@ -52,6 +84,7 @@ function inView(worlds: readonly World[], place: { kind: string; id: string }): 
 export async function warmBatch(place: { kind: string; id: string }, signal: AbortSignal): Promise<void> {
   if (!fastLink()) return;
   warmChunks();
+  warmRoutes();
   if (place.kind !== "system" && place.kind !== "universe") return;
   const file = await worldsFile();
   const queue = inView(file?.worlds ?? [], place).flatMap((world) => world.realms[0]?.path ?? []);

@@ -10,11 +10,12 @@ let flightOn = false;
 export const syncFlown = (): void =>
   document.querySelector("[data-globe]")?.setAttribute("data-flown", flightOn ? "flying" : "landed");
 
-/** A flight to the page's planet begins (`flying`) or ends. */
-export function markFlown(flying: boolean): void {
+/** A flight to the page's planet begins (`flying`) or ends; the aiming tags wait out of sight with it unless `tags` is false (the page's parts
+ * are hidden ahead of a click that may not send a flight, and given back as they were). */
+export function markFlown(flying: boolean, tags = true): void {
   flightOn = flying;
   syncFlown();
-  if (flying) waitTags();
+  if (flying && tags) waitTags();
 }
 
 /** The page's box keeps its planet's room and opens the plate round it once it says the planet is drawn (globe.module.css); the home's first

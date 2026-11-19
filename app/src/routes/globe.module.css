@@ -17,7 +17,7 @@
   }
 
   /* A flight brings the page's body: the frame, the plate and the dock wait out of sight, out of reach of a pointer, a key or a reader, and
-     come in together on the arrival's one clock (arrival.ts) as the flight ends. The page leaves `flown` "flying" from the click that asks
+     come in together on the arrival's one clock (arrival.ts) as the flight ends; the dock closes with the page at the click and opens with the destination's (the owner's call, over the approved video's). The page leaves `flown` "flying" from the click that asks
      the flight (host.ts). */
   .globe[data-flown="flying"] + * > * {
     opacity: 0;

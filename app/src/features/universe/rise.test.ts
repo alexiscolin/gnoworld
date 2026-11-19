@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { gsap } from "gsap";
 import { afterEach, expect, it, vi } from "vitest";
-import { holdChrome, riseChrome } from "./rise.ts";
+import { copyOf, fadeAway, holdChrome, riseChrome } from "./rise.ts";
 
 const still = vi.hoisted(() => ({ on: false }));
 vi.mock("../../space/motion.ts", () => ({
@@ -82,4 +82,80 @@ it("moves nothing at all under reduced motion", () => {
   still.on = true;
   riseChrome(0);
   expect(gsap.globalTimeline.getChildren()).toHaveLength(0);
+});
+
+// A page left by a click, its flight on its way, leaves as one block: the copy's layer fades as a whole on the compositor, none of its parts on a
+// clock of its own (the reversed arrival cut the lede and the cards out in the first frame and brought them back); the dock's copy keeps the
+// plate's fill, and no CSS animation runs in a copy.
+it("fades a copy as one layer on the compositor, no part animated alone, the dock's copy over the plate's fill", async () => {
+  const part = (attributes: string[]) => {
+    const box = document.body.appendChild(document.createElement("div"));
+    for (const name of attributes) box.setAttribute(name, "");
+    box.append(document.createElement("h1"), document.createElement("p"));
+    return box;
+  };
+  part(["data-exit"]);
+  part(["data-exit", "data-dock"]);
+  const set = vi.spyOn(CSSStyleDeclaration.prototype, "setProperty");
+  const layer = copyOf("[data-exit]");
+  if (layer === undefined) throw new Error("no copy taken");
+  // The copy is taken as the page stands; the page changes after it; the copy is the one taken.
+  document.body.querySelector("h1")?.remove();
+  expect(layer.parentElement).toBeNull();
+  let end: () => void = () => undefined;
+  const animate = vi.fn(() => ({ finished: new Promise<void>((done) => (end = done)) }));
+  layer.animate = animate as unknown as typeof layer.animate;
+  document.body.append(layer);
+  fadeAway(layer);
+  expect(animate).toHaveBeenCalledTimes(1);
+  expect(animate.mock.calls[0]).toMatchObject([[{ opacity: 1 }, { opacity: 0 }], { duration: 500 }]);
+  expect(gsap.getTweensOf(layer)).toHaveLength(0);
+  for (const inner of layer.querySelectorAll("*")) expect(gsap.getTweensOf(inner)).toHaveLength(0);
+  // (jsdom keeps no `animation` property: the calls are read.)
+  expect(set.mock.calls.filter(([name, value]) => name === "animation" && value === "none")).toHaveLength(6);
+  set.mockRestore();
+  expect(layer.querySelector<HTMLElement>("[data-dock]")?.style.background).toBe("var(--color-plate)");
+  expect(document.querySelector("[data-ghost]")).not.toBeNull();
+  end();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(document.querySelector("[data-ghost]")).toBeNull();
+});
+
+// A card mid its CSS rise (opacity 0 through its delay) stands in the copy as it is drawn at the click, never landed at its end state.
+it("copies a part mid-animation with the opacity and transform it is drawn with", () => {
+  const box = document.body.appendChild(document.createElement("div"));
+  box.setAttribute("data-exit", "");
+  const card = box.appendChild(document.createElement("section"));
+  const rested = box.appendChild(document.createElement("p"));
+  card.style.opacity = "0.2";
+  card.style.transform = "translateY(12px)";
+  card.dataset["rising"] = "";
+  const token = document.head.appendChild(document.createElement("style"));
+  token.textContent = "section { background-color: rgb(1, 2, 3); }";
+  // (jsdom has no getAnimations.)
+  Object.defineProperty(Element.prototype, "getAnimations", {
+    configurable: true,
+    value(this: Element) {
+      return this instanceof HTMLElement && this.dataset["rising"] !== undefined ? [{}] : [];
+    },
+  });
+  const copy = copyOf("[data-exit]")?.querySelector("section");
+  expect(copy?.style.opacity).toBe("0.2");
+  expect(copy?.style.backgroundColor).toBe("rgb(1, 2, 3)");
+  expect(copy?.style.transform).toBe("translateY(12px)");
+  expect(rested.style.opacity).toBe("");
+  Reflect.deleteProperty(Element.prototype, "getAnimations");
+  token.remove();
+});
+
+// A fade that is cancelled (the layer's animation rejects its `finished`) still removes the copy.
+it("removes the copy when its fade is cancelled", async () => {
+  const layer = document.body.appendChild(document.createElement("div"));
+  layer.animate = (() => ({ finished: Promise.reject(new Error("cancelled")) })) as unknown as typeof layer.animate;
+  fadeAway(layer);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(layer.isConnected).toBe(false);
 });

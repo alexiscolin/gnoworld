@@ -80,16 +80,37 @@ export { loading } from "./firstLook.ts";
 // The cosmos comes back under a flight: the hero and the worlds rise as it lands.
 export const RETURN_AFTER = 450;
 
-/** A fading ghost of each `[data-exit]` part in sight, as its page goes, so the page coming in is not cut in on them. Copied now, shown
- * once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
-export function ghost(stayed: () => boolean): void {
-  // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
-  const leaving = pageNow();
-  const parts = [...document.querySelectorAll("[data-exit]")].filter(
-    (part) => getComputedStyle(part).visibility !== "hidden",
-  );
+// What the page's place sets for a part holds out of its copy too: a plate whose fill space draws keeps it hidden (globe.module.css); beside a
+// plate the scene draws the dock's fill, which leaves with the page: its copy keeps the plate's. No animation runs in a copy.
+function carryFill(part: Element, copy: HTMLElement): void {
+  const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
+  if (fill !== "") copy.style.setProperty("--plate-fill", fill);
+  // A clone restarts its CSS animations (a card's rise holds it at opacity 0 till it runs out): none runs in a copy, each part standing as the
+  // live one is drawn now (one mid-rise, still at its delay, stays unseen, not landed at its end).
+  const [live, cloned] = [
+    [part, ...part.querySelectorAll("*")],
+    [copy, ...copy.querySelectorAll<HTMLElement>("*")],
+  ];
+  if (live.length === cloned.length)
+    live.forEach((each, at) => {
+      const drawn = getComputedStyle(each);
+      // A fill a part takes from a token its page sets (a card's, a dock's) is not set at the body, where the copy stands: it is carried as drawn.
+      if (drawn.backgroundColor !== "rgba(0, 0, 0, 0)")
+        cloned[at]?.style.setProperty("background-color", drawn.backgroundColor);
+      if (typeof each.getAnimations !== "function" || each.getAnimations().length === 0) return;
+      cloned[at]?.style.setProperty("opacity", drawn.opacity);
+      cloned[at]?.style.setProperty("transform", drawn.transform);
+    });
+  for (const inner of [copy, ...copy.querySelectorAll<HTMLElement>("*")]) inner.style.setProperty("animation", "none");
+  if (part.hasAttribute("data-dock") && !part.hasAttribute("data-alone")) copy.style.background = "var(--color-plate)";
+}
+
+/** A copy of each `[data-exit]` part in sight (or each of `among`), in a layer not yet shown: the page as it stands now. None under reduced
+ * motion, or with no part in sight. */
+export function copyOf(among: string): HTMLElement | undefined {
+  const parts = [...document.querySelectorAll(among)].filter((part) => getComputedStyle(part).visibility !== "hidden");
+  if (parts.length === 0 || motionOf().matches) return undefined;
   const layer = document.createElement("div");
-  if (parts.length === 0 || motionOf().matches) return;
   layer.setAttribute("aria-hidden", "true");
   // A ghost is the part's look and nothing else: it takes no pointer, and stands over the scene and the page, under the full chat
   // (ChatScreen.module.css, 3), which grows over it, and the loader.
@@ -101,9 +122,7 @@ export function ghost(stayed: () => boolean): void {
     if (copy === undefined) continue;
     copy.removeAttribute("data-exit");
     copy.setAttribute("data-ghost", "");
-    // What the page's place sets for it holds out of it too: a plate whose fill space draws keeps it hidden (globe.module.css).
-    const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
-    if (fill !== "") copy.style.setProperty("--plate-fill", fill);
+    carryFill(part, copy);
     if (getComputedStyle(part).position === "fixed") layer.append(copy);
     else {
       const { left, top, width, height } = part.getBoundingClientRect();
@@ -113,6 +132,29 @@ export function ghost(stayed: () => boolean): void {
       layer.append(stand);
     }
   }
+  return layer;
+}
+
+/** The copy `layer`, shown, fades away as one block, on the compositor: it goes on while the main thread is busy with the next page, where a
+ * tween on it stalled and cut the fade. */
+export function fadeAway(layer: HTMLElement): void {
+  layer
+    .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: "ease-out", fill: "forwards" })
+    .finished.then(() => {
+      layer.remove();
+    })
+    .catch(() => {
+      layer.remove();
+    });
+}
+
+/** A fading ghost of each `[data-exit]` part in sight as its page goes, so the page coming in is not cut in on them.
+ * Copied now, shown once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
+export function ghost(stayed: () => boolean): void {
+  // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
+  const leaving = pageNow();
+  const layer = copyOf("[data-exit]");
+  if (layer === undefined) return;
   queueMicrotask(() => {
     if (stayed()) return;
     document.body.append(layer);
