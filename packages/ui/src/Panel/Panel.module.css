@@ -147,7 +147,7 @@
     display: none;
   }
 
-  /* The one breakpoint of the plate and the dock beside it: the plate (608 at 1280, narrowing to it), 320 and the margins leave sky at 1280. Under it the
+  /* The one breakpoint of the plate and the dock beside it: the plate (632 at 1280 with its air, narrowing to it), 380 and the margins leave sky at 1280. Under it the
      plate is a block in the page and the chat takes the page, as a phone's does (DESIGN-SYSTEM.md, Breakpoints). */
   /* raw: the width where the plate and the dock fit with a sky between */
   @media (width >= 1280px) {

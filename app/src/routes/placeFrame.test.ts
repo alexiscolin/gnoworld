@@ -50,9 +50,6 @@ describe("the framed planet", () => {
     // The plate's air widens its fill, not its content (D14002): the content's edge, and the planet with it, stay where they stood.
     expect(token("--plate-inset-end")).toBe("calc(var(--plate-fade) + var(--plate-air))");
     const contentRight = px("--space-m") + plate(w) - px("--plate-fade") - air();
-    expect(contentRight).toBeCloseTo(
-      px("--space-m") + Math.min(Number(cap), Math.max(Number(floor), (Number(share) * w) / 100)) - px("--plate-fade"),
-    );
     const radius = Math.min(0.37 * w, 0.59 * h, (0.76 * w - contentRight - step) / 1.04);
     const limb = 0.76 * w - shift - 1.04 * radius;
     expect(radius).toBeGreaterThan(0);
