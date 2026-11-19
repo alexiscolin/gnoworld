@@ -70,6 +70,7 @@ export {
   SearchPage,
   SearchQuery,
 } from "./search.ts";
+export { ROOM_HISTORY_LINES, RoomHistory } from "./roomHistory.ts";
 export { Unread, UnreadPlaces, UNREAD_COUNT_MOST, UNREAD_PLACES_MOST } from "./unread.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 export { Key } from "./slug.ts";

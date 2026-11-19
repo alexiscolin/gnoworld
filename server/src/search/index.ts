@@ -6,7 +6,7 @@ import { z } from "zod";
 import { GONE } from "../door/lines.ts";
 import type { Fetched, Said } from "../irc/link.ts";
 import { remember } from "../remember.ts";
-import { makeQuery, type Found, type Query } from "./query.ts";
+import { makeLatest, makeQuery, type Found, type Query } from "./query.ts";
 import { ERGO_EXPIRE_MS } from "../retention/retention.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { searchable, type Typed } from "../rooms/types.ts";
@@ -55,6 +55,9 @@ INSERT INTO lines_fts (lines_fts, rank) VALUES ('secure-delete', 1);
 
 const INSERT = "INSERT OR IGNORE INTO lines (room, world, msgid, account, at, link, text) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
+const TRIM =
+  "DELETE FROM lines WHERE rowid IN (SELECT rowid FROM lines WHERE room = ? ORDER BY at DESC, rowid DESC LIMIT -1 OFFSET ?)";
+
 const linked = (text: string): number => (/https?:\/\/\S/i.test(text) ? 1 : 0);
 
 export interface Search {
@@ -69,6 +72,8 @@ export interface Search {
   size: () => number;
   /** The lines of `rooms` that hold every word of `q`, newest first, `limit` at most, from the cursor on. */
   query: (query: Query) => Found;
+  /** A room's newest `limit` lines, oldest first: what a page draws before its link has joined. */
+  latest: (room: string, limit: number) => { msgid: string; account: string; at: number; text: string }[];
   /** Asks Ergo for each of a room's lines, the oldest first, and drops those it no longer holds. */
   reconcile: (room: string, fetch: (room: string, msgid: string) => Promise<Fetched>) => Promise<void>;
 }
@@ -88,9 +93,7 @@ export function makeSearch(db: DatabaseSync, { roles, now, maxRows = MAX_ROWS }:
   db.exec("PRAGMA secure_delete = ON");
   const sql = {
     insert: db.prepare(INSERT),
-    trim: db.prepare(
-      "DELETE FROM lines WHERE rowid IN (SELECT rowid FROM lines WHERE room = ? ORDER BY at DESC, rowid DESC LIMIT -1 OFFSET ?)",
-    ),
+    trim: db.prepare(TRIM),
     drop: db.prepare(
       "DELETE FROM lines WHERE room = ? AND (msgid = ? OR rowid IN (SELECT line FROM line_edits WHERE edit = ?))",
     ),
@@ -156,6 +159,7 @@ export function makeSearch(db: DatabaseSync, { roles, now, maxRows = MAX_ROWS }:
     },
     size,
     query: makeQuery(db),
+    latest: makeLatest(db),
     async reconcile(room, fetch) {
       if (!held(room)) {
         sql.forget.run(room);
