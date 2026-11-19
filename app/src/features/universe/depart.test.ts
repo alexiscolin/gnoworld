@@ -163,9 +163,12 @@ describe("the flight on the click", () => {
     expect(stayed()).toBe(false);
     expect(among).toBe("[data-exit]:not([data-clear], nav)");
     expect(rise.ghost.mock.calls[0]?.[2]).toBe(true);
-    // The page's own arrival, if still playing, ends first: it would set the real dock visible through the flight.
+    // The copy is taken as the page stands on screen; then its own arrival ends (it would reveal the parts still hidden into the copy, and
+    // set the real dock visible through the flight).
     expect(arrival.endArrival).toHaveBeenCalledTimes(1);
-    expect(arrival.endArrival.mock.invocationCallOrder[0]).toBeLessThan(rise.ghost.mock.invocationCallOrder[0] ?? 0);
+    expect(arrival.endArrival.mock.invocationCallOrder[0]).toBeGreaterThan(
+      rise.ghost.mock.invocationCallOrder[0] ?? Infinity,
+    );
     expect(box.dataset["flown"]).toBe("flying");
     box.remove();
   });
