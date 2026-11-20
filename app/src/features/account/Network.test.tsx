@@ -1,45 +1,29 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { MemoryRouter, useLocation, useNavigate } from "react-router";
+import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
-import { PillHost } from "../../topPill.tsx";
 import { Network } from "./Network.tsx";
 
 // The network named right of the login button is a menu of the networks (D13501): Onyx and gno.land, the current one checked, "Testnet" kept
-// on Onyx; choosing one keeps the place when that network's chain holds it, else goes to its home and says so. The chain's read is faked.
-const chain = vi.hoisted(() => ({
-  readPage: vi.fn<(rpc: string, source: unknown, options: { signal?: AbortSignal }) => Promise<unknown>>(),
-}));
+// on Onyx; choosing another reloads the page on that network's home (D14004), so its worlds, rooms and scene start whole. No chain is read.
+const chain = vi.hoisted(() => ({ readPage: vi.fn() }));
 vi.mock("../../lib/chain/rpc.ts", async (original) => ({
   ...(await original<object>()),
   readPage: chain.readPage,
 }));
-
-const found = { ok: true, value: "# dao", source: { rpc: "x", chainId: null } };
-const missing = { ok: false, failure: { kind: "no-realm", next: "" }, source: { rpc: "x", chainId: null } };
+const assign = vi.fn<(path: string) => void>();
 
 beforeAll(() => {
   Object.assign(HTMLElement.prototype, { showPopover: () => undefined, hidePopover: () => undefined });
   vi.stubGlobal("reportError", vi.fn());
+  vi.stubGlobal("location", { assign, origin: "http://localhost" });
 });
 beforeEach(() => {
   chain.readPage.mockReset();
+  assign.mockReset();
 });
 
-const Where = () => <output data-at="">{useLocation().pathname}</output>;
-const Go = () => {
-  const navigate = useNavigate();
-  return (
-    <i
-      data-go=""
-      onClick={() => {
-        Promise.resolve(navigate("/w/bubble")).catch(reportError);
-      }}
-    />
-  );
-};
-const at = () => document.querySelector("[data-at]")?.textContent;
 const calling = <T extends Element>(find: () => T | null | undefined) => {
   const one = find();
   if (!one) throw new Error("not drawn");
@@ -58,9 +42,6 @@ async function draw(path: string, inPill = false) {
         testnet={!path.startsWith("/net/gnoland")}
         inPill={inPill}
       />
-      <Where />
-      <Go />
-      <PillHost />
     </MemoryRouter>,
   );
   act(() => {
@@ -101,116 +82,22 @@ describe("the network control", () => {
     expect(radio("Onyx").getAttribute("aria-checked")).toBe("false");
   });
 
-  it("goes to the realm's /net/gnoland page when gno.land's chain holds it, asking that chain", async () => {
-    chain.readPage.mockResolvedValue(found);
+  it("reloads the page on gno.land's home from any place, asking no chain", async () => {
     await draw("/r/gov/dao");
     await choose("gno.land");
-    await settled(() => at() === "/net/gnoland/r/gov/dao");
-    expect(chain.readPage).toHaveBeenCalledTimes(1);
-    expect(chain.readPage.mock.calls[0]?.[0]).toBe("https://rpc.gno.land:443");
-    expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
-  });
-
-  it("lets a read that settles late change nothing once the reader has gone elsewhere", async () => {
-    let settle: (value: typeof found) => void = () => undefined;
-    chain.readPage.mockReturnValue(new Promise((resolve) => (settle = resolve)));
-    await draw("/r/gov/dao");
-    await choose("gno.land");
-    act(() => {
-      document.querySelector<HTMLElement>("[data-go]")?.click();
-    });
-    await settled(() => at() === "/w/bubble");
-    settle(found);
-    await tick();
-    expect(at()).toBe("/w/bubble");
-    expect(document.querySelector("[aria-busy='true']")).toBeNull();
-    expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
-    expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
-  });
-
-  it("lets a second choice end the first: the first read changes nothing and the work stays shown until the second settles", async () => {
-    const pending: ((value: typeof found) => void)[] = [];
-    chain.readPage.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
-    const box = await draw("/r/gov/dao");
-    await choose("gno.land");
-    act(() => {
-      trigger(box).click();
-    });
-    await settled(() => radios().length > 0);
-    await choose("gno.land");
-    expect(chain.readPage).toHaveBeenCalledTimes(2);
-    pending[0]?.(found);
-    await tick();
-    expect(at()).toBe("/r/gov/dao");
-    expect(chain.readPage.mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
-    expect(trigger(box).getAttribute("aria-busy")).toBe("true");
-    pending[1]?.(found);
-    await settled(() => at() === "/net/gnoland/r/gov/dao");
-    expect(trigger(box).getAttribute("aria-busy")).not.toBe("true");
-  });
-
-  it("keeps a realm the other chain holds but draws no page for (no Render): the chain says it exists", async () => {
-    chain.readPage.mockResolvedValue({ ok: false, failure: { kind: "no-page", next: "" }, source: missing.source });
-    await draw("/r/gov/dao");
-    await choose("gno.land");
-    await settled(() => at() === "/net/gnoland/r/gov/dao");
-    expect(document.body.textContent).not.toMatch(/not on gno\.land/i);
-  });
-
-  it("keeps a realm the target's worlds list, with no chain asked", async () => {
-    chain.readPage.mockRejectedValue(new Error("down"));
-    await draw("/net/gnoland/r/gov/dao");
-    await choose("Onyx");
-    await settled(() => at() === "/r/gov/dao");
+    expect(assign.mock.calls).toEqual([["/net/gnoland"]]);
     expect(chain.readPage).not.toHaveBeenCalled();
-    expect(document.body.textContent).not.toMatch(/not on Onyx/i);
   });
 
-  it("shows the work on the trigger, which stays in view when the menu closes, while the chain is read", async () => {
-    chain.readPage.mockReturnValue(new Promise(() => undefined));
-    const hide = vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(function (this: HTMLElement) {
-      this.hidden = true;
-    });
-    const box = await draw("/r/gov/dao");
-    await choose("gno.land");
-    hide.mockRestore();
-    expect(document.querySelector<HTMLElement>("[role='menu']")?.hidden).toBe(true);
-    expect(trigger(box).getAttribute("aria-busy")).toBe("true");
-    expect(trigger(box).querySelector("[aria-hidden='true']")).not.toBeNull();
-    expect(at()).toBe("/r/gov/dao");
+  it("reloads the page on Onyx's home as /, never /net/onyx", async () => {
+    await draw("/net/gnoland/earth");
+    await choose("Onyx");
+    expect(assign.mock.calls).toEqual([["/"]]);
   });
 
-  it.each([
-    ["the chain has no such realm", () => chain.readPage.mockResolvedValue(missing)],
-    ["the read fails", () => chain.readPage.mockRejectedValue(new Error("down"))],
-  ])("goes to /net/gnoland with a line when %s", async (_, answer) => {
-    answer();
-    await draw("/r/gov/dao");
-    await choose("gno.land");
-    await settled(() => at() === "/net/gnoland");
-    await settled(() => /not on gno\.land/i.test(document.body.textContent));
-    expect(at()).toBe("/net/gnoland");
-  });
-
-  it("keeps a world gno.land does not list out: home and the line, no chain asked", async () => {
+  it("stays put for the network one is on", async () => {
     await draw("/w/bubble");
-    await choose("gno.land");
-    await settled(() => at() === "/net/gnoland");
-    expect(document.body.textContent).toMatch(/not on gno\.land/i);
-    expect(chain.readPage).not.toHaveBeenCalled();
-  });
-
-  it("goes back to Onyx's home as / from a gno.land page Onyx does not hold", async () => {
-    await draw("/net/gnoland/w/x");
     await choose("Onyx");
-    await settled(() => at() === "/");
-    expect(document.body.textContent).toMatch(/not on Onyx/i);
-  });
-
-  it("goes to the Earth of the other network from this one", async () => {
-    await draw("/earth");
-    await choose("gno.land");
-    await settled(() => at() === "/net/gnoland/earth");
-    expect(at()).toBe("/net/gnoland/earth");
+    expect(assign).not.toHaveBeenCalled();
   });
 });
