@@ -9,7 +9,9 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 ## Hard rules
 
 - Never add `Co-Authored-By`, "Generated with" or any other attribution line to commits or pull requests (`commit-msg` refuses them).
-- Never push, publish or deploy to a public network unless asked in the current conversation. Never `--no-verify`.
+- Never push, publish or deploy to a public network unless asked in the current conversation, but the agent's own `agent/**`
+  branches and their pull requests, which it publishes in Alexis's name through agent-pr alone (`.claude/skills/agent-github`,
+  D14012, D14013): never main, a tag, a forced push or a change of `.github/workflows`, which stays his. Never `--no-verify`.
 - Code, comments, commits and docs are in English, whatever the conversation's language; how to talk to each person is in their
   `CLAUDE.local.md`, never committed.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
@@ -18,9 +20,9 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 - Invent nothing: a claim about a library, an API or a gno package comes from the installed types or source, docs read in this
   session, or a live query of the chain; a review card cites its evidence and names what was not verified.
 - Be critical, never flattering: say what is wrong, weak or missing, with its evidence, even unasked.
-- A harness file (`.githooks/records.sh`'s list), CLAUDE.md and `.claude/` reach GitHub through Alexis's `land` alone (D241,
-  D13213): build the change in a copy, drop its branch's bundle and the pull request's text in `/private/tmp/claude-<uid>/land/`, give
-  him the tip's 16 hex.
+- A harness file (`.githooks/records.sh`'s list), CLAUDE.md and `.claude/` are built in a copy (D241) and reach GitHub as its
+  `agent/**` branch through agent-pr, or Alexis's `land` till 14a-2 removes it (D14014): its branch's bundle and the pull
+  request's text in `/private/tmp/claude-<uid>/land/`, and him given the tip's 16 hex.
 - The safety net never shrinks quietly: a test gone or switched off, a floor lowered, a gap or an ignore added is declared on a line
   of its own (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`) or GitHub's regressions job fails; no `.skip`, `.only`,
   `.todo`, `.fails`. Floors rise with the scores; a size cap moves only by Alexis's decision, recorded with its reason, never
@@ -38,7 +40,7 @@ the reviews: [docs/REVIEW.md](docs/REVIEW.md). Each area's rules load from `.cla
 - Commits: `type(scope): what` in 72 characters at most, one behaviour each, a refactor apart, files staged by name, the message
   from a file.
 - `sh scripts/check.sh` before each commit of code; a journey written or changed is walked before its commit. One pass (D13178,
-  D13186): before asking Alexis to push, run once every job GitHub will run that the sandbox can (check.sh on the committed tree,
+  D13186): before a push, run once every job GitHub will run that the sandbox can (check.sh on the committed tree,
   the lint job, regressions, the harness's tests; deploy-stack and zizmor are GitHub's alone), and read every red job of main
   first. One push a fix pass.
 - One review a pull request: the `reviewer` agent, with the `security-reviewer` when tier 1 or the harness changes (D13181; a

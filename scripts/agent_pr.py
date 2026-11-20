@@ -28,7 +28,8 @@ SPACE = f"/private/tmp/claude-{os.getuid()}/agent-pr/"
 OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}")
 NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}")
 PART = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}")
-TOKEN = re.compile(r"ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,255}")
+# A classic or fine-grained token, or the owner's own gh login's, as `gh auth token` gives it (D14012).
+TOKEN = re.compile(r"gh[po]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,255}")
 # An allow-list line: a repository, then the name of the token it uses when not the default one (token.<name>).
 LINE = re.compile(r"(\S+)(?: ([a-z0-9][a-z0-9-]{0,31}))?")
 SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
@@ -114,7 +115,21 @@ def take(path, limit, dest):
     return data
 
 
+def from_gh():
+    """The owner's own token: his gh login's for github.com, asked of gh at each call, as him, from his own home and with nothing
+    of the caller's environment (D14012, D14013); never kept, never copied."""
+    home = pwd.getpwuid(os.getuid()).pw_dir
+    environ = {"PATH": TOOLS, "HOME": home, "LC_ALL": "C", "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1"}
+    out = run(["gh", "auth", "token", "--hostname", "github.com"], environ, "gh auth token").stdout
+    token = out[:-1] if out.endswith("\n") else out
+    if not TOKEN.fullmatch(token):
+        raise Failed("gh gave no single GitHub token line for github.com (gh auth login, in your own Terminal)")
+    return token
+
+
 def read_token(which):
+    if which == "token":
+        return from_gh()
     path = os.path.join(STATE, which)
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)

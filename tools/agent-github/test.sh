@@ -36,7 +36,7 @@ done
 g clone -q "$t/github/alexis/proj.git" "$t/s"
 g -C "$t/s" checkout -qb agent/feat && echo two >"$t/s/b.txt" && g -C "$t/s" add b.txt && g -C "$t/s" commit -qm two
 g -C "$t/s" bundle create -q "$t/space/feat.bundle" agent/feat
-printf '%s\n' "$TOKEN" >"$t/state/token" && chmod 600 "$t/state/token"
+printf '%s\n' "$TOKEN" >"$t/gh.login" # the owner's own gh login, which gh gives agent-pr at each call (D14013)
 printf 'alexis/proj\nalexis/empty\nalexis/missing\nalexis/other agent\n' >"$t/state/repos.allow"
 AGENT=ghp_$(printf '%036d' 9)
 printf '%s\n' "$AGENT" >"$t/state/token.agent" && chmod 600 "$t/state/token.agent"
@@ -50,6 +50,12 @@ exec "$GIT" "\$@"
 EOF
 cat >"$t/bin/gh" <<EOF
 #!/bin/sh
+if [ "\$1 \$2" = "auth token" ]; then
+	printf '%s\n' "\$@" >"$t/gh.auth.args"
+	/usr/bin/env >"$t/gh.auth.env"
+	[ -f "$t/gh.login" ] || exit 1
+	exec /bin/cat "$t/gh.login"
+fi
 printf '%s\n' "\$@" >"$t/gh.args"
 env >"$t/gh.env"
 for a in "\$@"; do case \$a in --body-file=*) cat "\${a#--body-file=}" >"$t/gh.body" ;; esac; done
@@ -122,7 +128,13 @@ theirs = [c for c in calls if c not in ours]
 sys.exit(not ours or not all(c[2:3] == ["log"] or c[:3] == ["ls-remote", "--quiet", "--get-url"] for c in theirs))
 PY
 grep -q "^HOME=$t/evilhome" "$t/git.log" && fail "git ran with the session's HOME"
-grep -rl "$TOKEN" "$t/state" | grep -v "^$t/state/token$" && fail "the token was written into the helper's state"
+grep -rl "$TOKEN" "$t/state" && fail "the owner's token was written into the helper's state: it is gh's, never copied (D14013)"
+# gh was asked github.com's token alone, as the owner, from his own home (the password database's, never the session's), and none of
+# the session's variables reached it (its GH_ENTERPRISE_TOKEN, GITHUB_TOKEN, GH_HOST above).
+[ "$(tr '\n' ' ' <"$t/gh.auth.args" 2>/dev/null)" = "auth token --hostname github.com " ] || fail "gh was not asked github.com's token alone"
+pwhome=$(python3 -I -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')
+grep -qx "HOME=$pwhome" "$t/gh.auth.env" || fail "gh was asked the owner's token from another home than his"
+grep -E "^(GH_TOKEN|GITHUB_TOKEN|GH_HOST|GH_ENTERPRISE_TOKEN|GITHUB_ENTERPRISE_TOKEN|GH_CONFIG_DIR)=" "$t/gh.auth.env" && fail "a variable of the session reached gh's token read"
 rm -f "$t/git.log"
 
 # 3. Never a forced push: a rewritten agent branch is refused and the remote keeps its commit.
@@ -215,29 +227,57 @@ cp "$t/outside/out.bundle" "$t/space/out.bundle"
 case $t in /private/tmp/*) run push alexis/proj "${t#/private}/space/out.bundle" || fail "the space written /tmp/... was refused: $(cat "$t/out")" ;; *) fail "the test's folder is not under /private/tmp" ;; esac
 [ "$(remote agent/outside)" != none ] || fail "the bundle from the space written /tmp/... did not land"
 
-# 7. The token: missing, a link, open to others, or not exactly one token line; nothing is pushed; 400 is taken.
-tok="$t/state/token"
+# 7. A token kept in a file, an agent account's (token.<name>): missing, a link, open to others, or not exactly one token line;
+# nothing is pushed; 400 is taken.
+tok="$t/state/token.agent"
 g -C "$t/s" checkout -q -b agent/tok main && echo tok >"$t/s/t.txt" && g -C "$t/s" add t.txt && g -C "$t/s" commit -qm tok
 g -C "$t/s" bundle create -q "$t/space/tok.bundle" agent/tok
 mv "$tok" "$tok.bak"
-run push alexis/proj "$t/space/tok.bundle" && fail "it pushed with no token"
+run push alexis/other "$t/space/tok.bundle" && fail "it pushed with no token"
 ln -s "$tok.bak" "$tok"
-run push alexis/proj "$t/space/tok.bundle" && fail "it followed a link to the token"
+run push alexis/other "$t/space/tok.bundle" && fail "it followed a link to the token"
 rm "$tok"
 for mode in 644 640 604 666 755; do
 	cp "$tok.bak" "$tok" && chmod "$mode" "$tok"
-	run push alexis/proj "$t/space/tok.bundle" && fail "it took a token file of mode $mode"
+	run push alexis/other "$t/space/tok.bundle" && fail "it took a token file of mode $mode"
 	rm -f "$tok"
 done
 for bad in "$(printf '%s\n%s' "$TOKEN" "$TOKEN")" "ghp_x\$(touch $t/ran)" "$(printf '%s\r' "$TOKEN")" "$TOKEN " "not a token" ""; do
 	printf '%s\n' "$bad" >"$tok" && chmod 600 "$tok"
-	run push alexis/proj "$t/space/tok.bundle" && fail "it took a token file holding: $bad"
+	run push alexis/other "$t/space/tok.bundle" && fail "it took a token file holding: $bad"
 done
-[ "$(remote agent/tok)" = none ] || fail "a push went out without a usable token"
+[ "$(remote agent/tok "$t/github/alexis/other.git")" = none ] || fail "a push went out without a usable token"
 cp "$tok.bak" "$tok" && chmod 400 "$tok"
-run push alexis/proj "$t/space/tok.bundle" || fail "a token file of mode 400 was refused: $(cat "$t/out")"
-[ "$(remote agent/tok)" != none ] || fail "the control push after the token tests did not land"
+run push alexis/other "$t/space/tok.bundle" || fail "a token file of mode 400 was refused: $(cat "$t/out")"
+[ "$(remote agent/tok "$t/github/alexis/other.git")" != none ] || fail "the control push after the token tests did not land"
 chmod 600 "$tok"
+# A gh login's token in such a file (gho_ and 36 letters or digits) is taken as any other.
+g -C "$t/s" checkout -q -b agent/gho main && echo gho >"$t/s/o.txt" && g -C "$t/s" add o.txt && g -C "$t/s" commit -qm gho
+g -C "$t/s" bundle create -q "$t/space/gho.bundle" agent/gho
+GHO=gho_$(printf '%036d' 5)
+printf '%s\n' "$GHO" >"$tok" && chmod 600 "$tok"
+run push alexis/other "$t/space/gho.bundle" || fail "the owner's gh login token was refused: $(cat "$t/out")"
+[ "$(remote agent/gho "$t/github/alexis/other.git")" != none ] || fail "the push with the owner's gh login token did not land"
+grep -qx "AGENT_TOKEN=$GHO" "$t/git.log" || fail "git did not get the owner's gh login token"
+cp "$tok.bak" "$tok" && chmod 600 "$tok"
+
+# 7b. The owner's own token is gh's, asked at each call (D14012, D14013): gh giving none, or what is no single token line, pushes
+# nothing; a copy left in the state by an earlier install is never read.
+g -C "$t/s" checkout -q -b agent/ghtok main && echo g >"$t/s/g.txt" && g -C "$t/s" add g.txt && g -C "$t/s" commit -qm ghtok
+g -C "$t/s" bundle create -q "$t/space/ghtok.bundle" agent/ghtok
+mv "$t/gh.login" "$t/gh.login.bak"
+run push alexis/proj "$t/space/ghtok.bundle" && fail "it pushed with gh giving no token"
+for bad in "not a token" "${TOKEN}x" "$(printf '%s\n%s' "$TOKEN" "$TOKEN")" ""; do
+	printf '%s\n' "$bad" >"$t/gh.login"
+	run push alexis/proj "$t/space/ghtok.bundle" && fail "it pushed with gh giving: $bad"
+done
+[ "$(remote agent/ghtok)" = none ] || fail "a push went out without a token from gh"
+mv "$t/gh.login.bak" "$t/gh.login"
+printf '%s\n' "$AGENT" >"$t/state/token" && chmod 600 "$t/state/token"
+rm -f "$t/git.log"
+run push alexis/proj "$t/space/ghtok.bundle" || fail "the push with gh's token restored failed: $(cat "$t/out")"
+grep -qx "AGENT_TOKEN=$TOKEN" "$t/git.log" && ! grep -q "AGENT_TOKEN=$AGENT" "$t/git.log" || fail "a copy of a token in the state was read instead of gh's"
+rm -f "$t/state/token"
 
 # 8. A secret in any pushed commit stops the push: in a file, added then removed, hidden from diffs, allowed by the
 # repository's own gitleaks files, by an allow comment, or brought in by a merge; and again with a clean commit on top.
@@ -400,106 +440,162 @@ wait "$pb"; rb=$?
 "$GIT" -C "$t/github/alexis/proj.git" grep -q "$SECRET" agent/race 2>/dev/null && fail "a secret reached the remote through the race"
 alltext="$alltext$(cat "$t/outA" "$t/outB")"
 
-# 14. The guard hook: a call naming the helper is taken in its one form alone; no reading tool names the state folder.
+# 14. The guard hook: a call naming the helper is taken in its one form alone; no reading tool names the state folder. A refusal is
+# exit 2, which Claude Code blocks on; any other failure would let the call through, so what it cannot read is refused too.
 H=/opt/agent/.local/bin/agent-pr
 U=$(id -u)
 guard() { printf '%s' "$1" | python3 -I "$here/agent_pr_guard.py" "$H" >/dev/null 2>&1; }
+refuses() { guard "$1"; [ $? = 2 ]; }
+nl='
+' # a trailing newline, which a command substitution would strip
 bash_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
-for ok in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$H push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
-	"$H open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md" "git status" "ls tools/agent-github"; do
+# The helper is written with its absolute path, or from the session's own home, as the project's settings name it (D14000 C): both
+# forms take the same calls, and refuse the same ones.
+for P in "$H" "~/.local/bin/agent-pr"; do
+	for ok in "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$P push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
+		"$P open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md"; do
+		guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
+	done
+	for bad in "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle; cat x" "$P push alexis/proj /tmp/claude-$U/a/b.bundle" "$P push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle && cat x" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/*.bundle" "$P push alexis/proj /tmp/claude-$U/agent-pr/*(e:'touch x':)" \
+		"$P push alexis/proj \$(cat x)" "$P push alexis/proj /tmp/claude-$U/agent-pr/../../etc/hosts" "$P push alexis/proj /tmp/claude-$U/agent-pr/a\$(id)b" "$P push alexis/proj /tmp/claude-0/a.bundle" \
+		"HOME=/tmp $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" "env $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle > /tmp/claude-$U/o" "$(printf '%s\n%s' "$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle" "cat x")" \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle extra" "$P open alexis/proj main /tmp/claude-$U/agent-pr/a/pr.md" \
+		"$P open alexis/proj agent/x /tmp/claude-$U/a/pr.md" "$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle " \
+		"$P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle$nl" " $P push alexis/proj /tmp/claude-$U/agent-pr/a.bundle"; do
+		refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
+	done
+done
+# The helper spelt with the shell's quotes or escapes, which Claude Code strips from a command's first word before it matches the
+# exclusion (2.1.328's code, read by the security review of 14a-1): refused under both forms, never let through unread.
+for bad in "~/.local/bin/agent''-pr x > /tmp/claude-$U/o" "~/.local/bin/agent\\-pr x" '~/.local/bin/agent""-pr x' "~/.local/bin/agent\$'-'pr x" \
+	'~/.local/b""in/agent-pr x' '~/.local/bin/agent``-pr x' "$(printf '%s' "$H" | sed "s/-pr\$/''-pr/") x > /tmp/claude-$U/o" \
+	"$(printf '%s' "$H" | sed 's/-pr$/""-pr/') x"; do
+	refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2) the helper spelt: $bad"
+done
+# Only the session's own home: never another user's, the shell's own folders, a quoted or escaped tilde, a variable, or a folder below.
+for bad in "~root/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "~+/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"~-/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "./~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"'~/.local/bin/agent-pr' push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\"~/.local/bin/agent-pr\" push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"\\~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "\$HOME/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"\${HOME}/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "~/x/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" \
+	"cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'"; do
+	refuses "$(bash_call "$bad")" || fail "the guard did not refuse (exit 2): $bad"
+done
+for ok in "git status" "ls tools/agent-github"; do
 	guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
 done
-for bad in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle; cat x" "$H push alexis/proj /tmp/claude-$U/a/b.bundle" "$H push alexis/proj /tmp/claude-$U/a/b.bundle && cat x" \
-	"$H push alexis/proj /tmp/claude-$U/agent-pr/*.bundle" "$H push alexis/proj /tmp/claude-$U/agent-pr/*(e:'touch x':)" \
-	"$H push alexis/proj \$(cat x)" "$H push alexis/proj /tmp/claude-$U/agent-pr/../../etc/hosts" "$H push alexis/proj /tmp/claude-$U/agent-pr/a\$(id)b" "$H push alexis/proj /tmp/claude-0/a.bundle" \
-	"HOME=/tmp $H push alexis/proj /tmp/claude-$U/a.bundle" "~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/a.bundle" \
-	"$H push alexis/proj /tmp/claude-$U/a.bundle > /tmp/claude-$U/o" "$(printf '%s\n%s' "$H push alexis/proj /tmp/claude-$U/a.bundle" "cat x")" \
-	"$H push alexis/proj /tmp/claude-$U/a.bundle extra" "$H open alexis/proj main /tmp/claude-$U/a/pr.md" \
-	"cat ~/.local/share/agent-github/token" "sh -c 'cat /opt/agent/.local/share/agent-github/token'"; do
-	guard "$(bash_call "$bad")" && fail "the guard took: $bad"
+# What it cannot read is refused, never a crash Claude Code would let through.
+for bad in 'garbage' '[]' '{"tool_name": "Bash", "tool_input": null}' '{"tool_name": "Bash", "tool_input": {"command": 7}}' '{"tool_name": 7}' \
+	'{"tool_name": "Bash", "tool_input": {"command": ["x"]}}'; do
+	refuses "$bad" || fail "the guard did not refuse (exit 2) a call it cannot read: $bad"
 done
 for reader in '{"tool_name": "Read", "tool_input": {"file_path": "/opt/agent/.local/share/agent-github/token"}}' \
 	'{"tool_name": "Grep", "tool_input": {"pattern": "ghp_", "path": "../../.local/share/agent-github"}}' \
 	'{"tool_name": "Glob", "tool_input": {"pattern": "**/*", "path": "/opt/agent/.local/share/agent-github"}}'; do
-	guard "$reader" && fail "the guard let a tool read the state folder: $reader"
+	refuses "$reader" || fail "the guard let a tool read the state folder: $reader"
 done
 guard '{"tool_name": "Read", "tool_input": {"file_path": "tools/agent-github/agent-pr"}}' || fail "the guard refused reading the helper's source"
 guard '{"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content": "the state is ~/.local/share/agent-github"}}' ||
 	fail "the guard refused a write that only names the folder"
 
-# 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: each profile
-# gets the denies of every profile, the sandbox on, the exclusion and the hook; a profile that turns hooks off is refused.
+# 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: it installs the
+# helper with the tools it found, the guard and the state, takes the owner's own gh login token (D14012), and writes nothing into a
+# profile, neither settings nor a skill (D14000 C, D14013): the exclusion, the denies, the hook and the skill are the project's own,
+# committed. It still reads every profile, and refuses one that turns hooks off or grants what the helper keeps.
 fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts"
-cp "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/" && cp "$helper" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts/agent_pr.py"
+cp "$here/agent_pr_guard.py" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/" && cp "$helper" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/scripts/agent_pr.py"
 echo '{"permissions": {"deny": ["Edit(~/.zshrc)"]}, "sandbox": {"excludedCommands": ["x *"]}}' >"$fh/.claude/settings.json"
 echo '{"theme": "dark"}' >"$fh/.claude-work/settings.json"
+cp -R "$fh" "$t/fakehome.before"
 sed -e "s|^raw=.*|raw=file://$t/raw|" -e "s|^api=.*|api=file://$t/api|" -e "s|--proto '=https'|--proto '=https,file'|" "$here/install.sh" >"$t/install.sh"
 mkdir -p "$t/api/repos/a/b/compare" && echo '{"status": "behind"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
 echo '{"status": "identical"}' >"$t/api/repos/a/b/compare/main...0123456"
-inst() { HOME="$fh" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
+inst() { env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN -u GH_HOST HOME="$fh" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
 # What the installer must have found on the PATH it ran with (D13412): the helper holds that python3, then the folders of that
-# git, gh and gitleaks and the system's own PATH; each profile denies exactly the folder above each one's folder outside the
-# system's, as found and as real, the outermost alone, and runs the guard hook with that python3.
-protected() { # protected <home> <the PATH the installer ran with>
+# git, gh and gitleaks and the system's own PATH.
+written() { # written <home> <the PATH the installer ran with>
 	python3 -I - "$1" "$2" <<'PY'
-import json, os, shutil, sys
+import os, shutil, sys
 home, path = sys.argv[1:]
 system = os.confstr("CS_PATH").split(":")
 found = {n: os.path.join(os.path.realpath(os.path.dirname(w)), os.path.basename(w)) for n, w in ((n, shutil.which(n, path=path)) for n in ("python3", "git", "gh", "gitleaks"))}
-up = lambda d: os.path.dirname(d) if os.path.dirname(d) != "/" else d
-pre = {up(d) for p in found.values() for d in (os.path.dirname(p), os.path.dirname(os.path.realpath(p))) if d not in system}
-pre = {a for a in pre if not any(a.startswith(b + "/") for b in pre)}
 lines = open(f"{home}/.local/bin/agent-pr").read().split("\n")
 assert lines[0] == f"#!/usr/bin/env -S -i LC_ALL=C {found['python3']} -I", lines[0]
 tools = ":".join(list(dict.fromkeys(os.path.dirname(found[n]) for n in ("git", "gh", "gitleaks"))) + system)
 assert f'TOOLS = "{tools}"' in lines, [l for l in lines if l.startswith("TOOLS")]
-for profile in (".claude", ".claude-work"):
-    s = json.load(open(f"{home}/{profile}/settings.json"))
-    assert {r for r in s["permissions"]["deny"] if r.startswith("Edit(//")} == {f"Edit(/{a}/**)" for a in pre}, (profile, pre)
-    assert f"{found['python3']} -I {home}/.claude/hooks/agent_pr_guard.py {home}/.local/bin/agent-pr" in [h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]], profile
 PY
 }
-protected "$fh" "$PATH" || fail "the installer did not write in the tools found on its PATH, or deny their folders"
+written "$fh" "$PATH" || fail "the installer did not write in the tools found on its PATH"
+untouched() { # untouched <home> <its copy before>: every profile's settings as they were, and no skill written into one
+	diff -r -x hooks "$2/.claude" "$1/.claude" >/dev/null && diff -r "$2/.claude-work" "$1/.claude-work" >/dev/null
+}
+untouched "$fh" "$t/fakehome.before" || fail "the installer wrote into a profile (D14000 C): $(diff -r -x .local -x hooks "$t/fakehome.before" "$fh")"
 # A PATH folder that is a link in a folder a session writes, to the tools' own: the real folder is written in, never the link,
 # which the session could point at its own programs once the install is done.
 fh4="$t/fh4" && mkdir -p "$fh4/.claude" "$fh4/.claude-work" && echo '{}' >"$fh4/.claude/settings.json" && echo '{}' >"$fh4/.claude-work/settings.json" && ln -s "${GH%/*}" "$t/hb"
 (HOME="$fh4" PATH="$t/hb:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with a linked folder first: $(cat "$t/inst.out")"
-protected "$fh4" "$t/hb:$PATH" && ! grep -qF "$t/hb" "$fh4/.local/bin/agent-pr" "$fh4/.claude/settings.json" || fail "the installer wrote in a linked folder, not the one it leads to"
-# --stamp, which install_hooks.sh runs for land, writes the tools in once every profile denies their folders, and refuses before.
-cp "$helper" "$t/stamped" && HOME="$fh" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1 && head -1 "$t/stamped" | grep -qxF "#!/usr/bin/env -S -i LC_ALL=C $PY -I" ||
-	fail "--stamp did not write in the tools with every profile denying their folders: $(cat "$t/inst.out")"
+written "$fh4" "$t/hb:$PATH" && ! grep -qF "$t/hb" "$fh4/.local/bin/agent-pr" || fail "the installer wrote in a linked folder, not the one it leads to"
+[ "$(cat "$fh4/.claude/settings.json")" = '{}' ] && [ "$(cat "$fh4/.claude-work/settings.json")" = '{}' ] && [ ! -e "$fh4/.claude/skills" ] && [ ! -e "$fh4/.claude-work/skills" ] ||
+	fail "the installer wrote into a profile of a second home"
+# --stamp, which install_hooks.sh runs for land till 14a-2 removes it, writes the tools in once every profile denies exactly the folder
+# above each tool's folder outside the system's, as found and as real, the outermost alone (what an earlier install wrote), and
+# refuses while one is missing; with the system's own python3 and git found first, their folders need no deny.
+stamp_denies() { # stamp_denies <home> <PATH> [drop]: the denies an earlier install wrote for that PATH, or all but the first
+	python3 -I - "$1" "$2" "${3:-}" <<'PY'
+import json, os, shutil, sys
+home, path, drop = sys.argv[1:]
+system = os.confstr("CS_PATH").split(":")
+found = [os.path.join(os.path.realpath(os.path.dirname(w)), os.path.basename(w)) for w in (shutil.which(n, path=path) for n in ("python3", "git", "gh", "gitleaks"))]
+up = lambda d: os.path.dirname(d) if os.path.dirname(d) != "/" else d
+pre = {up(d) for p in found for d in (os.path.dirname(p), os.path.dirname(os.path.realpath(p))) if d not in system}
+pre = sorted(a for a in pre if not any(a.startswith(b + "/") for b in pre))
+rules = [f"Edit(/{a}/**)" for a in pre][1 if drop else 0:]
+for profile in (".claude", ".claude-work"):
+    json.dump({"permissions": {"deny": rules}}, open(f"{home}/{profile}/settings.json", "w"))
+PY
+}
+stamped_with() { # stamped_with <PATH>: --stamp, run with that PATH, wrote in the python3 it found, through its folder's real path
+	spy=$(PATH=$1 && command -v python3) && spy=$(cd "${spy%/*}" && pwd -P)/python3 &&
+		cp "$helper" "$t/stamped" && HOME="$fh" PATH="$1" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1 &&
+		head -1 "$t/stamped" | grep -qxF "#!/usr/bin/env -S -i LC_ALL=C $spy -I"
+}
+for P in "$PATH" "/usr/bin:$PATH"; do
+	stamp_denies "$fh" "$P" || fail "the test could not give the profiles the tools' denies"
+	stamped_with "$P" || fail "--stamp did not write in the tools with every profile denying their folders (PATH=$P): $(cat "$t/inst.out")"
+	stamp_denies "$fh" "$P" drop || fail "the test could not give the profiles the tools' denies"
+	stamped_with "$P" && fail "--stamp wrote in the tools with a profile missing one of their folders' denies (PATH=$P)"
+done
+cp "$t/fakehome.before/.claude/settings.json" "$fh/.claude/settings.json" && cp "$t/fakehome.before/.claude-work/settings.json" "$fh/.claude-work/settings.json"
 if [ -x /usr/bin/python3 ] && [ "$PY" != /usr/bin/python3 ]; then # another python3 and git, the system's own
 	fh3="$t/fh3" && mkdir -p "$fh3/.claude" "$fh3/.claude-work" && echo '{}' >"$fh3/.claude/settings.json" && echo '{}' >"$fh3/.claude-work/settings.json"
 	(HOME="$fh3" PATH="/usr/bin:$PATH" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) || fail "the installer failed with the system's python3 first: $(cat "$t/inst.out")"
-	protected "$fh3" "/usr/bin:$PATH" || fail "the installer did not write in the system's python3 and git it found first, or denied the wrong folders"
+	written "$fh3" "/usr/bin:$PATH" || fail "the installer did not write in the system's python3 and git it found first"
 fi
-python3 -I - "$fh" <<'PY' || fail "the installer left a profile without its protections"
-import json, sys
-home = sys.argv[1]
-for profile in (".claude", ".claude-work"):
-    s = json.load(open(f"{home}/{profile}/settings.json"))
-    deny, sb = s["permissions"]["deny"], s["sandbox"]
-    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/settings.json)",
-                 "Edit(~/.claude-work/settings.json)", "Edit(~/.claude-work/skills/**)", "Edit(~/.claude/hooks/**)"):
-        assert rule in deny, (profile, rule)
-    assert sb["enabled"] is True and sb["allowUnsandboxedCommands"] is False, profile
-    assert f"{home}/.local/bin/agent-pr *" in sb["excludedCommands"] and "~/.local/share/agent-github" in sb["filesystem"]["denyRead"], profile
-    assert any("agent_pr_guard.py" in h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]), profile
-assert "Edit(~/.zshrc)" in json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"]
-PY
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/proj\nalexis/other agent')" ] || fail "the allow list is not the repositories given"
-# Line 1 and TOOLS aside, the helper installed is the commit's.
+# Line 1 and TOOLS aside, the helper installed is the commit's; the guard installed is the commit's.
 sed -e 1d -e '/^TOOLS = /d' "$helper" >"$t/shipped.rest" && sed -e 1d -e '/^TOOLS = /d' "$fh/.local/bin/agent-pr" >"$t/installed.rest"
 cmp -s "$t/shipped.rest" "$t/installed.rest" || fail "the helper installed is not the commit's"
-grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
-[ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
+cmp -s "$here/agent_pr_guard.py" "$fh/.claude/hooks/agent_pr_guard.py" || fail "the guard installed is not the commit's"
+tokfile="$fh/.local/share/agent-github/token"
+mode() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"; }
+# No copy of the owner's token is kept (D14013): agent-pr asks gh for it at each call. Not from a gh token in the installer's own
+# environment either; and a copy an earlier install wrote is removed.
+GHO=gho_$(printf '%036d' 3)
+(export GH_TOKEN="$GHO" && HOME="$fh" sh "$t/install.sh" a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj </dev/null >"$t/inst.out" 2>&1) ||
+	fail "the install failed: $(cat "$t/inst.out")"
+[ ! -e "$tokfile" ] && ! grep -rq "$GHO" "$fh" || fail "the installer kept a copy of the owner's token (D14013)"
+printf '%s\n' "$GHO" >"$tokfile" && chmod 600 "$tokfile"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "an install over an earlier one failed: $(cat "$t/inst.out")"
+[ ! -e "$tokfile" ] || fail "the installer left the copy of the owner's token an earlier install wrote"
+[ "$(mode "$fh/.local/share/agent-github")" = 700 ] || fail "agent-pr's folder is not the owner's alone"
+untouched "$fh" "$t/fakehome.before" || fail "a later install wrote into a profile"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
-[ "$(grep -c agent_pr_guard "$fh/.claude/settings.json")" = 1 ] || fail "a second install added the hook twice"
 [ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/other agent\nalexis/proj')" ] || fail "a second install did not keep one line per repository"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/other
 grep -qx "alexis/other agent" "$fh/.local/share/agent-github/repos.allow" && fail "a repository named again kept its earlier token"
-grep -q "Edit(~/.zshrc)" "$fh/.claude-work/settings.json" || fail "the work profile did not get the default profile's own denies"
 grep -q "warning: .*runs 'x \*' outside the sandbox" "$t/inst.out" || fail "the installer did not warn of an exclusion found through PATH"
 echo '{"status": "diverged"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
 inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a commit that is not on the branch named"
@@ -542,7 +638,7 @@ refused "$fh2" "$t/early/../early:$PATH" "gh: $t/early/../early/gh is under "
 refused "$fh2" ".:$PATH" "./gh is under " "" "$t/early"
 case :$(command -p getconf PATH): in *":${GL%/*}:"*) ;; *)
 	cp "$helper" "$t/stamped" && (HOME="$fh2" sh "$t/install.sh" --stamp "$t/stamped" >"$t/inst.out" 2>&1) && fail "--stamp wrote in tools no profile keeps from its sessions"
-	grep -qF "run agent-github's installer first" "$t/inst.out" && head -1 "$t/stamped" | grep -q "@PYTHON3@" || fail "--stamp did not refuse tools no profile keeps from its sessions: $(cat "$t/inst.out")"
+	grep -qF "add these denies to each by hand" "$t/inst.out" && head -1 "$t/stamped" | grep -q "@PYTHON3@" || fail "--stamp did not refuse tools no profile keeps from its sessions: $(cat "$t/inst.out")"
 	;;
 esac
 refused "$fh2" /usr/bin:/bin "no gh on your PATH"

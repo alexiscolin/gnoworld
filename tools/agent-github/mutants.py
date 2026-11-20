@@ -21,7 +21,7 @@ MUTANTS = [
     (H, [("flags = os.O_RDONLY | os.O_NOFOLLOW |", "flags = os.O_RDONLY |")], "no link followed"),
     (H, [('TMP + p[4:] if p.startswith("/tmp/") else p for p', "p for p")], "the space written /tmp/..."),
     (H, [("        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:", "        if not stat.S_ISREG(st.st_mode):")], "the token is the owner's alone"),
-    (H, [("    if not TOKEN.fullmatch(token):", "    if not token:")], "the token is one token line"),
+    (H, [("    if not TOKEN.fullmatch(token):\n        raise Failed(f\"{path}", "    if not token:\n        raise Failed(f\"{path}")], "a file's token is one token line"),
     (H, [("        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)\n    except OSError as e:\n        raise Failed(f\"no token", "        fd = os.open(path, os.O_RDONLY)\n    except OSError as e:\n        raise Failed(f\"no token")], "the token is no link"),
     (H, [("    if count == 0:\n        return", "    if True:\n        return")], "the commits are scanned"),
     (H, [(" -m {base}..{tip}", " {base}..{tip}")], "merges are scanned"),
@@ -51,8 +51,6 @@ MUTANTS = [
     (H, [('meta = whole + "\\n".join(names)', 'meta = "\\n".join(names)')], "each commit's own headers are scanned"),
     (H, [('"token" if m.group(2) is None else f"token.{m.group(2)}"', '"token"')], "a repository's own token is its"),
     (G, [("/tmp/claude-{uid}/agent-pr/(?:", "/tmp/claude-{uid}/(?:")], "the guard: the drop folder alone"),
-    (I, [('sandbox["enabled"] = True\n', "")], "the installer: the sandbox on in every profile"),
-    (I, [(' + [f"Edit(/{p}/**)" for p in prefixes]', "")], "the installer: the helper's tools kept from every profile"),
     (I, [('case :$system: in *":$dir:"*) ;; *)', "case x in y) ;; *)")], "the installer: no deny of the system's own folders"),
     (I, [("awk '{ for (k in s) if (index($0, k \"/\") == 1) next; s[$0]; print }'", "cat")], "the installer: the outermost tool folders alone"),
     (I, [('".claude/hooks", *prefixes)', '".claude/hooks")')], "the installer: no profile granting the tools' folders"),
@@ -66,30 +64,37 @@ MUTANTS = [
     (I, [("if missing:\n    sys.exit(", "if False:\n    sys.exit(")], "the installer: land's tools denied in every profile first"),
     (I, [('at=$(command -v "$name") || {', 'at=$(command -v "$name") || true || {')], "the installer: every tool found"),
     (I, [("tools=$tools$system", "tools=${tools%:}")], "the installer: the system's PATH after the tools'"),
-    (I, [('f"{py} -I {hook} {helper}"', 'f"python3 -I {hook} {helper}"')], "the installer: the hook runs the python3 found"),
     (I, [('stamp "$fetched/agent_pr.py"\n', "")], "the installer: the helper holds the tools found"),
     (I, [('head -1 "$f" | grep -qxF', 'true || head -1 "$f" | grep -qxF')], "the installer: a copy without its placeholders refused"),
-    (I, [("for p in everyone:\n", "for p in []:\n")], "the installer: every profile's configuration kept from every profile"),
     (I, [('    if s.get("disableAllHooks") is True:\n', "    if False:\n")], "the installer: no profile with hooks off"),
     (I, [("        if any(k in str(g) for k in", "        if False and any(k in str(g) for k in")], "the installer: no profile granting what it guards"),
     (I, [("grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}'", "grep -Eqx '[0-9a-f]+'")], "the installer: a full commit id"),
     (H, [('n == ".github" or ', "")], "a link at .github itself is refused"),
     (H, [('errors="replace",\n', "\n")], "git's output read whatever its bytes"),
     (I, [("case $state_of in identical | behind) ;;", "case $state_of in *) ;;")], "the installer: the commit on its branch"),
-    (I, [('        rules += [r for r in json.load(f).get("permissions", {}).get("deny", []) if isinstance(r, str)]\n', "        pass\n")], "the installer: every profile's denies in each"),
     (I, [('            print(f"warning: {profile} runs', '            (lambda *a, **k: None)(f"warning: {profile} runs')], "the installer: a PATH exclusion is said"),
     (I, [("\tawk -v n=\"$name\" '$1 != n' \"$state/repos.allow\" >\"$state/repos.allow.new\"\n", "\tcp \"$state/repos.allow\" \"$state/repos.allow.new\"\n")], "the installer: one line per repository"),
     (G, [("if tool in READERS and", "if False and")], "the guard: no reader names the state folder"),
-    (G, [("        if not CALL.fullmatch(command):", "        if False:")], "the guard: one form of call"),
-    (G, [("    if \".local/bin/agent-pr\" in command or helper in command:", "    if helper in command:")], "the guard: the helper under any spelling"),
+    (G, [("            if not CALL.fullmatch(command):", "            if False:")], "the guard: one form of call"),
+    (G, [("        if \".local/bin/agent-pr\" in plain or helper in plain:", "        if helper in plain:")], "the guard: the helper under any spelling"),
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
+    (G, [('NAMED = rf"(?:{re.escape(helper)}|~/\\.local/bin/agent-pr)"', 'NAMED = rf"(?:{re.escape(helper)})"')], "the guard: the helper from the session's home"),
+    (G, [('|~/\\.local/bin/agent-pr)"', '|~[^/ ]*/\\.local/bin/agent-pr)"')], "the guard: the session's own home alone, never ~user"),
+    (G, [("except Exception:  # what it cannot read", "except ZeroDivisionError:  # what it cannot read")], "the guard: what it cannot read is refused"),
+    (G, [("    if not isinstance(tool, str):\n", "    if False:\n")], "the guard: a tool it cannot name is refused"),
+    (H, [('"auth", "token", "--hostname", "github.com"]', '"auth", "token"]')], "the owner's token: github.com's alone"),
+    (H, [('    environ = {"PATH": TOOLS, "HOME": home, "LC_ALL": "C", "GH_PROMPT_DISABLED"', '    environ = {"PATH": TOOLS, "HOME": STATE, "LC_ALL": "C", "GH_PROMPT_DISABLED"')], "the owner's token: from his own home"),
+    (H, [("    if not TOKEN.fullmatch(token):\n        raise Failed(\"gh gave", "    if not token:\n        raise Failed(\"gh gave")], "the owner's token: one token line from gh"),
+    (H, [('    if which == "token":\n        return from_gh()\n', "")], "the owner's token: gh's, never a copy"),
+    (I, [('{ rm -f "$state/token" && echo', '{ true && echo')], "the installer: an earlier copy of the owner's token goes"),
+    (G, [('        plain = re.sub(r"[\\\\\'\\"$`]", "", command)\n', "        plain = command\n")], "the guard: the helper read as the shell would, quotes stripped"),
 ]
 survived = []
 # python3 -I mutants.py [<words of a label>...]: those mutants alone.
 MUTANTS = [m for m in MUTANTS if all(w in m[2] for w in sys.argv[1:])]
 for name, pairs, label in MUTANTS:
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as d:
-        for f in (H, G, I, "SKILL.md", "test.sh"):
+        for f in (H, G, I, "test.sh"):
             shutil.copy(SOURCE.get(f, here / f), pathlib.Path(d) / f)
         target = pathlib.Path(d) / name
         text = target.read_text()

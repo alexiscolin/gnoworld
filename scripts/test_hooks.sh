@@ -91,11 +91,15 @@ PY
 python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "settings.json dropped a boundary"
 import json, sys
 s = json.load(open(sys.argv[1]))
-guard = [h for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.py" in h["command"]]
+guard = [h for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "scripts/guard.py" in h["command"]]
 assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does not block when it fails"
 # The tools its rules read (the security review of 3c, M2): Bash, a web fetch, the file tools' writes.
-matched = {t for e in s["hooks"]["PreToolUse"] if any("guard.py" in h["command"] for h in e["hooks"]) for t in e["matcher"].split("|")}
+matched = {t for e in s["hooks"]["PreToolUse"] if any("scripts/guard.py" in h["command"] for h in e["hooks"]) for t in e["matcher"].split("|")}
 assert matched == {"Bash", "WebFetch", "Edit", "Write"}, f"the guard reads other tools than its rules: {sorted(matched)}"
+# agent-pr's guard (D14013): one entry of its own, for the tools that could call the helper or read its token, blocking when it fails.
+apr = [e for e in s["hooks"]["PreToolUse"] if any("agent_pr_guard.py" in h["command"] for h in e["hooks"])]
+assert len(apr) == 1 and set(apr[0]["matcher"].split("|")) == {"Bash", "Read", "Grep", "Glob"}, "agent-pr's guard reads other tools than its rules"
+assert all(h.get("onFailure") == "block" for h in apr[0]["hooks"]), "agent-pr's guard does not block when it fails"
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
@@ -120,12 +124,23 @@ assert nested <= set(box["filesystem"]["denyWrite"]), "a command can write instr
 stryker = json.load(open(sys.argv[1].replace(".claude/settings.json", "stryker.config.json")))
 copied = [w for w in box["filesystem"]["denyWrite"] if w.startswith("**/") and w[3:].split("/")[0].lower() not in {p.lower() for p in stryker["ignorePatterns"]}]
 assert not copied, f"StrykerJS copies into its sandboxes what the sandbox refuses it to write there: {copied}"
-# worktree.sh alone leaves the sandbox: it writes the trees it makes and removes, in its one root.
-assert box.get("excludedCommands") == ["sh scripts/worktree.sh *"], "a command other than worktree.sh runs outside the sandbox"
+# worktree.sh leaves the sandbox: it writes the trees it makes and removes, in its one root; and agent-pr, which publishes in the
+# owner's name with his gh login token (D14012, D14013), named from the session's home, as the project's settings alone can (D14000 C).
+assert box.get("excludedCommands") == ["sh scripts/worktree.sh *", "~/.local/bin/agent-pr *"], "a command other than worktree.sh and agent-pr runs outside the sandbox"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 assert not any("gno.land" in d for d in box["network"]["allowedDomains"]), "the network list names a chain host (the security review of 3c, L3)"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
+# agent-pr's token, its state and the folders it runs from are no session's to read or write, and its guard hook takes a call to it in
+# one form: the project's own settings hold them, no profile's (D14000 C, D14013), and the project's skill says how to call it.
+assert "~/.local/share/agent-github" in box["filesystem"]["denyRead"], "a command can read agent-pr's token"
+assert {"Read(~/.local/share/agent-github/**)", "Edit(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/hooks/**)"} <= deny, \
+    "a file tool can reach agent-pr's token, its folder or the hooks"
+guards = [h.get("command", "") for e in s.get("hooks", {}).get("PreToolUse", []) for h in e.get("hooks", [])]
+assert '"$HOME/.claude/hooks/agent_pr_guard.py" "$HOME/.local/bin/agent-pr"' in " ".join(guards), "agent-pr's guard hook is not the project's"
+skill = open(sys.argv[1].replace(".claude/settings.json", ".claude/skills/agent-github/SKILL.md")).read()
+assert "~/.local/bin/agent-pr push" in skill and "@HELPER@" not in skill, "the project's skill does not name agent-pr as its settings do"
+assert skill.startswith("---\nname: agent-github\ndescription: ") and "agent/" in skill, "the project's skill has no frontmatter, or names no agent/** branch"
 # The file tools write the session's folders alone (7w3, Alexis's "Oui, pour gnoworld"): a deny list names some places, never all
 # (7w2's reviews found thirteen more), and Claude Code's blockWritesOutsideWorkingDirectories refuses Write, Edit and NotebookEdit
 # anywhere else, in every mode, bypass included (its settings reference; the schema of 2.1.318 reads a boolean). True itself: a
@@ -175,6 +190,31 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
+# agent-pr's hook command as the settings write it, run by sh as Claude Code runs it, from a home holding the helper and its guard:
+# $HOME expands there, its one form passes, a chained call is refused (exit 2); with its guard gone it still blocks (python3 exits 2);
+# with no helper installed nothing can leave the sandbox through it, and a session runs (exit 0).
+agh="$t/agent-home" && mkdir -p "$agh/.claude/hooks" "$agh/.local/bin" && cp "$here/../tools/agent-github/agent_pr_guard.py" "$agh/.claude/hooks/"
+: >"$agh/.local/bin/agent-pr"
+apr_cmd=$(python3 -I -c 'import json, sys; s = json.load(open(sys.argv[1])); print(next(h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "agent_pr_guard.py" in h["command"]))' "$here/../.claude/settings.json")
+apr_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
+apr_u=$(id -u)
+apr_call "~/.local/bin/agent-pr push o/r /tmp/claude-$apr_u/agent-pr/a.bundle" | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null ||
+	fail "agent-pr's hook, as the settings run it, refused its one form"
+# set -e: a refusal's exit 2 is read, not let end the run.
+apr_rc=0 && { apr_call "~/.local/bin/agent-pr push o/r /tmp/claude-$apr_u/agent-pr/a.bundle; cat x" | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
+[ "$apr_rc" = 2 ] || fail "agent-pr's hook, as the settings run it, did not refuse a chained call"
+rm "$agh/.claude/hooks/agent_pr_guard.py"
+apr_rc=0 && { apr_call "git status" | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
+[ "$apr_rc" = 2 ] || fail "agent-pr's hook with its guard missing did not block"
+rm "$agh/.local/bin/agent-pr"
+apr_call "git status" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || fail "agent-pr's hook blocked a session before agent-pr is installed"
+# But a call that names the helper is refused there, whatever its form: the exclusion stands, and no guard reads it.
+apr_rc=0 && { apr_call "~/.local/bin/agent-pr x > /tmp/claude-$apr_u/o" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
+[ "$apr_rc" = 2 ] || fail "agent-pr's hook let a call naming the helper through before agent-pr is installed"
+for apr_spelt in "~/.local/bin/agent''-pr x > /tmp/claude-$apr_u/o" "~/.local/bin/agent\\-pr x" '~/.local/bin/agent""-pr x' "~/.local/bin/agent\$'-'pr x"; do
+	apr_rc=0 && { apr_call "$apr_spelt" 2>/dev/null | HOME="$agh" sh -c "$apr_cmd" 2>/dev/null || apr_rc=$?; }
+	[ "$apr_rc" = 2 ] || fail "agent-pr's hook let the helper through before its install, spelt: $apr_spelt"
+done
 # pnpm runs no pnpmfile, and no script at a person's install: one pointed git at the
 # repository's hooks, which a branch can change.
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
@@ -240,7 +280,7 @@ assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktr
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
-assert "tools/agent-github" in listed, "agent-github's installer, which writes every profile's denies and which install_hooks.sh runs, is outside the harness list (F13449)"
+assert "tools/agent-github" in listed, "agent-github's tools, which install_hooks.sh runs, are outside the harness list (F13449)"
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json", "CLAUDE.md"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs, or the instructions every session reads (a nested one no commit may hold: check_docs refuses it)"
 # Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
 # tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
@@ -602,11 +642,14 @@ fs = s["sandbox"]["filesystem"]
 CREDENTIALS = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)", "Read(~/.local/share/gnomcp/**)",
                "Read(~/Library/Application Support/gno/**)", "Read(~/.claude.json)"}
 named = lambda n: f"{n}/**" if n == ".claude/rules" else n
-GENERIC = CREDENTIALS | {f"Edit({a}/{named(n)})" for a in ("~", "//tmp", "//private/tmp") for n in INSTRUCTIONS}
+# And agent-pr's (D14013), the home folder's too: its token kept from the file tools, its state, the folder it runs from and the hooks'.
+AGENT_PR = {"Read(~/.local/share/agent-github/**)", "Edit(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(~/.claude/hooks/**)"}
+GENERIC = CREDENTIALS | AGENT_PR | {f"Edit({a}/{named(n)})" for a in ("~", "//tmp", "//private/tmp") for n in INSTRUCTIONS}
 absolute = {r for r in committed_deny if re.fullmatch(r"\w+\((//|~).*\)", r)}
 assert absolute == GENERIC, ("the committed settings' absolute rules are not the home folder's and the temporary folder's alone", sorted(absolute - GENERIC)[:3], sorted(GENERIC - absolute)[:3])
 assert not [w for w in committed_writes if w.startswith(("/", "~"))], "the committed denyWrite names an absolute folder"
-assert set(fs.get("denyRead", [])) == {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws", "~/.local/share/gnomcp", "~/Library/Application Support/gno", "~/.claude.json"}, "denyRead changed"
+assert set(fs.get("denyRead", [])) == {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws", "~/.local/share/gnomcp", "~/Library/Application Support/gno", "~/.claude.json",
+                                      "~/.local/share/agent-github"}, "denyRead changed"
 assert set(fs.get("allowWrite", [])) == {"~/.cache/gno-toolchains/onyx/gnohome", "~/.cache/gnoworld-tools", "~/.cache/go-build", "~/Library/Caches/go-build", "~/go/pkg/mod"}, "allowWrite changed"
 assert not s["permissions"].get("additionalDirectories"), "the committed settings add a working directory to every session"
 
@@ -3083,7 +3126,7 @@ done
 case :$(command -p getconf PATH): in *":$(dirname "$(command -v gitleaks)"):"*) ;; *)
 	mkdir -p "$i/home5/.claude" && echo '{}' >"$i/home5/.claude/settings.json"
 	(cd "$i" && HOME="$i/home5" alexis sh scripts/install_hooks.sh landed >"$t/out" 2>&1) || fail "install_hooks.sh failed on land's profile, its hooks with it: $(cat "$t/out")"
-	grep -qF "run agent-github's installer first" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
+	grep -qF "add these denies to each by hand" "$t/out" && grep -q "no new land installed" "$t/out" && [ ! -e "$i/home5/.local/bin/land" ] || fail "install_hooks.sh did not refuse land for a profile that may write its tools: $(cat "$t/out")"
 	;;
 esac
 # This machine's twins of the committed rules go into every Claude profile's user settings (D13413): this repository's checkout is
