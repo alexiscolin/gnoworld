@@ -207,11 +207,11 @@ export class Space {
     }
   }
 
-  /** The page's plate, in the page's pixels, and where its words end: its fill is drawn behind the planet. */
-  plate(box: Plated["box"], words: number): void {
-    this.keep.plated = { box, words };
+  /** The page's plate, in the page's pixels, and where its fill starts to fade: its fill is drawn behind the planet. */
+  plate(box: Plated["box"], fade: number): void {
+    this.keep.plated = { box, fade };
     this.touch();
-    this.stage.plate.place(box, words, {
+    this.stage.plate.place(box, fade, {
       width: this.see.screen.width,
       height: this.see.screen.height,
       ratio: this.renderer.getPixelRatio(),
@@ -221,7 +221,7 @@ export class Space {
   /** The plate again, where the buffer's pixel ratio changed under it. */
   replate(): void {
     const { plated } = this.keep;
-    if (plated !== undefined) this.plate(plated.box, plated.words);
+    if (plated !== undefined) this.plate(plated.box, plated.fade);
   }
 
   /** Tells the loop something changed that its numbers do not show: the next frame is drawn. */

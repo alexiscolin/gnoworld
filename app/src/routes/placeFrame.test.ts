@@ -9,8 +9,10 @@ const tokens = read("../../../packages/ui/src/tokens.css");
 
 const token = (name: string) => new RegExp(`${name}:\\s*([^;]+);`).exec(tokens)?.[1]?.trim() ?? "";
 const px = (name: string) => Number.parseFloat(token(name));
-const [, floor = "", share = "", cap = ""] = /^clamp\((\d+)px, ([\d.]+)vi, (\d+)px\)$/.exec(token("--plate-w")) ?? [];
-const plate = (w: number) => Math.min(Number(cap), Math.max(Number(floor), (Number(share) * w) / 100));
+const [, floor = "", share = "", cap = ""] =
+  /^calc\(clamp\((\d+)px, ([\d.]+)vi, (\d+)px\) \+ var\(--plate-air\)\)$/.exec(token("--plate-w")) ?? [];
+const air = () => (token("--plate-air") === "var(--space-m)" ? px("--space-m") : Number.NaN);
+const plate = (w: number) => Math.min(Number(cap), Math.max(Number(floor), (Number(share) * w) / 100)) + air();
 const rule = (name: string) => new RegExp(`${name}:\\s*([^;]+);`).exec(css)?.[1]?.trim() ?? "";
 
 describe("the framed planet", () => {
@@ -45,8 +47,9 @@ describe("the framed planet", () => {
     // Alexis's 55 px from 1440 up; below, less, so the disc stops at the content's edge at 1280, where the plate's controls end (D13735).
     const shift = Math.min(55, Math.max(24, 24 + ((w - 1280) * 31) / 448));
     expect(token("--page-edge")).toBe("var(--space-m)");
-    expect(token("--plate-inset-end")).toBe("var(--plate-fade)");
-    const contentRight = px("--space-m") + plate(w) - px("--plate-fade");
+    // The plate's air widens its fill, not its content (D14002): the content's edge, and the planet with it, stay where they stood.
+    expect(token("--plate-inset-end")).toBe("calc(var(--plate-fade) + var(--plate-air))");
+    const contentRight = px("--space-m") + plate(w) - px("--plate-fade") - air();
     const radius = Math.min(0.37 * w, 0.59 * h, (0.76 * w - contentRight - step) / 1.04);
     const limb = 0.76 * w - shift - 1.04 * radius;
     expect(radius).toBeGreaterThan(0);

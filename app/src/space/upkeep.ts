@@ -5,7 +5,7 @@ import { Redraw } from "./redraw.ts";
 
 export interface Plated {
   readonly box: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
-  readonly words: number;
+  readonly fade: number;
 }
 
 export class Upkeep {
