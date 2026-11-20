@@ -187,8 +187,8 @@ vi.mock("../../lib/api/login.ts", () => ({ pageLoginApi: () => api }));
 const adena = vi.hoisted(() => ({ connect: vi.fn(() => Promise.resolve({ ok: false, reason: "missing" })) }));
 vi.mock("../../lib/adena/adena.ts", () => ({ connect: adena.connect, pageAdena: () => undefined, signLogin: vi.fn() }));
 
-const chain = vi.hoisted(() => ({ readPage: vi.fn() }));
-vi.mock("../../lib/chain/rpc.ts", async (original) => ({ ...(await original<object>()), readPage: chain.readPage }));
+// Choosing another network reloads the page on its home (D14004): the reload is faked.
+const assign = vi.hoisted(() => vi.fn<(path: string) => void>());
 
 const settle = async () => {
   for (let turn = 0; turn < 5; turn += 1)
@@ -315,7 +315,8 @@ describe.each([
   it("is no descendant of another button, and choosing a network neither logs in nor opens the account's menu", async () => {
     api.me.mockReset().mockResolvedValue({ ok: true, value: { address } });
     adena.connect.mockClear();
-    chain.readPage.mockResolvedValue({ ok: true, value: "# dao", source: { rpc: "x", chainId: null } });
+    assign.mockReset();
+    vi.stubGlobal("location", { assign, origin: window.location.origin, pathname: "/" });
     const { StoreProvider } = await import("../../storeContext.tsx");
     const { AccountMenu } = await import("./AccountMenu.tsx");
     const box = mount(
@@ -345,6 +346,7 @@ describe.each([
         ?.click();
     });
     await settle();
+    expect(assign.mock.calls).toEqual([["/net/gnoland"]]);
     expect(adena.connect).not.toHaveBeenCalled();
     expect(items(box)).not.toContain("Passport");
   });

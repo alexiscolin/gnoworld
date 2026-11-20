@@ -99,7 +99,7 @@ export function Opened({
     to("Settings", "sliders", "settings"),
     // A phone draws no fixed Credits corner (CC BY 4.0 allows a link): the menu holds it.
     ...(phone ? [{ label: "Credits", onSelect: credits.show }] : []),
-    ...(phone ? network.items.map(named) : []),
+    ...(phone ? network.map(named) : []),
     // A key's holder frees it with no login: the way is in the menu a visitor sees.
     ...(address === undefined ? [to("Release a key", "key", "release")] : []),
     ...ownRows(address !== undefined, onPickName, onLogOut),
@@ -114,7 +114,6 @@ export function Opened({
         openAtOnce
         emphasis={phoneLook(phone)}
         note={guestNote}
-        busy={network.busy}
       />
     ) : (
       <Menu
@@ -126,7 +125,6 @@ export function Opened({
         openAtOnce
         emphasis={phoneLook(phone)}
         note={whose(phone, address)}
-        busy={network.busy}
       />
     );
   return (

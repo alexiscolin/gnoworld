@@ -1,74 +1,26 @@
 // The network's menu itself, asked at its trigger's first press and drawn in its place, open (Network.tsx): the networks of the data, the
-// current one checked; choosing one goes by networkSwitch.ts.
+// current one checked. Choosing another reloads the page on that network's home (D14004): its worlds, rooms, caches and scene start whole
+// from the page's first load, with no swap inside the running app; no chain is read to keep the place.
 import { Menu, type MenuItem } from "@gnoworld/ui";
-import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
-import universes from "../../../data/universes.json" with { type: "json" };
-import { readPage } from "../../lib/chain/rpc.ts";
-import { pageFetch } from "../../lib/query/policy.ts";
-import { knownOf } from "../../realmKnown.ts";
-import { site } from "../../places.ts";
-import { raisePill } from "../../topPill.tsx";
-import { switchTo } from "./networkSwitch.ts";
+import { useLocation } from "react-router";
+import { site, universePrefix } from "../../places.ts";
 
-// Whether a universe holds a realm, as the app says it everywhere (realms/known.ts): its worlds list it, or its chain answers a page or
-// a realm with no page to draw; a read that fails says no.
-async function holds(universe: string, realm: string, signal: AbortSignal): Promise<boolean> {
-  const rpc = universes.find((each) => each.id === universe)?.rpc;
-  const listed = site.universes
-    .find((each) => each.id === universe)
-    ?.worlds.some((each) => each.realms?.includes(realm));
-  if (rpc === undefined) return false;
-  if (listed === true) return true;
-  const read = await readPage(rpc, { realm }, { fetch: pageFetch, signal });
-  return read.ok || knownOf(false, { state: "failed", failure: read.failure }) === "yes";
-}
-
-/** The networks as the menu's choices, the current one checked, and whether a switch is under way: the network's own menu draws them, and
- * a phone's account menu, which holds the network, as rows among its own. */
-export function useNetworkItems(): { items: MenuItem[]; busy: boolean } {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  // The switch in progress: a new choice or another place ends it, and what it read then changes nothing.
-  const goingRef = useRef<AbortController>(undefined);
-  useEffect(
-    () => () => {
-      goingRef.current?.abort();
-      setBusy(false);
-    },
-    [pathname],
-  );
-  const here = site.universeAt(pathname).id;
-  const items = site.universes.map((each) => ({
+/** The networks as the menu's choices, the current one checked: the network's own menu draws them, and a phone's account menu, which
+ * holds the network, as rows among its own. */
+export function useNetworkItems(): MenuItem[] {
+  const here = site.universeAt(useLocation().pathname).id;
+  return site.universes.map((each) => ({
     label: each.name,
     checked: each.id === here,
     ...(each.testnet ? { note: "Testnet" } : {}),
     onSelect: () => {
-      goingRef.current?.abort();
-      const stop = new AbortController();
-      goingRef.current = stop;
-      setBusy(true);
-      switchTo({ site, pathname, to: each.id, holds: (universe, realm) => holds(universe, realm, stop.signal) })
-        .then(({ path, line }) => {
-          if (stop.signal.aborted) return undefined;
-          if (line !== undefined) raisePill({ title: line });
-          return navigate(path);
-        })
-        .catch((error: unknown) => {
-          if (!stop.signal.aborted) reportError(error);
-        })
-        .finally(() => {
-          if (!stop.signal.aborted) setBusy(false);
-        });
+      if (each.id !== here) location.assign(universePrefix(each) || "/");
     },
   }));
-  return { items, busy };
 }
 
 export function NetworkMenu({ name }: { name: string }) {
-  const { items, busy } = useNetworkItems();
   return (
-    <Menu trigger={name} label="Choose the network" emphasis="plain" size="s" openAtOnce busy={busy} items={items} />
+    <Menu trigger={name} label="Choose the network" emphasis="plain" size="s" openAtOnce items={useNetworkItems()} />
   );
 }
